@@ -22,6 +22,7 @@ import {
 } from './pressureCurve';
 import { sliderRate } from './slider';
 import { elementAt } from '@lib/elementAt';
+import { pow } from '@lib/pow';
 
 /** Heat-capacity ratio of the trapped charge (named, FR-FPR-72). */
 const SPECIFIC_HEAT_RATIO = 1.35;
@@ -51,8 +52,8 @@ function heatPerCycle(model: SingleZoneModel, rpm: number): number {
 /** Wiebe parameters at `rpm`: duration scaled by speed, start from the CA50 phasing or the fixed spark angle. */
 function burnAt(model: SingleZoneModel, rpm: number): { startDeg: number; durationDeg: number; a: number; m: number } {
   const { burn } = model;
-  const durationDeg = burn.durationDeg * (Math.max(rpm, MIN_RPM) / BURN_REFERENCE_RPM) ** burn.rpmExponent;
-  const startDeg = 'ca50Deg' in burn ? burn.ca50Deg - durationDeg * (Math.LN2 / burn.a) ** (1 / (burn.m + 1)) : burn.startDeg;
+  const durationDeg = burn.durationDeg * pow(Math.max(rpm, MIN_RPM) / BURN_REFERENCE_RPM, burn.rpmExponent);
+  const startDeg = 'ca50Deg' in burn ? burn.ca50Deg - durationDeg * pow(Math.LN2 / burn.a, 1 / (burn.m + 1)) : burn.startDeg;
   return { startDeg, durationDeg, a: burn.a, m: burn.m };
 }
 
@@ -84,12 +85,12 @@ export function singleZoneCurve(
   const slope = (psi: number, p: number): number => {
     const volume = volumeAt(geometry, psi);
     const temperature = (tIn * p * volume) / (pIn * bdcVolume);
-    const motored = pIn * (bdcVolume / volume) ** SPECIFIC_HEAT_RATIO;
+    const motored = pIn * pow(bdcVolume / volume, SPECIFIC_HEAT_RATIO);
     const burning = psi >= burn.startDeg;
     const velocity =
       w.c2Closed * meanPistonSpeed + (burning ? w.c3 * ((geometry.displacementM3 * tIn) / (pIn * bdcVolume)) * (p - motored) : 0);
     const coefficient =
-      w.c1 * boreM ** -0.2 * (Math.max(p, 1) / 1000) ** 0.8 * temperature ** w.tempExponent * Math.max(velocity, 0) ** 0.8;
+      w.c1 * pow(boreM, -0.2) * pow(Math.max(p, 1) / 1000, 0.8) * pow(temperature, w.tempExponent) * pow(Math.max(velocity, 0), 0.8);
     const wallArea = 2 * area + (Math.PI * boreM * volume) / area;
     const lossPerDeg = ((coefficient * wallArea * (temperature - w.wallTempK)) / omega) * RADIANS_PER_DEG;
     const released = heat * burnFraction(burn, psi).rate;

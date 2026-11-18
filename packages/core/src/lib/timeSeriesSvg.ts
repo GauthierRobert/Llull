@@ -1,6 +1,7 @@
 /** Stacked time-series chart as SVG text: one panel per unit with axes, ticks, grid, legend and title (headless "look at the curve"). */
 
 import { escapeXml } from './escapeXml';
+import { pow } from './pow';
 
 export interface PlotSeries {
   readonly label: string;
@@ -43,7 +44,7 @@ function niceTicks(low: number, high: number, count = TICKS): { ticks: number[];
   const span = high - low;
   if (!(span > 0)) return { ticks: [low], step: 1 };
   const raw = span / count;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const magnitude = pow(10, Math.floor(Math.log10(raw)));
   const step = ([1, 2, 5, 10].find((m) => m * magnitude >= raw) ?? 10) * magnitude;
   const first = Math.ceil(low / step - 1e-9);
   const last = Math.floor(high / step + 1e-9);

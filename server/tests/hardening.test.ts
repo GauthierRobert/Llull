@@ -49,7 +49,7 @@ describe('CORS', () => {
   });
 });
 
-describe('sanitizeFilename / GET /export/stl', () => {
+describe('sanitizeFilename', () => {
   it('strips unsafe characters and falls back', () => {
     expect(sanitizeFilename('a"b\r\nc/../d')).toBe('a_b_c_.._d');
     expect(sanitizeFilename('..')).toBe('llull');
@@ -57,11 +57,9 @@ describe('sanitizeFilename / GET /export/stl', () => {
     expect(sanitizeFilename('x'.repeat(200))).toHaveLength(64);
   });
 
-  it('never emits header-injecting characters in Content-Disposition', async () => {
-    const res = await request(app).get('/export/stl').query({ name: 'my"part\r\nX-Evil: 1/é' });
-    expect(res.status).toBe(200);
-    expect(res.headers['content-disposition']).toBe('attachment; filename="my_part_X-Evil_1_.stl"');
-    expect(res.headers['x-evil']).toBeUndefined();
+  it('never emits header-injecting characters (the Content-Disposition basename)', () => {
+    expect(sanitizeFilename('my"part\r\nX-Evil: 1/é', 'model')).toBe('my_part_X-Evil_1_');
+    expect(sanitizeFilename('my part/../x', 'model')).toMatch(/^[A-Za-z0-9._-]+$/);
   });
 });
 
@@ -153,6 +151,19 @@ describe('REST rate limiting', () => {
     expect((await request(mini).post('/x')).status).toBe(200);
     expect((await request(mini).post('/x')).status).toBe(200);
     expect((await request(mini).post('/x')).status).toBe(429);
+  });
+
+  it('does not count requests with the valid bearer token (the UI and CLI agents share one loopback address); a wrong token is counted', async () => {
+    process.env['LLULL_REST_RATE_LIMIT_MAX'] = '2';
+    process.env['LLULL_AUTH_TOKEN'] = 'secret-token';
+    const mini = express()
+      .use(buildRestRateLimiter())
+      .post('/x', (_req, res) => res.json({ ok: true }));
+    for (let call = 0; call < 5; call++)
+      expect((await request(mini).post('/x').set('Authorization', 'Bearer secret-token')).status).toBe(200);
+    expect((await request(mini).post('/x').set('Authorization', 'Bearer wrong')).status).toBe(200);
+    expect((await request(mini).post('/x')).status).toBe(200);
+    expect((await request(mini).post('/x').set('Authorization', 'Bearer wrong')).status).toBe(429);
   });
 });
 

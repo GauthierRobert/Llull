@@ -39,6 +39,23 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
   return { scaled: { ...result.scaled, decals: scaledDecals(e.decals, f) } as Entity, dims: result.dims };
 }
 
+function scaledMesh(e: MeshSolidEntity, f: number): { scaled: Entity; dims: string } {
+  const positions = e.mesh.positions.map((v) => v * f);
+  const brep = e.brep && ({ op: 'scale', source: e.brep, factor: f } as const);
+  // The stored asset describes the unscaled mesh: a scaled mesh keeps none (scale_entity writes a new asset for it).
+  const plain: MeshSolidEntity = { ...e };
+  delete plain.asset;
+  return {
+    scaled: {
+      ...plain,
+      mesh: { ...e.mesh, positions },
+      ...(brep ? { brep } : {}),
+      ...(e.faceColors ? { faceColors: e.faceColors.map((face) => ({ ...face, near: scale3(face.near, f) })) } : {}),
+    },
+    dims: `scaled ${positions.length / 3} vertices`,
+  };
+}
+
 function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   switch (e.kind) {
     case 'box':
@@ -115,22 +132,8 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
       return e.offset === undefined
         ? { scaled: { ...e }, dims: 'offset unchanged (no offset set)' }
         : { scaled: { ...e, offset: e.offset * f }, dims: `new offset ${e.offset * f}` };
-    case 'mesh': {
-      const positions = e.mesh.positions.map((v) => v * f);
-      const brep = e.brep && ({ op: 'scale', source: e.brep, factor: f } as const);
-      // The stored asset describes the unscaled mesh: a scaled mesh keeps none (scale_entity writes a new asset for it).
-      const plain: MeshSolidEntity = { ...e };
-      delete plain.asset;
-      return {
-        scaled: {
-          ...plain,
-          mesh: { ...e.mesh, positions },
-          ...(brep ? { brep } : {}),
-          ...(e.faceColors ? { faceColors: e.faceColors.map((face) => ({ ...face, near: scale3(face.near, f) })) } : {}),
-        },
-        dims: `scaled ${positions.length / 3} vertices`,
-      };
-    }
+    case 'mesh':
+      return scaledMesh(e, f);
     case 'torus': {
       const ringRadius = e.ringRadius * f;
       const tubeRadius = e.tubeRadius * f;

@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /** Drainage design criteria and rainfall intensity (constant or IDF curve i = a / (t + b)^c). */
 
 /** Intensity-duration-frequency curve: i (mm/h) = a / (t + b)^c, t in minutes. */
@@ -28,7 +29,7 @@ export const DEFAULT_ENTRY_TIME_MIN = 5;
 /** Rainfall intensity (mm/h) for a time of concentration of `tcMin` minutes. */
 export function intensityAt(criteria: DrainageCriteria, tcMin: number): number {
   const idf = criteria.idf;
-  return idf ? idf.a / (tcMin + idf.b) ** idf.c : criteria.rainfallIntensityMmH;
+  return idf ? idf.a / pow(tcMin + idf.b, idf.c) : criteria.rainfallIntensityMmH;
 }
 
 /** Error text when an IDF curve is unusable, else null. */

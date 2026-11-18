@@ -8,6 +8,7 @@ import { symmetricEigen } from './eigen';
 import { strainEnergy, type ResolvedHyper } from './hyperelastic';
 import type { Volumetric } from './hyperVolumetric';
 import type { Vec6 } from './tensor';
+import { pow } from '../../lib/pow';
 
 export type Mat3 = number[][];
 
@@ -53,7 +54,7 @@ function inverse3(m: readonly (readonly number[])[]): Mat3 | null {
   const cof = (i: number, j: number): number => {
     const r = [0, 1, 2].filter((k) => k !== i) as [number, number];
     const c = [0, 1, 2].filter((k) => k !== j) as [number, number];
-    return (-1) ** (i + j) * (at(m, r[0], c[0]) * at(m, r[1], c[1]) - at(m, r[0], c[1]) * at(m, r[1], c[0]));
+    return pow(-1, i + j) * (at(m, r[0], c[0]) * at(m, r[1], c[1]) - at(m, r[0], c[1]) * at(m, r[1], c[0]));
   };
   return [0, 1, 2].map((i) => [0, 1, 2].map((j) => cof(j, i) / det));
 }
@@ -83,8 +84,8 @@ function deviatoricKirchhoff(iso: ResolvedHyper, bar: readonly [number, number, 
     return bar.map((x) =>
       iso.mu.reduce((sum, mu, k) => {
         const alpha = iso.alpha[k] ?? 1;
-        const mean = (bar[0] ** alpha + bar[1] ** alpha + bar[2] ** alpha) / 3;
-        return sum + ((2 * mu) / alpha) * (x ** alpha - mean);
+        const mean = (pow(bar[0], alpha) + pow(bar[1], alpha) + pow(bar[2], alpha)) / 3;
+        return sum + ((2 * mu) / alpha) * (pow(x, alpha) - mean);
       }, 0),
     );
   }
@@ -113,7 +114,7 @@ export function finiteResponse(law: CompressibleLaw, F: Mat3): FiniteResponse | 
   const stretches = values.map((value) => Math.sqrt(Math.max(value, 0)));
   if (stretches.some((value) => !(value > 0))) return null;
   const volumeRatio = stretches.reduce((product_, value) => product_ * value, 1);
-  const isochoric = volumeRatio ** (-1 / 3);
+  const isochoric = pow(volumeRatio, -1 / 3);
   const bar = stretches.map((value) => value * isochoric) as [number, number, number];
   const pressure = law.vol.pressure(volumeRatio);
   const principalStress = deviatoricKirchhoff(law.iso, bar).map((tau) => tau / volumeRatio + pressure);

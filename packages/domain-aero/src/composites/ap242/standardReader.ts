@@ -60,31 +60,21 @@ const STOCK = new Set([
   'discontinuous_fiber_assembly',
 ]);
 
-export function readStandard(text: string): StandardRead {
-  const { bodies } = parseRecords(text);
-  const kind = (id: number): string => entityName(bodies.get(id) ?? '');
-  const tableId = [...bodies].find(([, body]) => entityName(body) === 'PLY_LAMINATE_TABLE')?.[0];
-  if (tableId === undefined) return ABSENT;
-  const firstString = (id: number): string => unquoted(stringsOf(bodies.get(id) ?? '')[0] ?? '');
+type Bodies = ReadonlyMap<number, string>;
 
-  const productOfDefinition = (definition: number): number | undefined => {
-    const formation = referencesOf(bodies.get(definition) ?? '')[0];
-    return formation === undefined ? undefined : referencesOf(bodies.get(formation) ?? '')[0];
-  };
-  const nameOf = (definition: number): string => {
-    if (kind(definition) === 'PLY_LAMINATE_SEQUENCE_DEFINITION' || kind(definition) === 'PLY_LAMINATE_TABLE')
-      return firstString(definition);
-    const product = productOfDefinition(definition);
-    return product === undefined ? '' : firstString(product);
-  };
+/** The product-category names each product belongs to. */
+function categoryMap(bodies: Bodies): Map<number, Set<string>> {
   const categories = new Map<number, Set<string>>();
   for (const body of bodies.values()) {
     if (entityName(body) !== 'PRODUCT_RELATED_PRODUCT_CATEGORY') continue;
     const name = unquoted(stringsOf(body)[0] ?? '');
     for (const product of referencesOf(body)) categories.set(product, new Set([...(categories.get(product) ?? []), name]));
   }
-  const categoryOf = (definition: number): Set<string> => categories.get(productOfDefinition(definition) ?? -1) ?? new Set();
+  return categories;
+}
 
+/** The related definitions of each relating one, ordered by the usage designator then the record id. */
+function childMap(bodies: Bodies): Map<number, number[]> {
   const usages = new Map<number, { related: number; designator: number; id: number }[]>();
   for (const [id, body] of [...bodies].sort(([a], [b]) => a - b)) {
     if (entityName(body) !== 'NEXT_ASSEMBLY_USAGE_OCCURRENCE') continue;
@@ -102,127 +92,186 @@ export function readStandard(text: string): StandardRead {
       relating,
       [...list].sort((a, b) => a.designator - b.designator || a.id - b.id).map((entry) => entry.related),
     );
-  const materialOf = new Map<number, string>();
-  for (const body of bodies.values()) {
-    if (entityName(body) !== 'MAKE_FROM_USAGE_OPTION') continue;
-    const [relating, related] = referencesOf(body);
-    if (relating !== undefined && related !== undefined) materialOf.set(relating, nameOf(related));
-  }
-  const valueOf = (item: number): number | undefined => itemValue(bodies.get(item) ?? '');
-  const itemsOf = (representation: number): number[] => referencesOf(bodies.get(representation) ?? '').slice(0, -1);
-  const representationOfProperty = new Map<number, number>();
-  for (const body of bodies.values()) {
-    if (entityName(body) !== 'PROPERTY_DEFINITION_REPRESENTATION') continue;
-    const [definition, representation] = referencesOf(body);
-    if (definition !== undefined && representation !== undefined) representationOfProperty.set(definition, representation);
-  }
-  const propertiesOf = (target: number, name: string): number[] =>
-    [...bodies]
-      .filter(
-        ([, body]) =>
-          entityName(body) === 'PROPERTY_DEFINITION' && unquoted(stringsOf(body)[0] ?? '') === name && referencesOf(body)[0] === target,
-      )
-      .map(([id]) => id);
+  return children;
+}
 
+/** The first two references of every record of `entity` that has both, as (first -> second) pairs in record order. */
+function referencePairs(bodies: Bodies, entity: string): [number, number][] {
+  const pairs: [number, number][] = [];
+  for (const body of bodies.values()) {
+    if (entityName(body) !== entity) continue;
+    const [first, second] = referencesOf(body);
+    if (first !== undefined && second !== undefined) pairs.push([first, second]);
+  }
+  return pairs;
+}
+
+/** The lookups over the records the composite reader walks. */
+interface Index {
+  readonly bodies: Bodies;
+  readonly kind: (id: number) => string;
+  readonly firstString: (id: number) => string;
+  readonly nameOf: (definition: number) => string;
+  readonly categoryOf: (definition: number) => Set<string>;
+  readonly children: Map<number, number[]>;
+  readonly materialOf: Map<number, string>;
+  readonly valueOf: (item: number) => number | undefined;
+  readonly itemsOf: (representation: number) => number[];
+  readonly representationOfProperty: Map<number, number>;
+  readonly propertiesOf: (target: number, name: string) => number[];
+  readonly basisOfAngle: Map<number, string>;
+}
+
+function indexOf(bodies: Bodies): Index {
+  const kind = (id: number): string => entityName(bodies.get(id) ?? '');
+  const firstString = (id: number): string => unquoted(stringsOf(bodies.get(id) ?? '')[0] ?? '');
+  const productOfDefinition = (definition: number): number | undefined => {
+    const formation = referencesOf(bodies.get(definition) ?? '')[0];
+    return formation === undefined ? undefined : referencesOf(bodies.get(formation) ?? '')[0];
+  };
+  const nameOf = (definition: number): string => {
+    if (kind(definition) === 'PLY_LAMINATE_SEQUENCE_DEFINITION' || kind(definition) === 'PLY_LAMINATE_TABLE')
+      return firstString(definition);
+    const product = productOfDefinition(definition);
+    return product === undefined ? '' : firstString(product);
+  };
+  const categories = categoryMap(bodies);
+  const materialOf = new Map<number, string>();
+  for (const [relating, related] of referencePairs(bodies, 'MAKE_FROM_USAGE_OPTION')) materialOf.set(relating, nameOf(related));
+  const representationOfProperty = new Map<number, number>(referencePairs(bodies, 'PROPERTY_DEFINITION_REPRESENTATION'));
   // orientation: ply -> angle representation -> (rosette basis, value)
   const basisOfAngle = new Map<number, string>();
-  for (const body of bodies.values()) {
-    if (entityName(body) !== 'PLY_ORIENTATION_ANGLE') continue;
-    const [basis, angle] = referencesOf(body);
-    if (basis !== undefined && angle !== undefined) basisOfAngle.set(angle, firstString(basis));
-  }
-  const plyByName = new Map<string, number>();
+  for (const [basis, angle] of referencePairs(bodies, 'PLY_ORIENTATION_ANGLE')) basisOfAngle.set(angle, firstString(basis));
+  return {
+    bodies,
+    kind,
+    firstString,
+    nameOf,
+    categoryOf: (definition) => categories.get(productOfDefinition(definition) ?? -1) ?? new Set(),
+    children: childMap(bodies),
+    materialOf,
+    valueOf: (item) => itemValue(bodies.get(item) ?? ''),
+    itemsOf: (representation) => referencesOf(bodies.get(representation) ?? '').slice(0, -1),
+    representationOfProperty,
+    propertiesOf: (target, name) =>
+      [...bodies]
+        .filter(
+          ([, body]) =>
+            entityName(body) === 'PROPERTY_DEFINITION' && unquoted(stringsOf(body)[0] ?? '') === name && referencesOf(body)[0] === target,
+        )
+        .map(([id]) => id),
+    basisOfAngle,
+  };
+}
+
+/** The first item value of the representation a ply property (`orientation`, `thickness`) points to, with that representation. */
+function propertyValue(ix: Index, member: number, name: string): { representation: number | undefined; value: number | undefined } {
+  const [property] = ix.propertiesOf(member, name);
+  const representation = property === undefined ? undefined : ix.representationOfProperty.get(property);
+  const [item] = representation === undefined ? [] : ix.itemsOf(representation);
+  return { representation, value: item === undefined ? undefined : ix.valueOf(item) };
+}
+
+function readPly(ix: Index, member: number, sequence: number): StandardPly {
+  const { representation: angleRepresentation, value: angle } = propertyValue(ix, member, 'orientation');
+  const { value: thick } = propertyValue(ix, member, 'thickness');
+  const pieces = (ix.children.get(member) ?? []).map(ix.nameOf);
+  const material = ix.materialOf.get(member);
+  const rosette = angleRepresentation === undefined ? undefined : ix.basisOfAngle.get(angleRepresentation);
+  return {
+    name: ix.nameOf(member),
+    sequence: ix.nameOf(sequence),
+    ...(material === undefined ? {} : { material }),
+    ...(rosette === undefined ? {} : { rosette }),
+    ...(angle === undefined ? {} : { angle }),
+    ...(thick === undefined ? {} : { thickness: thick }),
+    pieces,
+  };
+}
+
+/** The sequences from the laminate table down (each sequence names the next as a member) and their plies in stacking order. */
+function readSequences(ix: Index, tableId: number): { sequences: { name: string; plies: string[] }[]; plies: StandardPly[] } {
   const sequences: { name: string; plies: string[] }[] = [];
   const plies: StandardPly[] = [];
-  let sequence: number | undefined = children.get(tableId)?.[0];
-  while (sequence !== undefined && kind(sequence) === 'PLY_LAMINATE_SEQUENCE_DEFINITION') {
-    const members = children.get(sequence) ?? [];
+  let sequence: number | undefined = ix.children.get(tableId)?.[0];
+  while (sequence !== undefined && ix.kind(sequence) === 'PLY_LAMINATE_SEQUENCE_DEFINITION') {
+    const members = ix.children.get(sequence) ?? [];
     const names: string[] = [];
     for (const member of members) {
-      if (kind(member) === 'PLY_LAMINATE_SEQUENCE_DEFINITION') continue;
-      const name = nameOf(member);
-      names.push(name);
-      plyByName.set(name, member);
-      const [orientation] = propertiesOf(member, 'orientation');
-      const angleRepresentation = orientation === undefined ? undefined : representationOfProperty.get(orientation);
-      const [angleItem] = angleRepresentation === undefined ? [] : itemsOf(angleRepresentation);
-      const [thickness] = propertiesOf(member, 'thickness');
-      const thicknessRepresentation = thickness === undefined ? undefined : representationOfProperty.get(thickness);
-      const [thicknessItem] = thicknessRepresentation === undefined ? [] : itemsOf(thicknessRepresentation);
-      const pieces = (children.get(member) ?? []).map(nameOf);
-      const angle = angleItem === undefined ? undefined : valueOf(angleItem);
-      const thick = thicknessItem === undefined ? undefined : valueOf(thicknessItem);
-      const material = materialOf.get(member);
-      const rosette = angleRepresentation === undefined ? undefined : basisOfAngle.get(angleRepresentation);
-      plies.push({
-        name,
-        sequence: nameOf(sequence),
-        ...(material === undefined ? {} : { material }),
-        ...(rosette === undefined ? {} : { rosette }),
-        ...(angle === undefined ? {} : { angle }),
-        ...(thick === undefined ? {} : { thickness: thick }),
-        pieces,
-      });
+      if (ix.kind(member) === 'PLY_LAMINATE_SEQUENCE_DEFINITION') continue;
+      const ply = readPly(ix, member, sequence);
+      names.push(ply.name);
+      plies.push(ply);
     }
-    sequences.push({ name: nameOf(sequence), plies: names });
-    sequence = members.find((member) => kind(member) === 'PLY_LAMINATE_SEQUENCE_DEFINITION');
+    sequences.push({ name: ix.nameOf(sequence), plies: names });
+    sequence = members.find((member) => ix.kind(member) === 'PLY_LAMINATE_SEQUENCE_DEFINITION');
   }
+  return { sequences, plies };
+}
 
+/** The level and subject a composite validation property of `target` belongs to, or undefined when it is none the checker reads. */
+function validationSubject(ix: Index, target: number): { level: StandardValidationValue['level']; subject: string } | undefined {
+  const targetKind = ix.kind(target);
+  if (targetKind === 'PLY_LAMINATE_TABLE') return { level: 'table', subject: ix.firstString(target) };
+  if (targetKind === 'PLY_LAMINATE_SEQUENCE_DEFINITION') return { level: 'sequence', subject: ix.firstString(target) };
+  if (targetKind === 'ITEM_IDENTIFIED_REPRESENTATION_USAGE')
+    return { level: 'rosette', subject: ix.firstString(referencesOf(ix.bodies.get(target) ?? '')[1] ?? 0) };
+  if (targetKind !== 'PRODUCT_DEFINITION') return undefined;
+  const names = ix.categoryOf(target);
+  if (names.has('ply')) return { level: 'ply', subject: ix.nameOf(target) };
+  if (names.has('part')) return { level: 'part', subject: ix.nameOf(target) };
+  return [...names].some((name) => STOCK.has(name)) ? { level: 'material', subject: ix.nameOf(target) } : undefined;
+}
+
+/** The validation value an item of a validation representation carries, or undefined when a numeric item has none. */
+function validationValue(ix: Index, item: number): number | string | undefined {
+  const itemBody = ix.bodies.get(item) ?? '';
+  const itemKind = entityName(itemBody);
+  if (itemKind === 'DESCRIPTIVE_REPRESENTATION_ITEM') return unquoted(stringsOf(itemBody)[1] ?? '');
+  if (itemKind === 'ROW_REPRESENTATION_ITEM')
+    return referencesOf(itemBody)
+      .map((entry) => unquoted(stringsOf(ix.bodies.get(entry) ?? '')[1] ?? ''))
+      .join('|');
+  return ix.valueOf(item);
+}
+
+function readValidation(ix: Index): StandardValidationValue[] {
+  const validation: StandardValidationValue[] = [];
+  for (const [id, body] of ix.bodies) {
+    if (entityName(body) !== 'PROPERTY_DEFINITION' || unquoted(stringsOf(body)[0] ?? '') !== 'composite validation property') continue;
+    const target = referencesOf(body)[0];
+    const representation = ix.representationOfProperty.get(id);
+    if (target === undefined || representation === undefined) continue;
+    const owner = validationSubject(ix, target);
+    if (owner === undefined) continue;
+    for (const item of ix.itemsOf(representation)) {
+      const value = validationValue(ix, item);
+      const name = unquoted(stringsOf(ix.bodies.get(item) ?? '')[0] ?? '');
+      if (value !== undefined) validation.push({ ...owner, name, value });
+    }
+  }
+  return validation;
+}
+
+export function readStandard(text: string): StandardRead {
+  const { bodies } = parseRecords(text);
+  const tableId = [...bodies].find(([, body]) => entityName(body) === 'PLY_LAMINATE_TABLE')?.[0];
+  if (tableId === undefined) return ABSENT;
+  const ix = indexOf(bodies);
+  const { sequences, plies } = readSequences(ix, tableId);
   const rosettes = [...bodies.values()]
     .filter((body) => entityName(body) === 'REINFORCEMENT_ORIENTATION_BASIS')
     .map((body) => unquoted(stringsOf(body)[0] ?? ''));
   const materials = [...new Set(plies.flatMap((ply) => (ply.material === undefined ? [] : [ply.material])))];
-
-  const validation: StandardValidationValue[] = [];
-  for (const [id, body] of bodies) {
-    if (entityName(body) !== 'PROPERTY_DEFINITION' || unquoted(stringsOf(body)[0] ?? '') !== 'composite validation property') continue;
-    const target = referencesOf(body)[0];
-    const representation = representationOfProperty.get(id);
-    if (target === undefined || representation === undefined) continue;
-    let level: StandardValidationValue['level'] | undefined;
-    let subject = '';
-    const targetKind = kind(target);
-    if (targetKind === 'PLY_LAMINATE_TABLE') [level, subject] = ['table', firstString(target)];
-    else if (targetKind === 'PLY_LAMINATE_SEQUENCE_DEFINITION') [level, subject] = ['sequence', firstString(target)];
-    else if (targetKind === 'ITEM_IDENTIFIED_REPRESENTATION_USAGE')
-      [level, subject] = ['rosette', firstString(referencesOf(bodies.get(target) ?? '')[1] ?? 0)];
-    else if (targetKind === 'PRODUCT_DEFINITION') {
-      const names = categoryOf(target);
-      if (names.has('ply')) [level, subject] = ['ply', nameOf(target)];
-      else if (names.has('part')) [level, subject] = ['part', nameOf(target)];
-      else if ([...names].some((name) => STOCK.has(name))) [level, subject] = ['material', nameOf(target)];
-    }
-    if (level === undefined) continue;
-    for (const item of itemsOf(representation)) {
-      const itemBody = bodies.get(item) ?? '';
-      const itemKind = entityName(itemBody);
-      const name = unquoted(stringsOf(itemBody)[0] ?? '');
-      if (itemKind === 'DESCRIPTIVE_REPRESENTATION_ITEM')
-        validation.push({ level, subject, name, value: unquoted(stringsOf(itemBody)[1] ?? '') });
-      else if (itemKind === 'ROW_REPRESENTATION_ITEM')
-        validation.push({
-          level,
-          subject,
-          name,
-          value: referencesOf(itemBody)
-            .map((entry) => unquoted(stringsOf(bodies.get(entry) ?? '')[1] ?? ''))
-            .join('|'),
-        });
-      else {
-        const value = valueOf(item);
-        if (value !== undefined) validation.push({ level, subject, name, value });
-      }
-    }
-  }
   return {
     present: true,
     recPracId: text.includes(RECPRAC_ID),
-    table: firstString(tableId),
+    table: ix.firstString(tableId),
     sequences,
     plies,
     rosettes,
     materials,
-    validation,
+    validation: readValidation(ix),
   };
 }
 

@@ -27,6 +27,58 @@ const refuse = tableRejection({
   SWG_FIT_TOLERANCE: 'loosen tolerance: the NURBS display curve could not reach it within its span budget',
 });
 
+interface PitchInput {
+  readonly type: 'helix' | 'spiral';
+  readonly pitchLaw: Parameters<typeof parseLaw>[0] | undefined;
+  readonly pitch: number | undefined;
+  readonly turns: number | undefined;
+  readonly height: number | undefined;
+  readonly endRadius: number | undefined;
+  readonly taperDeg: number | undefined;
+}
+
+/** The turns and pitch (or pitch law) the given parameters fix, or the refusal (code, message, path). */
+function resolveTurnsAndPitch(
+  input: PitchInput,
+): { turns: number; pitch: number | ScalarLaw } | { code: string; message: string; path: string } {
+  const { type, pitchLaw } = input;
+  let law: ScalarLaw | undefined;
+  if (pitchLaw !== undefined) {
+    const parsed = parseLaw(pitchLaw);
+    if (typeof parsed === 'string') return { code: 'SWG_LAW_INVALID', message: `pitchLaw: ${parsed}`, path: 'pitchLaw' };
+    const issue = lawIssue(parsed, { positive: true, length: 1 });
+    if (issue !== null) return { code: issue.code, message: `pitchLaw: ${issue.message}`, path: 'pitchLaw' };
+    law = parsed;
+  }
+  const given = [input.pitch, input.turns, input.height].filter((v) => v !== undefined).length;
+  let turns = input.turns;
+  let pitch: number | ScalarLaw;
+  if (type === 'spiral') {
+    if (
+      law !== undefined ||
+      input.height !== undefined ||
+      input.taperDeg !== undefined ||
+      turns === undefined ||
+      (input.endRadius === undefined) === (input.pitch === undefined)
+    )
+      return {
+        code: 'SWG_HELIX_PARAMS',
+        message: 'a spiral takes turns and exactly one of endRadius or pitch (no height, pitchLaw or taperDeg)',
+        path: 'type',
+      };
+    pitch = input.pitch ?? 0;
+  } else if (law !== undefined) {
+    if (given !== 1 || turns === undefined)
+      return { code: 'SWG_HELIX_PARAMS', message: 'with pitchLaw give turns and no pitch / height', path: 'pitchLaw' };
+    pitch = law;
+  } else {
+    if (given !== 2) return { code: 'SWG_HELIX_PARAMS', message: `give exactly two of pitch, turns, height (got ${given})`, path: 'pitch' };
+    turns ??= (input.height as number) / (input.pitch as number);
+    pitch = input.pitch ?? (input.height as number) / turns;
+  }
+  return { turns, pitch };
+}
+
 /**
  * @affects creates 1 nurbs_curve entity carrying its HelixDefinition (`analytic`); position = the helix origin
  * @invariant the poles lie within `tolerance` of the exact helix (reported as data.fitDeviation); the start point is at startAngleRad on the radius circle
@@ -94,39 +146,17 @@ export const addHelix = defineCommand({
       return fail('SWG_HELIX_PARAMS', 'pitch, turns and height must be finite and > 0', 'pitch');
     if (params.endRadius !== undefined && params.taperDeg !== undefined)
       return fail('SWG_HELIX_PARAMS', 'give endRadius or taperDeg, not both', 'taperDeg');
-    let law: ScalarLaw | undefined;
-    if (pitchLaw !== undefined) {
-      const parsed = parseLaw(pitchLaw);
-      if (typeof parsed === 'string') return fail('SWG_LAW_INVALID', `pitchLaw: ${parsed}`, 'pitchLaw');
-      const issue = lawIssue(parsed, { positive: true, length: 1 });
-      if (issue !== null) return fail(issue.code, `pitchLaw: ${issue.message}`, 'pitchLaw');
-      law = parsed;
-    }
-    const given = [params.pitch, params.turns, params.height].filter((v) => v !== undefined).length;
-    let turns = params.turns;
-    let pitch: number | ScalarLaw;
-    if (type === 'spiral') {
-      if (
-        law !== undefined ||
-        params.height !== undefined ||
-        params.taperDeg !== undefined ||
-        turns === undefined ||
-        (params.endRadius === undefined) === (params.pitch === undefined)
-      )
-        return fail(
-          'SWG_HELIX_PARAMS',
-          'a spiral takes turns and exactly one of endRadius or pitch (no height, pitchLaw or taperDeg)',
-          'type',
-        );
-      pitch = params.pitch ?? 0;
-    } else if (law !== undefined) {
-      if (given !== 1 || turns === undefined) return fail('SWG_HELIX_PARAMS', 'with pitchLaw give turns and no pitch / height', 'pitchLaw');
-      pitch = law;
-    } else {
-      if (given !== 2) return fail('SWG_HELIX_PARAMS', `give exactly two of pitch, turns, height (got ${given})`, 'pitch');
-      turns ??= (params.height as number) / (params.pitch as number);
-      pitch = params.pitch ?? (params.height as number) / turns;
-    }
+    const resolved = resolveTurnsAndPitch({
+      type,
+      pitchLaw,
+      pitch: params.pitch,
+      turns: params.turns,
+      height: params.height,
+      endRadius: params.endRadius,
+      taperDeg: params.taperDeg,
+    });
+    if ('code' in resolved) return fail(resolved.code, resolved.message, resolved.path);
+    const { turns, pitch } = resolved;
     if (!(turns > 0 && turns <= MAX_TURNS))
       return fail('SWG_HELIX_PARAMS', `turns must be in (0, ${MAX_TURNS}] (got ${fmt(turns)})`, 'turns');
     const base: HelixDefinition = {

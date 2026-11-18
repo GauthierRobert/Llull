@@ -3,6 +3,7 @@
 import type { AnalysisCase, FeResultsArtifact } from '@core/model/analysis';
 import type { ResultStep } from '../results/fields';
 import { holdStepNumber } from './times';
+import { pow } from '@lib/pow';
 
 /** Most history points one probe keeps in the document (TR-CRP-52). */
 export const MAX_HISTORY_POINTS = 200;
@@ -45,7 +46,7 @@ export function selectIndices(times: readonly number[], limit: number = MAX_HIST
   const high = times[count - 1] ?? low;
   const chosen = new Set<number>([0, count - 1]);
   for (let k = 1; k < limit - 1; k += 1) {
-    const target = low * (high / low) ** (k / (limit - 1));
+    const target = low * pow(high / low, k / (limit - 1));
     const distance = (index: number): number => Math.abs((times[index] ?? Number.NaN) - target);
     let best = first;
     for (let index = first; index < count; index += 1) if (distance(index) < distance(best)) best = index;

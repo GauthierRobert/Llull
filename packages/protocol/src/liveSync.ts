@@ -32,6 +32,9 @@ export interface LiveCommandEvent {
   readonly source?: LiveCommandSource;
   /** The sender's idempotency key, echoed so a client can recognise its own commands. */
   readonly commandId?: string;
+  /** The server's history flags after the command; absent = leave the client's flags unchanged. */
+  readonly canUndo?: boolean;
+  readonly canRedo?: boolean;
 }
 
 /**
@@ -99,6 +102,9 @@ export interface LiveSnapshotEvent {
   readonly seq: number;
   readonly stateHash: string;
   readonly document: CadDocument;
+  /** The server's history flags; absent = leave the client's flags unchanged. */
+  readonly canUndo?: boolean;
+  readonly canRedo?: boolean;
 }
 
 type LiveApplyResult = { readonly ok: true; readonly document: CadDocument } | { readonly ok: false; readonly reason: 'gap' | 'mismatch' };

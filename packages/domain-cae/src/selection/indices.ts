@@ -6,6 +6,7 @@ import { anisotropicWarning, resolveCandidateProperty, type Layup } from './layu
 import type { ResolveOptions } from './properties';
 import type { CadDocument } from '@core/model/types';
 import type { Excluded, IndexResult, PropertyUse, StrengthProperty } from './types';
+import { pow } from '@lib/pow';
 
 export interface IndexOptions extends ResolveOptions {
   readonly strengthProperty?: StrengthProperty | undefined;
@@ -49,7 +50,7 @@ export function evaluateIndex(doc: CadDocument, material: string, rule: IndexRul
     };
   }
   const inputs = [pValue.use, density.use];
-  const value = Math.pow(pValue.use.value, exponentValue(rule)) / density.use.value;
+  const value = pow(pValue.use.value, exponentValue(rule)) / density.use.value;
   if (!Number.isFinite(value) || !(value > 0))
     return {
       material,

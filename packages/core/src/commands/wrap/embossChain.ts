@@ -9,19 +9,19 @@
  */
 
 import type { CadDocument, ShapeRecipe, Vec2 } from '../../model/types';
-import type { EmbossParams } from '../../model/wrap';
 import { measureDistortion } from '../../geometry/chartDistortion';
 import { embossClosedForm } from '../../geometry/embossVolume';
 import { type PlaneSegment, sampleSegment, segmentArea } from '../../geometry/planeSegments';
 import { scale3 } from '../../lib/vec3';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import type { CommandResult, ExecutionContext } from '../types';
-import { buildChain, type ChainFace } from './chainCharts';
+import { buildChain, type Chain, type ChainFace } from './chainCharts';
 import { clipRegions } from './clipRegions';
 import { isMitreFailure, mitreFillers } from './embossMitre';
+import { chainData, chainSummary, type ChainOutcome, type ChainStep } from './embossChainReport';
 import { MIN_FIT_TOLERANCE, SEWING_RATIO } from './constants';
 import { wrapRejection } from './codes';
-import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
+import { DEFAULT_MAX_LENGTH_STRAIN } from './conventions';
 import type { FaceRefInput, FaceSession, PlacementInput, ResolvedChart } from './faceSession';
 import type { ChartRegion } from './sketchProfiles';
 import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineRegions, probePoints } from './wrapMapping';
@@ -60,11 +60,20 @@ const regionsArea = (regions: readonly ChartRegion[]): number =>
     0,
   );
 
+type Fail = (code: string, message: string, paths: string[], ids?: readonly string[]) => CommandResult;
+type KernelBuilt = Exclude<ReturnType<typeof evaluateRecipe>, string>;
+type Mitre = Exclude<ReturnType<typeof mitreFillers>, { readonly code: string }>;
+
+interface FacePlan {
+  readonly step: ChainStep;
+  readonly clipped: number;
+  readonly strain: number | null;
+}
+
 /** See the module comment. */
 export function runEmbossChain(input: ChainEmboss): CommandResult {
   const { doc, ctx, command, params, session, resolved, regions, tolerance, depth, volumeOf } = input;
-  const fail = (code: string, message: string, paths: string[], ids: readonly string[] = [params.id]): CommandResult =>
-    wrapRejection(doc, command, code, message, [...ids], paths);
+  const fail: Fail = (code, message, paths, ids = [params.id]) => wrapRejection(doc, command, code, message, [...ids], paths);
   const scribe = params.mode === 'scribe';
   const cutting = params.mode === 'deboss';
   const limit = params.maxLengthStrain ?? DEFAULT_MAX_LENGTH_STRAIN;
@@ -82,52 +91,9 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
   );
   if ('summary' in chain) return chain;
   const sketchArea = regionsArea(regions);
-  const steps: Array<{ face: ChainFace; recipeParams: Omit<EmbossParams, 'face'>; area: number; probes: number }> = [];
-  let clippedArea = 0;
-  let strain = 0;
-  for (const face of chain.faces) {
-    let part: readonly ChartRegion[] | null = regions;
-    for (const plane of face.clips) {
-      part = clipRegions(part ?? [], plane);
-      if (part === null)
-        return fail(
-          'WRP_CHAIN_CLIP_FAILED',
-          `the sketch outline could not be cut at the chain edges of face ${face.session.face} (a boundary touches an edge tangentially)`,
-          ['profileIds'],
-          params.profileIds,
-        );
-    }
-    if (part.length === 0) continue;
-    clippedArea += regionsArea(part);
-    if (!chain.developable) {
-      const stretch = measureDistortion(
-        face.chart,
-        part.flatMap((region) => [region.outer, ...region.holes]),
-        [],
-        0,
-      );
-      strain = Math.max(strain, stretch.maxLengthStrain);
-    }
-    const mapped = mapOutlineRegions(face.session, face.chart, part, tolerance);
-    if (isMappingFailure(mapped))
-      return fail(mapped.code, `face ${face.session.face}: ${mapped.message}`, ['profileIds'], params.profileIds);
-    const overlap = checkWrapAround(face.chart, mapped.pieces, params.profileIds);
-    if (overlap !== null) return fail(overlap.code, `face ${face.session.face}: ${overlap.message}`, ['profileIds'], params.profileIds);
-    const outside = checkOnFace(face.session, probePoints(face.chart, mapped.pieces, MAX_PROBES), params.profileIds, {
-      slack: face.slack,
-      joins: face.joins,
-    });
-    if (outside !== null) return fail(outside.code, `face ${face.session.face}: ${outside.message}`, ['profileIds'], params.profileIds);
-    const recipeParams = {
-      surface: face.chart.wire,
-      regions: mapped.regions,
-      mode: cutting ? ('deboss' as const) : (params.mode as 'emboss' | 'scribe'),
-      depth,
-      direction: scale3(face.chart.normalAt(mapped.regions[0]?.outer.start as Vec2), face.orientation),
-      tolerance: Math.max(SEWING_RATIO * session.diagonal, MIN_FIT_TOLERANCE, tolerance),
-    };
-    steps.push({ face, recipeParams, area: embossClosedForm(recipeParams)?.area ?? 0, probes: mapped.pieces.length });
-  }
+  const planned = planSteps(input, chain, fail);
+  if ('summary' in planned) return planned;
+  const { steps, clippedArea, strain } = planned;
   if (steps.length === 0) return fail('WRP_OUTSIDE_FACE', 'the sketch lies on none of the chain faces', ['profileIds'], params.profileIds);
   const joinStrain = Math.max(0, ...chain.edges.map((edge) => edge.mismatch));
   if (!chain.developable && strain > limit) {
@@ -150,6 +116,117 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       ['profileIds'],
       params.profileIds,
     );
+  const result = buildChainSolid(input, steps, mitre, fail);
+  if ('summary' in result) return result;
+  const before = volumeOf(session.shape);
+  const after = volumeOf(result.shape);
+  const volumeDelta = before !== null && after !== null ? after - before : null;
+  if (volumeDelta !== null && !scribe && (cutting ? volumeDelta >= 0 : volumeDelta <= 0))
+    return fail(
+      'WRP_KERNEL_BUILD_FAILED',
+      `the chain ${params.mode} changed the volume by ${volumeDelta} ${doc.units}^3, the wrong way; refused`,
+      ['profileIds'],
+      params.profileIds,
+    );
+  const expected = steps.reduce((sum, step) => sum + (embossClosedForm(step.recipeParams)?.delta ?? 0), 0) + (mitre?.delta ?? 0);
+  const outcome: ChainOutcome = {
+    doc,
+    command,
+    params,
+    session,
+    chain,
+    steps,
+    mitre,
+    regions,
+    depth,
+    tolerance,
+    unverified: input.unverified,
+    sketchArea,
+    clippedArea,
+    strain,
+    joinStrain,
+    limit,
+    volumeDelta,
+    expected,
+  };
+  const data = chainData(outcome);
+  const committed = commitKernelResult(doc, session.kernel, result, [session.entity], (newId, triangles) =>
+    chainSummary(outcome, newId, triangles),
+  );
+  return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
+}
+
+function planSteps(
+  input: ChainEmboss,
+  chain: Chain,
+  fail: Fail,
+): { readonly steps: ChainStep[]; readonly clippedArea: number; readonly strain: number } | CommandResult {
+  const steps: ChainStep[] = [];
+  let clippedArea = 0;
+  let strain = 0;
+  for (const face of chain.faces) {
+    const plan = planFace(input, chain, face, fail);
+    if (plan === null) continue;
+    if ('summary' in plan) return plan;
+    clippedArea += plan.clipped;
+    if (plan.strain !== null) strain = Math.max(strain, plan.strain);
+    steps.push(plan.step);
+  }
+  return { steps, clippedArea, strain };
+}
+
+/** One chain face: cut the sketch to it, map it, check it; null when no part of the sketch lies on the face. */
+function planFace(input: ChainEmboss, chain: Chain, face: ChainFace, fail: Fail): FacePlan | CommandResult | null {
+  const { params, session, regions, tolerance, depth } = input;
+  let part: readonly ChartRegion[] | null = regions;
+  for (const plane of face.clips) {
+    part = clipRegions(part ?? [], plane);
+    if (part === null)
+      return fail(
+        'WRP_CHAIN_CLIP_FAILED',
+        `the sketch outline could not be cut at the chain edges of face ${face.session.face} (a boundary touches an edge tangentially)`,
+        ['profileIds'],
+        params.profileIds,
+      );
+  }
+  if (part.length === 0) return null;
+  const clipped = regionsArea(part);
+  const stretch = chain.developable
+    ? null
+    : measureDistortion(
+        face.chart,
+        part.flatMap((region) => [region.outer, ...region.holes]),
+        [],
+        0,
+      ).maxLengthStrain;
+  const mapped = mapOutlineRegions(face.session, face.chart, part, tolerance);
+  if (isMappingFailure(mapped)) return fail(mapped.code, `face ${face.session.face}: ${mapped.message}`, ['profileIds'], params.profileIds);
+  const overlap = checkWrapAround(face.chart, mapped.pieces, params.profileIds);
+  if (overlap !== null) return fail(overlap.code, `face ${face.session.face}: ${overlap.message}`, ['profileIds'], params.profileIds);
+  const outside = checkOnFace(face.session, probePoints(face.chart, mapped.pieces, MAX_PROBES), params.profileIds, {
+    slack: face.slack,
+    joins: face.joins,
+  });
+  if (outside !== null) return fail(outside.code, `face ${face.session.face}: ${outside.message}`, ['profileIds'], params.profileIds);
+  const recipeParams = {
+    surface: face.chart.wire,
+    regions: mapped.regions,
+    mode: params.mode === 'deboss' ? ('deboss' as const) : (params.mode as 'emboss' | 'scribe'),
+    depth,
+    direction: scale3(face.chart.normalAt(mapped.regions[0]?.outer.start as Vec2), face.orientation),
+    tolerance: Math.max(SEWING_RATIO * session.diagonal, MIN_FIT_TOLERANCE, tolerance),
+  };
+  return {
+    step: { face, recipeParams, area: embossClosedForm(recipeParams)?.area ?? 0, probes: mapped.pieces.length },
+    clipped,
+    strain: stretch,
+  };
+}
+
+/** The faces embossed one after another as kernel steps, then the mitre fillers, then the health check of the result. */
+function buildChainSolid(input: ChainEmboss, steps: readonly ChainStep[], mitre: Mitre | null, fail: Fail): KernelBuilt | CommandResult {
+  const { params, session } = input;
+  const cutting = params.mode === 'deboss';
   let recipe: ShapeRecipe = session.source;
   let shape = session.shape;
   for (const [index, step] of steps.entries()) {
@@ -184,96 +261,5 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       ['profileIds'],
       params.profileIds,
     );
-  const before = volumeOf(session.shape);
-  const after = volumeOf(result.shape);
-  const volumeDelta = before !== null && after !== null ? after - before : null;
-  if (volumeDelta !== null && !scribe && (cutting ? volumeDelta >= 0 : volumeDelta <= 0))
-    return fail(
-      'WRP_KERNEL_BUILD_FAILED',
-      `the chain ${params.mode} changed the volume by ${volumeDelta} ${doc.units}^3, the wrong way; refused`,
-      ['profileIds'],
-      params.profileIds,
-    );
-  const expected = steps.reduce((sum, step) => sum + (embossClosedForm(step.recipeParams)?.delta ?? 0), 0) + (mitre?.delta ?? 0);
-  const faces = steps.map((step) => ({
-    face: step.face.session.face,
-    ...(step.face.session.faceName !== undefined ? { faceName: step.face.session.faceName } : {}),
-    faceKind: step.face.session.surface.type,
-    regions: step.recipeParams.regions.length,
-    area: step.area,
-    expectedVolumeDelta: embossClosedForm(step.recipeParams)?.delta ?? null,
-  }));
-  const data = wrapData(
-    doc,
-    {
-      volumeDelta,
-      expectedVolumeDelta: mitre !== null && !mitre.exact ? null : expected,
-      regionArea: sketchArea,
-      chainArea: clippedArea,
-      regions: regions.length,
-      mode: params.mode,
-      depth,
-      method: chain.method,
-      exact: chain.developable,
-      faces,
-      ...(mitre === null
-        ? {}
-        : {
-            mitre: {
-              fillerVolume: mitre.fillerVolume,
-              overlapVolume: mitre.overlapVolume,
-              exact: mitre.exact,
-              reasons: mitre.reasons,
-              edges: mitre.edges,
-            },
-          }),
-      chain: chain.faces.map((face) => face.session.face),
-      edges: chain.edges.map((edge) => ({
-        edge: edge.edge,
-        faces: edge.faces,
-        length: edge.length,
-        convexity: edge.convexity,
-        mismatch: edge.mismatch,
-        windowLength: edge.windowLength,
-        cutGap: edge.cutGap,
-      })),
-      distortion: {
-        maxLengthStrain: Math.max(strain, joinStrain),
-        curveStrain: strain,
-        joinMismatch: joinStrain,
-        meanLengthStrain: 0,
-        areaRatio: 1,
-        method: chain.method,
-        limit,
-        limitDefaulted: params.maxLengthStrain === undefined,
-      },
-    },
-    {
-      unverified: input.unverified,
-      provenance: {
-        method: `${params.mode} across ${steps.length} faces of a chain ${chain.developable ? 'unfolded by develop (isometry, strain 0)' : 'charted by geodesic charts anchored on the shared edges (stretch measured)'}: the sketch is cut at the chain edges and each part is embossed on its face as one exact kernel step`,
-        inputs: { id: params.id, face: session.face, chain: params.chain, profileIds: params.profileIds, mode: params.mode, depth },
-      },
-      defaults: [
-        ...(params.fitTolerance === undefined
-          ? [namedDefault('fitTolerance', tolerance, doc.units, 'llull WRP default (D-WRP-4): 1e-6 x the solid diagonal')]
-          : []),
-        ...(params.maxLengthStrain === undefined && !chain.developable
-          ? [namedDefault('maxLengthStrain', DEFAULT_MAX_LENGTH_STRAIN, '1', MAX_LENGTH_STRAIN_SOURCE)]
-          : []),
-      ],
-    },
-  );
-  const committed = commitKernelResult(doc, session.kernel, result, [session.entity], (newId, triangles) => {
-    const change =
-      volumeDelta === null
-        ? 'volume change not measured'
-        : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3 (closed form ${mitre !== null && !mitre.exact ? 'not exact' : expected.toPrecision(9)})`;
-    const mitred =
-      mitre === null
-        ? ''
-        : ` ${mitre.edges.map((e) => (e.kind === 'filler' ? `edge ${e.edge} mitred (filler ${(e.area * e.length).toPrecision(5)} ${doc.units}^3)` : `edge ${e.edge} slabs overlap (${(e.area * e.length).toPrecision(5)} ${doc.units}^3)`)).join(', ')}${mitre.exact ? '' : `; overlap not in the closed form (${mitre.reasons.join('; ')})`}.`;
-    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) across ${steps.length} faces${chain.developable ? '' : ` (${chain.method}, max stretch ${(100 * Math.max(strain, joinStrain)).toPrecision(4)} %)`} (${steps.map((s) => `${s.face.session.surface.type} ${s.face.session.face}`).join(', ')}), sketch area ${sketchArea.toPrecision(8)} ${doc.units}^2, depth ${depth} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}.${mitred} Source solid consumed, profiles kept.`;
-  });
-  return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
+  return result;
 }

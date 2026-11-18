@@ -88,6 +88,29 @@ function endpointErrors(value: unknown, path: string, items: Items): string[] {
   }
 }
 
+function segmentErrors(
+  item: Record<string, unknown>,
+  path: string,
+  items: Items,
+  members: LineMembers,
+  lineReference: string[],
+  optionalDn: string[],
+  optionalPipingClass: string[],
+): string[] {
+  const listed = members.get(String(item['lineId']))?.has(item['id']) === true;
+  return [
+    ...lineReference,
+    ...(kindOf(items, item['lineId']) !== 'line' || listed ? [] : [`${path}.lineId: the line does not list this segment in segmentIds`]),
+    ...endpointErrors(item['from'], `${path}.from`, items),
+    ...endpointErrors(item['to'], `${path}.to`, items),
+    ...(isRoute(item['route']) ? [] : [`${path}.route must be at least two points of two finite numbers`]),
+    ...(isOneOf(['forward', 'reverse', 'none'], item['flow']) ? [] : [`${path}.flow must be forward, reverse or none`]),
+    ...(typeof item['primary'] === 'boolean' ? [] : [`${path}.primary must be a boolean`]),
+    ...optionalDn,
+    ...optionalPipingClass,
+  ];
+}
+
 function kindErrors(
   item: Record<string, unknown>,
   path: string,
@@ -133,22 +156,8 @@ function kindErrors(
         }),
       ];
     }
-    case 'segment': {
-      const listed = members.get(String(item['lineId']))?.has(item['id']) === true;
-      return [
-        ...reference('lineId', ['line']),
-        ...(kindOf(items, item['lineId']) !== 'line' || listed
-          ? []
-          : [`${path}.lineId: the line does not list this segment in segmentIds`]),
-        ...endpointErrors(item['from'], `${path}.from`, items),
-        ...endpointErrors(item['to'], `${path}.to`, items),
-        ...(isRoute(item['route']) ? [] : [`${path}.route must be at least two points of two finite numbers`]),
-        ...(isOneOf(['forward', 'reverse', 'none'], item['flow']) ? [] : [`${path}.flow must be forward, reverse or none`]),
-        ...(typeof item['primary'] === 'boolean' ? [] : [`${path}.primary must be a boolean`]),
-        ...optionalDn,
-        ...optionalText(['pipingClass']),
-      ];
-    }
+    case 'segment':
+      return segmentErrors(item, path, items, members, reference('lineId', ['line']), optionalDn, optionalText(['pipingClass']));
     case 'inline':
       return [
         ...(Array.isArray(item['ports']) && item['ports'].every(isVec2) ? [] : [`${path}.ports must be an array of points`]),

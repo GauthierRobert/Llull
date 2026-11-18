@@ -149,39 +149,75 @@ const lawsEqual = (a: EdgeRadius, b: EdgeRadius): boolean => JSON.stringify(a) =
 const profiled = (recipe: { readonly profile?: { readonly type: string }; readonly radii?: readonly EdgeRadius[] }): boolean =>
   (recipe.profile !== undefined && recipe.profile.type !== 'circular') || (recipe.radii ?? []).some((law) => law.size2 !== undefined);
 
-function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe) => S | null): S | null {
+type RecipeOf<Op extends ShapeRecipe['op']> = Extract<ShapeRecipe, { op: Op }>;
+type Child<S> = (r: ShapeRecipe) => S | null;
+
+function buildBoolean<S>(ops: KernelOps<S>, recipe: RecipeOf<'boolean'>, child: Child<S>): S | null {
+  const [left, right] = ops.prepareBoolean?.(recipe.a, recipe.b) ?? [recipe.a, recipe.b];
+  const a = child(left);
+  const b = a === null ? null : child(right);
+  return a === null || b === null ? null : ops.boolean(recipe.boolean, a, b);
+}
+
+function buildEdgeBlend<S>(ops: KernelOps<S>, recipe: RecipeOf<'fillet' | 'chamfer'>, child: Child<S>): S | null {
+  const source = child(recipe.source);
+  if (source === null) return null;
+  if (recipe.op === 'chamfer')
+    return recipe.faces !== undefined || recipe.sizeEnd !== undefined ? null : ops.chamfer(source, recipe.edges, recipe.size);
+  if (profiled(recipe)) return null;
+  if (recipe.radii === undefined) return ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd);
+  const [first] = recipe.radii;
+  const uniform = first !== undefined && recipe.radii.every((law) => lawsEqual(law, first));
+  const plain = uniform && first.sizes === undefined && first.interpolation === undefined;
+  if (plain) return ops.fillet(source, recipe.edges, first.size, first.sizeEnd);
+  return ops.filletEach === undefined ? null : ops.filletEach(source, recipe.edges, recipe.radii);
+}
+
+function buildBlend<S>(ops: KernelOps<S>, recipe: RecipeOf<'blend'>, child: Child<S>): S | null {
+  const shapes: S[] = [];
+  for (const source of recipe.sources) {
+    const shape = child(source);
+    if (shape === null) return null;
+    shapes.push(shape);
+  }
+  return recipe.joints === undefined ? ops.blend(shapes, recipe.radius) : null;
+}
+
+function buildFeature<S>(ops: KernelOps<S>, recipe: RecipeOf<'feature'>, child: Child<S>): S | null {
+  const source = child(recipe.source);
+  const mesh = source !== null && needsReach(recipe) ? ops.tessellate(source) : null;
+  if (source === null || (needsReach(recipe) && mesh === null)) return null;
+  const reach = mesh === null ? 0 : throughReach(mesh, recipe.frame);
+  const lowered = lowerFeature(recipe, reach);
+  if (lowered === null) return null;
+  const epochBefore = ops.failureEpoch?.() ?? 0;
+  const native = ops.feature?.(source, recipe, reach) ?? null;
+  if (native === null && (ops.failureEpoch?.() ?? 0) !== epochBefore) return null;
+  const tool = native === null ? child(lowered.tool) : null;
+  if (native === null && tool === null) return null;
+  const cut = native ?? (tool === null ? null : ops.boolean(lowered.mode, source, tool));
+  const fillet = recipe.feature === 'pocket' ? recipe.pocket.floorFillet : 0;
+  if (cut === null || fillet <= 0 || lowered.pocket === undefined) return cut;
+  try {
+    const topology = ops.topology(cut);
+    const edges = topology === null ? [] : floorEdgeIndices(topology, lowered.pocket, recipe.frame);
+    return edges.length === 0 ? null : ops.fillet(cut, edges, fillet);
+  } finally {
+    ops.release(cut);
+  }
+}
+
+function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: Child<S>): S | null {
   switch (recipe.op) {
     case 'solid':
       return ops.solid(recipe.entity);
-    case 'boolean': {
-      const [left, right] = ops.prepareBoolean?.(recipe.a, recipe.b) ?? [recipe.a, recipe.b];
-      const a = child(left);
-      const b = a === null ? null : child(right);
-      return a === null || b === null ? null : ops.boolean(recipe.boolean, a, b);
-    }
+    case 'boolean':
+      return buildBoolean(ops, recipe, child);
     case 'fillet':
-    case 'chamfer': {
-      const source = child(recipe.source);
-      if (source === null) return null;
-      if (recipe.op === 'chamfer')
-        return recipe.faces !== undefined || recipe.sizeEnd !== undefined ? null : ops.chamfer(source, recipe.edges, recipe.size);
-      if (profiled(recipe)) return null;
-      if (recipe.radii === undefined) return ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd);
-      const [first] = recipe.radii;
-      const uniform = first !== undefined && recipe.radii.every((law) => lawsEqual(law, first));
-      const plain = uniform && first.sizes === undefined && first.interpolation === undefined;
-      if (plain) return ops.fillet(source, recipe.edges, first.size, first.sizeEnd);
-      return ops.filletEach === undefined ? null : ops.filletEach(source, recipe.edges, recipe.radii);
-    }
-    case 'blend': {
-      const shapes: S[] = [];
-      for (const source of recipe.sources) {
-        const shape = child(source);
-        if (shape === null) return null;
-        shapes.push(shape);
-      }
-      return recipe.joints === undefined ? ops.blend(shapes, recipe.radius) : null;
-    }
+    case 'chamfer':
+      return buildEdgeBlend(ops, recipe, child);
+    case 'blend':
+      return buildBlend(ops, recipe, child);
     case 'shell': {
       const source = child(recipe.source);
       return source === null ? null : ops.shell(source, recipe.thickness, recipe.openNear);
@@ -213,29 +249,8 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'faceBlend':
     case 'fullRound':
       return null;
-    case 'feature': {
-      const source = child(recipe.source);
-      const mesh = source !== null && needsReach(recipe) ? ops.tessellate(source) : null;
-      if (source === null || (needsReach(recipe) && mesh === null)) return null;
-      const reach = mesh === null ? 0 : throughReach(mesh, recipe.frame);
-      const lowered = lowerFeature(recipe, reach);
-      if (lowered === null) return null;
-      const epochBefore = ops.failureEpoch?.() ?? 0;
-      const native = ops.feature?.(source, recipe, reach) ?? null;
-      if (native === null && (ops.failureEpoch?.() ?? 0) !== epochBefore) return null;
-      const tool = native === null ? child(lowered.tool) : null;
-      if (native === null && tool === null) return null;
-      const cut = native ?? (tool === null ? null : ops.boolean(lowered.mode, source, tool));
-      const fillet = recipe.feature === 'pocket' ? recipe.pocket.floorFillet : 0;
-      if (cut === null || fillet <= 0 || lowered.pocket === undefined) return cut;
-      try {
-        const topology = ops.topology(cut);
-        const edges = topology === null ? [] : floorEdgeIndices(topology, lowered.pocket, recipe.frame);
-        return edges.length === 0 ? null : ops.fillet(cut, edges, fillet);
-      } finally {
-        ops.release(cut);
-      }
-    }
+    case 'feature':
+      return buildFeature(ops, recipe, child);
   }
 }
 

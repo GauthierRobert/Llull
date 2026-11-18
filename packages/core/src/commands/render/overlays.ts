@@ -4,6 +4,7 @@ import { escapeXml } from '../../lib/escapeXml';
 import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot, svgLine } from './svg';
 import { appendEntityLabels } from './labels';
+import { pow } from '../../lib/pow';
 
 interface OverlayFlags {
   showDimensions: boolean;
@@ -61,7 +62,7 @@ function groundGridLines(project: Projector, data: RenderViewData, axisLength: n
     : Math.max(axisLength * 3, 2);
   // Grid step: ~5–8 lines across the scene, rounded to a nice number (1, 2, 5, 10, 20, 50, ...).
   const rawStep = ext / 4;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const magnitude = pow(10, Math.floor(Math.log10(rawStep)));
   const normalized = rawStep / magnitude;
   const gridStep = magnitude * (normalized < 2 ? 1 : normalized < 5 ? 2 : 5);
   const iMin = Math.floor(-ext / gridStep);

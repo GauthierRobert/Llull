@@ -1,6 +1,6 @@
 /** Joints between rigid bodies (transmissions between joints: transmissions.ts). */
 
-import { GROUND, type DynamicJoint } from '@core/model/dynamics';
+import { GROUND, type DynamicJoint, type DynamicsModel } from '@core/model/dynamics';
 import type { Vec3 } from '@core/model/vectors';
 import { buildTopology, isRefusal } from '../sim/topology';
 import type { CommandResult } from '@core/commands/types';
@@ -12,6 +12,72 @@ import { dynamicsOf, withDynamics } from './bodies';
 import { BODY_JOINT_KINDS, bodyJointKind } from './kinematicKinds';
 
 const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
+
+interface JointInput {
+  readonly kind: Parameters<typeof bodyJointKind>[0];
+  readonly child: string;
+  readonly parent?: string | undefined;
+  readonly anchor: Vec3;
+  readonly axis?: Vec3 | undefined;
+  readonly anchorOnChild?: Vec3 | undefined;
+  readonly damping?: number | undefined;
+  readonly friction?: number | undefined;
+  readonly stiffness?: number | undefined;
+  readonly springReference?: number | undefined;
+  readonly initialRpm?: number | undefined;
+  readonly initialVelocity?: number | undefined;
+}
+
+interface CheckedJoint {
+  readonly child: DynamicsModel['bodies'][string];
+  readonly parent: string;
+  readonly kind: DynamicJoint['kind'];
+  readonly axis: Vec3;
+  readonly spherical: boolean;
+}
+
+/** The child body, parent, joint kind and axis of a valid request, or the first refusal message. */
+function checkJointInputs(dynamics: DynamicsModel, params: JointInput): CheckedJoint | string {
+  const parent = params.parent ?? GROUND;
+  const child = dynamics.bodies[params.child];
+  if (child === undefined) return `child body '${params.child}' not found (add_rigid_body first)`;
+  if (child.fixed) return `body '${child.id}' is fixed to the ground and cannot move`;
+  if (parent !== GROUND && dynamics.bodies[parent] === undefined) return `parent body '${parent}' not found`;
+  if (parent === child.id) return `a body cannot be jointed to itself ('${parent}')`;
+  const kind = bodyJointKind(params.kind);
+  if (typeof kind === 'object') return kind.refusal;
+  const spherical = kind === 'spherical';
+  const axis: Vec3 = params.axis ?? [0, 0, 1];
+  if (!spherical && (params.axis === undefined || Math.hypot(...axis) < 1e-12)) return 'axis must be a non-zero vector';
+  const requestedSpeed = params.initialRpm !== undefined || (params.initialVelocity ?? 0) !== 0;
+  if (spherical && ((params.damping ?? 0) !== 0 || (params.friction ?? 0) !== 0 || requestedSpeed))
+    return 'a spherical joint has no damping, friction or initial speed (put them on the tree joints)';
+  if (spherical && (params.stiffness !== undefined || params.springReference !== undefined))
+    return 'a spherical joint has no spring (put stiffness on a revolute or prismatic tree joint)';
+  if (params.springReference !== undefined && (params.stiffness ?? 0) === 0) return 'springReference needs a stiffness > 0';
+  return { child, parent, kind, axis, spherical };
+}
+
+/** The joint record of a checked request. */
+function jointOf(jointId: string, params: JointInput, checked: CheckedJoint): DynamicJoint {
+  const { child, parent, kind, axis } = checked;
+  const initialVelocity =
+    params.initialRpm !== undefined && kind === 'revolute' ? params.initialRpm * RAD_PER_S_PER_RPM : (params.initialVelocity ?? 0);
+  return {
+    id: jointId,
+    kind,
+    parent,
+    child: child.id,
+    anchor: params.anchor,
+    axis,
+    ...(params.anchorOnChild !== undefined ? { anchorOnChild: params.anchorOnChild } : {}),
+    damping: params.damping ?? 0,
+    friction: params.friction ?? 0,
+    ...((params.stiffness ?? 0) > 0 ? { stiffness: params.stiffness ?? 0 } : {}),
+    ...((params.stiffness ?? 0) > 0 && (params.springReference ?? 0) !== 0 ? { springReference: params.springReference ?? 0 } : {}),
+    initialVelocity,
+  };
+}
 
 /**
  * @affects adds 1 joint to doc.dynamics (affected: [jointId])
@@ -78,41 +144,12 @@ export const addBodyJoint = defineCommand({
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'add_body_joint');
     const dynamics = dynamicsOf(doc);
-    const parent = params.parent ?? GROUND;
-    const child = dynamics.bodies[params.child];
-    if (child === undefined) return fail(`child body '${params.child}' not found (add_rigid_body first)`);
-    if (child.fixed) return fail(`body '${child.id}' is fixed to the ground and cannot move`);
-    if (parent !== GROUND && dynamics.bodies[parent] === undefined) return fail(`parent body '${parent}' not found`);
-    if (parent === child.id) return fail(`a body cannot be jointed to itself ('${parent}')`);
-    const kind = bodyJointKind(params.kind);
-    if (typeof kind === 'object') return fail(kind.refusal);
-    const spherical = kind === 'spherical';
-    const axis: Vec3 = params.axis ?? [0, 0, 1];
-    if (!spherical && (params.axis === undefined || Math.hypot(...axis) < 1e-12)) return fail('axis must be a non-zero vector');
-    const requestedSpeed = params.initialRpm !== undefined || (params.initialVelocity ?? 0) !== 0;
-    if (spherical && ((params.damping ?? 0) !== 0 || (params.friction ?? 0) !== 0 || requestedSpeed))
-      return fail('a spherical joint has no damping, friction or initial speed (put them on the tree joints)');
-    if (spherical && (params.stiffness !== undefined || params.springReference !== undefined))
-      return fail('a spherical joint has no spring (put stiffness on a revolute or prismatic tree joint)');
-    if (params.springReference !== undefined && (params.stiffness ?? 0) === 0) return fail('springReference needs a stiffness > 0');
+    const checked = checkJointInputs(dynamics, params);
+    if (typeof checked === 'string') return fail(checked);
+    const { child, parent, kind, axis, spherical } = checked;
     const jointId = idOrNext(params.id, 'bjoint');
     if (idTakenInDynamicsOrFlight(doc, jointId)) return fail(`id '${jointId}' is already used`);
-    const initialVelocity =
-      params.initialRpm !== undefined && kind === 'revolute' ? params.initialRpm * RAD_PER_S_PER_RPM : (params.initialVelocity ?? 0);
-    const joint: DynamicJoint = {
-      id: jointId,
-      kind,
-      parent,
-      child: child.id,
-      anchor: params.anchor,
-      axis,
-      ...(params.anchorOnChild !== undefined ? { anchorOnChild: params.anchorOnChild } : {}),
-      damping: params.damping ?? 0,
-      friction: params.friction ?? 0,
-      ...((params.stiffness ?? 0) > 0 ? { stiffness: params.stiffness ?? 0 } : {}),
-      ...((params.stiffness ?? 0) > 0 && (params.springReference ?? 0) !== 0 ? { springReference: params.springReference ?? 0 } : {}),
-      initialVelocity,
-    };
+    const joint = jointOf(jointId, params, checked);
     const next = { ...dynamics, joints: { ...dynamics.joints, [jointId]: joint } };
     const topology = buildTopology(next);
     // a spherical joint may be declared before the joint that carries its body: only simulate_motion / inspect_dynamics complain then

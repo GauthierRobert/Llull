@@ -6,6 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { applyPoint, invertAffine } from './mat4';
 import { scanOf, toM, vecToM } from './model';
+import { map3 } from '@lib/vec3';
 
 /** A region in the document frame, metres (what `llull-compute cloud op` receives). */
 export type MetricRegion =
@@ -68,7 +69,7 @@ export function assetBox(cloud: CloudReference, region: MetricRegion): CloudBoun
   const [low, high] =
     region.kind === 'box'
       ? [region.min, region.max]
-      : [region.point.map((v) => v - region.radius) as unknown as Vec3, region.point.map((v) => v + region.radius) as unknown as Vec3];
+      : [map3(region.point, (v) => v - region.radius), map3(region.point, (v) => v + region.radius)];
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
   for (let corner = 0; corner < 8; corner++) {

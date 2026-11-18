@@ -53,6 +53,106 @@ export function raoAngles(expansionRatio: number): { entranceDeg: number; exitDe
   return { entranceDeg: interpolate(RAO_80_ENTRANCE, expansionRatio), exitDeg: interpolate(RAO_80_EXIT, expansionRatio) };
 }
 
+interface Problem {
+  readonly message: string;
+  readonly path: string;
+}
+
+interface NozzleInput {
+  readonly throatRadius: number;
+  readonly expansionRatio: number;
+  readonly wallThickness: number;
+  readonly chamberLength?: number | undefined;
+  readonly includeContour?: boolean | undefined;
+  readonly color?: string | undefined;
+  readonly halfAngleDeg?: number | undefined;
+  readonly lengthFraction?: number | undefined;
+  readonly entranceAngleDeg?: number | undefined;
+  readonly exitAngleDeg?: number | undefined;
+}
+
+/** First failing range / colour / wall check of the shared parameters, or null. */
+function baseProblem(params: NozzleInput, contraction: number, convergent: number, segments: number): Problem | null {
+  const { throatRadius: rt, expansionRatio: eps, wallThickness: t } = params;
+  if (!(rt > 0) || !(eps >= 1.5 && eps <= 400) || !(contraction >= 1.5 && contraction <= 20))
+    return { message: 'throatRadius > 0, expansionRatio 1.5..400, contractionRatio 1.5..20', path: 'throatRadius' };
+  if (!(convergent >= 15 && convergent <= 60) || !((params.chamberLength ?? 0) >= 0) || !(segments >= 16 && segments <= 256))
+    return { message: 'convergentHalfAngleDeg 15..60, chamberLength >= 0, segments 16..256', path: 'convergentHalfAngleDeg' };
+  if (params.color !== undefined && !isHexColor(params.color))
+    return { message: `color must be a #rrggbb hex string (got "${params.color}")`, path: 'color' };
+  if (!(t > 0 && t < 0.382 * rt))
+    return { message: `wallThickness must be within (0, ${sig(0.382 * rt)}) (the downstream throat arc radius)`, path: 'wallThickness' };
+  return null;
+}
+
+/** Divergent section spec of the shape (conical or Rao bell); records the defaults it applied in `defaulted`; a Problem when invalid. */
+function divergentOf(params: NozzleInput, shape: 'conical' | 'bell', eps: number, defaulted: string[]): ContourSpec['divergent'] | Problem {
+  if (shape === 'conical') {
+    const half = params.halfAngleDeg ?? 15;
+    if (params.halfAngleDeg === undefined) defaulted.push('halfAngleDeg 15');
+    if (!(half >= 5 && half <= 30)) return { message: 'halfAngleDeg must be within 5..30', path: 'halfAngleDeg' };
+    return { shape: 'conical', halfAngle: half * RAD };
+  }
+  const fraction = params.lengthFraction ?? 0.8;
+  if (params.lengthFraction === undefined) defaulted.push('lengthFraction 0.8');
+  if (!(fraction >= 0.6 && fraction <= 1)) return { message: 'lengthFraction must be within 0.6..1', path: 'lengthFraction' };
+  const chart = raoAngles(eps);
+  if ((params.entranceAngleDeg === undefined || params.exitAngleDeg === undefined) && (chart === null || fraction !== 0.8))
+    return {
+      message: 'give entranceAngleDeg and exitAngleDeg: the built-in chart covers only the 80 % bell for ε 5..50',
+      path: 'entranceAngleDeg',
+    };
+  const entrance = params.entranceAngleDeg ?? (chart as NonNullable<typeof chart>).entranceDeg;
+  const exit = params.exitAngleDeg ?? (chart as NonNullable<typeof chart>).exitDeg;
+  if (params.entranceAngleDeg === undefined) defaulted.push(`θn ${sig(entrance)}° (Huzel & Huang 80 % chart)`);
+  if (params.exitAngleDeg === undefined) defaulted.push(`θe ${sig(exit)}° (Huzel & Huang 80 % chart)`);
+  if (!(entrance > exit && exit >= 0 && entrance < 60))
+    return { message: 'need 0 <= exitAngleDeg < entranceAngleDeg < 60', path: 'entranceAngleDeg' };
+  return { shape: 'bell', lengthFraction: fraction, entranceAngle: entrance * RAD, exitAngle: exit * RAD };
+}
+
+interface NozzleDataInput {
+  readonly id: string;
+  readonly shape: 'conical' | 'bell';
+  readonly rt: number;
+  readonly contour: Exclude<ReturnType<typeof nozzleContour>, string>;
+  readonly params: NozzleInput;
+  readonly defaulted: string[];
+}
+
+function nozzleData(input: NozzleDataInput): Record<string, unknown> & { exitRadius: number; divergentLength: number } {
+  const { id, shape, rt, contour, defaulted, params } = input;
+  return {
+    id,
+    shape,
+    throatRadius: rt,
+    exitRadius: sig(contour.exitRadius),
+    chamberRadius: sig(contour.chamberRadius),
+    expansionRatioCheck: sig((contour.exitRadius / rt) ** 2),
+    convergentLength: sig(contour.convergentLength),
+    divergentLength: sig(contour.divergentLength),
+    referenceConeLength15: sig(contour.referenceConeLength),
+    totalLength: sig(contour.convergentLength + (params.chamberLength ?? 0) + contour.divergentLength),
+    contourPoints: contour.points.length,
+    exitAngleDeg: sig((contour.points[contour.points.length - 1]?.angle ?? 0) / RAD),
+    ...(params.includeContour
+      ? {
+          contour: contour.points.map((point) => ({
+            axial: sig(point.axial),
+            radius: sig(point.radius),
+            angleDeg: sig(point.angle / RAD),
+          })),
+        }
+      : {}),
+    defaulted,
+    provenance: {
+      method: shape === 'bell' ? 'Rao thrust-optimised parabola (quadratic Bézier between θn and θe tangents)' : 'conical divergent',
+      throatArcs: 'upstream 1.5 R_t, downstream 0.382 R_t (Rao 1958; Huzel & Huang NASA SP-125 Fig. 4-15)',
+      lengthReference: 'L_15 = (R_t(√ε - 1) + R_d(sec 15° - 1)) / tan 15°',
+    },
+  };
+}
+
 /**
  * @affects creates 1 revolution solid (the nozzle wall, axis +Z through `position`, throat at z = position, flow towards +z)
  * @invariant every omitted design parameter (contractionRatio, convergentHalfAngleDeg, segments, lengthFraction, chamberLength, halfAngleDeg, chart angles) is listed in data.defaulted and the summary
@@ -94,44 +194,11 @@ export const designNozzle = defineCommand({
     const convergent = params.convergentHalfAngleDeg ?? 30;
     const shape = params.shape ?? 'bell';
     const segments = params.segments ?? 96;
-    if (!(rt > 0) || !(eps >= 1.5 && eps <= 400) || !(contraction >= 1.5 && contraction <= 20))
-      return fail('FLD_PARAM_INVALID', 'throatRadius > 0, expansionRatio 1.5..400, contractionRatio 1.5..20', 'throatRadius');
-    if (!(convergent >= 15 && convergent <= 60) || !((params.chamberLength ?? 0) >= 0) || !(segments >= 16 && segments <= 256))
-      return fail('FLD_PARAM_INVALID', 'convergentHalfAngleDeg 15..60, chamberLength >= 0, segments 16..256', 'convergentHalfAngleDeg');
-    if (params.color !== undefined && !isHexColor(params.color))
-      return fail('FLD_PARAM_INVALID', `color must be a #rrggbb hex string (got "${params.color}")`, 'color');
-    if (!(t > 0 && t < 0.382 * rt))
-      return fail(
-        'FLD_PARAM_INVALID',
-        `wallThickness must be within (0, ${sig(0.382 * rt)}) (the downstream throat arc radius)`,
-        'wallThickness',
-      );
+    const invalid = baseProblem(params, contraction, convergent, segments);
+    if (invalid !== null) return fail('FLD_PARAM_INVALID', invalid.message, invalid.path);
     const defaulted: string[] = [];
-    let divergent: ContourSpec['divergent'];
-    if (shape === 'conical') {
-      const half = params.halfAngleDeg ?? 15;
-      if (params.halfAngleDeg === undefined) defaulted.push('halfAngleDeg 15');
-      if (!(half >= 5 && half <= 30)) return fail('FLD_PARAM_INVALID', 'halfAngleDeg must be within 5..30', 'halfAngleDeg');
-      divergent = { shape: 'conical', halfAngle: half * RAD };
-    } else {
-      const fraction = params.lengthFraction ?? 0.8;
-      if (params.lengthFraction === undefined) defaulted.push('lengthFraction 0.8');
-      if (!(fraction >= 0.6 && fraction <= 1)) return fail('FLD_PARAM_INVALID', 'lengthFraction must be within 0.6..1', 'lengthFraction');
-      const chart = raoAngles(eps);
-      if ((params.entranceAngleDeg === undefined || params.exitAngleDeg === undefined) && (chart === null || fraction !== 0.8))
-        return fail(
-          'FLD_PARAM_INVALID',
-          'give entranceAngleDeg and exitAngleDeg: the built-in chart covers only the 80 % bell for ε 5..50',
-          'entranceAngleDeg',
-        );
-      const entrance = params.entranceAngleDeg ?? (chart as NonNullable<typeof chart>).entranceDeg;
-      const exit = params.exitAngleDeg ?? (chart as NonNullable<typeof chart>).exitDeg;
-      if (params.entranceAngleDeg === undefined) defaulted.push(`θn ${sig(entrance)}° (Huzel & Huang 80 % chart)`);
-      if (params.exitAngleDeg === undefined) defaulted.push(`θe ${sig(exit)}° (Huzel & Huang 80 % chart)`);
-      if (!(entrance > exit && exit >= 0 && entrance < 60))
-        return fail('FLD_PARAM_INVALID', 'need 0 <= exitAngleDeg < entranceAngleDeg < 60', 'entranceAngleDeg');
-      divergent = { shape: 'bell', lengthFraction: fraction, entranceAngle: entrance * RAD, exitAngle: exit * RAD };
-    }
+    const divergent = divergentOf(params, shape, eps, defaulted);
+    if ('message' in divergent) return fail('FLD_PARAM_INVALID', divergent.message, divergent.path);
     if (params.contractionRatio === undefined) defaulted.push('contractionRatio 3');
     if (params.convergentHalfAngleDeg === undefined) defaulted.push('convergentHalfAngleDeg 30');
     if (params.segments === undefined) defaulted.push('segments 96');
@@ -160,35 +227,7 @@ export const designNozzle = defineCommand({
       params.color === undefined
         ? revolved.document
         : execute(revolved.document, 'set_entity_color', { entityIds: [id], color: params.color }, ctx).document;
-    const data = {
-      id,
-      shape,
-      throatRadius: rt,
-      exitRadius: sig(contour.exitRadius),
-      chamberRadius: sig(contour.chamberRadius),
-      expansionRatioCheck: sig((contour.exitRadius / rt) ** 2),
-      convergentLength: sig(contour.convergentLength),
-      divergentLength: sig(contour.divergentLength),
-      referenceConeLength15: sig(contour.referenceConeLength),
-      totalLength: sig(contour.convergentLength + (params.chamberLength ?? 0) + contour.divergentLength),
-      contourPoints: contour.points.length,
-      exitAngleDeg: sig((contour.points[contour.points.length - 1]?.angle ?? 0) / RAD),
-      ...(params.includeContour
-        ? {
-            contour: contour.points.map((point) => ({
-              axial: sig(point.axial),
-              radius: sig(point.radius),
-              angleDeg: sig(point.angle / RAD),
-            })),
-          }
-        : {}),
-      defaulted,
-      provenance: {
-        method: shape === 'bell' ? 'Rao thrust-optimised parabola (quadratic Bézier between θn and θe tangents)' : 'conical divergent',
-        throatArcs: 'upstream 1.5 R_t, downstream 0.382 R_t (Rao 1958; Huzel & Huang NASA SP-125 Fig. 4-15)',
-        lengthReference: 'L_15 = (R_t(√ε - 1) + R_d(sec 15° - 1)) / tan 15°',
-      },
-    };
+    const data = nozzleData({ id, shape, rt, contour, params, defaulted });
     const summary = revolved.summary;
     return {
       ...changed(

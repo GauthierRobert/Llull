@@ -20,7 +20,7 @@ import {
 } from '../../geometry/blend/blendInfo';
 import { blendSource } from '../../geometry/blend/continuity';
 import { controlParameters, radiusAt } from '../../geometry/blend/law';
-import { jointStations, spineStations } from './spineStations';
+import { jointStations, spineStations, type SpineStations, type SpineUnreadable } from './spineStations';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
 import type { BlendSection } from '../../geometry/kernelPorts';
@@ -190,6 +190,85 @@ function directionOf(
   return sameDirection(sections, (t) => kernel.faceQuery?.edgeSamples(shape, edge, 5)?.[Math.round(t * 4)]?.point ?? null);
 }
 
+type Fine = NonNullable<ReturnType<typeof radiusSamples>>;
+type Span = ReturnType<typeof setbackSpan>;
+type Stations = SpineStations | null;
+type SpinePoints = ReadonlyArray<{ readonly t: number; readonly radius: number }>;
+
+const notRead = (): RadiusCheck => ({ radius: null, lawChecked: false, deviations: [] });
+
+/** The radius along the blend at `samples` uniform fractions plus the law's control points. */
+function radiusReadback(fine: Fine, record: LawRecord | undefined, direction: boolean | null, span: Span, samples: number): RadiusReadback {
+  const radii = fine.map((sample) => sample.radius);
+  const grid = Array.from({ length: samples }, (_, k) => k / (samples - 1));
+  const lawT =
+    record === undefined || direction === null || span !== null ? [] : controlParameters(record.law).map((u) => (direction ? u : 1 - u));
+  const at = [...new Set([...grid, ...lawT].map((t) => sig(t)))].sort((a, b) => a - b).map((t) => ({ t, value: sig(radiusAtT(fine, t)) }));
+  return { min: sig(Math.min(...radii)), max: sig(Math.max(...radii)), at };
+}
+
+function lawComparable(record: LawRecord | undefined, direction: boolean | null): boolean {
+  return (
+    record !== undefined &&
+    direction !== null &&
+    (constantLaw(record.law)
+      ? true
+      : record.joint !== undefined
+        ? record.joint.isolated
+        : record.topology !== undefined && record.edge !== undefined && isolatedEdge(record.topology, record.edge))
+  );
+}
+
+/** Stations of the sections along the source edge (or the joint spine) where the law is position dependent and the edge runs at an uneven speed. */
+function lawStations(
+  kernel: GeometryKernel,
+  record: LawRecord,
+  span: Span,
+  positioned: boolean,
+  info: ShapeTopology['edges'][number] | undefined,
+  sections: readonly BlendSection[],
+): Stations | SpineUnreadable {
+  const unevenJoint = span === null && !constantLaw(record.law) && record.joint?.unevenSpeed === true;
+  return unevenJoint && record.joint !== undefined
+    ? record.joint.spine === undefined
+      ? { reason: 'the joint edge runs at an uneven speed and the kernel did not give its spine, so the law cannot be read along it' }
+      : jointStations(record.joint.spine, sections)
+    : positioned && info !== undefined && info.unevenSpeed === true && record.shape !== undefined && record.edge !== undefined
+      ? spineStations(kernel, record.shape, record.edge, info, sections)
+      : null;
+}
+
+interface DeviationContext {
+  readonly record: LawRecord;
+  readonly blend: BlendFaceContacts;
+  readonly fine: Fine;
+  readonly span: Span;
+  readonly direction: boolean;
+  readonly read: Stations;
+  readonly onSpine: SpinePoints | null;
+}
+
+/** The deviation of the blend from the law at law position `u` (null when within tolerance). */
+function deviationAt(u: number, context: DeviationContext): RadiusFinding | null {
+  const { record, blend, fine, span, direction, read, onSpine } = context;
+  // without a span `u` is the position on the edge; with one it is the position on the blend, mapped onto the edge fractions the blend covers
+  const t = span !== null ? u : direction ? u : 1 - u;
+  const onEdge = span === null ? u : span.forward ? span.lo + u * (span.hi - span.lo) : span.hi - u * (span.hi - span.lo);
+  // the blend covers [first, last] of the edge: a station beyond it is read at the blend end (its own spine position), not clamped against the law there
+  // (a closed edge: the lap of the unwrapped stations that holds the law position, the seam read from the side the blend is on)
+  const first = onSpine?.[0]?.t ?? 0;
+  const last = onSpine?.[onSpine.length - 1]?.t ?? 1;
+  const lap =
+    read?.closed === true
+      ? ([onEdge, onEdge - 1, onEdge + 1].find((c) => c >= first - LAP_SLACK && c <= last + LAP_SLACK) ?? onEdge)
+      : onEdge;
+  const at = onSpine === null ? onEdge : Math.min(Math.max(lap, first), last);
+  const expected = radiusAt(record.law, read?.closed === true ? (at < 0 ? at + 1 : at > 1 ? at - 1 : at) : at);
+  const actual = onSpine === null ? radiusAtT(fine, t) : radiusAtT(onSpine, at);
+  if (!(Math.abs(actual - expected) > RADIUS_LAW_TOLERANCE * expected)) return null;
+  return { face: blend.face, t: sig(t), expected: sig(expected), actual: sig(actual), deviation: sig(Math.abs(actual - expected)) };
+}
+
 /** The radius along `blend` at `samples` uniform fractions plus the law's control points, and its deviation from the law. */
 export function checkRadius(
   kernel: GeometryKernel,
@@ -199,34 +278,20 @@ export function checkRadius(
   samples: number,
 ): RadiusCheck {
   // a conic / curvature section has no radius: the circle through three of its points would be a number without meaning
-  if (record?.profile !== undefined && record.profile.type !== 'circular') return { radius: null, lawChecked: false, deviations: [] };
+  if (record?.profile !== undefined && record.profile.type !== 'circular') return notRead();
   // a size2 row has no radius: `size` is a leg (a length on its face), read by the leg readback (checkChamferLegs.ts), and the section is not a circle of that radius (size2 equal to size included)
-  if (record?.law.size2 !== undefined) return { radius: null, lawChecked: false, deviations: [] };
+  if (record?.law.size2 !== undefined) return notRead();
   const sections = blendSectionsOf(kernel, shape, blend, FINE_SECTIONS);
   const fine = sections === null ? null : radiusSamples(sections);
-  if (sections === null || fine === null) return { radius: null, lawChecked: false, deviations: [] };
-  const radii = fine.map((sample) => sample.radius);
+  if (sections === null || fine === null) return notRead();
   // A setback blend stops short of the edge ends: the law is read over the span it covers, not over the whole edge.
   const span = record?.setback === true ? setbackSpan(sections, record) : null;
   const direction = directionOf(kernel, sections, record, span);
-  const grid = Array.from({ length: samples }, (_, k) => k / (samples - 1));
-  const lawT =
-    record === undefined || direction === null || span !== null ? [] : controlParameters(record.law).map((u) => (direction ? u : 1 - u));
-  const at = [...new Set([...grid, ...lawT].map((t) => sig(t)))].sort((a, b) => a - b).map((t) => ({ t, value: sig(radiusAtT(fine, t)) }));
-  const radius = { min: sig(Math.min(...radii)), max: sig(Math.max(...radii)), at };
-  const comparable =
-    record !== undefined &&
-    direction !== null &&
-    (constantLaw(record.law)
-      ? true
-      : record.joint !== undefined
-        ? record.joint.isolated
-        : record.topology !== undefined && record.edge !== undefined && isolatedEdge(record.topology, record.edge));
-  if (!comparable || record === undefined || direction === null || (record.setback && span === null))
+  const radius = radiusReadback(fine, record, direction, span, samples);
+  if (!lawComparable(record, direction) || record === undefined || direction === null || (record.setback && span === null))
     return { radius, lawChecked: false, deviations: [] };
   const exact = exactParameters(record.law);
   const parameters = exact === 'all' || span !== null ? Array.from({ length: 21 }, (_, k) => k / 20) : exact;
-  const deviations: RadiusFinding[] = [];
   // a curved edge carries a position-dependent law at the spine position of each section when the KERNEL says it runs at an uneven speed (its own decision, ShapeEdge.unevenSpeed)
   const info = record.topology?.edges[record.edge ?? -1];
   const positioned = span === null && !constantLaw(record.law) && info !== undefined && info.curve !== 'line';
@@ -235,41 +300,15 @@ export function checkRadius(
     return unchecked(
       `edge ${record.edge} is curved and the kernel does not report whether it runs at a steady speed, so the law is not read along it`,
     );
-  const unevenJoint = span === null && !constantLaw(record.law) && record.joint?.unevenSpeed === true;
-  const read =
-    unevenJoint && record.joint !== undefined
-      ? record.joint.spine === undefined
-        ? { reason: 'the joint edge runs at an uneven speed and the kernel did not give its spine, so the law cannot be read along it' }
-        : jointStations(record.joint.spine, sections)
-      : positioned && info.unevenSpeed === true && record.shape !== undefined && record.edge !== undefined
-        ? spineStations(kernel, record.shape, record.edge, info, sections)
-        : null;
+  const read = lawStations(kernel, record, span, positioned, info, sections);
   if (read !== null && 'reason' in read) return unchecked(read.reason);
   const onSpine =
     read === null ? null : fine.map((sample, k) => ({ t: read.stations[k] ?? 0, radius: sample.radius })).sort((x, y) => x.t - y.t);
+  const context: DeviationContext = { record, blend, fine, span, direction, read, onSpine };
+  const deviations: RadiusFinding[] = [];
   for (const u of parameters) {
-    // without a span `u` is the position on the edge; with one it is the position on the blend, mapped onto the edge fractions the blend covers
-    const t = span !== null ? u : direction ? u : 1 - u;
-    const onEdge = span === null ? u : span.forward ? span.lo + u * (span.hi - span.lo) : span.hi - u * (span.hi - span.lo);
-    // the blend covers [first, last] of the edge: a station beyond it is read at the blend end (its own spine position), not clamped against the law there
-    // (a closed edge: the lap of the unwrapped stations that holds the law position, the seam read from the side the blend is on)
-    const first = onSpine?.[0]?.t ?? 0;
-    const last = onSpine?.[onSpine.length - 1]?.t ?? 1;
-    const lap =
-      read?.closed === true
-        ? ([onEdge, onEdge - 1, onEdge + 1].find((c) => c >= first - LAP_SLACK && c <= last + LAP_SLACK) ?? onEdge)
-        : onEdge;
-    const at = onSpine === null ? onEdge : Math.min(Math.max(lap, first), last);
-    const expected = radiusAt(record.law, read?.closed === true ? (at < 0 ? at + 1 : at > 1 ? at - 1 : at) : at);
-    const actual = onSpine === null ? radiusAtT(fine, t) : radiusAtT(onSpine, at);
-    if (Math.abs(actual - expected) > RADIUS_LAW_TOLERANCE * expected)
-      deviations.push({
-        face: blend.face,
-        t: sig(t),
-        expected: sig(expected),
-        actual: sig(actual),
-        deviation: sig(Math.abs(actual - expected)),
-      });
+    const finding = deviationAt(u, context);
+    if (finding !== null) deviations.push(finding);
   }
   return { radius, lawChecked: true, deviations };
 }

@@ -9,6 +9,7 @@ import { caseOf } from '../shared/access';
 import { isQuantityProblem, meshMeasure, quantityValue, studyQuantityShape, toStudyQuantity, type QuantityProblem } from './studyQuantity';
 import { REFINEMENTS } from './studyKinds';
 import { levelDocument, type LevelSpec } from './studyState';
+import { pow } from '@lib/pow';
 
 /** Named guard: largest level mesh the study runs (tetrahedra); a finer level is refused with VNV_LEVEL_TOO_LARGE. */
 export const STUDY_MAX_ELEMENTS = 2_000_000;
@@ -79,10 +80,10 @@ function timeStepLevels(
       message:
         'time-step studies cover heat_transient analyses with an end time (set_thermal_step endTimeS); the structural dynamics analyses (frequency response, random response, explicit) have no fixed transient step run by these transports',
     };
-  const finest = finestGiven ?? end / (STUDY_DT_COARSEST_INCREMENTS * ratio ** (levels - 1));
+  const finest = finestGiven ?? end / (STUDY_DT_COARSEST_INCREMENTS * pow(ratio, levels - 1));
   if (!(finest > 0) || !Number.isFinite(finest))
     return { code: 'VNV_PARAM_INVALID', message: 'finest must be a finite increment > 0 seconds' };
-  const sizes = Array.from({ length: levels }, (_, index) => finest * ratio ** index);
+  const sizes = Array.from({ length: levels }, (_, index) => finest * pow(ratio, index));
   const bad = sizes.find((size) => Math.abs(end / size - Math.round(end / size)) > 1e-9 * Math.max(1, end / size) || size > end);
   if (bad !== undefined)
     return {
@@ -148,7 +149,7 @@ export function planStudy(doc: CadDocument, analysisId: string, options: StudyOp
     quantity,
     ratio,
     levels: Array.from({ length: levels }, (_, index) => {
-      const size = finest * ratio ** index;
+      const size = finest * pow(ratio, index);
       return { index, controls: scaledControls(analysisCase.mesh, size), h: size };
     }),
   };

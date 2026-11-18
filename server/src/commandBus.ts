@@ -6,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { getCommand } from '@core/commands/registry';
 import { reportServerCrash } from './serverCrash';
-import { getLiveDoc, setLiveDoc } from './liveDocument';
+import { getLiveDoc, setHistoryFlagsSource, setLiveDoc } from './liveDocument';
 import { sha256Hex } from './sha256';
 import { emptyHistory, historySummary, recordChange, stepHistory, type History, type HistoryDirection } from '@protocol/history';
 import type { LiveCommandSource } from '@protocol/liveSync';
@@ -113,6 +113,7 @@ function commit(
   params: unknown,
   source: LiveCommandSource | undefined,
   commandId: string | undefined,
+  coalesce = false,
 ): CommandResponseBody {
   const { document, outcome, params: filled, thrown } = run;
   if (thrown !== undefined) reportCommandCrash(thrown, name, params, prior);
@@ -120,7 +121,7 @@ function commit(
     // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
     setLiveDoc(document);
   } else if (outcome.changed) {
-    history = recordChange(history, prior);
+    history = recordChange(history, prior, coalesce);
     setLiveDoc(document, { name, params: filled, source: source ?? 'rest', ...(commandId !== undefined ? { commandId } : {}) });
   }
   return withHistoryFlags(outcome);
@@ -129,6 +130,8 @@ function commit(
 export interface AsyncApplyOptions {
   readonly commandId?: string;
   readonly source?: LiveCommandSource;
+  /** Fold this change into the previous undo step (one Undo takes back both): a held nudge key, the second half of a two-command gesture. */
+  readonly coalesce?: boolean;
   /** Reports of the native mesh jobs the command waits for (stage, share done, estimated time left). */
   readonly onProgress?: (event: JobProgress) => void;
   /** Aborting cancels the command: nothing is applied, running native jobs nobody else waits for are killed. */
@@ -195,7 +198,7 @@ async function runResolved(
     ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}),
     ...(signal !== undefined ? { signal } : {}),
     commit: (run) => {
-      response = commit(run, run.prior, name, params, options.source, options.commandId);
+      response = commit(run, run.prior, name, params, options.source, options.commandId, options.coalesce === true);
     },
   });
   return response ?? withHistoryFlags({ summary: `Command ${name} produced no result.`, affected: [], isError: true, changed: false });
@@ -232,6 +235,8 @@ export function canUndo(): boolean {
 export function canRedo(): boolean {
   return history.redo.length > 0;
 }
+
+setHistoryFlagsSource(() => ({ canUndo: canUndo(), canRedo: canRedo() }));
 
 /** @internal tests only */
 export function _resetHistory(): void {

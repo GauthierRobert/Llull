@@ -12,6 +12,7 @@ import type { Vec3 } from '@core/model/types';
 import type { GraphResult } from './graph';
 import type { VoronoiNode } from './model';
 import { type Tet, delaunay, faceKey, facesOf } from './voronoiDelaunay';
+import { pow } from '@lib/pow';
 
 /** Seeds beyond this are refused: the Delaunay pass takes 2.4 s for 100000 seeds (14.16) and a seed adds 9 to 11 beams (measured), so the beam cap below binds first above about 90000 seeds. */
 const MAX_SEEDS = 100_000;
@@ -66,7 +67,7 @@ export function voronoiGeometry(node: VoronoiParams): GraphResult {
 
 function buildVoronoi(node: VoronoiParams): GraphResult {
   const { min, max } = node;
-  const spacing = (1 / node.density) ** (1 / 3);
+  const spacing = pow(1 / node.density, 1 / 3);
   const margin = 1.2 * spacing;
   const grown = [0, 1, 2].map((axis) => (max[axis] as number) - (min[axis] as number) + 2 * margin);
   const expected = Math.round(node.density * (grown[0] as number) * (grown[1] as number) * (grown[2] as number));

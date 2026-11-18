@@ -5,6 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { briefReport, sig } from '../shared/results';
 import { bassettDensityRatio, bassettFrontalArea, bassettPower, bassettSpeed } from './roadLoad';
 import type { RoadLoadInput, RoadLoadRefusal } from './roadLoadParams';
+import { powInt } from '@lib/powInt';
 
 /** Sea-level density of the 1976 standard (kg/m³): Kd = ρ / ρ0 when bassett_1999 gets densityKgM3. */
 const SEA_LEVEL_DENSITY = 1.225;
@@ -56,7 +57,7 @@ export function runBassett(doc: CadDocument, params: RoadLoadInput, speedGiven: 
     breakdown: {
       rollingW: sig(k * 0.00953 * (mass + bike) * speedKmh),
       speedSquaredW: sig(k * 0.00775 * speedKmh ** 2),
-      aeroW: sig(k * k1 * bassettFrontalArea(height, mass) * 0.007551 * speedKmh ** 3),
+      aeroW: sig(k * k1 * bassettFrontalArea(height, mass) * 0.007551 * powInt(speedKmh, 3)),
     },
     inputs: {
       riderHeightM: height,

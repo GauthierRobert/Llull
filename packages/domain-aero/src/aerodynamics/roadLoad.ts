@@ -8,6 +8,8 @@
  */
 
 import { bisect } from '@lib/bisect';
+import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 /** Bicycle preset of Martin et al. 1998 (road tyres Crr, wheel drag area Fw m², chain drivetrain efficiency). */
 export const BICYCLE_DEFAULTS = { crr: 0.0032, wheelAreaM2: 0.0044, drivetrainEfficiency: 0.976 } as const;
@@ -82,13 +84,13 @@ export interface BassettInputs {
 }
 
 /** Frontal area of rider + bicycle, m² (Bassett 1999 eq. 7). */
-export const bassettFrontalArea = (heightM: number, massKg: number): number => 0.0293 * heightM ** 0.725 * massKg ** 0.425 + 0.0604;
+export const bassettFrontalArea = (heightM: number, massKg: number): number => 0.0293 * pow(heightM, 0.725) * pow(massKg, 0.425) + 0.0604;
 
 /** Power in W at `speedKmh` (Bassett 1999 eq. 8). */
 export function bassettPower(input: BassettInputs, speedKmh: number): number {
   const totalMass = input.riderMassKg + input.bikeMassKg;
   const area = bassettFrontalArea(input.riderHeightM, input.riderMassKg);
-  return input.k * (0.00953 * totalMass * speedKmh + 0.00775 * speedKmh ** 2 + input.k1 * area * 0.007551 * speedKmh ** 3);
+  return input.k * (0.00953 * totalMass * speedKmh + 0.00775 * speedKmh ** 2 + input.k1 * area * 0.007551 * powInt(speedKmh, 3));
 }
 
 /** Speed in km/h at `powerW` (eq. 8 is monotone in V). */
@@ -100,5 +102,5 @@ export function bassettSpeed(input: BassettInputs, powerW: number): number {
 /** Air density ratio at `altitudeM` from the polytropic atmosphere of Bassett 1999 eq. 5 (n 1.235, R 287.1, T1 288 K, g 9.807). */
 export function bassettDensityRatio(altitudeM: number): number {
   const n = 1.235;
-  return (1 - (9.807 * (n - 1) * altitudeM) / (n * 287.1 * 288)) ** (1 / (n - 1));
+  return pow(1 - (9.807 * (n - 1) * altitudeM) / (n * 287.1 * 288), 1 / (n - 1));
 }

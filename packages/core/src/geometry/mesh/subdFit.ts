@@ -13,6 +13,7 @@ import { symmetricDeviation } from './deviation';
 import { SurfaceIndex } from './surfaceIndex';
 import { VertexGrid } from './vertexGrid';
 import { type CgReport, type RoundRows, NO_CG, solvePins, solveRound } from './subdFitSystem';
+import { pow } from '../../lib/pow';
 
 /** Most target vertices used as backward samples. */
 const MAX_BACKWARD_SAMPLES = 20_000;
@@ -346,7 +347,7 @@ export function fitSubdivision(cage: Cage, target: MeshData, options: SubdFitOpt
   ]);
   const fitted: Cage = { ...cage, vertices };
   let verifyLevel = level + 1;
-  while (verifyLevel > level && cage.faces.length * 4 ** verifyLevel > VERIFY_MAX_QUADS) verifyLevel--;
+  while (verifyLevel > level && cage.faces.length * pow(4, verifyLevel) > VERIFY_MAX_QUADS) verifyLevel--;
   const { mesh: verify, level: verified } = limitSurfaceMesh(fitted, verifyLevel);
   const deviation = symmetricDeviation(verify, target, VERIFY_MAX_SAMPLES, { edgeMidpoints: true });
   if (deviation === null) return { code: 'MESH_FIT_FAILED', message: 'the limit surface or the target has no triangle to measure' };

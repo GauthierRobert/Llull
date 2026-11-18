@@ -5,9 +5,9 @@
  * a name they know trusts the agent. The dialog therefore warns when the owner already has a trusted key or several keys are pending.
  */
 
-import { createKeyStore } from '../../server/src/plm/keyStore';
-import { createTrustStore } from '../../server/src/plm/trustStore';
-import { issueTrustGrant } from '../../server/src/plm/trustGrant';
+import { createKeyStore } from '@server/plm/keyStore';
+import { createTrustStore } from '@server/plm/trustStore';
+import { issueTrustGrant } from '@server/plm/trustGrant';
 
 export interface KeyTrustDeps {
   /** Native confirmation: resolves true only when the user explicitly agrees to the shown text. */

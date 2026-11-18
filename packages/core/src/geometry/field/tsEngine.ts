@@ -24,6 +24,7 @@ import { evaluateWithGradient } from './gradient';
 import { evaluateAt, prepareProgram } from './interpret';
 import { evaluateInterval } from './interval';
 import { type FieldProgram, programError } from './program';
+import { powInt } from '../../lib/powInt';
 
 const MAX_SAMPLES = 2 ** 21;
 const MAX_TRIANGLES = 5_000_000;
@@ -195,7 +196,7 @@ function quadraturePoints(grid: FieldGrid, sampling: 'midpoint' | 'lowdiscrepanc
         }
     return points;
   }
-  const alpha = [1 / PHI3, 1 / PHI3 ** 2, 1 / PHI3 ** 3];
+  const alpha = [1 / PHI3, 1 / PHI3 ** 2, 1 / powInt(PHI3, 3)];
   for (let n = 0; n < count; n += 1)
     for (const axis of [0, 1, 2] as const) {
       const u = (0.5 + (n + 1) * (alpha[axis] as number)) % 1;

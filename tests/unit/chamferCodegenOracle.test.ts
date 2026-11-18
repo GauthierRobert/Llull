@@ -13,12 +13,15 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { pythonRuntime, type PythonBackend } from '@core/codegen/pythonRuntime';
-import { requireTool } from '../requireTool';
+import { requireTools } from '../requireTool';
 import { edgeOf, scriptedKernel, TOPOLOGY } from '../helpers/blendKernel';
 
 const PYTHON = process.env['LLULL_PYTHON'] ?? 'python3';
-const probe = spawnSync(PYTHON, ['-I', '-c', 'import OCP'], { encoding: 'utf8', timeout: 60_000 });
-const available = probe.status === 0;
+/** The header asks for ONE interpreter with OCP, CadQuery and build123d: each is probed, so a Python without build123d skips (counted) instead of failing half the cases. */
+const imports = (module: string): boolean =>
+  spawnSync(PYTHON, ['-I', '-c', `import ${module}`], { encoding: 'utf8', timeout: 120_000 }).status === 0;
+const MODULES = ['OCP', 'cadquery', 'build123d'] as const;
+const missingTool = requireTools(MODULES.map((module) => [module === 'OCP' ? 'python:ocp' : `python:${module}`, imports(module)] as const));
 
 const directory = mkdtempSync(join(tmpdir(), 'llull-chamfer-'));
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
@@ -101,7 +104,7 @@ function legVertices(forward: boolean, firstOnSide: boolean): { present: Vertex[
   };
 }
 
-describe.skipIf(requireTool('python:ocp', available))('exported variable chamfers, run with OCP', () => {
+describe.skipIf(missingTool)('exported variable chamfers, run with OCP', () => {
   /** Export a chamfer whose kernel edge 0 is x = 10, z = 2.5 and starts at y = startY(forward). */
   const exported = (params: Record<string, unknown>, language: PythonBackend, forward = true): string => {
     const edge = edgeOf(0, { start: [10, startY(forward), 2.5], end: [10, -startY(forward), 2.5], mid: [10, 0, 2.5], length: 10 });

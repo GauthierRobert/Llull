@@ -1,6 +1,7 @@
 /** Campbell diagram of check_rotor_resonance as deterministic SVG text: rpm (x) against Hz (y), mode lines, k.rpm/60 rays, shaded operating bands. */
 
 import { excitationHz } from './campbellMath';
+import { pow } from '@lib/pow';
 
 export interface CampbellInput {
   readonly modes: readonly { readonly mode: number; readonly frequencyHz: number }[];
@@ -24,7 +25,7 @@ const escapeText = (text: string): string => xmlSafe(text).replace(/&/g, '&amp;'
 /** Round an axis end up to 1, 2 or 5 x 10^n. */
 function niceCeil(value: number): number {
   if (!(value > 0)) return 1;
-  const power = 10 ** Math.floor(Math.log10(value));
+  const power = pow(10, Math.floor(Math.log10(value)));
   const mantissa = value / power;
   return (mantissa <= 1 ? 1 : mantissa <= 2 ? 2 : mantissa <= 5 ? 5 : 10) * power;
 }

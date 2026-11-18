@@ -166,21 +166,20 @@ function plyOf(items: readonly Item[]): PlyRecord | string {
   };
 }
 
-/** The composite content of `text`. */
-export function readComposite(text: string): ReadOutcome {
-  const { bodies } = parseRecords(text);
-  const properties = propertiesOf(bodies);
-  const laminates = properties.filter((entry) => entry.name === PROPERTY.laminate);
-  const laminate = laminates[0];
-  if (laminate === undefined) return { ok: false, code: 'no_composite', reason: 'the file has no composite laminate record' };
-  const { items } = laminate;
-  const encoding = textOf(items, 'encoding');
-  if (encoding !== ENCODING && encoding !== LEGACY_ENCODING)
-    return {
-      ok: false,
-      code: 'malformed',
-      reason: `unknown composite encoding "${textOf(items, 'encoding') ?? ''}" (expected ${ENCODING})`,
-    };
+interface Header {
+  readonly surface: CompositeRecord['surface'];
+  readonly outline: Vec2[];
+  readonly rules: CompositeRecord['rules'];
+  readonly plyDropRules: CompositeRecord['plyDropRules'];
+  readonly tool: CompositeRecord['tool'] | undefined;
+  readonly side: 'positive_normal' | 'negative_normal';
+  readonly unit: string;
+  readonly toolName: string;
+  readonly face: Vec3;
+}
+
+/** Surface, outline, side, unit and tool of the laminate record, or the reason it lacks them. */
+function headerOf(items: readonly Item[]): Header | string {
   const data = parseJson<{
     surface?: CompositeRecord['surface'];
     outline?: Vec2[];
@@ -202,7 +201,24 @@ export function readComposite(text: string): ReadOutcome {
     toolName === undefined ||
     !isVec3(face)
   )
-    return { ok: false, code: 'malformed', reason: 'the laminate record lacks its surface, outline, side, unit, tool or tool face point' };
+    return 'the laminate record lacks its surface, outline, side, unit, tool or tool face point';
+  return {
+    surface: data.surface,
+    outline: data.outline,
+    rules: data.rules,
+    plyDropRules: data.plyDropRules,
+    tool: data.tool,
+    side,
+    unit: unit as string,
+    toolName,
+    face,
+  };
+}
+
+type PropertyList = ReturnType<typeof propertiesOf>;
+
+/** The rosette records, or the reason one is incomplete. */
+function readRosettes(properties: PropertyList): RosetteRecord[] | string {
   const rosettes: RosetteRecord[] = [];
   for (const entry of properties.filter((property) => property.name === PROPERTY.rosette)) {
     const find = (name: string): readonly number[] | undefined => entry.items.find((item) => item.name === name)?.numbers;
@@ -217,7 +233,7 @@ export function readComposite(text: string): ReadOutcome {
       method === undefined ||
       !ROSETTE_METHODS.includes(method)
     )
-      return { ok: false, code: 'malformed', reason: `rosette record "${entry.description}" is incomplete` };
+      return `rosette record "${entry.description}" is incomplete`;
     rosettes.push({
       name,
       origin: origin,
@@ -227,20 +243,34 @@ export function readComposite(text: string): ReadOutcome {
       ...(isVec3(axis) ? { axis } : {}),
     });
   }
+  return rosettes;
+}
+
+/** The lamina material records, or the reason one is unreadable. */
+function readMaterials(properties: PropertyList): LaminaMaterial[] | string {
   const materials: LaminaMaterial[] = [];
   for (const entry of properties.filter((property) => property.name === PROPERTY.material)) {
     const material = parseJson<LaminaMaterial>(textOf(entry.items, 'data'));
-    if (material === null || typeof material.name !== 'string')
-      return { ok: false, code: 'malformed', reason: `material record "${entry.description}" is unreadable` };
+    if (material === null || typeof material.name !== 'string') return `material record "${entry.description}" is unreadable`;
     materials.push(material);
   }
+  return materials;
+}
+
+/** The ply records, or the reason the count is over the limit or one is invalid. */
+function readPlies(properties: PropertyList): PlyRecord[] | string {
   const plies: PlyRecord[] = [];
   for (const entry of properties.filter((property) => property.name === PROPERTY.ply)) {
-    if (plies.length >= MAX_PLIES) return { ok: false, code: 'malformed', reason: `more than ${MAX_PLIES} plies` };
+    if (plies.length >= MAX_PLIES) return `more than ${MAX_PLIES} plies`;
     const ply = plyOf(entry.items);
-    if (typeof ply === 'string') return { ok: false, code: 'malformed', reason: ply };
+    if (typeof ply === 'string') return ply;
     plies.push(ply);
   }
+  return plies;
+}
+
+/** The validation properties the file carries (ply areas by ply name, laminate counts / thickness / mass). */
+function readEmbedded(properties: PropertyList, encoding: string): EmbeddedValidation {
   const plyAreas: Record<string, number> = {};
   let plyCount: number | undefined;
   let thickness: number | undefined;
@@ -258,6 +288,16 @@ export function readComposite(text: string): ReadOutcome {
       mass = numberOf(entry.items, 'laminate mass') ?? mass;
     }
   }
+  return {
+    ...(plyCount === undefined ? {} : { plyCount }),
+    ...(thickness === undefined ? {} : { thickness }),
+    ...(mass === undefined ? {} : { mass }),
+    plyAreas,
+  };
+}
+
+/** Ply name -> product names of its explicit solids, from the PROPERTY.piece links. */
+function readLinkedSolids(bodies: Bodies): Record<string, string[]> {
   const linkedSolids: Record<string, string[]> = {};
   for (const body of bodies.values()) {
     if (entityName(body) !== 'PROPERTY_DEFINITION' || unquoted(stringsOf(body)[0] ?? '') !== PROPERTY.piece) continue;
@@ -265,31 +305,45 @@ export function readComposite(text: string): ReadOutcome {
     const product = productNameOf(bodies, referencesOf(body)[0] ?? 0);
     if (product !== null) linkedSolids[ply] = [...(linkedSolids[ply] ?? []), product];
   }
+  return linkedSolids;
+}
+
+const malformed = (reason: string): ReadOutcome => ({ ok: false, code: 'malformed', reason });
+
+/** The composite content of `text`. */
+export function readComposite(text: string): ReadOutcome {
+  const { bodies } = parseRecords(text);
+  const properties = propertiesOf(bodies);
+  const laminates = properties.filter((entry) => entry.name === PROPERTY.laminate);
+  const laminate = laminates[0];
+  if (laminate === undefined) return { ok: false, code: 'no_composite', reason: 'the file has no composite laminate record' };
+  const { items } = laminate;
+  const encoding = textOf(items, 'encoding');
+  if (encoding !== ENCODING && encoding !== LEGACY_ENCODING)
+    return malformed(`unknown composite encoding "${textOf(items, 'encoding') ?? ''}" (expected ${ENCODING})`);
+  const header = headerOf(items);
+  if (typeof header === 'string') return malformed(header);
+  const rosettes = readRosettes(properties);
+  if (typeof rosettes === 'string') return malformed(rosettes);
+  const materials = readMaterials(properties);
+  if (typeof materials === 'string') return malformed(materials);
+  const plies = readPlies(properties);
+  if (typeof plies === 'string') return malformed(plies);
+  const embedded = readEmbedded(properties, encoding);
+  const linkedSolids = readLinkedSolids(bodies);
   const record: Omit<CompositeRecord, 'validation'> = {
     name: textOf(items, 'name') ?? laminate.description,
-    units: unit as DocumentUnit,
-    laminateSide: side,
-    tool: { ...(data.tool ?? { entityId: '', faceNear: face }), name: toolName, faceNear: face },
+    units: header.unit as DocumentUnit,
+    laminateSide: header.side,
+    tool: { ...(header.tool ?? { entityId: '', faceNear: header.face }), name: header.toolName, faceNear: header.face },
     partRosette: textOf(items, 'part rosette') ?? '',
     rosettes,
-    surface: data.surface,
-    outline: data.outline,
-    ...(data.rules === undefined ? {} : { rules: data.rules }),
-    ...(data.plyDropRules === undefined ? {} : { plyDropRules: data.plyDropRules }),
+    surface: header.surface,
+    outline: header.outline,
+    ...(header.rules === undefined ? {} : { rules: header.rules }),
+    ...(header.plyDropRules === undefined ? {} : { plyDropRules: header.plyDropRules }),
     materials,
     plies,
   };
-  return {
-    ok: true,
-    record,
-    embedded: {
-      ...(plyCount === undefined ? {} : { plyCount }),
-      ...(thickness === undefined ? {} : { thickness }),
-      ...(mass === undefined ? {} : { mass }),
-      plyAreas,
-    },
-    linkedSolids,
-    laminates: laminates.length,
-    standard: readStandard(text),
-  };
+  return { ok: true, record, embedded, linkedSolids, laminates: laminates.length, standard: readStandard(text) };
 }

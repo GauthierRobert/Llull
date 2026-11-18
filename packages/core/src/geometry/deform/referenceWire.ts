@@ -35,13 +35,76 @@ function ring(centre: Vec3, a: Vec3, b: Vec3, offset: Vec3 = [0, 0, 0]): Vec3[] 
 
 const unit = (v: Vec3 | undefined, fallback: Vec3): Vec3 => (v !== undefined && len3(v) > 0 ? normalize3(v) : fallback);
 
+const spread = (count: number): number[] => Array.from({ length: count }, (_, i) => (count === 1 ? 0 : -1 + (2 * i) / (count - 1)));
+
+function helicoidWire(shape: ReferenceShape, extent: WireExtent): Vec3[][] | null {
+  const R = extent.radius;
+  const { point, axis, reference, rate } = shape;
+  if (point === undefined || axis === undefined || reference === undefined || rate === undefined) return null;
+  const w = unit(axis, [0, 0, 1]);
+  const across = add3(reference, scale3(w, -(reference[0] * w[0] + reference[1] * w[1] + reference[2] * w[2])));
+  const x = len3(across) > 0 ? normalize3(across) : basisAround(w)[0];
+  const y = cross3(w, x);
+  const offset = shape.offset ?? 0;
+  const t0 = (extent.centre[0] - point[0]) * w[0] + (extent.centre[1] - point[1]) * w[1] + (extent.centre[2] - point[2]) * w[2];
+  const wires: Vec3[][] = [];
+  // the twisted plane x cos(k z) + y sin(k z) = offset: one line per height, and rulings along z at fixed distances from the axis
+  for (const s of spread(2 * RINGS + 1)) {
+    const z = t0 + s * R;
+    const [c, d] = [Math.cos(rate * z), Math.sin(rate * z)];
+    const foot = add3(point, scale3(w, z));
+    const direction = add3(scale3(x, -d), scale3(y, c));
+    const start = add3(foot, add3(scale3(x, offset * c), scale3(y, offset * d)));
+    wires.push([add3(start, scale3(direction, -R)), add3(start, scale3(direction, R))]);
+  }
+  for (const r of spread(RINGS)) {
+    wires.push(
+      Array.from({ length: STEPS + 1 }, (_, i) => {
+        const z = t0 - R + (2 * R * i) / STEPS;
+        const [c, d] = [Math.cos(rate * z), Math.sin(rate * z)];
+        const along = add3(scale3(x, offset * c - r * R * d), scale3(y, offset * d + r * R * c));
+        return add3(add3(point, scale3(w, z)), along);
+      }),
+    );
+  }
+  return wires;
+}
+
+function cylinderWire(shape: ReferenceShape, extent: WireExtent): Vec3[][] | null {
+  const R = extent.radius;
+  const { point, axis } = shape;
+  if (point === undefined || axis === undefined) return null;
+  const w = unit(axis, [0, 0, 1]);
+  let a: Vec3;
+  let b: Vec3;
+  if (shape.kind === 'cylinder') {
+    if (shape.radius === undefined) return null;
+    const [u, v] = basisAround(w);
+    [a, b] = [scale3(u, shape.radius), scale3(v, shape.radius)];
+  } else {
+    if (shape.reference === undefined || shape.radii === undefined || shape.radii.length !== 2) return null;
+    const across = add3(shape.reference, scale3(w, -(shape.reference[0] * w[0] + shape.reference[1] * w[1] + shape.reference[2] * w[2])));
+    const u = len3(across) > 0 ? normalize3(across) : basisAround(w)[0];
+    [a, b] = [scale3(u, shape.radii[0] as number), scale3(cross3(w, u), shape.radii[1] as number)];
+  }
+  // the point of the axis nearest the body centre is the middle of the drawing
+  const t0 = (extent.centre[0] - point[0]) * w[0] + (extent.centre[1] - point[1]) * w[1] + (extent.centre[2] - point[2]) * w[2];
+  const middle = add3(point, scale3(w, t0));
+  const wires = spread(RINGS).map((s) => ring(add3(middle, scale3(w, s * R)), a, b));
+  for (let k = 0; k < RULINGS; k++) {
+    const angle = (2 * Math.PI * k) / RULINGS;
+    const rim = add3(scale3(a, Math.cos(angle)), scale3(b, Math.sin(angle)));
+    wires.push([add3(add3(middle, scale3(w, -R)), rim), add3(add3(middle, scale3(w, R)), rim)]);
+  }
+  return wires;
+}
+
 /**
  * Polylines of `shape` (world), or null when a number it needs is missing. The surfaces that are infinite are drawn over the body: rings and rulings of a cylinder, a
  * cone, an elliptic cylinder or a helicoid span the body's size around the point of the axis nearest the body centre; a plane is a grid of that size.
  */
 export function referenceWire(shape: ReferenceShape, extent: WireExtent): Vec3[][] | null {
   const R = extent.radius;
-  const spread = (count: number): number[] => Array.from({ length: count }, (_, i) => (count === 1 ? 0 : -1 + (2 * i) / (count - 1)));
   switch (shape.kind) {
     case 'sphere': {
       const { center, radius } = shape;
@@ -75,36 +138,8 @@ export function referenceWire(shape: ReferenceShape, extent: WireExtent): Vec3[]
       return wires;
     }
     case 'cylinder':
-    case 'ellipticCylinder': {
-      const { point, axis } = shape;
-      if (point === undefined || axis === undefined) return null;
-      const w = unit(axis, [0, 0, 1]);
-      let a: Vec3;
-      let b: Vec3;
-      if (shape.kind === 'cylinder') {
-        if (shape.radius === undefined) return null;
-        const [u, v] = basisAround(w);
-        [a, b] = [scale3(u, shape.radius), scale3(v, shape.radius)];
-      } else {
-        if (shape.reference === undefined || shape.radii === undefined || shape.radii.length !== 2) return null;
-        const across = add3(
-          shape.reference,
-          scale3(w, -(shape.reference[0] * w[0] + shape.reference[1] * w[1] + shape.reference[2] * w[2])),
-        );
-        const u = len3(across) > 0 ? normalize3(across) : basisAround(w)[0];
-        [a, b] = [scale3(u, shape.radii[0] as number), scale3(cross3(w, u), shape.radii[1] as number)];
-      }
-      // the point of the axis nearest the body centre is the middle of the drawing
-      const t0 = (extent.centre[0] - point[0]) * w[0] + (extent.centre[1] - point[1]) * w[1] + (extent.centre[2] - point[2]) * w[2];
-      const middle = add3(point, scale3(w, t0));
-      const wires = spread(RINGS).map((s) => ring(add3(middle, scale3(w, s * R)), a, b));
-      for (let k = 0; k < RULINGS; k++) {
-        const angle = (2 * Math.PI * k) / RULINGS;
-        const rim = add3(scale3(a, Math.cos(angle)), scale3(b, Math.sin(angle)));
-        wires.push([add3(add3(middle, scale3(w, -R)), rim), add3(add3(middle, scale3(w, R)), rim)]);
-      }
-      return wires;
-    }
+    case 'ellipticCylinder':
+      return cylinderWire(shape, extent);
     case 'cone': {
       const { apex, axis, halfAngleDeg } = shape;
       if (apex === undefined || axis === undefined || halfAngleDeg === undefined) return null;
@@ -138,36 +173,7 @@ export function referenceWire(shape: ReferenceShape, extent: WireExtent): Vec3[]
       }
       return wires;
     }
-    case 'helicoid': {
-      const { point, axis, reference, rate } = shape;
-      if (point === undefined || axis === undefined || reference === undefined || rate === undefined) return null;
-      const w = unit(axis, [0, 0, 1]);
-      const across = add3(reference, scale3(w, -(reference[0] * w[0] + reference[1] * w[1] + reference[2] * w[2])));
-      const x = len3(across) > 0 ? normalize3(across) : basisAround(w)[0];
-      const y = cross3(w, x);
-      const offset = shape.offset ?? 0;
-      const t0 = (extent.centre[0] - point[0]) * w[0] + (extent.centre[1] - point[1]) * w[1] + (extent.centre[2] - point[2]) * w[2];
-      const wires: Vec3[][] = [];
-      // the twisted plane x cos(k z) + y sin(k z) = offset: one line per height, and rulings along z at fixed distances from the axis
-      for (const s of spread(2 * RINGS + 1)) {
-        const z = t0 + s * R;
-        const [c, d] = [Math.cos(rate * z), Math.sin(rate * z)];
-        const foot = add3(point, scale3(w, z));
-        const direction = add3(scale3(x, -d), scale3(y, c));
-        const start = add3(foot, add3(scale3(x, offset * c), scale3(y, offset * d)));
-        wires.push([add3(start, scale3(direction, -R)), add3(start, scale3(direction, R))]);
-      }
-      for (const r of spread(RINGS)) {
-        wires.push(
-          Array.from({ length: STEPS + 1 }, (_, i) => {
-            const z = t0 - R + (2 * R * i) / STEPS;
-            const [c, d] = [Math.cos(rate * z), Math.sin(rate * z)];
-            const along = add3(scale3(x, offset * c - r * R * d), scale3(y, offset * d + r * R * c));
-            return add3(add3(point, scale3(w, z)), along);
-          }),
-        );
-      }
-      return wires;
-    }
+    case 'helicoid':
+      return helicoidWire(shape, extent);
   }
 }

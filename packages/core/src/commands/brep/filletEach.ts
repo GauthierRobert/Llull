@@ -6,7 +6,7 @@
  */
 
 import { round6 } from '../../lib/compactNumber';
-import type { CadDocument, EdgeRadius, ShapeRecipe, Vec3 } from '../../model/types';
+import type { CadDocument, EdgeRadius, Entity, ShapeRecipe, Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult, ExecutionContext } from '../types';
 import { currentContext } from '../context';
@@ -225,20 +225,28 @@ function cornerRefusal(doc: CadDocument, id: string, refusal: CornerRefusal): Co
   };
 }
 
-/**
- * @failure missing / non-solid target, no kernel, entry without exactly one of index/near, repeated or unroundable edge, chord mode without
- *   face adjacency, kernel refusal -> unchanged doc; bad law -> BLD_LAW_INVALID; open law on a closed edge -> BLD_LAW_NOT_PERIODIC; tangent faces
- *   in chord mode -> BLD_CHORD_UNDEFINED
- */
-export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, request: FilletRequest): CommandResult {
-  const fail = (why: string): CommandResult => noop(doc, `fillet_edge: ${why}; document unchanged.`);
-  const refuse = (refusal: Refusal | ProfileRefusal): CommandResult =>
-    blendRejection(doc, 'fillet_edge', refusal.code, `${refusal.message} (${refusal.path})`, [request.id], [refusal.path]);
+const failFillet = (doc: CadDocument, why: string): CommandResult => noop(doc, `fillet_edge: ${why}; document unchanged.`);
+
+const refuseFillet = (doc: CadDocument, request: FilletRequest, refusal: Refusal | ProfileRefusal): CommandResult =>
+  blendRejection(doc, 'fillet_edge', refusal.code, `${refusal.message} (${refusal.path})`, [request.id], [refusal.path]);
+
+interface FilletTarget {
+  readonly profile: Exclude<ReturnType<typeof resolveProfile>, ProfileRefusal>;
+  readonly entity: Entity;
+  readonly kernel: GeometryKernel;
+  readonly source: ShapeRecipe;
+  readonly shape: ShapeHandle;
+  readonly topology: ShapeTopology | null;
+  readonly named: FilletRequest;
+}
+
+/** Phase 1: the profile, the target solid, the kernel and its shape and topology, and the request with its recorded edge names resolved. */
+function openTarget(doc: CadDocument, ctx: ExecutionContext | undefined, request: FilletRequest): FilletTarget | CommandResult {
   const profile = resolveProfile(request.profile);
-  if (isProfileRefusal(profile)) return refuse(profile);
+  if (isProfileRefusal(profile)) return refuseFillet(doc, request, profile);
   if (request.edges !== undefined && (request.edgeIndices.length > 0 || request.edgesNear.length > 0 || request.radius !== undefined))
-    return fail('give either edges (one size per edge) or the radius / edgeIndices / edgesNear shorthand, not both');
-  if (request.edges !== undefined && request.edges.length === 0) return fail('edges must not be empty');
+    return failFillet(doc, 'give either edges (one size per edge) or the radius / edgeIndices / edgesNear shorthand, not both');
+  if (request.edges !== undefined && request.edges.length === 0) return failFillet(doc, 'edges must not be empty');
   const validation = validateSolidTarget(doc, 'fillet_edge', request.id);
   if ('summary' in validation) return validation;
   const { entity } = validation;
@@ -246,59 +254,91 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   if (!kernel) return noop(doc, kernelUnavailable('fillet_edge'));
   const source = operandRecipe(kernel, entity);
   const shape = kernel.evaluate(source);
-  if (shape === null) return fail(`kernel could not build entity '${request.id}' (kind '${entity.kind}')`);
+  if (shape === null) return failFillet(doc, `kernel could not build entity '${request.id}' (kind '${entity.kind}')`);
   const topology = kernel.topology(shape);
   const named = byRecordedNames(topology, request);
   if ('problem' in named)
-    return { ...fail(`${named.problem} on '${request.id}'`), error: commandError(named.code, REPICK_EDGES, [], ['edgeNames']) };
+    return { ...failFillet(doc, `${named.problem} on '${request.id}'`), error: commandError(named.code, REPICK_EDGES, [], ['edgeNames']) };
+  return { profile, entity, kernel, source, shape, topology, named };
+}
+
+/** Phase 2: the planned edges with their laws (chords converted to radii in chord mode), or the refusal. */
+function planEdges(
+  doc: CadDocument,
+  request: FilletRequest,
+  target: FilletTarget,
+): { readonly planned: readonly Planned[] } | CommandResult {
+  const { kernel, shape, topology, named } = target;
   const resolved =
     request.chain !== undefined
       ? resolveChain(topology, kernel, shape, named, request.chain)
       : named.edges === undefined
         ? resolveShorthand(topology, named)
         : resolveEntries(topology, named.edges);
-  if ('refusal' in resolved) return refuse(resolved.refusal);
-  if ('problem' in resolved) return fail(`${resolved.problem} on '${request.id}'`);
+  if ('refusal' in resolved) return refuseFillet(doc, request, resolved.refusal);
+  if ('problem' in resolved) return failFillet(doc, `${resolved.problem} on '${request.id}'`);
   const validated = selectEdges(
     topology,
     resolved.planned.map((entry) => entry.edge),
     [],
   );
-  if ('problem' in validated) return fail(`${validated.problem} on '${request.id}'`);
-  if (resolved.planned.length === 0) return fail(`'${request.id}' has no roundable edge`);
+  if ('problem' in validated) return failFillet(doc, `${validated.problem} on '${request.id}'`);
+  if (resolved.planned.length === 0) return failFillet(doc, `'${request.id}' has no roundable edge`);
   const open = openLawOnClosedEdge(topology, resolved.planned);
-  if (open !== null) return refuse(open);
+  if (open !== null) return refuseFillet(doc, request, open);
   const sized = request.mode === 'chord' ? chordsToRadii(kernel, shape, topology, resolved.planned) : resolved;
   if ('problem' in sized) {
     const message = `${sized.problem} on '${request.id}'`;
-    return 'code' in sized && sized.code !== undefined ? refuse({ code: sized.code, message, path: 'mode' }) : fail(message);
+    return 'code' in sized && sized.code !== undefined
+      ? refuseFillet(doc, request, { code: sized.code, message, path: 'mode' })
+      : failFillet(doc, message);
   }
-  const profiled = profile.profile !== undefined || sized.planned.some((entry) => entry.law.size2 !== undefined);
+  return sized;
+}
+
+interface BlendPlan {
+  readonly plan: readonly Planned[];
+  readonly corners: readonly SetbackCorner[];
+  readonly cornerRecord: readonly CornerInput[] | null;
+  readonly profiled: boolean;
+}
+
+/** Phase 3: the setback corners and the profile preparation of the planned edges, or the refusal. */
+function planBlend(
+  doc: CadDocument,
+  request: FilletRequest,
+  target: FilletTarget,
+  sizedPlanned: readonly Planned[],
+): BlendPlan | CommandResult {
+  const { kernel, shape, topology, profile } = target;
+  const profiled = profile.profile !== undefined || sizedPlanned.some((entry) => entry.law.size2 !== undefined);
   const cornered =
     request.corners === undefined
       ? null
-      : resolveCorners(topology, sized.planned, request.corners, profile.profile !== undefined && profile.profile.type !== 'circular');
-  if (cornered !== null && 'problem' in cornered) return fail(`${cornered.problem} on '${request.id}'`);
+      : resolveCorners(topology, sizedPlanned, request.corners, profile.profile !== undefined && profile.profile.type !== 'circular');
+  if (cornered !== null && 'problem' in cornered) return failFillet(doc, `${cornered.problem} on '${request.id}'`);
   if (cornered !== null && 'refusal' in cornered) return cornerRefusal(doc, request.id, cornered.refusal);
-  const prepared = profiled ? prepareProfile(kernel, shape, topology, sized.planned as PlannedProfile[]) : null;
-  if (prepared !== null && isProfileRefusal(prepared)) return refuse(prepared);
-  const plan = prepared === null ? sized.planned : (prepared.planned as Planned[]);
+  const prepared = profiled ? prepareProfile(kernel, shape, topology, sizedPlanned as PlannedProfile[]) : null;
+  if (prepared !== null && isProfileRefusal(prepared)) return refuseFillet(doc, request, prepared);
+  const plan = prepared === null ? sizedPlanned : (prepared.planned as Planned[]);
   const corners = cornered === null ? [] : cornered.corners;
-  const modified = recipeOfPlan(source, plan, topology, profile.profile, corners);
-  const result = evaluateRecipe(kernel, modified);
-  if (typeof result === 'string') return blendRefusal(doc, 'fillet_edge', request.id, kernel, modified, result, topology);
-  const list = plan.map((entry) => `${entry.edge}: r ${lawText(entry.law)}`).join(', ');
-  const section = profileText(profile.profile);
-  const rounded = corners.length === 0 ? '' : `, ${corners.length} setback corner(s)`;
-  const chord = request.mode === 'chord' ? ' (sizes given as chord lengths, converted to radii)' : '';
-  const committed = commitKernelResult(
-    doc,
-    kernel,
-    result,
-    [entity],
-    (newId, triangles) =>
-      `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${rounded}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
-  );
+  return { plan, corners, cornerRecord: cornered === null ? null : cornered.record, profiled };
+}
+
+interface FilletOutcome {
+  readonly request: FilletRequest;
+  readonly target: FilletTarget;
+  readonly blend: BlendPlan;
+  readonly sizedPlanned: readonly Planned[];
+  readonly modified: ShapeRecipe;
+  readonly committed: CommandResult;
+}
+
+/** Phase 5: the kink check, the profile / corner notes, the creases and the recorded names added to the committed result. */
+function finishFillet(doc: CadDocument, ctx: ExecutionContext | undefined, outcome: FilletOutcome): CommandResult {
+  const { request, target, blend, sizedPlanned, modified, committed } = outcome;
+  const { kernel, source, shape, topology } = target;
+  const { plan, corners, cornerRecord, profiled } = blend;
   const kink = findKink(doc, committed, source, ctx);
   if (kink !== null && request.allowNonTangent !== true)
     return kinkRefusal(doc, 'fillet_edge', request.id, kink, request.edges === undefined ? 'radius' : 'edges');
@@ -340,12 +380,43 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
       : namesOf(
           topology,
           'edge',
-          sized.planned.map((entry) => entry.edge),
+          sizedPlanned.map((entry) => entry.edge),
         );
-  const cornerRecord = cornered === null ? null : cornered.record;
   if (committed.document === doc || (record === null && cornerRecord === null)) return reported;
   return {
     ...reported,
     recordExtras: { ...(record === null ? {} : { edgeNames: record }), ...(cornerRecord === null ? {} : { corners: cornerRecord }) },
   };
+}
+
+/**
+ * @failure missing / non-solid target, no kernel, entry without exactly one of index/near, repeated or unroundable edge, chord mode without
+ *   face adjacency, kernel refusal -> unchanged doc; bad law -> BLD_LAW_INVALID; open law on a closed edge -> BLD_LAW_NOT_PERIODIC; tangent faces
+ *   in chord mode -> BLD_CHORD_UNDEFINED
+ */
+export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, request: FilletRequest): CommandResult {
+  const target = openTarget(doc, ctx, request);
+  if ('summary' in target) return target;
+  const sized = planEdges(doc, request, target);
+  if ('summary' in sized) return sized;
+  const blend = planBlend(doc, request, target, sized.planned);
+  if ('summary' in blend) return blend;
+  const { entity, kernel, source, topology, profile } = target;
+  const { plan, corners } = blend;
+  const modified = recipeOfPlan(source, plan, topology, profile.profile, corners);
+  const result = evaluateRecipe(kernel, modified);
+  if (typeof result === 'string') return blendRefusal(doc, 'fillet_edge', request.id, kernel, modified, result, topology);
+  const list = plan.map((entry) => `${entry.edge}: r ${lawText(entry.law)}`).join(', ');
+  const section = profileText(profile.profile);
+  const rounded = corners.length === 0 ? '' : `, ${corners.length} setback corner(s)`;
+  const chord = request.mode === 'chord' ? ' (sizes given as chord lengths, converted to radii)' : '';
+  const committed = commitKernelResult(
+    doc,
+    kernel,
+    result,
+    [entity],
+    (newId, triangles) =>
+      `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${rounded}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
+  );
+  return finishFillet(doc, ctx, { request, target, blend, sizedPlanned: sized.planned, modified, committed });
 }

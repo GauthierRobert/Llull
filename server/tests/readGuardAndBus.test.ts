@@ -27,13 +27,13 @@ afterEach(() => {
 describe('guardRead', () => {
   it('is open without a token', async () => {
     expect((await request(app).get('/live/snapshot')).status).toBe(200);
-    expect((await request(app).get('/export/stl')).status).toBe(200);
+    expect((await request(app).get('/export/step')).status).not.toBe(401); // 503 / 500 without a STEP backend: the guard let it through
   });
 
   it('with a token: rejects bare loopback requests and ?access_token=, accepts bearer', async () => {
     process.env['LLULL_AUTH_TOKEN'] = TOKEN;
     expect((await request(app).get('/live/snapshot')).status).toBe(401);
-    expect((await request(app).get('/export/stl')).status).toBe(401);
+    expect((await request(app).get('/export/step')).status).toBe(401);
     expect((await request(app).get('/live')).status).toBe(401);
     const bearer = await request(app).get('/live/snapshot').set('Authorization', `Bearer ${TOKEN}`);
     expect(bearer.status).toBe(200);

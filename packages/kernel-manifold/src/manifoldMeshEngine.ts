@@ -22,6 +22,7 @@ import type {
 } from '@core/geometry/mesh/engineTypes';
 import { orientOutward } from '@core/geometry/meshVolume';
 import { MANIFOLD_VERSION, loadManifoldModule } from './manifoldModule';
+import { pow } from '@lib/pow';
 
 interface RawMesh {
   readonly numProp: number;
@@ -305,7 +306,7 @@ class Engine implements MeshProcessingEngine {
     const source = this.solid(mesh);
     if (source === null) return this.notManifold('the input mesh');
     const tangent = this.own(source.smoothOut(op.featureAngleDeg, 0));
-    const refined = this.own(op.maxEdge !== undefined ? tangent.refineToLength(op.maxEdge) : tangent.refine(2 ** op.levels));
+    const refined = this.own(op.maxEdge !== undefined ? tangent.refineToLength(op.maxEdge) : tangent.refine(pow(2, op.levels)));
     return {
       mesh: this.extract(refined),
       report: { levels: op.levels, ...(op.maxEdge !== undefined ? { maxEdge: op.maxEdge } : {}), featureAngleDeg: op.featureAngleDeg },

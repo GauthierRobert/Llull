@@ -2,12 +2,65 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed, noop } from '@core/commands/noop';
 import type { PipeLine } from '@aec/plant/types';
-import { rereadRequest, resolveInsulation } from '../insulation';
+import { rereadRequest, resolveInsulation, type InsulationRequest } from '../insulation';
 import { lineNumberTemplate, renderLineNumber } from '../lineNumber';
 import { getPiping, refuse, withPiping } from '../model';
 import { refuseDerivation, rederive } from '../runUpdate';
-import { createSpecLookup, isMiss } from '../specLookup';
+import { createSpecLookup, isMiss, type SpecLookup, type SpecMiss } from '../specLookup';
 import { insulationInput, lineSlopeInput, slopeProblem } from './lineInput';
+
+interface Fields {
+  readonly slope?: z.infer<typeof lineSlopeInput> | null | undefined;
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+  readonly service?: string | undefined;
+  readonly sequence?: string | undefined;
+}
+
+function nextLine(
+  line: PipeLine,
+  fields: Fields,
+  specId: string,
+  resolved: PipeLine['insulation'],
+  pressure: number | undefined,
+  temperature: number | undefined,
+): PipeLine {
+  const { from, to } = fields;
+  const nextSlope = fields.slope === undefined ? line.slope : (fields.slope ?? undefined);
+  const nextFrom = from === undefined ? line.from : from === '' ? undefined : from;
+  const nextTo = to === undefined ? line.to : to === '' ? undefined : to;
+  return {
+    id: line.id,
+    lineNumber: line.lineNumber,
+    service: fields.service ?? line.service,
+    sequence: fields.sequence ?? line.sequence,
+    spec: specId,
+    dn: line.dn,
+    ...(resolved === undefined ? {} : { insulation: resolved }),
+    ...(nextSlope === undefined ? {} : { slope: nextSlope }),
+    ...(pressure === undefined ? {} : { designPressureBarG: pressure }),
+    ...(temperature === undefined ? {} : { designTempC: temperature }),
+    ...(nextFrom === undefined ? {} : { from: nextFrom }),
+    ...(nextTo === undefined ? {} : { to: nextTo }),
+  };
+}
+
+function nextInsulation(
+  lookup: SpecLookup,
+  line: PipeLine,
+  specId: string,
+  temperature: number | undefined,
+  requested: InsulationRequest | null | undefined,
+): PipeLine['insulation'] | SpecMiss {
+  const readAgain = line.insulation?.source === 'spec' && (specId !== line.spec || temperature !== line.designTempC);
+  return requested === null
+    ? undefined
+    : requested !== undefined
+      ? resolveInsulation(lookup, line.dn, temperature, requested)
+      : readAgain && line.insulation !== undefined
+        ? resolveInsulation(lookup, line.dn, temperature, rereadRequest(line.insulation))
+        : line.insulation;
+}
 
 /**
  * @affects changes 1 pipe line (plant.piping) and re-derives every run of it (a new spec re-selects every part)
@@ -55,7 +108,7 @@ export const updatePipeline = defineCommand({
     const piping = getPiping(doc);
     const line = piping.lines[params.lineId];
     if (line === undefined) return refuse(doc, 'update_pipeline', 'RTE_UNKNOWN_LINE', `no pipe line "${params.lineId}"`, [], ['lineId']);
-    const { lineNumber: explicitNumber, from, to } = params;
+    const { lineNumber: explicitNumber } = params;
     const template = lineNumberTemplate(piping).value;
     const followedTemplate = line.lineNumber === renderLineNumber(template, line);
     const specId = params.spec ?? line.spec;
@@ -65,38 +118,14 @@ export const updatePipeline = defineCommand({
     if (isMiss(pipe)) return refuse(doc, 'update_pipeline', pipe.miss, pipe.detail, [...pipe.ids], ['spec']);
     const pressure = params.designPressureBarG ?? line.designPressureBarG;
     const temperature = params.designTempC ?? line.designTempC;
-    const readAgain = line.insulation?.source === 'spec' && (specId !== line.spec || temperature !== line.designTempC);
-    const resolved =
-      params.insulation === null
-        ? undefined
-        : params.insulation !== undefined
-          ? resolveInsulation(lookup, line.dn, temperature, params.insulation)
-          : readAgain && line.insulation !== undefined
-            ? resolveInsulation(lookup, line.dn, temperature, rereadRequest(line.insulation))
-            : line.insulation;
+    const resolved = nextInsulation(lookup, line, specId, temperature, params.insulation);
     if (resolved !== undefined && isMiss(resolved))
       return refuse(doc, 'update_pipeline', resolved.miss, resolved.detail, [...resolved.ids], [...resolved.paths]);
     if (params.slope !== undefined && params.slope !== null) {
       const problem = slopeProblem(params.slope);
       if (problem !== null) return refuse(doc, 'update_pipeline', 'RTE_SLOPE_INVALID', problem, [], ['slope']);
     }
-    const nextSlope = params.slope === undefined ? line.slope : (params.slope ?? undefined);
-    const nextFrom = from === undefined ? line.from : from === '' ? undefined : from;
-    const nextTo = to === undefined ? line.to : to === '' ? undefined : to;
-    const next: PipeLine = {
-      id: line.id,
-      lineNumber: line.lineNumber,
-      service: params.service ?? line.service,
-      sequence: params.sequence ?? line.sequence,
-      spec: specId,
-      dn: line.dn,
-      ...(resolved === undefined ? {} : { insulation: resolved }),
-      ...(nextSlope === undefined ? {} : { slope: nextSlope }),
-      ...(pressure === undefined ? {} : { designPressureBarG: pressure }),
-      ...(temperature === undefined ? {} : { designTempC: temperature }),
-      ...(nextFrom === undefined ? {} : { from: nextFrom }),
-      ...(nextTo === undefined ? {} : { to: nextTo }),
-    };
+    const next = nextLine(line, params, specId, resolved, pressure, temperature);
     const lineNumber = explicitNumber ?? (followedTemplate ? renderLineNumber(template, next) : line.lineNumber);
     const updated: PipeLine = { ...next, lineNumber };
     const changedFields = (Object.keys({ ...line, ...updated }) as Array<keyof PipeLine>).filter(

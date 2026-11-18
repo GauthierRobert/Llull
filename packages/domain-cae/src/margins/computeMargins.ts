@@ -11,8 +11,7 @@ import { significantNumber } from '@lib/compactNumber';
 import { loadCasesOf } from '../decks/context';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../decks/elastic';
 import { lengthUnitName, stressPerMpa, stressUnitName } from '../decks/units';
-import { nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from '../results/fields';
-import { appliedOverFibres, type Applied } from './fibreStress';
+import { nodeCoordinates, stepOfLoadCase } from '../results/fields';
 import { plyMarginRows } from './plyMargins';
 import { compositeWarnings, exclusionWarnings, isCompositeEntity, orphanSingularKeys } from './screenWarnings';
 import { caseOf } from '../shared/access';
@@ -34,13 +33,11 @@ import { dispositionOf } from './disposition';
 import { refuseMargins } from './refusal';
 import { screenSingularities } from './singularity';
 import { adequacyOf } from '../results/adequacy';
-import { adequacyWarnings, gateRows, notAssessedText, overallOf } from './adequacyGate';
+import { adequacyWarnings, gateRows, notAssessedText, overallOf, type GatedRows } from './adequacyGate';
+import { appliedOver, CRITERIA, groupsOf, type Criterion } from './marginGroups';
+import { queryRefusal, refusalFor, verifiedArtifacts } from './marginQueryChecks';
 import { jointMarginSchema, jointMarginTable } from '../contact/jointMargins';
 import { limitLoadMarginSchema, limitLoadMarginTable } from './limitLoadMargins';
-
-const CRITERIA = ['von_mises', 's_xx', 's_yy', 's_zz'] as const;
-type Criterion = (typeof CRITERIA)[number];
-const COMPONENT: Readonly<Record<Exclude<Criterion, 'von_mises'>, number>> = { s_xx: 0, s_yy: 1, s_zz: 2 };
 
 const allowableSchema = z.union([
   z.enum(['ftu', 'fty']),
@@ -61,51 +58,6 @@ function checksFor(category: LoadCategory, allowable: AllowableInput | undefined
   if (allowable === undefined) return category === 'limit' ? ['ultimate', 'yield'] : ['ultimate'];
   const wanted: CheckKind = allowable === 'ftu' ? 'ultimate' : allowable === 'fty' ? 'yield' : (allowable.against ?? 'ultimate');
   return wanted === 'yield' && category === 'ultimate' ? [] : [wanted];
-}
-
-interface Group {
-  readonly entityId: string;
-  readonly region: string;
-  readonly nodes: readonly number[];
-}
-
-/** Part groups (every node of the part's elements) or target groups (the nodes of each constraint / load target, split by owning part). */
-function groupsOf(analysis: AnalysisCase, mesh: FeMeshArtifact, groupBy: 'part' | 'target'): Group[] {
-  if (groupBy === 'part') {
-    const byPart = new Map<string, Set<number>>();
-    for (const block of mesh.blocks) {
-      const nodes = byPart.get(block.entityId) ?? new Set<number>();
-      for (const element of block.elements) for (const node of element.slice(1)) nodes.add(node);
-      byPart.set(block.entityId, nodes);
-    }
-    return Object.keys(analysis.parts).flatMap((entityId) => {
-      const nodes = byPart.get(entityId);
-      return nodes === undefined ? [] : [{ entityId, region: 'part', nodes: [...nodes] }];
-    });
-  }
-  const owner = nodeEntities(mesh);
-  const groups: Group[] = [];
-  for (const key of Object.keys(mesh.nodeSets).sort()) {
-    if (!key.startsWith('C_') && !key.startsWith('L_')) continue;
-    const split = new Map<string, number[]>();
-    for (const node of mesh.nodeSets[key] ?? []) {
-      const entityId = owner.get(node) ?? '';
-      split.set(entityId, [...(split.get(entityId) ?? []), node]);
-    }
-    for (const [entityId, nodes] of split) groups.push({ entityId, region: key, nodes });
-  }
-  return groups;
-}
-
-/** Largest criterion value over `nodes` of the step's STRESS (and shell fibre) fields; component criteria: largest magnitude. */
-function appliedOver(
-  fields: NonNullable<ReturnType<typeof stepOfLoadCase>>['fields'],
-  nodes: readonly number[],
-  criterion: Criterion,
-): Applied | null {
-  const scalar = (values: readonly number[]): number =>
-    criterion === 'von_mises' ? vonMises(values) : Math.abs(values[COMPONENT[criterion]] ?? Number.NaN);
-  return appliedOverFibres(fields, nodes, scalar);
 }
 
 export interface MarginRow {
@@ -368,6 +320,100 @@ export interface MarginRefusal {
   readonly ids: readonly string[];
 }
 
+type Adequacy = ReturnType<typeof adequacyOf>;
+type Gate = GatedRows<MarginRow>;
+
+/** The mesh-adequacy gate over the built rows and the composite warnings; no row left to report is a refusal. */
+function gatedRows(
+  analysis: AnalysisCase,
+  built: { readonly rows: MarginRow[]; readonly skipped: ReadonlyMap<string, string> },
+  artifacts: { readonly mesh: FeMeshArtifact; readonly results: FeResultsArtifact },
+  acceptInadequateMesh: boolean,
+): { readonly gate: Gate; readonly composite: string[]; readonly adequacy: Adequacy } | MarginRefusal {
+  const adequacy = adequacyOf(artifacts.results, artifacts.mesh);
+  const gate = gateRows(built.rows, adequacy, acceptInadequateMesh);
+  const rows = gate.rows;
+  const withRows = new Set(rows.map((row) => String(row['part'])));
+  const composite = compositeWarnings(analysis, new Map([...built.skipped].filter(([entityId]) => !withRows.has(entityId))));
+  if (rows.length === 0 && composite.length > 0)
+    return refusalFor(
+      analysis.id,
+      'FEA_COMPOSITE_MARGINS_UNSUPPORTED',
+      composite.map((text) => text.replace(/^FEA_COMPOSITE_MARGINS_UNSUPPORTED: /, '')).join('; '),
+    );
+  if (rows.length === 0)
+    return refusalFor(
+      analysis.id,
+      'FEA_MARGIN_PARAM_INVALID',
+      'no margin row to compute (yield checks need a limit load case, and the groups need stress values)',
+    );
+  return { gate, composite, adequacy };
+}
+
+/** What the table's data and summary are written from. */
+interface Tabulated {
+  readonly analysis: AnalysisCase;
+  readonly mesh: FeMeshArtifact;
+  readonly context: Context;
+  readonly screen: ReturnType<typeof screenSingularities>;
+  readonly gate: Gate;
+  readonly adequacy: Adequacy;
+  readonly composite: readonly string[];
+  readonly lowest: MarginRow | null;
+}
+
+function marginData(t: Tabulated): Record<string, unknown> {
+  const { analysis, mesh, context, screen, gate, adequacy, composite, lowest } = t;
+  const { criterion, groupBy, marginalBand } = context;
+  const rows = gate.rows;
+  return {
+    analysisId: analysis.id,
+    unitSystem: analysis.unitSystem,
+    resultsHash: analysis.results?.resultsHash ?? '',
+    criterion,
+    groupBy,
+    marginalBand: marginalBand ?? null,
+    minMs: lowest?.ms ?? null,
+    minMsRow: lowest?.rowId ?? null,
+    factors: factorReport(analysis),
+    rows,
+    singularScreening: screen.data,
+    overall: overallOf(rows),
+    meshAdequacy: adequacy,
+    ...(gate.overrides.length > 0 ? { overrides: gate.overrides } : {}),
+    warnings: [
+      ...adequacyWarnings(gate, adequacy),
+      ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
+      ...composite,
+      ...dispositionWarnings(rows),
+      ...exclusionWarnings(mesh, screen.excluded),
+      ...orphanSingularKeys(rows).map(
+        (key) => `FEA_MS_ALL_SINGULAR: group ${key} lies entirely in a singular zone: it has only a singular row and no margin`,
+      ),
+      ...(analysis.type === 'thermo_static' ? temperatureWarnings(context.temperatures, propertyTemperatureK(analysis), rows) : []),
+    ],
+    reviewRequired: true,
+  };
+}
+
+function marginSummary(t: Tabulated): string {
+  const { analysis, gate, adequacy, lowest } = t;
+  const rows = gate.rows;
+  const pending = rows.filter((row) => row.disposition === 'pending_human').length;
+  const decided = rows.filter(
+    (row) => row.status !== 'PASS' && row.status !== 'NOT_ASSESSED' && row.disposition !== 'pending_human',
+  ).length;
+  const unverified = rows.filter((row) => row['unverified'] === true).length;
+  const singularCount = rows.filter((row) => row['singular'] === true).length;
+  const factors = factorReport(analysis);
+  const worst = gate.gated
+    ? notAssessedText(gate.reasons)
+    : lowest === null
+      ? 'no finite margin'
+      : `min MS ${significantNumber(lowest.ms ?? 0, 4)} (${String(lowest['statusLabel'])}, ${lowest.rowId} ${String(lowest['loadCase'])}, part ${String(lowest['part'])})`;
+  return `compute_margins: '${analysis.id}' ${rows.length} row(s), ${worst}${adequacy.verdict === 'marginal' ? '; FEA_MESH_MARGINAL: a thin region of the mesh is under-resolved (not gated, see data.warnings)' : ''}; ${pending} pending a human disposition${decided > 0 ? `, ${decided} dispositioned by a human (status unchanged)` : ''}, ${unverified} unverified${singularCount > 0 ? `, ${singularCount} singular row(s) excluded from min MS` : ''}; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`;
+}
+
 /**
  * The margin table of `analysisId` for `query` (what `compute_margins` returns), or the refusal; shared with `dispose_margin` and `check_analysis`.
  * @failure see `computeMargins`
@@ -379,129 +425,50 @@ export function marginTable(
   ctx: ExecutionContext | undefined,
 ): MarginTable | MarginRefusal {
   const { groupBy = 'part', marginalBand } = query;
-  const refuse = (code: string, message: string): MarginRefusal => ({ code, message, ids: [analysisId] });
+  const refuse = (code: string, message: string): MarginRefusal => refusalFor(analysisId, code, message);
   const analysis = caseOf(doc, analysisId);
   if (analysis === undefined) return refuse('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`);
   if (marginalBand !== undefined && !(Number.isFinite(marginalBand) && marginalBand >= 0))
     return refuse('FEA_MARGIN_PARAM_INVALID', `marginalBand ${marginalBand} must be a finite number >= 0`);
   if (query.criterion === 'limit_load') return limitLoadMarginTable(doc, analysis, query, ctx);
   if (query.criterion === 'joint') return jointMarginTable(doc, analysis, query, ctx);
-  if (query.joint !== undefined) return refuse('FEA_MARGIN_PARAM_INVALID', 'joint applies to criterion joint only');
-  if (query.limitLoad !== undefined) return refuse('FEA_MARGIN_PARAM_INVALID', 'limitLoad applies to criterion limit_load only');
+  const queryProblem = queryRefusal(analysis, analysisId, query);
+  if (queryProblem !== null) return queryProblem;
   const criterion = query.criterion ?? 'von_mises';
-  if (analysis.type !== 'static' && analysis.type !== 'thermo_static')
-    return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `margins need structural results; '${analysisId}' is ${analysis.type}`);
   const { singularityRadius, singularityNote } = query;
-  if (singularityRadius !== undefined && !(Number.isFinite(singularityRadius) && singularityRadius >= 0))
-    return refuse(
-      'FEA_MARGIN_PARAM_INVALID',
-      `singularityRadius ${singularityRadius} must be a finite number >= 0 (document length units)`,
-    );
-  if (singularityRadius !== undefined && (singularityNote ?? '').trim() === '')
-    return refuse(
-      'FEA_MARGIN_PARAM_INVALID',
-      'singularityNote: a singularityRadius override needs a non-empty engineering justification (singularityNote)',
-    );
-  const known = loadCasesOf(analysis).map((entry) => entry.name);
-  const unknown = (query.loadCases ?? []).filter((name) => !known.includes(name));
-  if (unknown.length > 0)
-    return refuse('FEA_MARGIN_PARAM_INVALID', `unknown load case(s) ${unknown.join(', ')}; the analysis has ${known.join(', ')}`);
-  const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
-  if (trust.state === 'stale' && analysis.results !== undefined)
-    return refuse('FEA_RESULTS_STALE', `the results of '${analysisId}' predate a change of its inputs`);
-  if (trust.state === 'untrusted')
-    return refuse(
-      trust.problem?.code ?? 'FEA_SUMMARY_MISMATCH',
-      trust.problem?.message ?? 'the recorded summary differs from its artifact',
-    );
-  if (trust.resultsArtifact === null || trust.meshArtifact === null)
-    return refuse(
-      'FEA_RESULTS_MISSING',
-      `analysis '${analysisId}' has no verified results (${trust.problem?.message ?? `state ${trust.state}`})`,
-    );
+  const artifacts = verifiedArtifacts(analysis, trustedRecord(doc, analysis, ctx?.feaArtifacts));
+  if ('code' in artifacts) return artifacts;
+  const { mesh, results } = artifacts;
   const screen = screenSingularities(
     doc,
     analysis,
-    trust.meshArtifact,
+    mesh,
     singularityRadius === undefined ? undefined : { radius: singularityRadius, note: (singularityNote ?? '').trim() },
   );
   const context: Context = {
     singular: screen.excluded,
     doc,
     analysis,
-    mesh: trust.meshArtifact,
-    results: trust.resultsArtifact,
+    mesh,
+    results,
     criterion,
     allowable: query.allowable,
     marginalBand,
     groupBy,
     loadCaseFilter: query.loadCases === undefined ? undefined : new Set(query.loadCases),
     port: ctx?.humanSignature ?? null,
-    temperatures:
-      analysis.type === 'thermo_static' ? solvedNodeTemperatures(doc, analysis, trust.meshArtifact, ctx?.feaArtifacts ?? null) : null,
+    temperatures: analysis.type === 'thermo_static' ? solvedNodeTemperatures(doc, analysis, mesh, ctx?.feaArtifacts ?? null) : null,
   };
   const built = buildRows(context);
   if ('code' in built) return refuse(built.code, built.message);
-  const { skipped } = built;
-  const adequacy = adequacyOf(trust.resultsArtifact, trust.meshArtifact);
-  const gate = gateRows(built.rows, adequacy, query.acceptInadequateMesh === true);
+  const gated = gatedRows(analysis, built, { mesh, results }, query.acceptInadequateMesh === true);
+  if ('code' in gated) return gated;
+  const { gate, composite, adequacy } = gated;
   const rows = gate.rows;
-  const withRows = new Set(rows.map((row) => String(row['part'])));
-  const composite = compositeWarnings(analysis, new Map([...skipped].filter(([entityId]) => !withRows.has(entityId))));
-  if (rows.length === 0 && composite.length > 0)
-    return refuse(
-      'FEA_COMPOSITE_MARGINS_UNSUPPORTED',
-      composite.map((text) => text.replace(/^FEA_COMPOSITE_MARGINS_UNSUPPORTED: /, '')).join('; '),
-    );
-  if (rows.length === 0)
-    return refuse(
-      'FEA_MARGIN_PARAM_INVALID',
-      'no margin row to compute (yield checks need a limit load case, and the groups need stress values)',
-    );
   const finite = rows.filter((row) => row.ms !== null && row['singular'] !== true);
   const lowest = finite.reduce<MarginRow | null>((best, row) => (best === null || (row.ms ?? 0) < (best.ms ?? 0) ? row : best), null);
-  const pending = rows.filter((row) => row.disposition === 'pending_human').length;
-  const decided = rows.filter(
-    (row) => row.status !== 'PASS' && row.status !== 'NOT_ASSESSED' && row.disposition !== 'pending_human',
-  ).length;
-  const unverified = rows.filter((row) => row['unverified'] === true).length;
-  const singularCount = rows.filter((row) => row['singular'] === true).length;
-  const factors = factorReport(analysis);
-  const data = {
-    analysisId,
-    unitSystem: analysis.unitSystem,
-    resultsHash: analysis.results?.resultsHash ?? '',
-    criterion,
-    groupBy,
-    marginalBand: marginalBand ?? null,
-    minMs: lowest?.ms ?? null,
-    minMsRow: lowest?.rowId ?? null,
-    factors,
-    rows,
-    singularScreening: screen.data,
-    overall: overallOf(rows),
-    meshAdequacy: adequacy,
-    ...(gate.overrides.length > 0 ? { overrides: gate.overrides } : {}),
-    warnings: [
-      ...adequacyWarnings(gate, adequacy),
-      ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
-      ...composite,
-      ...dispositionWarnings(rows),
-      ...exclusionWarnings(trust.meshArtifact, screen.excluded),
-      ...orphanSingularKeys(rows).map(
-        (key) => `FEA_MS_ALL_SINGULAR: group ${key} lies entirely in a singular zone: it has only a singular row and no margin`,
-      ),
-      ...(analysis.type === 'thermo_static' ? temperatureWarnings(context.temperatures, propertyTemperatureK(analysis), rows) : []),
-    ],
-    reviewRequired: true,
-  };
-  const worst = gate.gated
-    ? notAssessedText(gate.reasons)
-    : lowest === null
-      ? 'no finite margin'
-      : `min MS ${significantNumber(lowest.ms ?? 0, 4)} (${String(lowest['statusLabel'])}, ${lowest.rowId} ${String(lowest['loadCase'])}, part ${String(lowest['part'])})`;
-  const summary = `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}${adequacy.verdict === 'marginal' ? '; FEA_MESH_MARGINAL: a thin region of the mesh is under-resolved (not gated, see data.warnings)' : ''}; ${pending} pending a human disposition${decided > 0 ? `, ${decided} dispositioned by a human (status unchanged)` : ''}, ${unverified} unverified${singularCount > 0 ? `, ${singularCount} singular row(s) excluded from min MS` : ''}; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`;
-  return { analysis, rows, summary, data };
+  const tabulated: Tabulated = { analysis, mesh, context, screen, gate, adequacy, composite, lowest };
+  return { analysis, rows, summary: marginSummary(tabulated), data: marginData(tabulated) };
 }
 
 /**

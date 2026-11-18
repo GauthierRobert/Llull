@@ -8,6 +8,10 @@ small files, discovery by name/path over prose. Command skeleton + tags: `rules/
 - TS strict; `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` ON.
 - NO `any` (use `unknown` + narrowing). NO non-null `!` except in tests. (`any` is hook-blocked.)
 - Explicit return types on exported functions. Model facts as unions/literals, not comments.
+- Powers never use the built-in `x ** y` / `Math.pow`: its last bit differs between V8 versions (Node 22 vs 24, Electron), which breaks
+  state hashes and golden snapshots. Use `pow(x, y)` (`@lib/pow`: fdlibm, bit-identical on every engine and to Node 22's `Math.pow`) or
+  `powInt(x, n)` (`@lib/powInt`: exact products, for a small integer `n`). `x ** 2` and literal constants (`2 ** 32`) are exact and stay.
+  Lint rule `llull/no-builtin-pow`.
 
 ## C2 — Comments
 
@@ -39,6 +43,8 @@ PostToolUse hook formats each edited file; never hand-format or fight it.
 - One concern per file (SRP). Group commands by domain; split by concern when it grows; import
   from defining files — no re-export barrels (package `index.ts` excepted).
 - Max **500 code lines** per file (oxlint `max-lines`, no allowlist; disabling it is hook-blocked).
+- Cyclomatic complexity ceiling per function: **40** (oxlint `complexity`, an error). Split a function that outgrows it into an orchestrator
+  plus named phase / case helpers; never raise the ceiling.
 - Open/closed: add a capability with a NEW command file + registration, a new domain with a new
   `CadPlugin`, a new entity kind with a union member + render branch (`add-entity-kind` skill) —
   not by growing a `switch` in every caller.

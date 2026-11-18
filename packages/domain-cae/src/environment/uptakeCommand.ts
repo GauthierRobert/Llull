@@ -2,11 +2,12 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
-import type { CommandResult } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import type { CadDocument } from '@core/model/types';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { refuseEnv, unverifiedItem, type EnvItem } from './codes';
 import { contentAt, effectiveThickness, fractionalUptake, logSpaced, TAU_99, timeToFraction } from './fick';
-import { describeInput, givenInput, isInputProblem } from './inputs';
+import { describeInput, givenInput, isInputProblem, type GivenQuantity, type ResolvedInput } from './inputs';
 import type { MaterialMissing } from './materialValue';
 import { spaceEnvironmentOf } from './model';
 import { boundaryInput, diffusivityInput, initialInput, type UptakeInputs } from './uptakeInputs';
@@ -27,6 +28,170 @@ const DESCRIPTION =
   'curve[{t, fraction, moisturePercent}] (t in the time unit). Example: h 2 mm, D 1e-6 mm^2/s, M_inf 1.5 %, 7 d: tau 0.1512, M 1.2266 %, t50 2.277 d. ' +
   'Inputs without a source (or from typical / supplier data) set unverified and the ENV_VALUE_UNVERIFIED warning. A screening model: not a moisture-knockdown or non-Fickian prediction.';
 
+const uptakeSchema = z.object({
+  thickness: quantitySchema.describe('Plate thickness h, a length (e.g. {value: 2, unit: "mm"}); > 0.'),
+  faces: z
+    .enum(['both', 'one'])
+    .optional()
+    .describe('Exposed faces: both, or one with the other face sealed. Required unless useMissionExposure supplies it.'),
+  mode: z.enum(['absorption', 'desorption']).optional().describe('absorption (default) or desorption.'),
+  diffusivity: sourcedQuantity('Moisture diffusivity D through the thickness, length^2/time')
+    .optional()
+    .describe('D {value, unit (e.g. mm^2/s, in^2/h), source}; > 0. Omit to read it from `material`.'),
+  saturation: sourcedQuantity('Equilibrium (boundary) moisture content')
+    .optional()
+    .describe('Equilibrium content M_inf, mass fraction {value, unit "%" or "1"}. Omit to use `saturationLaw` or the material.'),
+  saturationLaw: z
+    .object({
+      a: z.number().describe('Coefficient a: M_inf[%] = a * RH[%]^b.'),
+      b: z.number().describe('Exponent b.'),
+      relativeHumidity: z
+        .number()
+        .optional()
+        .describe('Relative humidity in % (0 to 100); default: the mission humidityExposure when useMissionExposure.'),
+      source: z.string().optional().describe('Where a and b come from.'),
+    })
+    .optional()
+    .describe('Equilibrium content from relative humidity: M_inf[%] = a * RH[%]^b.'),
+  initial: sourcedQuantity('Initial moisture content')
+    .optional()
+    .describe('Initial content {value, unit "%" or "1"}; default 0 % for absorption; REQUIRED for desorption.'),
+  exposure: quantitySchema.optional().describe('Exposure time {value, unit (s, h, d)}: the result carries the content at this time.'),
+  targets: z
+    .array(z.number())
+    .max(50)
+    .optional()
+    .describe('Fractions of the way to the boundary content, each strictly between 0 and 1: the time to reach each is returned.'),
+  material: z.string().optional().describe('Material id whose moistureDiffusivity / moistureSaturation properties fill what is not given.'),
+  temperature: quantitySchema
+    .optional()
+    .describe('Operating temperature {value, unit K | degC | degF} for temperature-dependent material properties.'),
+  timeUnit: z.string().optional().describe('Unit of the returned times (default: the exposure unit, else "d").'),
+  useMissionExposure: z
+    .boolean()
+    .optional()
+    .describe(
+      'true: take exposure duration, faces, temperature and relative humidity from the mission humidityExposure (set_mission_environment) where not given.',
+    ),
+});
+
+type UptakeParams = z.infer<typeof uptakeSchema>;
+
+function failuresOf(
+  doc: CadDocument,
+  material: string | undefined,
+): {
+  fail: (code: string, message: string, path: string, ids?: readonly string[]) => CommandResult;
+  failFor: (problem: UnitProblem | MaterialMissing, path: string) => CommandResult;
+} {
+  const fail = (code: string, message: string, path: string, ids: readonly string[] = []): CommandResult =>
+    refuseEnv(doc, COMMAND, code, message, ids, [path]);
+  const failFor = (problem: UnitProblem | MaterialMissing, path: string): CommandResult =>
+    'path' in problem
+      ? fail('ENV_PARAM_INVALID', problem.message, problem.path)
+      : fail(
+          problem.code === 'PROP_NO_MODEL_FOR_PROPERTY' ? 'ENV_PROPERTY_MISSING' : problem.code,
+          problem.reason,
+          path,
+          material === undefined ? [] : [material],
+        );
+  return { fail, failFor };
+}
+
+interface ResolvedUptake {
+  readonly faces: 'both' | 'one';
+  readonly mode: 'absorption' | 'desorption';
+  readonly exposure: GivenQuantity | undefined;
+  readonly thickness: ResolvedInput;
+  readonly diffusivity: ResolvedInput;
+  readonly boundary: ResolvedInput;
+  readonly initial: ResolvedInput;
+  readonly defaults: string[];
+}
+
+/** Mission exposure, faces, mode and the thickness / diffusivity / boundary / initial inputs, or the refusal. */
+function resolveUptakeInputs(doc: CadDocument, ctx: ExecutionContext | undefined, params: UptakeParams): ResolvedUptake | CommandResult {
+  const { fail, failFor } = failuresOf(doc, params.material);
+  const mission = params.useMissionExposure === true ? spaceEnvironmentOf(doc).humidityExposure : undefined;
+  if (params.useMissionExposure === true && mission === undefined)
+    return fail(
+      'ENV_PARAM_INVALID',
+      'useMissionExposure is set but the mission has no humidityExposure (set_mission_environment)',
+      'useMissionExposure',
+    );
+  const faces = params.faces ?? mission?.faces;
+  if (faces === undefined) return fail('ENV_PARAM_INVALID', 'faces is required: both, or one (other face sealed)', 'faces');
+  const mode = params.mode ?? 'absorption';
+  const temperature = params.temperature ?? mission?.temperature;
+  const exposure = params.exposure ?? mission?.duration;
+  const material = params.material;
+
+  const given = givenInput(params.thickness, 'm', 'thickness');
+  if (isInputProblem(given)) return failFor(given, 'thickness');
+  const thickness = { ...given, unverified: false };
+  if (!(thickness.value > 0))
+    return fail('ENV_PARAM_INVALID', `thickness must be > 0 (got ${params.thickness.value} ${params.thickness.unit})`, 'thickness');
+
+  const request: UptakeInputs = {
+    doc,
+    ctx,
+    material,
+    at: temperature === undefined ? {} : { T: temperature },
+    mode,
+    relativeHumidity: mission?.relativeHumidity,
+  };
+  const diffusivity = diffusivityInput(request, params.diffusivity);
+  if (isInputProblem(diffusivity))
+    return failFor(diffusivity, params.diffusivity === undefined && material !== undefined ? 'material' : 'diffusivity');
+  if (!(diffusivity.value > 0) || !Number.isFinite(diffusivity.value))
+    return fail('ENV_PARAM_INVALID', `diffusivity must be > 0 (got ${diffusivity.value} m^2/s)`, 'diffusivity');
+  const defaults: string[] = [];
+  const boundary = boundaryInput(request, params.saturation, params.saturationLaw, defaults);
+  if (isInputProblem(boundary))
+    return failFor(boundary, params.saturation === undefined && material !== undefined ? 'material' : 'saturation');
+  const initial = initialInput(request, params.initial, defaults);
+  if (isInputProblem(initial)) return failFor(initial, 'initial');
+  return { faces, mode, exposure, thickness, diffusivity, boundary, initial, defaults };
+}
+
+interface UptakeTimes {
+  readonly targets: readonly number[];
+  readonly targetTaus: number[];
+  readonly exposureSeconds: number | undefined;
+  readonly timeUnit: string;
+  readonly fromSeconds: (seconds: number) => number;
+}
+
+/** Target taus, exposure in seconds and the output time unit, or the refusal. */
+function resolveTimes(doc: CadDocument, params: UptakeParams, exposure: GivenQuantity | undefined): UptakeTimes | CommandResult {
+  const { fail } = failuresOf(doc, params.material);
+  const targets = params.targets ?? [];
+  if (exposure === undefined && targets.length === 0)
+    return fail('ENV_PARAM_INVALID', 'give an `exposure` time and/or `targets` fractions: nothing to compute', 'exposure');
+  const targetTaus: number[] = [];
+  for (const [index, target] of targets.entries()) {
+    const tau = timeToFraction(target);
+    if (tau === null)
+      return fail(
+        'ENV_PARAM_INVALID',
+        `target ${target} must be strictly between 0 and 1 (and not within rounding of 1)`,
+        `targets.${index}`,
+      );
+    targetTaus.push(tau);
+  }
+  let exposureSeconds: number | undefined;
+  if (exposure !== undefined) {
+    const seconds = convertValue(exposure.value, exposure.unit, 's');
+    if (isUnitFailure(seconds) || !(seconds.value >= 0) || !Number.isFinite(seconds.value))
+      return fail('ENV_PARAM_INVALID', `exposure must be a finite time >= 0 (got ${exposure.value} ${exposure.unit})`, 'exposure');
+    exposureSeconds = seconds.value;
+  }
+  const timeUnit = params.timeUnit ?? exposure?.unit ?? DEFAULT_TIME_UNIT;
+  const unitScale = convertValue(1, 's', timeUnit);
+  if (isUnitFailure(unitScale)) return fail('ENV_PARAM_INVALID', `timeUnit '${timeUnit}': ${unitScale.message}`, 'timeUnit');
+  return { targets, targetTaus, exposureSeconds, timeUnit, fromSeconds: (seconds: number): number => seconds * unitScale.value };
+}
+
 /**
  * @affects nothing; read-only, data { model, faces, mode, tau, fraction?, moisturePercent?, timesToFraction[], curve[], inputs, defaults, items, assumption, unverified }
  * @invariant G(tau) = 1 - 8/pi^2 sum exp(-(2j+1)^2 pi^2 tau)/(2j+1)^2, tau = D t / h^2 (h doubled when one face is sealed); M = Mi + G (Mb - Mi); inverse by bisection (rel 1e-14 in tau)
@@ -36,132 +201,14 @@ export const moistureUptake = defineCommand({
   name: COMMAND,
   annotations: { readOnly: true },
   description: DESCRIPTION,
-  params: z.object({
-    thickness: quantitySchema.describe('Plate thickness h, a length (e.g. {value: 2, unit: "mm"}); > 0.'),
-    faces: z
-      .enum(['both', 'one'])
-      .optional()
-      .describe('Exposed faces: both, or one with the other face sealed. Required unless useMissionExposure supplies it.'),
-    mode: z.enum(['absorption', 'desorption']).optional().describe('absorption (default) or desorption.'),
-    diffusivity: sourcedQuantity('Moisture diffusivity D through the thickness, length^2/time')
-      .optional()
-      .describe('D {value, unit (e.g. mm^2/s, in^2/h), source}; > 0. Omit to read it from `material`.'),
-    saturation: sourcedQuantity('Equilibrium (boundary) moisture content')
-      .optional()
-      .describe('Equilibrium content M_inf, mass fraction {value, unit "%" or "1"}. Omit to use `saturationLaw` or the material.'),
-    saturationLaw: z
-      .object({
-        a: z.number().describe('Coefficient a: M_inf[%] = a * RH[%]^b.'),
-        b: z.number().describe('Exponent b.'),
-        relativeHumidity: z
-          .number()
-          .optional()
-          .describe('Relative humidity in % (0 to 100); default: the mission humidityExposure when useMissionExposure.'),
-        source: z.string().optional().describe('Where a and b come from.'),
-      })
-      .optional()
-      .describe('Equilibrium content from relative humidity: M_inf[%] = a * RH[%]^b.'),
-    initial: sourcedQuantity('Initial moisture content')
-      .optional()
-      .describe('Initial content {value, unit "%" or "1"}; default 0 % for absorption; REQUIRED for desorption.'),
-    exposure: quantitySchema.optional().describe('Exposure time {value, unit (s, h, d)}: the result carries the content at this time.'),
-    targets: z
-      .array(z.number())
-      .max(50)
-      .optional()
-      .describe('Fractions of the way to the boundary content, each strictly between 0 and 1: the time to reach each is returned.'),
-    material: z
-      .string()
-      .optional()
-      .describe('Material id whose moistureDiffusivity / moistureSaturation properties fill what is not given.'),
-    temperature: quantitySchema
-      .optional()
-      .describe('Operating temperature {value, unit K | degC | degF} for temperature-dependent material properties.'),
-    timeUnit: z.string().optional().describe('Unit of the returned times (default: the exposure unit, else "d").'),
-    useMissionExposure: z
-      .boolean()
-      .optional()
-      .describe(
-        'true: take exposure duration, faces, temperature and relative humidity from the mission humidityExposure (set_mission_environment) where not given.',
-      ),
-  }),
+  params: uptakeSchema,
   run: (doc, params, ctx): CommandResult => {
-    const fail = (code: string, message: string, path: string, ids: readonly string[] = []): CommandResult =>
-      refuseEnv(doc, COMMAND, code, message, ids, [path]);
-    const failFor = (problem: UnitProblem | MaterialMissing, path: string): CommandResult =>
-      'path' in problem
-        ? fail('ENV_PARAM_INVALID', problem.message, problem.path)
-        : fail(
-            problem.code === 'PROP_NO_MODEL_FOR_PROPERTY' ? 'ENV_PROPERTY_MISSING' : problem.code,
-            problem.reason,
-            path,
-            params.material === undefined ? [] : [params.material],
-          );
-    const mission = params.useMissionExposure === true ? spaceEnvironmentOf(doc).humidityExposure : undefined;
-    if (params.useMissionExposure === true && mission === undefined)
-      return fail(
-        'ENV_PARAM_INVALID',
-        'useMissionExposure is set but the mission has no humidityExposure (set_mission_environment)',
-        'useMissionExposure',
-      );
-    const faces = params.faces ?? mission?.faces;
-    if (faces === undefined) return fail('ENV_PARAM_INVALID', 'faces is required: both, or one (other face sealed)', 'faces');
-    const mode = params.mode ?? 'absorption';
-    const temperature = params.temperature ?? mission?.temperature;
-    const exposure = params.exposure ?? mission?.duration;
-    const material = params.material;
-
-    const given = givenInput(params.thickness, 'm', 'thickness');
-    if (isInputProblem(given)) return failFor(given, 'thickness');
-    const thickness = { ...given, unverified: false };
-    if (!(thickness.value > 0))
-      return fail('ENV_PARAM_INVALID', `thickness must be > 0 (got ${params.thickness.value} ${params.thickness.unit})`, 'thickness');
-
-    const request: UptakeInputs = {
-      doc,
-      ctx,
-      material,
-      at: temperature === undefined ? {} : { T: temperature },
-      mode,
-      relativeHumidity: mission?.relativeHumidity,
-    };
-    const diffusivity = diffusivityInput(request, params.diffusivity);
-    if (isInputProblem(diffusivity))
-      return failFor(diffusivity, params.diffusivity === undefined && material !== undefined ? 'material' : 'diffusivity');
-    if (!(diffusivity.value > 0) || !Number.isFinite(diffusivity.value))
-      return fail('ENV_PARAM_INVALID', `diffusivity must be > 0 (got ${diffusivity.value} m^2/s)`, 'diffusivity');
-    const defaults: string[] = [];
-    const boundary = boundaryInput(request, params.saturation, params.saturationLaw, defaults);
-    if (isInputProblem(boundary))
-      return failFor(boundary, params.saturation === undefined && material !== undefined ? 'material' : 'saturation');
-    const initial = initialInput(request, params.initial, defaults);
-    if (isInputProblem(initial)) return failFor(initial, 'initial');
-
-    const targets = params.targets ?? [];
-    if (exposure === undefined && targets.length === 0)
-      return fail('ENV_PARAM_INVALID', 'give an `exposure` time and/or `targets` fractions: nothing to compute', 'exposure');
-    const targetTaus: number[] = [];
-    for (const [index, target] of targets.entries()) {
-      const tau = timeToFraction(target);
-      if (tau === null)
-        return fail(
-          'ENV_PARAM_INVALID',
-          `target ${target} must be strictly between 0 and 1 (and not within rounding of 1)`,
-          `targets.${index}`,
-        );
-      targetTaus.push(tau);
-    }
-    let exposureSeconds: number | undefined;
-    if (exposure !== undefined) {
-      const seconds = convertValue(exposure.value, exposure.unit, 's');
-      if (isUnitFailure(seconds) || !(seconds.value >= 0) || !Number.isFinite(seconds.value))
-        return fail('ENV_PARAM_INVALID', `exposure must be a finite time >= 0 (got ${exposure.value} ${exposure.unit})`, 'exposure');
-      exposureSeconds = seconds.value;
-    }
-    const timeUnit = params.timeUnit ?? exposure?.unit ?? DEFAULT_TIME_UNIT;
-    const unitScale = convertValue(1, 's', timeUnit);
-    if (isUnitFailure(unitScale)) return fail('ENV_PARAM_INVALID', `timeUnit '${timeUnit}': ${unitScale.message}`, 'timeUnit');
-    const fromSeconds = (seconds: number): number => seconds * unitScale.value;
+    const resolved = resolveUptakeInputs(doc, ctx, params);
+    if ('document' in resolved) return resolved;
+    const { faces, mode, exposure, thickness, diffusivity, boundary, initial, defaults } = resolved;
+    const timing = resolveTimes(doc, params, exposure);
+    if ('document' in timing) return timing;
+    const { targets, targetTaus, exposureSeconds, timeUnit, fromSeconds } = timing;
 
     const hEff = effectiveThickness(thickness.value, faces);
     const secondsPerTau = (hEff * hEff) / diffusivity.value;

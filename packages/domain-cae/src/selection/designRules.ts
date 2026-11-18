@@ -2,6 +2,7 @@
 
 import { exponentValue, ruleOf } from './indexRules';
 import type { IndexCase } from './types';
+import { pow } from '@lib/pow';
 
 export const DESIGN_RULES = [
   'same_geometry',
@@ -79,8 +80,8 @@ export function ratiosOf(rule: DesignRule, from: Side, to: Side): RuleRatios | n
   if (indexRule === undefined || first === undefined || second === undefined) return null;
   const quotient = first / second;
   return {
-    massRatio: (to.rho / from.rho) * Math.pow(quotient, exponentValue(indexRule)),
-    resized: { dimension: resize.dimension, factor: Math.pow(quotient, resize.sizeExponent) },
+    massRatio: (to.rho / from.rho) * pow(quotient, exponentValue(indexRule)),
+    resized: { dimension: resize.dimension, factor: pow(quotient, resize.sizeExponent) },
     ...(strength ? {} : { stiffness: { ratio: 1, deflectionRatio: 1 } }),
   };
 }

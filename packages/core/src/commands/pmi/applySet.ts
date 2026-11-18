@@ -127,6 +127,51 @@ const lost = (attributes: readonly string[] | undefined): string[] =>
 const differs = (stated: number, measured: number): string =>
   `the file states nominal ${stated} but the B-rep measures ${Number(measured.toPrecision(9))}`;
 
+type SizeDraft = Extract<PmiDraft, { kind: 'size_dimension' }>;
+type LocationDraft = Extract<PmiDraft, { kind: 'location_dimension' }>;
+
+/** The measured size (and instance count) of a size draft, with the problems found while measuring. */
+function sizeMeasurement(faces: ResolvedFeature | null, draft: SizeDraft): { size: PmiFeature['ofSize']; count: number; found: string[] } {
+  const found: string[] = [];
+  let size: PmiFeature['ofSize'];
+  let count = 1;
+  const unmeasured = draft.sizeKind === 'angular' || draft.sizeKind === 'curve_length';
+  if (faces !== null && !unmeasured) {
+    const measured = measureSize(faces.faces, draft.sizeKind as MeasuredSizeKind, faces.topology, faces.tolerance);
+    if ('code' in measured) found.push(`${measured.code}: ${measured.message}`);
+    else {
+      size = measured.ofSize;
+      count = measured.count;
+      const half = draft.sizeKind === 'radius' || draft.sizeKind === 'spherical_radius';
+      const nominal = half ? measured.ofSize.measured / 2 : measured.ofSize.measured;
+      if (mismatch(draft.nominal, nominal)) found.push(differs(draft.nominal, nominal));
+    }
+  }
+  if (unmeasured && draft.nominal === undefined) found.push(`a ${draft.sizeKind} size has no nominal`);
+  return { size, count, found };
+}
+
+/** The measured value of a location draft (the file nominal when the B-rep cannot measure it), with the problems found. */
+function locationMeasurement(
+  from: ResolvedFeature | null,
+  to: ResolvedFeature | null,
+  draft: LocationDraft,
+): { measured: number; found: string[] } {
+  const found: string[] = [];
+  let measured = draft.nominal ?? 0;
+  if (from !== null && to !== null) {
+    const a = featureElement(from.faces, from.tolerance);
+    const b = featureElement(to.faces, to.tolerance);
+    const located = 'code' in a || 'code' in b ? null : locate(a, b, draft.measure);
+    if (located === null || 'code' in located) found.push('the B-rep cannot measure the two features: the file nominal is kept');
+    else {
+      if (mismatch(draft.nominal, located.measured)) found.push(differs(draft.nominal, located.measured));
+      measured = located.measured;
+    }
+  }
+  return { measured, found };
+}
+
 /** Items are added to `doc` in order; every item starts review-required with the import as its reason. */
 export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: readonly PmiDraft[], source: string): ApplyOutcome {
   const entityId = target.entity.id;
@@ -214,21 +259,9 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
     } else if (draft.kind === 'size_dimension') {
       const at = feature(draft.facesNear);
       const problems: string[] = at.faces === null ? [at.why] : [];
-      let size: PmiFeature['ofSize'];
-      let count = 1;
       const unmeasured = draft.sizeKind === 'angular' || draft.sizeKind === 'curve_length';
-      if (at.faces !== null && !unmeasured) {
-        const measured = measureSize(at.faces.faces, draft.sizeKind as MeasuredSizeKind, at.faces.topology, at.faces.tolerance);
-        if ('code' in measured) problems.push(`${measured.code}: ${measured.message}`);
-        else {
-          size = measured.ofSize;
-          count = measured.count;
-          const half = draft.sizeKind === 'radius' || draft.sizeKind === 'spherical_radius';
-          const nominal = half ? measured.ofSize.measured / 2 : measured.ofSize.measured;
-          if (mismatch(draft.nominal, nominal)) problems.push(differs(draft.nominal, nominal));
-        }
-      }
-      if (unmeasured && draft.nominal === undefined) problems.push(`a ${draft.sizeKind} size has no nominal`);
+      const { size, count, found } = sizeMeasurement(at.faces, draft);
+      problems.push(...found);
       const item: SizeDimensionPmi = {
         id,
         kind: 'size_dimension',
@@ -246,17 +279,8 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
       const from = feature(draft.from);
       const to = feature(draft.to);
       const problems: string[] = [from, to].filter((side) => side.faces === null).map((side) => side.why);
-      let measured = draft.nominal ?? 0;
-      if (from.faces !== null && to.faces !== null) {
-        const a = featureElement(from.faces.faces, from.faces.tolerance);
-        const b = featureElement(to.faces.faces, to.faces.tolerance);
-        const located = 'code' in a || 'code' in b ? null : locate(a, b, draft.measure);
-        if (located === null || 'code' in located) problems.push('the B-rep cannot measure the two features: the file nominal is kept');
-        else {
-          if (mismatch(draft.nominal, located.measured)) problems.push(differs(draft.nominal, located.measured));
-          measured = located.measured;
-        }
-      }
+      const { measured, found } = locationMeasurement(from.faces, to.faces, draft);
+      problems.push(...found);
       const item: LocationDimensionPmi = {
         id,
         kind: 'location_dimension',

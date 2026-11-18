@@ -27,7 +27,8 @@ let dispatched: Array<{ name: string; params: Record<string, unknown> }>;
 let downloads: string[];
 const originalCreateObjectUrl = URL.createObjectURL;
 const originalRevokeObjectUrl = URL.revokeObjectURL;
-const originalDispatch = useStore.getState().dispatch;
+// the store as created, not its state at file load: the shared DOM worker resets stores per test, so a previous file can leave a mocked dispatch behind
+const originalDispatch = useStore.getInitialState().dispatch;
 
 /** A 1x1 PNG: the dialog only base64-decodes and displays files; the real render is exercised once, tiny, in the last describe. */
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

@@ -6,6 +6,7 @@ import { refuse } from '../model';
 import { buildTankTemplate, tankShape } from './tankParams';
 import { isVesselIssue } from './vesselParams';
 import { commitNewEquipment, levelContext, locationParam, newEquipmentElement, placementShape } from './newEquipment';
+import { powInt } from '@lib/powInt';
 
 /**
  * @affects creates 1 equipment element (plant template 'tank') plus derived revolutions (bottom, one ring per course, roof) on layer Q-EQPM tagged element:<id>
@@ -38,7 +39,7 @@ export const addStorageTank = defineCommand({
     if (!created.ok) return created.result;
     const { template } = built;
     const { element } = created;
-    const cubic = toMetres(doc, 1) ** 3;
+    const cubic = powInt(toMetres(doc, 1), 3);
     const bottoms = courseBottoms(template);
     const totalM3 = tankLiquidVolume(template, template.shellHeight) * cubic;
     return commitNewEquipment(

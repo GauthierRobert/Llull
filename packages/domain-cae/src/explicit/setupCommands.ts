@@ -122,43 +122,20 @@ export const setExplicitControls = defineCommand({
     const { analysisCase, spec } = found;
     const units = supportedUnits(analysisCase);
     if (units === null) return fail('EXP_UNITS_UNSUPPORTED', `unit system ${analysisCase.unitSystem} is not supported by llull_explicit`);
-    const endTimeS = seconds(params.endTime);
-    const historyIntervalS = seconds(params.historyInterval);
-    if (endTimeS === null || !(endTimeS > 0)) return fail('EXP_TIME_INVALID', 'endTime must be a time > 0', [], ['endTime']);
-    if (historyIntervalS === null || !(historyIntervalS > 0) || historyIntervalS > endTimeS)
-      return fail('EXP_TIME_INVALID', 'historyInterval must be a time in (0, endTime]', [], ['historyInterval']);
-    if (!withinHistoryCap(endTimeS, historyIntervalS))
-      return fail(
-        'EXP_TIME_INVALID',
-        `endTime / historyInterval must be at most ${MAX_HISTORY_INTERVALS} (bounds the result size)`,
-        [],
-        ['historyInterval'],
-      );
-    const minTimeStepS = params.minTimeStep === undefined ? undefined : seconds(params.minTimeStep);
-    if (minTimeStepS === null || (minTimeStepS !== undefined && !(minTimeStepS > 0)))
-      return fail('EXP_TIME_INVALID', 'minTimeStep must be a time > 0', [], ['minTimeStep']);
+    const times = timesOf(params, fail);
+    if ('document' in times) return times;
+    const { endTimeS, historyIntervalS, minTimeStepS } = times;
     const scaling = massScalingOf(params.massScaling, fail);
     if ('document' in scaling) return scaling;
-    const timeStepScale = given(params.timeStepScale, DEFAULT_TIME_STEP_SCALE);
-    const hourglass = given(params.hourglassCoefficient, DEFAULT_HOURGLASS_COEFFICIENT);
-    const linear = given(params.bulkViscosity?.linear, DEFAULT_BULK_LINEAR);
-    const quadratic = given(params.bulkViscosity?.quadratic, DEFAULT_BULK_QUADRATIC);
-    if (!(timeStepScale.value > 0 && timeStepScale.value <= 1))
-      return fail('EXP_PARAM_INVALID', `timeStepScale ${timeStepScale.value} must be in (0, 1]`, [], ['timeStepScale']);
-    if (!(hourglass.value >= 0 && hourglass.value <= 0.5))
-      return fail('EXP_PARAM_INVALID', `hourglassCoefficient ${hourglass.value} must be in [0, 0.5]`, [], ['hourglassCoefficient']);
-    if (!(linear.value >= 0 && quadratic.value >= 0 && Number.isFinite(linear.value + quadratic.value)))
-      return fail('EXP_PARAM_INVALID', 'bulk viscosity coefficients must be >= 0', [], ['bulkViscosity']);
+    const coefficients = coefficientsOf(params, fail);
+    if ('document' in coefficients) return coefficients;
+    const { timeStepScale, hourglass, linear, quadratic } = coefficients;
     const gravity = params.gravity === undefined ? undefined : analysisVector(params.gravity.vector, params.gravity.unit, units.length, 2);
     if (gravity === null)
       return fail('EXP_PARAM_INVALID', `gravity unit '${params.gravity?.unit ?? ''}' is not an acceleration`, [], ['gravity']);
-    let mesh: ExplicitMeshSource = { kind: 'fea_mesh' };
-    if (params.mesh?.kind === 'structured_hex') {
-      const size = params.mesh.size;
-      if (size === undefined || !(size > 0) || !Number.isFinite(size))
-        return fail('EXP_PARAM_INVALID', 'structured_hex needs size > 0 (document units)', [], ['mesh.size']);
-      mesh = { kind: 'structured_hex', size };
-    }
+    const meshSource = meshOf(params, fail);
+    if ('document' in meshSource) return meshSource;
+    const mesh = meshSource.value;
     const next: ExplicitSpec = {
       endTimeS,
       historyIntervalS,
@@ -169,17 +146,7 @@ export const setExplicitControls = defineCommand({
       hourglassCoefficient: hourglass,
       bulkViscosity: { linear, quadratic },
       mesh,
-      initialVelocities: spec?.initialVelocities ?? {},
-      rigidWalls: spec?.rigidWalls ?? {},
-      rigidWallOrder: spec?.rigidWallOrder ?? [],
-      ...(spec?.failure !== undefined ? { failure: spec.failure } : {}),
-      ...(spec?.heating !== undefined ? { heating: spec.heating } : {}),
-      ...(spec?.imposedMotions !== undefined
-        ? { imposedMotions: spec.imposedMotions, imposedMotionOrder: spec.imposedMotionOrder ?? [] }
-        : {}),
-      ...(spec?.contacts !== undefined ? { contacts: spec.contacts, contactOrder: spec.contactOrder ?? [] } : {}),
-      ...(spec?.shells !== undefined ? { shells: spec.shells } : {}),
-      ...(spec?.results !== undefined ? { results: spec.results } : {}),
+      ...keptSetup(spec),
     };
     const defaults = [timeStepScale, hourglass, linear, quadratic].filter((value) => value.defaulted).length;
     return changed(
@@ -189,6 +156,109 @@ export const setExplicitControls = defineCommand({
     );
   },
 });
+
+interface Quantity {
+  readonly value: number;
+  readonly unit: string;
+}
+
+interface ControlParams {
+  readonly analysisId: string;
+  readonly endTime: Quantity;
+  readonly historyInterval: Quantity;
+  readonly minTimeStep?: Quantity | undefined;
+  readonly timeStepScale?: { readonly value: number; readonly source: string } | undefined;
+  readonly hourglassCoefficient?: { readonly value: number; readonly source: string } | undefined;
+  readonly bulkViscosity?:
+    | {
+        readonly linear: { readonly value: number; readonly source: string };
+        readonly quadratic: { readonly value: number; readonly source: string };
+      }
+    | undefined;
+  readonly mesh?: { readonly kind: 'structured_hex' | 'fea_mesh'; readonly size?: number | undefined } | undefined;
+}
+
+/** End time, history interval and optional minimum step in seconds, or the first refusal. */
+function timesOf(
+  params: ControlParams,
+  fail: Fail,
+): { readonly endTimeS: number; readonly historyIntervalS: number; readonly minTimeStepS: number | undefined } | CommandResult {
+  const endTimeS = seconds(params.endTime);
+  const historyIntervalS = seconds(params.historyInterval);
+  if (endTimeS === null || !(endTimeS > 0)) return fail('EXP_TIME_INVALID', 'endTime must be a time > 0', [], ['endTime']);
+  if (historyIntervalS === null || !(historyIntervalS > 0) || historyIntervalS > endTimeS)
+    return fail('EXP_TIME_INVALID', 'historyInterval must be a time in (0, endTime]', [], ['historyInterval']);
+  if (!withinHistoryCap(endTimeS, historyIntervalS))
+    return fail(
+      'EXP_TIME_INVALID',
+      `endTime / historyInterval must be at most ${MAX_HISTORY_INTERVALS} (bounds the result size)`,
+      [],
+      ['historyInterval'],
+    );
+  const minTimeStepS = params.minTimeStep === undefined ? undefined : seconds(params.minTimeStep);
+  if (minTimeStepS === null || (minTimeStepS !== undefined && !(minTimeStepS > 0)))
+    return fail('EXP_TIME_INVALID', 'minTimeStep must be a time > 0', [], ['minTimeStep']);
+  return { endTimeS, historyIntervalS, minTimeStepS };
+}
+
+/** The time-step, hourglass and bulk-viscosity coefficients (given or named defaults), or the refusal for one out of range. */
+function coefficientsOf(
+  params: ControlParams,
+  fail: Fail,
+):
+  | { readonly timeStepScale: NamedValue; readonly hourglass: NamedValue; readonly linear: NamedValue; readonly quadratic: NamedValue }
+  | CommandResult {
+  const timeStepScale = given(params.timeStepScale, DEFAULT_TIME_STEP_SCALE);
+  const hourglass = given(params.hourglassCoefficient, DEFAULT_HOURGLASS_COEFFICIENT);
+  const linear = given(params.bulkViscosity?.linear, DEFAULT_BULK_LINEAR);
+  const quadratic = given(params.bulkViscosity?.quadratic, DEFAULT_BULK_QUADRATIC);
+  if (!(timeStepScale.value > 0 && timeStepScale.value <= 1))
+    return fail('EXP_PARAM_INVALID', `timeStepScale ${timeStepScale.value} must be in (0, 1]`, [], ['timeStepScale']);
+  if (!(hourglass.value >= 0 && hourglass.value <= 0.5))
+    return fail('EXP_PARAM_INVALID', `hourglassCoefficient ${hourglass.value} must be in [0, 0.5]`, [], ['hourglassCoefficient']);
+  if (!(linear.value >= 0 && quadratic.value >= 0 && Number.isFinite(linear.value + quadratic.value)))
+    return fail('EXP_PARAM_INVALID', 'bulk viscosity coefficients must be >= 0', [], ['bulkViscosity']);
+  return { timeStepScale, hourglass, linear, quadratic };
+}
+
+/** The mesh source (default fea_mesh); structured_hex without a positive finite size is refused. */
+function meshOf(params: ControlParams, fail: Fail): { readonly value: ExplicitMeshSource } | CommandResult {
+  if (params.mesh?.kind !== 'structured_hex') return { value: { kind: 'fea_mesh' } };
+  const size = params.mesh.size;
+  if (size === undefined || !(size > 0) || !Number.isFinite(size))
+    return fail('EXP_PARAM_INVALID', 'structured_hex needs size > 0 (document units)', [], ['mesh.size']);
+  return { value: { kind: 'structured_hex', size } };
+}
+
+/** The parts of an existing spec that set_explicit_controls keeps (initial velocities, walls, failure, heating, motions, contacts, shells, results). */
+function keptSetup(
+  spec: ExplicitSpec | undefined,
+): Omit<
+  ExplicitSpec,
+  | 'endTimeS'
+  | 'historyIntervalS'
+  | 'timeStepScale'
+  | 'minTimeStepS'
+  | 'massScaling'
+  | 'gravity'
+  | 'hourglassCoefficient'
+  | 'bulkViscosity'
+  | 'mesh'
+> {
+  return {
+    initialVelocities: spec?.initialVelocities ?? {},
+    rigidWalls: spec?.rigidWalls ?? {},
+    rigidWallOrder: spec?.rigidWallOrder ?? [],
+    ...(spec?.failure !== undefined ? { failure: spec.failure } : {}),
+    ...(spec?.heating !== undefined ? { heating: spec.heating } : {}),
+    ...(spec?.imposedMotions !== undefined
+      ? { imposedMotions: spec.imposedMotions, imposedMotionOrder: spec.imposedMotionOrder ?? [] }
+      : {}),
+    ...(spec?.contacts !== undefined ? { contacts: spec.contacts, contactOrder: spec.contactOrder ?? [] } : {}),
+    ...(spec?.shells !== undefined ? { shells: spec.shells } : {}),
+    ...(spec?.results !== undefined ? { results: spec.results } : {}),
+  };
+}
 
 function massScalingOf(
   input:

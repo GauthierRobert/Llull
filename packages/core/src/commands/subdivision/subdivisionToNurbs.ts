@@ -36,6 +36,132 @@ function starPoints(entity: SubdivisionEntity): Array<{ id: string; kind: 'verte
   return [...vertices, ...faces];
 }
 
+type Converted = ReturnType<typeof cageToNurbs>;
+type ConversionMode = {
+  readonly solid: boolean;
+  readonly faces: string;
+  readonly effectiveG1: boolean;
+  readonly tangentToleranceDeg: number;
+};
+
+interface ConversionReport {
+  readonly patchCount: number;
+  readonly refineLevels: number;
+  readonly faces: string;
+  readonly extraordinary: string;
+  readonly maxDeviation: number;
+  readonly deviationSamples: number;
+  readonly skippedSamples: number;
+  readonly evEdges: Array<Converted['evEdges'][number]>;
+  readonly maxEvG0: number;
+  readonly maxEvG1Deg: number;
+  readonly starPoints: ReturnType<typeof starPoints>;
+  readonly tangentToleranceDeg: number | null;
+  readonly g1ToleranceMet: boolean | null;
+  readonly g1Method: Converted['g1Method'];
+  readonly g1Exact: {
+    readonly method: NonNullable<Converted['exactMethod']>;
+    readonly freeQuads: number;
+    readonly patchCount: number;
+    readonly objective: Converted['exactObjective'];
+  } | null;
+  readonly g1Choice: Converted['g1Choice'];
+  readonly plainMaxDeviation: number | null;
+  readonly deviationRatio: number | null;
+  readonly exactG1Refused: Array<Converted['exactRefused'][number]>;
+  readonly warnings: string[];
+  readonly packedQuads: number;
+  readonly packedBlocks: number;
+  readonly unit: CadDocument['units'];
+}
+
+/** The `data` payload of the conversion. */
+function conversionReport(doc: CadDocument, entity: SubdivisionEntity, converted: Converted, mode: ConversionMode): ConversionReport {
+  const { solid, faces, effectiveG1, tangentToleranceDeg } = mode;
+  const shapeRatio =
+    effectiveG1 && converted.plainMaxDeviation !== null && converted.plainMaxDeviation > 0
+      ? converted.maxDeviation / converted.plainMaxDeviation
+      : null;
+  const report = {
+    patchCount: converted.patchCount,
+    refineLevels: converted.refineLevels,
+    faces: solid ? 'unpacked' : faces,
+    extraordinary: effectiveG1 ? 'G1' : 'G0',
+    maxDeviation: sig(converted.maxDeviation),
+    deviationSamples: converted.deviationSamples,
+    skippedSamples: converted.skippedSamples,
+    evEdges: converted.evEdges.slice(0, MAX_LISTED_EV_EDGES).map((e) => ({ ...e, g0: sig(e.g0), g1Deg: sig(e.g1Deg) })),
+    maxEvG0: sig(converted.maxEvG0),
+    maxEvG1Deg: sig(converted.maxEvG1Deg),
+    starPoints: starPoints(entity),
+    tangentToleranceDeg: effectiveG1 ? tangentToleranceDeg : null,
+    g1ToleranceMet: effectiveG1 ? converted.g1ToleranceMet : null,
+    g1Method: effectiveG1 ? converted.g1Method : null,
+    g1Exact:
+      converted.exactMethod === null
+        ? null
+        : {
+            method: converted.exactMethod,
+            freeQuads: converted.exactFreeQuads,
+            patchCount: converted.patchCount,
+            objective: converted.exactObjective,
+          },
+    g1Choice:
+      converted.g1Choice === null
+        ? null
+        : {
+            ...converted.g1Choice,
+            exactDeviation: converted.g1Choice.exactDeviation === null ? null : sig(converted.g1Choice.exactDeviation),
+            fitDeviation: converted.g1Choice.fitDeviation === null ? null : sig(converted.g1Choice.fitDeviation),
+          },
+    plainMaxDeviation: converted.plainMaxDeviation === null ? null : sig(converted.plainMaxDeviation),
+    deviationRatio: shapeRatio === null ? null : sig(shapeRatio),
+    exactG1Refused: converted.exactRefused.map((group) => ({ ...group, residual: sig(group.residual) })),
+    warnings: [
+      ...(effectiveG1 && converted.g1ToleranceMet === false ? ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'] : []),
+      ...(shapeRatio !== null && shapeRatio > SHAPE_MOVED_RATIO ? ['DIR_CONVERT_G1_SHAPE_MOVED'] : []),
+      ...(settleBudgetProblem(entity) !== null ? ['DIR_SHARPNESS_BUDGET'] : []),
+    ],
+    packedQuads: converted.packedQuads,
+    packedBlocks: converted.packedBlocks,
+    unit: doc.units,
+  };
+  return report;
+}
+
+function g1LabelOf(effectiveG1: boolean, converted: Converted): string {
+  return !effectiveG1
+    ? 'G0'
+    : converted.g1Method === 'exact'
+      ? 'G1 exact'
+      : converted.g1Method === 'fit'
+        ? converted.exactRefused.length > 0
+          ? `G1 fit (${converted.exactRefused.length} group(s) refused by the exact solve)`
+          : 'G1 fit'
+        : 'G1';
+}
+
+function measuredText(
+  doc: CadDocument,
+  entity: SubdivisionEntity,
+  report: ConversionReport,
+  g1Label: string,
+  tangentToleranceDeg: number,
+): string {
+  return (
+    `max deviation ${report.maxDeviation} ${doc.units} over ${report.deviationSamples} samples, EV seams: gap ${report.maxEvG0} ${doc.units}, tangent break ${report.maxEvG1Deg} deg` +
+    (report.warnings.includes('DIR_CONVERT_G1_TOLERANCE_NOT_MET')
+      ? ` [DIR_CONVERT_G1_TOLERANCE_NOT_MET: ${report.maxEvG1Deg} deg > ${tangentToleranceDeg} deg at the 4096-patch budget]`
+      : '') +
+    (report.warnings.includes('DIR_CONVERT_G1_SHAPE_MOVED')
+      ? ` [DIR_CONVERT_G1_SHAPE_MOVED: ${g1Label}, deviation ${report.maxDeviation} ${doc.units} = ${report.deviationRatio}x the G0 patches]`
+      : '') +
+    (report.warnings.includes('DIR_SHARPNESS_BUDGET')
+      ? ` [DIR_SHARPNESS_BUDGET: ${settleBudgetProblem(entity)}; the leftover sharpness is read as infinite]`
+      : '')
+  );
+}
+
 /**
  * @affects sheets: removes 1 subdivision entity (unless keep), creates one nurbs_surface per patch (or per packed block); solid: creates 1 mesh entity carrying the exact B-rep recipe
  * @invariant regular quads convert exactly (deviation from the Catmull-Clark limit surface ~1e-15); quads next to extraordinary vertices are Loop-Schaefer geometry patches, G0 across every seam (data.maxEvG0 = 0); extraordinary 'G1' (sheets) builds the exact G1 solution (the linear tangent-plane conditions: interior poles, and where that has no solution the inner edge poles between free quads too, same patch count and corner poles; every edge G1 to about 1e-8 rad) and the approximate tangent-plane fit, and keeps by g1Solve: 'auto' (default) the exact one when it meets tangentToleranceDeg and its deviation from the limit surface is at most max(1.25 x the fit, deviationTolerance), else the fit (the exact one when only it meets the tolerance); 'exact' / 'fit' force one; the exact solve costs position (data.maxDeviation against data.plainMaxDeviation: 3.3x on a cube, 11 to 15x on boxes with several segments, 1.1x on cylinders; DIR_CONVERT_G1_SHAPE_MOVED above 3x), its solve is bounded (a work budget, a named refusal per group in data.exactG1Refused, no retry at finer levels once refused); then refines until the measured tangent break along extraordinary-vertex edges is <= tangentToleranceDeg or 4096 patches are reached; kernel-optional: sheets need no kernel, solid needs the exact native kernel
@@ -133,74 +259,9 @@ export const subdivisionToNurbs = defineCommand({
       ...(deviationTolerance === undefined ? {} : { deviationTolerance }),
       samples,
     });
-    const shapeRatio =
-      effectiveG1 && converted.plainMaxDeviation !== null && converted.plainMaxDeviation > 0
-        ? converted.maxDeviation / converted.plainMaxDeviation
-        : null;
-    const report = {
-      patchCount: converted.patchCount,
-      refineLevels: converted.refineLevels,
-      faces: solid ? 'unpacked' : faces,
-      extraordinary: effectiveG1 ? 'G1' : 'G0',
-      maxDeviation: sig(converted.maxDeviation),
-      deviationSamples: converted.deviationSamples,
-      skippedSamples: converted.skippedSamples,
-      evEdges: converted.evEdges.slice(0, MAX_LISTED_EV_EDGES).map((e) => ({ ...e, g0: sig(e.g0), g1Deg: sig(e.g1Deg) })),
-      maxEvG0: sig(converted.maxEvG0),
-      maxEvG1Deg: sig(converted.maxEvG1Deg),
-      starPoints: starPoints(entity),
-      tangentToleranceDeg: effectiveG1 ? tangentToleranceDeg : null,
-      g1ToleranceMet: effectiveG1 ? converted.g1ToleranceMet : null,
-      g1Method: effectiveG1 ? converted.g1Method : null,
-      g1Exact:
-        converted.exactMethod === null
-          ? null
-          : {
-              method: converted.exactMethod,
-              freeQuads: converted.exactFreeQuads,
-              patchCount: converted.patchCount,
-              objective: converted.exactObjective,
-            },
-      g1Choice:
-        converted.g1Choice === null
-          ? null
-          : {
-              ...converted.g1Choice,
-              exactDeviation: converted.g1Choice.exactDeviation === null ? null : sig(converted.g1Choice.exactDeviation),
-              fitDeviation: converted.g1Choice.fitDeviation === null ? null : sig(converted.g1Choice.fitDeviation),
-            },
-      plainMaxDeviation: converted.plainMaxDeviation === null ? null : sig(converted.plainMaxDeviation),
-      deviationRatio: shapeRatio === null ? null : sig(shapeRatio),
-      exactG1Refused: converted.exactRefused.map((group) => ({ ...group, residual: sig(group.residual) })),
-      warnings: [
-        ...(effectiveG1 && converted.g1ToleranceMet === false ? ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'] : []),
-        ...(shapeRatio !== null && shapeRatio > SHAPE_MOVED_RATIO ? ['DIR_CONVERT_G1_SHAPE_MOVED'] : []),
-        ...(settleBudgetProblem(entity) !== null ? ['DIR_SHARPNESS_BUDGET'] : []),
-      ],
-      packedQuads: converted.packedQuads,
-      packedBlocks: converted.packedBlocks,
-      unit: doc.units,
-    };
-    const g1Label = !effectiveG1
-      ? 'G0'
-      : converted.g1Method === 'exact'
-        ? 'G1 exact'
-        : converted.g1Method === 'fit'
-          ? converted.exactRefused.length > 0
-            ? `G1 fit (${converted.exactRefused.length} group(s) refused by the exact solve)`
-            : 'G1 fit'
-          : 'G1';
-    const measured =
-      `max deviation ${report.maxDeviation} ${doc.units} over ${report.deviationSamples} samples, EV seams: gap ${report.maxEvG0} ${doc.units}, tangent break ${report.maxEvG1Deg} deg` +
-      (report.warnings.includes('DIR_CONVERT_G1_TOLERANCE_NOT_MET')
-        ? ` [DIR_CONVERT_G1_TOLERANCE_NOT_MET: ${report.maxEvG1Deg} deg > ${tangentToleranceDeg} deg at the 4096-patch budget]`
-        : '') +
-      (report.warnings.includes('DIR_CONVERT_G1_SHAPE_MOVED')
-        ? ` [DIR_CONVERT_G1_SHAPE_MOVED: ${g1Label}, deviation ${report.maxDeviation} ${doc.units} = ${report.deviationRatio}x the G0 patches]`
-        : '') +
-      (report.warnings.includes('DIR_SHARPNESS_BUDGET')
-        ? ` [DIR_SHARPNESS_BUDGET: ${settleBudgetProblem(entity)}; the leftover sharpness is read as infinite]`
-        : '');
+    const report = conversionReport(doc, entity, converted, { solid, faces, effectiveG1, tangentToleranceDeg });
+    const g1Label = g1LabelOf(effectiveG1, converted);
+    const measured = measuredText(doc, entity, report, g1Label, tangentToleranceDeg);
     if (solid && kernel !== null) {
       const built = evaluateRecipe(kernel, recipeOf(entity));
       if (typeof built === 'string')

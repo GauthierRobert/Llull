@@ -23,6 +23,35 @@ import { bcfExtensionsXml, bcfMarkupXml, bcfVersionXml, bcfVisualizationXml, typ
 
 const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
+type Review = ReturnType<typeof reviewOf>;
+
+const issueComments = (review: Review, issue: ReviewIssue, viewpointGuids: ReadonlyMap<string, string>): MarkupComment[] =>
+  Object.values(review.comments)
+    .filter((comment) => comment.issueId === issue.id)
+    .map((comment) => {
+      const viewpointGuid = comment.viewpointId === undefined ? undefined : viewpointGuids.get(comment.viewpointId);
+      return {
+        guid: nameUuid(`llull-bcf-comment|${issue.guid}|${comment.id}`),
+        text: comment.text,
+        author: comment.importedAuthor ?? comment.author,
+        ...(viewpointGuid === undefined ? {} : { viewpointGuid }),
+      };
+    });
+
+const warningText = (unmappedCount: number, largeCount: number): string =>
+  `${unmappedCount > 0 ? ` VIS_BCF_GUID_UNMAPPED: ${unmappedCount} entit(ies) referenced by AuthoringToolId.` : ''}` +
+  `${largeCount > 0 ? ` VIS_BCF_COLOURING_LARGE: ${largeCount} viewpoint(s) over 1000 coloured components, the profile is written as legend labels.` : ''}`;
+
+const bcfWarnings = (
+  unmapped: readonly string[],
+  large: ReadonlyArray<{ viewpointId: string; coloured: number }>,
+): Array<{ code: string; ids: string[]; counts?: number[] }> => [
+  ...(unmapped.length === 0 ? [] : [{ code: 'VIS_BCF_GUID_UNMAPPED', ids: [...unmapped] }]),
+  ...(large.length === 0
+    ? []
+    : [{ code: 'VIS_BCF_COLOURING_LARGE', ids: large.map((item) => item.viewpointId), counts: large.map((item) => item.coloured) }]),
+];
+
 /**
  * @affects nothing — read-only; data.base64 is the .bcf archive (`--save review.bcf`)
  * @invariant reference snapshots: the same document and params give the same archive bytes (sha256)
@@ -144,17 +173,7 @@ export const exportBcf = defineCommand({
         entries.push({ name: `${issue.guid}/${guid}.png`, data: png });
         markupViews.push({ guid, file: `${guid}.bcfv`, snapshot: `${guid}.png` });
       }
-      const comments: MarkupComment[] = Object.values(review.comments)
-        .filter((comment) => comment.issueId === issue.id)
-        .map((comment) => {
-          const viewpointGuid = comment.viewpointId === undefined ? undefined : viewpointGuids.get(comment.viewpointId);
-          return {
-            guid: nameUuid(`llull-bcf-comment|${issue.guid}|${comment.id}`),
-            text: comment.text,
-            author: comment.importedAuthor ?? comment.author,
-            ...(viewpointGuid === undefined ? {} : { viewpointGuid }),
-          };
-        });
+      const comments = issueComments(review, issue, viewpointGuids);
       const topic = legendLabels.length === 0 ? issue : { ...issue, labels: [...new Set([...issue.labels, ...legendLabels])] };
       exported.push(topic);
       entries.push({
@@ -170,12 +189,7 @@ export const exportBcf = defineCommand({
     if (outcome !== undefined && 'code' in outcome) return fail(outcome.code, outcome.message, [], ['snapshotRenderer']);
     const archive = zipStore(entries);
     const unmapped = [...new Set(issues.flatMap((issue) => present(issue.entityIds)))];
-    const warnings = [
-      ...(unmapped.length === 0 ? [] : [{ code: 'VIS_BCF_GUID_UNMAPPED', ids: unmapped }]),
-      ...(large.length === 0
-        ? []
-        : [{ code: 'VIS_BCF_COLOURING_LARGE', ids: large.map((item) => item.viewpointId), counts: large.map((item) => item.coloured) }]),
-    ];
+    const warnings = bcfWarnings(unmapped, large);
     const coloured = [...styles.values()].reduce((sum, style) => sum + (style.large ? 0 : style.coloured), 0);
     const provenance =
       outcome !== undefined && !('code' in outcome)
@@ -185,8 +199,7 @@ export const exportBcf = defineCommand({
     return report(
       doc,
       `Exported ${issues.length} BCF ${version} topic(s), ${viewpointCount} viewpoint(s), ${snapshotCount} snapshot(s), ${coloured} coloured component(s) (${archive.length} bytes). ` +
-        `Save with --save ${params.fileName ?? 'review.bcf'}.${unmapped.length > 0 ? ` VIS_BCF_GUID_UNMAPPED: ${unmapped.length} entit(ies) referenced by AuthoringToolId.` : ''}` +
-        `${large.length > 0 ? ` VIS_BCF_COLOURING_LARGE: ${large.length} viewpoint(s) over 1000 coloured components, the profile is written as legend labels.` : ''}`,
+        `Save with --save ${params.fileName ?? 'review.bcf'}.${warningText(unmapped.length, large.length)}`,
       {
         fileName: params.fileName ?? 'review.bcf',
         base64: uint8ArrayToBase64(archive),

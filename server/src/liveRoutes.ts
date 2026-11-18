@@ -4,7 +4,7 @@
  *                        guardRead: Bearer, or a single-use `?ticket=` (EventSource cannot set headers).
  *   POST /live/ticket    `{ ticket, expiresInMs }`: 30 s single-use ticket (header auth only)
  *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
- *   POST /command        `{ name, params?, commandId? }`; a repeated `commandId` is idempotent. Answers JSON when the command is done; the event loop stays
+ *   POST /command        `{ name, params?, commandId?, coalesce? }` (`coalesce`: fold into the previous undo step); a repeated `commandId` is idempotent. Answers JSON when the command is done; the event loop stays
  *                        free while a native mesh job runs (TECHNICAL_SPEC 13.8). With `Accept: application/x-ndjson` it streams one `{ type: 'progress', ... }`
  *                        line per job report (and a heartbeat when the job is silent) and ends with `{ type: 'result', result }`. Closing the connection cancels the command.
  *   POST /undo, /redo    "Nothing to undo/redo." is a normal result, not an error
@@ -22,7 +22,7 @@ import {
   MAX_LIVE_SUBSCRIBERS,
   liveMaxPerClient,
 } from './liveDocument';
-import { guardMutation, guardRead, guardTicketIssue, isLocalPeer } from './security';
+import { guardMutation, guardRead, isLocalPeer } from './security';
 import { redactLicensedOutcome } from '@protocol/index';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
 
@@ -47,7 +47,6 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
   const streamsPerClient = new Map<string, number>();
   const mutationGuard = guardMutation();
   const readGuard = guardRead();
-  const ticketGuard = guardTicketIssue();
 
   router.get('/live', restLimiter, readGuard, (req, res) => {
     if (liveSubscriberCount() >= MAX_LIVE_SUBSCRIBERS) return void res.status(503).json({ error: 'Too many live subscribers.' });
@@ -73,7 +72,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     });
   });
 
-  router.post('/live/ticket', restLimiter, ticketGuard, (req, res) => {
+  router.post('/live/ticket', restLimiter, mutationGuard, (req, res) => {
     const ticket = issueTicket(req.ip ?? req.socket.remoteAddress ?? 'unknown');
     if (ticket === null) return void res.status(503).json({ error: 'Too many outstanding tickets.' });
     res.status(200).json({ ticket, expiresInMs: TICKET_TTL_MS });
@@ -109,6 +108,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     };
     applyCommandAsync(name, params ?? {}, {
       ...(commandId !== undefined ? { commandId } : {}),
+      ...(body.coalesce === true ? { coalesce: true } : {}),
       source: body.client === 'cli' ? 'cli' : 'rest',
       signal: cancel.signal,
       onProgress: (event) => {

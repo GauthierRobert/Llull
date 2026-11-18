@@ -1,3 +1,4 @@
+import { powInt } from '@lib/powInt';
 /**
  * Single-degree-of-freedom frequency response (PHY-09 §5.1, TR-DYN-20): receptance, base transmissibility, peak and half-power points,
  * Miles' equation and the exact white-noise integrals. r = f / fn, zeta = viscous ratio. Pure, deterministic.
@@ -58,5 +59,5 @@ export const whiteNoiseAccelerationRms = (fnHz: number, zeta: number, asdG2PerHz
 /** Exact relative-displacement rms on a white base ASD: sqrt(W g^2 / (8 zeta wn^3)), in metres (W in g^2/Hz, g = 9.80665 m/s^2). */
 export function whiteNoiseRelativeDisplacementRms(fnHz: number, zeta: number, asdG2PerHz: number): number {
   const wn = 2 * Math.PI * fnHz;
-  return Math.sqrt((asdG2PerHz * STANDARD_GRAVITY * STANDARD_GRAVITY) / (8 * zeta * wn ** 3));
+  return Math.sqrt((asdG2PerHz * STANDARD_GRAVITY * STANDARD_GRAVITY) / (8 * zeta * powInt(wn, 3)));
 }

@@ -243,6 +243,24 @@ export const addFlightController = defineCommand({
   },
 });
 
+/** Why a set-point's pivot command is not valid for `bodyId` (unknown surface, wrong body, outside the servo limits), or null. */
+const pivotProblem = (
+  flight: ReturnType<typeof flightOf>,
+  bodyId: string,
+  setpoints: ReadonlyArray<{ readonly t: number; readonly pivotDeg?: Record<string, number> }>,
+): string | null => {
+  for (const setpoint of setpoints)
+    for (const [surfaceId, angle] of Object.entries(setpoint.pivotDeg ?? {})) {
+      const surface = Object.hasOwn(flight.aeroSurfaces ?? {}, surfaceId) ? flight.aeroSurfaces?.[surfaceId] : undefined;
+      if (surface === undefined || surface.servo === null)
+        return `'${surfaceId}' is not an aero surface with a pivot servo (generate_aero_table first)`;
+      if (surface.bodyId !== bodyId) return `aero surface '${surfaceId}' is on body '${surface.bodyId}', not '${bodyId}'`;
+      if (!(angle >= surface.servo.minDeg && angle <= surface.servo.maxDeg))
+        return `pivot command ${angle}° of '${surfaceId}' at t = ${setpoint.t} s is outside its servo limits [${surface.servo.minDeg}, ${surface.servo.maxDeg}]°`;
+    }
+  return null;
+};
+
 /**
  * @affects adds 1 flight scenario to doc.flight.scenarios (affected: [scenarioId])
  * @invariant set-point times strictly increase from 0 and stay below durationS; gusts start inside the run with a positive duration
@@ -344,17 +362,8 @@ export const defineFlightScenario = defineCommand({
       yawDeg: setpoint.yawDeg ?? START_HEADING_DEG,
       ...(setpoint.pivotDeg === undefined ? {} : { pivotDeg: setpoint.pivotDeg }),
     }));
-    for (const setpoint of setpoints)
-      for (const [surfaceId, angle] of Object.entries(setpoint.pivotDeg ?? {})) {
-        const surface = Object.hasOwn(flight.aeroSurfaces ?? {}, surfaceId) ? flight.aeroSurfaces?.[surfaceId] : undefined;
-        if (surface === undefined || surface.servo === null)
-          return fail(`'${surfaceId}' is not an aero surface with a pivot servo (generate_aero_table first)`);
-        if (surface.bodyId !== params.body) return fail(`aero surface '${surfaceId}' is on body '${surface.bodyId}', not '${params.body}'`);
-        if (!(angle >= surface.servo.minDeg && angle <= surface.servo.maxDeg))
-          return fail(
-            `pivot command ${angle}° of '${surfaceId}' at t = ${setpoint.t} s is outside its servo limits [${surface.servo.minDeg}, ${surface.servo.maxDeg}]°`,
-          );
-      }
+    const pivotFault = pivotProblem(flight, params.body, setpoints);
+    if (pivotFault !== null) return fail(pivotFault);
     if (setpoints[0]?.t !== 0) return fail('the first set-point must be at t = 0');
     if (setpoints.some((setpoint, i) => i > 0 && setpoint.t <= (setpoints[i - 1]?.t ?? Infinity)))
       return fail('set-point times must strictly increase');

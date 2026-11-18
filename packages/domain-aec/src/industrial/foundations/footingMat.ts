@@ -18,6 +18,7 @@ import {
   SPACINGS_MM,
   V_RD_MAX,
 } from './footingModel';
+import { pow } from '@lib/pow';
 
 /** Soil pressure along x from the highest-pressure edge: linear, truncated at zero (kPa). */
 function pressureProfile(
@@ -116,8 +117,8 @@ function flexuralArea(moment: number, effectiveMm: number): number | null {
 function concreteShear(areaPerMetre: number, effectiveMm: number): { vRd: number; stress: number; k: number; rho: number } {
   const k = Math.min(2, 1 + Math.sqrt(200 / effectiveMm));
   const rho = Math.min(areaPerMetre / (1000 * effectiveMm), MAX_RHO);
-  const minimum = 0.035 * k ** 1.5 * Math.sqrt(FCK);
-  const stress = Math.max(C_RD_C * k * (100 * rho * FCK) ** (1 / 3), minimum);
+  const minimum = 0.035 * pow(k, 1.5) * Math.sqrt(FCK);
+  const stress = Math.max(C_RD_C * k * pow(100 * rho * FCK, 1 / 3), minimum);
   return { vRd: (stress * 1000 * effectiveMm) / 1000, stress, k, rho };
 }
 

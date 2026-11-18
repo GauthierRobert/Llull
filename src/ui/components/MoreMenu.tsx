@@ -11,6 +11,7 @@ import { ProjectIO } from '@ui/components/ProjectIO';
 import { ModelExport } from '@ui/components/ModelExport';
 import { ImageUnderlayImport } from '@ui/components/ImageUnderlayImport';
 import { ExchangeImport } from '@ui/components/ExchangeImport';
+import { desktopBridge } from '@ui/desktopBridge';
 
 function InspectorToggle(): React.ReactElement {
   const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
@@ -44,7 +45,8 @@ export function MoreMenu(): React.ReactElement {
       </button>
       <div className="more-menu__panel" id="more-menu-panel" role="group" aria-label="More actions" hidden={!open}>
         <span className="more-menu__title">File</span>
-        <ProjectIO />
+        {/* In the desktop app New / Open / Save belong to the native File menu: it owns the file path, its lock and the saved state. */}
+        {desktopBridge() === null && <ProjectIO />}
         <ImageUnderlayImport />
         <ExchangeImport />
         <span className="more-menu__title">Export</span>

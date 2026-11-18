@@ -2,6 +2,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import { cross3, dot3, len3, sub3 } from '@lib/vec3';
+import { powInt } from '@lib/powInt';
 
 export interface TetMetrics {
   /** Verdict scaled Jacobian `J sqrt(2) / lambdaMax` (1 regular, <= 0 inverted). */
@@ -101,6 +102,6 @@ export function quadMetrics(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3): QuadMetrics
     aspectRatio: area > 0 ? (Math.max(...lengths) * lengths.reduce((sum, value) => sum + value, 0)) / (4 * area) : Number.MAX_SAFE_INTEGER,
     scaledJacobian: Math.min(...jacobians),
     skew: axes > 0 ? Math.abs(dot3(x1, x2)) / axes : 1,
-    warpage: 1 - warp ** 3,
+    warpage: 1 - powInt(warp, 3),
   };
 }

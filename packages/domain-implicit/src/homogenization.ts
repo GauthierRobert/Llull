@@ -8,6 +8,7 @@
 import type { FieldEngine, HomogenizeAnswer } from '@core/geometry/field/engineTypes';
 import type { FieldProgram } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
+import { powInt } from '@lib/powInt';
 
 /** Named cap: voxels of the finer cell (64^3). The solve costs about this many times a few hundred iterations of six load cases. */
 const MAX_HOMOGENIZATION_VOXELS = 64 * 64 * 64;
@@ -36,7 +37,7 @@ export function cellVoxels(cell: Vec3, resolution: number): { dims: [number, num
 function voxelise(engine: FieldEngine, program: FieldProgram, origin: Vec3, dims: readonly number[], h: number): Uint8Array | null {
   const [nx, ny, nz] = dims as [number, number, number];
   const density = new Uint8Array(nx * ny * nz);
-  const perVoxel = SUBSAMPLES ** 3;
+  const perVoxel = powInt(SUBSAMPLES, 3);
   // voxels per batch so that a batch stays under the engine's sample budget
   const batch = Math.max(1, Math.floor(Math.min(engine.limits.maxSamples, 2 ** 21) / perVoxel));
   for (let start = 0; start < density.length; start += batch) {

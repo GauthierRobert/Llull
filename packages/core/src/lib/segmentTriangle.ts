@@ -2,6 +2,7 @@
 
 import type { Vec3 } from '../model/vectors';
 import { cross3, dot3, sub3 } from './vec3';
+import { pow } from './pow';
 
 const EPSILON = 1e-12;
 const END_MARGIN = 1e-9;
@@ -14,7 +15,7 @@ export function segmentHitsTriangle(start: Vec3, end: Vec3, corners: readonly [V
   const edge2 = sub3(c, a);
   const p = cross3(direction, edge2);
   const determinant = dot3(edge1, p);
-  if (Math.abs(determinant) < EPSILON * dot3(direction, direction) ** 0.5 * dot3(edge1, edge1) ** 0.5) return false;
+  if (Math.abs(determinant) < EPSILON * pow(dot3(direction, direction), 0.5) * pow(dot3(edge1, edge1), 0.5)) return false;
   const offset = sub3(start, a);
   const u = dot3(offset, p) / determinant;
   if (u <= 0 || u >= 1) return false;

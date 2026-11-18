@@ -7,6 +7,9 @@
 import type { CfdQuality, CfdSolver } from '@aero/cfd/types';
 import type { Vec3 } from '@core/model/types';
 import type { Box } from './domainSizing';
+import { map3 } from '@lib/vec3';
+import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 export const CELLS_PER_REFERENCE_LENGTH: Readonly<Record<CfdQuality, number>> = { draft: 64, standard: 128, fine: 256 };
 /**
@@ -83,15 +86,15 @@ function lbmCells(input: EstimateInput, n: number): { cells: number; updates: nu
         : volume(
             clampTo(
               {
-                min: input.body.min.map((v) => v - (level + 1) * LBM_BOX_MARGIN_LENGTHS * length) as unknown as Vec3,
-                max: input.body.max.map((v) => v + (level + 1) * LBM_BOX_MARGIN_LENGTHS * length) as unknown as Vec3,
+                min: map3(input.body.min, (v) => v - (level + 1) * LBM_BOX_MARGIN_LENGTHS * length),
+                max: map3(input.body.max, (v) => v + (level + 1) * LBM_BOX_MARGIN_LENGTHS * length),
               },
               input.domain,
             ),
           );
-    const levelCells = Math.max(0, total - previous) / (h * 2 ** level) ** 3;
+    const levelCells = Math.max(0, total - previous) / powInt(h * pow(2, level), 3);
     cells += levelCells;
-    updates += levelCells / 2 ** level;
+    updates += levelCells / pow(2, level);
     previous = total;
   }
   return { cells, updates };
@@ -106,7 +109,9 @@ const octreeLevels = (input: EstimateInput, h: number): number => {
 /** Octree: a band of 8 cell layers (geometric over coarser levels) on the surface, plus the bulk at the coarsest level. */
 function eulerCells(input: EstimateInput, n: number): number {
   const h = input.referenceLengthM / n;
-  return (EULER_SURFACE_BAND * input.surfaceAreaM2 * (4 / 3)) / h ** 2 + volume(input.domain) / (h * 2 ** octreeLevels(input, h)) ** 3;
+  return (
+    (EULER_SURFACE_BAND * input.surfaceAreaM2 * (4 / 3)) / h ** 2 + volume(input.domain) / powInt(h * pow(2, octreeLevels(input, h)), 3)
+  );
 }
 
 const cellCount = (input: EstimateInput, n: number): number => (input.solver === 'lbm' ? lbmCells(input, n).cells : eulerCells(input, n));

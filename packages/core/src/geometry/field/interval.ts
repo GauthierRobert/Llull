@@ -25,6 +25,34 @@ function sinRange(lo: number, hi: number): [number, number] {
   return [containsMin ? -1 : Math.min(...ends), containsMax ? 1 : Math.max(...ends)];
 }
 
+function divRange(al: number, ah: number, bl: number, bh: number): [number, number] {
+  if (bl <= 0 && bh >= 0) return [-Infinity, Infinity];
+  const products = [safeMul(al, 1 / bl), safeMul(al, 1 / bh), safeMul(ah, 1 / bl), safeMul(ah, 1 / bh)];
+  return [Math.min(...products), Math.max(...products)];
+}
+
+const absRange = (al: number, ah: number): [number, number] => [
+  al <= 0 && ah >= 0 ? 0 : Math.min(Math.abs(al), Math.abs(ah)),
+  Math.max(Math.abs(al), Math.abs(ah)),
+];
+
+const sqrtRange = (al: number, ah: number): [number, number] =>
+  ah < 0 ? [Infinity, Infinity] : [Math.sqrt(Math.max(al, 0)), Math.sqrt(ah)];
+
+const squareRange = (al: number, ah: number): [number, number] => [
+  al <= 0 && ah >= 0 ? 0 : Math.min(al * al, ah * ah),
+  Math.max(al * al, ah * ah),
+];
+
+const fractRange = (al: number, ah: number): [number, number] =>
+  Math.floor(al) === Math.floor(ah) ? [al - Math.floor(al), ah - Math.floor(ah)] : [0, 1];
+
+function selectRange(al: number, ah: number, bl: number, bh: number, cl: number, ch: number): [number, number] {
+  if (ah < 0) return [bl, bh];
+  if (al >= 0) return [cl, ch];
+  return [Math.min(bl, cl), Math.max(bh, ch)];
+}
+
 /** Interval [lo, hi] of the output over `box`. Tolerates non-finite inputs by answering [-Infinity, Infinity]. */
 export function evaluateInterval(prepared: PreparedProgram, box: FieldBox): [number, number] {
   const { opcodes, operands, program } = prepared;
@@ -80,19 +108,14 @@ export function evaluateInterval(prepared: PreparedProgram, box: FieldBox): [num
         break;
       }
       case 'div': {
-        if (bl <= 0 && bh >= 0) {
-          set(i, -Infinity, Infinity);
-          break;
-        }
-        const products = [safeMul(al, 1 / bl), safeMul(al, 1 / bh), safeMul(ah, 1 / bl), safeMul(ah, 1 / bh)];
-        set(i, Math.min(...products), Math.max(...products));
+        set(i, ...divRange(al, ah, bl, bh));
         break;
       }
       case 'neg':
         set(i, -ah, -al);
         break;
       case 'abs':
-        set(i, al <= 0 && ah >= 0 ? 0 : Math.min(Math.abs(al), Math.abs(ah)), Math.max(Math.abs(al), Math.abs(ah)));
+        set(i, ...absRange(al, ah));
         break;
       case 'min':
         set(i, Math.min(al, bl), Math.min(ah, bh));
@@ -101,11 +124,10 @@ export function evaluateInterval(prepared: PreparedProgram, box: FieldBox): [num
         set(i, Math.max(al, bl), Math.max(ah, bh));
         break;
       case 'sqrt':
-        if (ah < 0) set(i, Infinity, Infinity);
-        else set(i, Math.sqrt(Math.max(al, 0)), Math.sqrt(ah));
+        set(i, ...sqrtRange(al, ah));
         break;
       case 'square':
-        set(i, al <= 0 && ah >= 0 ? 0 : Math.min(al * al, ah * ah), Math.max(al * al, ah * ah));
+        set(i, ...squareRange(al, ah));
         break;
       case 'sin': {
         const [low, high] = sinRange(al, ah);
@@ -124,16 +146,13 @@ export function evaluateInterval(prepared: PreparedProgram, box: FieldBox): [num
         set(i, Math.floor(al), Math.floor(ah));
         break;
       case 'fract':
-        if (Math.floor(al) === Math.floor(ah)) set(i, al - Math.floor(al), ah - Math.floor(ah));
-        else set(i, 0, 1);
+        set(i, ...fractRange(al, ah));
         break;
       case 'clamp':
         set(i, Math.min(Math.max(al, bl), cl), Math.min(Math.max(ah, bh), ch));
         break;
       case 'select':
-        if (ah < 0) set(i, bl, bh);
-        else if (al >= 0) set(i, cl, ch);
-        else set(i, Math.min(bl, cl), Math.max(bh, ch));
+        set(i, ...selectRange(al, ah, bl, bh, cl, ch));
         break;
       case 'smin_quad':
         set(i, Math.min(al, bl) - Math.max(ch, 0) / 4, Math.min(ah, bh));

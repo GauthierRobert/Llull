@@ -1,10 +1,11 @@
 // Mechanisms › Physics: the rigid-body setup (inspect_dynamics), a Simulate button (read-only simulate_motion, MuJoCo loaded on first use),
 // the run's numbers, an rpm-vs-time chart with the playback cursor, and playback controls for the viewport replay (DynamicsPlayer).
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { runSimulation } from '@ui/services/simulationRun';
+import { warmPhysicsEngine } from '@ui/services/physicsRun';
 import { execute } from '@core/commands/registry';
 import type { SimulationData } from '@dynamics/index';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
@@ -84,6 +85,8 @@ function ResultTable({ result }: { result: SimulationData }): React.ReactElement
 }
 
 export function PhysicsSection(): React.ReactElement {
+  // the backend serves the engine: load it into the physics worker while it is reachable, so a simulation still runs if it goes away
+  useEffect(() => warmPhysicsEngine(), []);
   const document = useDocumentWithoutSelection();
   const dynamics = document.dynamics;
   const result = useDynamicsPlaybackStore((s) => s.result);

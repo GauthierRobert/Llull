@@ -2,6 +2,7 @@
 // Minor cells stay MIN_CELL_PX..MAX_CELL_PX wide on a nice 1/2/5×10^n step; major = 10× minor.
 
 import { clamp } from '@lib/clamp';
+import { pow } from '@lib/pow';
 
 const MIN_CELL_PX = 20;
 const MAX_CELL_PX = 120;
@@ -11,13 +12,13 @@ const NICE_STEPS = [1, 2, 5] as const;
 export function adaptiveGridStep(zoom: number): number {
   if (zoom <= 0) return 1;
   const exp = Math.floor(Math.log10(MIN_CELL_PX / zoom));
-  const decade = Math.pow(10, exp);
+  const decade = pow(10, exp);
   for (const nice of NICE_STEPS) {
     const candidate = nice * decade;
     const candidatePx = candidate * zoom;
     if (candidatePx >= MIN_CELL_PX && candidatePx <= MAX_CELL_PX) return candidate;
     if (candidatePx > MAX_CELL_PX) {
-      const smallerStep = 5 * Math.pow(10, exp - 1);
+      const smallerStep = 5 * pow(10, exp - 1);
       return smallerStep > 0 ? smallerStep : candidate;
     }
   }
@@ -66,7 +67,7 @@ export function formatScaleBarLength(worldLength: number): string {
 /** Smallest 1/2/5/10×10^n length at least half `targetPx` wide on screen. */
 export function scaleBarLength(zoom: number, targetPx = 80): { worldLength: number; pixelLength: number } {
   if (zoom <= 0) return { worldLength: 1, pixelLength: 1 };
-  const decade = Math.pow(10, Math.floor(Math.log10(targetPx / zoom)));
+  const decade = pow(10, Math.floor(Math.log10(targetPx / zoom)));
   for (const nice of [1, 2, 5, 10]) {
     const candidatePx = nice * decade * zoom;
     if (candidatePx >= targetPx * 0.5) return { worldLength: nice * decade, pixelLength: candidatePx };

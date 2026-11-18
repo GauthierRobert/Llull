@@ -27,6 +27,27 @@ interface PortalInputs {
   readonly haunch: { readonly eaves: number; readonly apex: number } | null;
 }
 
+/** The resolved profiles, or the failure text naming the unknown profile(s). */
+function resolvePortalProfiles(params: PortalParams): PortalProfiles | string {
+  const names = {
+    column: params.columnProfile ?? 'HEA400',
+    rafter: params.rafterProfile ?? 'IPE450',
+    purlin: params.purlinProfile ?? 'C200x75x2.5',
+    rail: params.railProfile ?? 'C200x75x2.5',
+    brace: params.braceProfile ?? 'CHS76.1x3.6',
+    gable: params.gablePostProfile ?? 'HEA200',
+  };
+  const profiles = Object.fromEntries(Object.entries(names).map(([key, name]) => [key, findProfile(name)])) as Record<
+    keyof typeof names,
+    SteelProfile | undefined
+  >;
+  const missing = Object.entries(profiles).filter(([, profile]) => !profile);
+  if (missing.length > 0) {
+    return `unknown profile(s) ${missing.map(([key]) => names[key as keyof typeof names]).join(', ')} (see list_steel_profiles).`;
+  }
+  return profiles as PortalProfiles;
+}
+
 /** @failure any invalid dimension / profile / combination -> `{ reason }` (full failure summary) */
 export function portalInputs(doc: CadDocument, params: PortalParams): PortalInputs | { reason: string } {
   const fail = (reason: string): { reason: string } => ({ reason: `add_portal_frame_building failed: ${reason}` });
@@ -50,23 +71,8 @@ export function portalInputs(doc: CadDocument, params: PortalParams): PortalInpu
   const columnBase = params.columnBase ?? 'pinned';
   if (columnBase === 'fixed' && params.basePlates === false)
     return fail("columnBase 'fixed' needs base plates (basePlates must not be false).");
-  const names = {
-    column: params.columnProfile ?? 'HEA400',
-    rafter: params.rafterProfile ?? 'IPE450',
-    purlin: params.purlinProfile ?? 'C200x75x2.5',
-    rail: params.railProfile ?? 'C200x75x2.5',
-    brace: params.braceProfile ?? 'CHS76.1x3.6',
-    gable: params.gablePostProfile ?? 'HEA200',
-  };
-  const profiles = Object.fromEntries(Object.entries(names).map(([key, name]) => [key, findProfile(name)])) as Record<
-    keyof typeof names,
-    SteelProfile | undefined
-  >;
-  const missing = Object.entries(profiles).filter(([, profile]) => !profile);
-  if (missing.length > 0) {
-    return fail(`unknown profile(s) ${missing.map(([key]) => names[key as keyof typeof names]).join(', ')} (see list_steel_profiles).`);
-  }
-  const p = profiles as PortalProfiles;
+  const profiles = resolvePortalProfiles(params);
+  if (typeof profiles === 'string') return fail(profiles);
   if (params.crane && !(params.crane.railHeight > 0 && params.crane.railHeight < eave))
     return fail('crane.railHeight must be > 0 and below the eaves.');
   const { eavesLength = 0.1, apexLength = 0 } = params.haunch ?? {};
@@ -88,6 +94,6 @@ export function portalInputs(doc: CadDocument, params: PortalParams): PortalInpu
     railSpacing,
     roofType,
     columnBase,
-    profiles: p,
+    profiles,
   };
 }

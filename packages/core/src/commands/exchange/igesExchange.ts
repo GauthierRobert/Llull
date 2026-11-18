@@ -23,6 +23,7 @@ import { buildBodies } from './importBodies';
 import { stepImportReport } from './stepImportReport';
 import { planExchange } from './stepPlan';
 import { ACCEPT_UNVERIFIED, acceptedReasons, gateResult, unverifiedGate } from './unverifiedGate';
+import { powInt } from '../../lib/powInt';
 
 const MAX_IGES_CHARS = 64 * 1024 * 1024;
 
@@ -291,7 +292,7 @@ export const exportIges = defineCommand({
           kernel.loadBlob?.(blob.sha256, solid.brep);
           const shape = kernel.evaluate({ op: 'brep', blob: blob.sha256, format: 'occt-brep-v1' });
           const mass = shape === null ? null : (kernel.massProperties?.(shape) ?? null);
-          volume += (mass?.volume ?? 0) / scale ** 3;
+          volume += (mass?.volume ?? 0) / powInt(scale, 3);
           area += (mass?.area ?? 0) / scale ** 2;
         }
         const close = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-6 * Math.max(Math.abs(a), 1e-12);

@@ -8,6 +8,7 @@ import { flightOf } from '../flight/model';
 import { compilePower, type MotorLoad } from '../flight/powerBlock';
 import { motorPoint } from '../flight/powerChain';
 import { compileRotor, rotorOutput, staticCoefficients } from '../flight/rotorLaw';
+import { pow } from '@lib/pow';
 
 const format = (value: number): string => (Number.isFinite(value) ? value.toPrecision(4) : String(value));
 
@@ -65,7 +66,7 @@ export const estimateEnduranceCommand = defineCommand({
       }
       const { ct } = staticCoefficients(rotor);
       if (!(ct > 0)) return fail(`rotor '${rotor.rotor.id}' has no static thrust (Ct = 0 at J = 0): give \`rpm\``);
-      const n = Math.sqrt(params.totalThrustN / rotors.length / (ct * rotor.rotor.airDensity * rotor.rotor.diameter ** 4));
+      const n = Math.sqrt(params.totalThrustN / rotors.length / (ct * rotor.rotor.airDensity * pow(rotor.rotor.diameter, 4)));
       speeds.push(n * 60);
     }
     const rows = rotors.map((rotor, i) => {
@@ -78,7 +79,7 @@ export const estimateEnduranceCommand = defineCommand({
     const shaft = rows.reduce((sum, row) => sum + row.output.power, 0);
     const ideal = rows.reduce(
       (sum, { rotor, output }) =>
-        sum + output.thrust ** 1.5 / Math.sqrt(2 * rotor.rotor.airDensity * Math.PI * (rotor.rotor.diameter / 2) ** 2),
+        sum + pow(output.thrust, 1.5) / Math.sqrt(2 * rotor.rotor.airDensity * Math.PI * (rotor.rotor.diameter / 2) ** 2),
       0,
     );
     const data = {

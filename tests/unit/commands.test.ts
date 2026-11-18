@@ -1336,6 +1336,22 @@ describe('export_stl', () => {
     expect((ghost.data as StlData).triangleCount).toBe(0);
     expect(stl(e).triangleCount).toBe(0);
   });
+
+  it('an empty document is a valid empty STL: an ASCII solid without facets and an 84-byte binary with a zero count', () => {
+    const ascii = stl(empty(), { format: 'ascii' }).stl!;
+    expect(ascii.startsWith('solid ')).toBe(true);
+    expect(ascii).toContain('endsolid');
+    expect(ascii).not.toContain('facet normal');
+    const binary = stlBytes(empty());
+    expect(binary.byteLength).toBe(84);
+    expect(binary.getUint32(80, true)).toBe(0);
+  });
+
+  it('the name is the ASCII solid name on both lines', () => {
+    const named = stl(chain(['add_box', { size: [1, 1, 1] }]), { format: 'ascii', name: 'mypart' }).stl!;
+    expect(named.startsWith('solid mypart')).toBe(true);
+    expect(named).toContain('endsolid mypart');
+  });
 });
 
 describe('recipes', () => {

@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /**
  * Acceleration spectral density helpers (PHY-09 §5.3, TR-DYN-43): log-log interpolation between breakpoints and the exact segment
  * integral W1 f1 / (n + 1) ((f2/f1)^(n+1) - 1) (W1 f1 ln(f2/f1) for n = -1), n = ln(W2/W1) / ln(f2/f1). Pure, deterministic.
@@ -34,7 +35,7 @@ const slopeOf = (f1: number, w1: number, f2: number, w2: number): number => Math
 /** Exact area of W1 (f/f1)^n over [f1, f2]. */
 function segmentArea(f1: number, w1: number, f2: number, n: number): number {
   if (Math.abs(n + 1) < 1e-12) return w1 * f1 * Math.log(f2 / f1);
-  return ((w1 * f1) / (n + 1)) * ((f2 / f1) ** (n + 1) - 1);
+  return ((w1 * f1) / (n + 1)) * (pow(f2 / f1, n + 1) - 1);
 }
 
 /** ASD level at `fHz` (log-log between breakpoints, 0 outside the spectrum). */
@@ -42,7 +43,7 @@ export function asdAt(points: readonly AsdPoint[], fHz: number): number {
   for (let i = 0; i + 1 < points.length; i += 1) {
     const [f1, w1] = points[i] ?? [0, 0];
     const [f2, w2] = points[i + 1] ?? [0, 0];
-    if (f1 <= fHz && fHz <= f2) return w1 * (fHz / f1) ** slopeOf(f1, w1, f2, w2);
+    if (f1 <= fHz && fHz <= f2) return w1 * pow(fHz / f1, slopeOf(f1, w1, f2, w2));
   }
   return 0;
 }
@@ -64,8 +65,8 @@ export function integrateAsd(
     const lo = band === undefined ? f1 : Math.max(f1, band[0]);
     const hi = band === undefined ? f2 : Math.min(f2, band[1]);
     if (!(hi > lo)) continue;
-    const wLo = lo === f1 ? w1 : w1 * (lo / f1) ** n;
-    const wHi = hi === f2 ? w2 : w1 * (hi / f1) ** n;
+    const wLo = lo === f1 ? w1 : w1 * pow(lo / f1, n);
+    const wHi = hi === f2 ? w2 : w1 * pow(hi / f1, n);
     const area = segmentArea(lo, wLo, hi, n);
     total += area;
     segments.push({ f1Hz: lo, f2Hz: hi, w1: wLo, w2: wHi, slope: n, slopeDbPerOct: 10 * n * Math.log10(2), area });

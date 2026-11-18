@@ -121,6 +121,100 @@ function engineParts(context: ExecutionContext, doc: CadDocument, durationS: num
   return parts;
 }
 
+function assemblyCheckOf(assemblyRun: Sub | null): PrototypeCheck {
+  return (
+    assemblyRun?.check ??
+    skippedCheck(
+      'assembly',
+      'FPR_KERNEL_UNSUPPORTED',
+      reasonOf(assemblyRun?.result.summary ?? 'check_assembly is not registered'),
+      'Install a geometry kernel.',
+    )
+  );
+}
+
+interface Stop {
+  readonly reason: string | null;
+  readonly code: string;
+  readonly fix: string;
+}
+
+function stopOf(assembly: PrototypeCheck, mobility: ReturnType<typeof mobilityOf>, dynamics: DynamicsModel): Stop {
+  const stopper = assembly.items.find(
+    (item) => item.status === 'fail' && (item.code === 'FPR_PART_INVALID' || item.code === 'FPR_PART_FLOATING'),
+  );
+  const openLoop = mobility?.openLoops[0]?.joint;
+  const reason =
+    stopper !== undefined
+      ? `${stopper.code} on ${stopper.ids.join(', ')} makes the motion checks meaningless`
+      : openLoop !== undefined
+        ? `FPR_LOOP_OPEN: loop joint '${openLoop}' is open at the start pose`
+        : Object.keys(dynamics.bodies).length === 0
+          ? 'the document has no rigid bodies, so nothing moves'
+          : null;
+  const code = reason !== null && stopper === undefined && openLoop === undefined ? 'FPR_NO_MOTION' : 'FPR_CHECK_SKIPPED';
+  const fix =
+    code === 'FPR_NO_MOTION'
+      ? 'Add rigid bodies, joints and a drive (add_rigid_body, add_body_joint, add_motor) to check the motion.'
+      : 'Fix the blocking finding first, then re-run check_prototype.';
+  return { reason, code, fix };
+}
+
+interface MotionInputs {
+  readonly durationS: number;
+  readonly crankAxis: string | undefined;
+  readonly shared: { readonly clearanceMm?: number };
+  readonly fix: string;
+}
+
+interface MotionChecks {
+  readonly motion: PrototypeCheck;
+  readonly dynamicsCheck: PrototypeCheck;
+  readonly closestMm: number | null;
+}
+
+function motionChecks(context: ExecutionContext, checked: CadDocument, input: MotionInputs): MotionChecks {
+  const { durationS, crankAxis, shared, fix } = input;
+  const dynamics = dynamicsOf(checked);
+  // one simulate_motion run (poses + energy) feeds both motion checks (spec 5.7); check_dynamics still halves the timestep on its own
+  const crank = crankAxis === undefined || dynamics.joints[crankAxis]?.kind !== 'revolute' ? {} : { crankAxis };
+  const sharedRun = simulateMotion.run(checked, { duration: durationS, detail: 'poses', energy: true, ...crank }, context);
+  const motionResult = motionClearanceCheck(
+    checked,
+    { duration: durationS, maxSamples: CLEARANCE_MAX_SAMPLES, ...shared, ...crank },
+    context,
+    sharedRun,
+  );
+  const motionRun: Sub = { result: motionResult, check: isCheck(motionResult.data) ? motionResult.data : null };
+  const motion =
+    motionRun?.check ??
+    skippedCheck(
+      'motion_clearance',
+      motionRun?.result.error?.code ?? 'FPR_NO_MOTION',
+      reasonOf(motionRun?.result.summary ?? 'check_motion_clearance is not registered'),
+      motionRun?.result.error?.remediation ?? fix,
+    );
+  const minimum = isRecord(motionRun?.result.data) ? motionRun.result.data['minClearance'] : null;
+  const closestMm = isRecord(minimum) && typeof minimum['mm'] === 'number' ? minimum['mm'] : null;
+  const dynamicsResult = runDynamicsCheck(checked, { duration: durationS }, context, sharedRun);
+  const dynamicsRun: Sub = { result: dynamicsResult, check: isCheck(dynamicsResult.data) ? dynamicsResult.data : null };
+  const base =
+    dynamicsRun?.check ??
+    skippedCheck('dynamics', 'FPR_NO_MOTION', reasonOf(dynamicsRun?.result.summary ?? 'check_dynamics is not registered'), fix);
+  const dynamicsCheck = mergeChecks('dynamics', [base, ...engineParts(context, checked, durationS)]);
+  return { motion, dynamicsCheck, closestMm };
+}
+
+function summaryOf(checks: readonly PrototypeCheck[], verdict: string, staleCount: number): string {
+  const count = (status: string): number => checks.flatMap((check) => check.items).filter((item) => item.status === status).length;
+  return (
+    `${NAME}: ${verdict} — ${checks.map((check) => `${check.check} ${check.status}`).join(', ')}; ${count('fail')} fail, ${count('warn')} warn, ` +
+    `${count('not_run')} not_run${staleCount > 0 ? `, ${staleCount} stale disposition(s)` : ''}. ` +
+    (verdict === 'blocked' ? 'Next: fix the fails (see remediation), then re-run.' : 'Next: a qualified engineer reviews the checks.') +
+    ' Computed by llull, not approved — needs a qualified engineer.'
+  );
+}
+
 /**
  * @affects nothing — read-only; data { verdict, ownerSummary, checks[4], staleDispositions, durationS, reviewRequired, inputsHash, references? }
  * @invariant same document back, affected []; dispositions are joined, never applied: an accepted fail stays a fail ("fail (accepted)") and
@@ -175,68 +269,20 @@ export const checkPrototype = defineCommand({
       ...(params.process === undefined ? {} : { process: params.process }),
       ...(params.minWallMm === undefined ? {} : { minWallMm: params.minWallMm }),
     });
-    const assembly =
-      assemblyRun?.check ??
-      skippedCheck(
-        'assembly',
-        'FPR_KERNEL_UNSUPPORTED',
-        reasonOf(assemblyRun?.result.summary ?? 'check_assembly is not registered'),
-        'Install a geometry kernel.',
-      );
+    const assembly = assemblyCheckOf(assemblyRun);
     const mobility = mobilityOf(context, checked);
     const mechanism = mechanismCheck(context, checked, mobility);
 
-    const stopper = assembly.items.find(
-      (item) => item.status === 'fail' && (item.code === 'FPR_PART_INVALID' || item.code === 'FPR_PART_FLOATING'),
-    );
-    const openLoop = mobility?.openLoops[0]?.joint;
-    const stopReason =
-      stopper !== undefined
-        ? `${stopper.code} on ${stopper.ids.join(', ')} makes the motion checks meaningless`
-        : openLoop !== undefined
-          ? `FPR_LOOP_OPEN: loop joint '${openLoop}' is open at the start pose`
-          : Object.keys(dynamics.bodies).length === 0
-            ? 'the document has no rigid bodies, so nothing moves'
-            : null;
-    const stopCode = stopReason !== null && stopper === undefined && openLoop === undefined ? 'FPR_NO_MOTION' : 'FPR_CHECK_SKIPPED';
-    const fix =
-      stopCode === 'FPR_NO_MOTION'
-        ? 'Add rigid bodies, joints and a drive (add_rigid_body, add_body_joint, add_motor) to check the motion.'
-        : 'Fix the blocking finding first, then re-run check_prototype.';
-
+    const stop = stopOf(assembly, mobility, dynamics);
+    const stopReason = stop.reason;
     let motion: PrototypeCheck;
     let dynamicsCheck: PrototypeCheck;
     let closestMm: number | null = null;
     if (stopReason !== null) {
-      motion = skippedCheck('motion_clearance', stopCode, stopReason, fix);
-      dynamicsCheck = skippedCheck('dynamics', stopCode, stopReason, fix);
+      motion = skippedCheck('motion_clearance', stop.code, stopReason, stop.fix);
+      dynamicsCheck = skippedCheck('dynamics', stop.code, stopReason, stop.fix);
     } else {
-      // one simulate_motion run (poses + energy) feeds both motion checks (spec 5.7); check_dynamics still halves the timestep on its own
-      const crank = crankAxis === undefined || dynamics.joints[crankAxis]?.kind !== 'revolute' ? {} : { crankAxis };
-      const sharedRun = simulateMotion.run(checked, { duration: durationS, detail: 'poses', energy: true, ...crank }, context);
-      const motionResult = motionClearanceCheck(
-        checked,
-        { duration: durationS, maxSamples: CLEARANCE_MAX_SAMPLES, ...shared, ...crank },
-        context,
-        sharedRun,
-      );
-      const motionRun: Sub = { result: motionResult, check: isCheck(motionResult.data) ? motionResult.data : null };
-      motion =
-        motionRun?.check ??
-        skippedCheck(
-          'motion_clearance',
-          motionRun?.result.error?.code ?? 'FPR_NO_MOTION',
-          reasonOf(motionRun?.result.summary ?? 'check_motion_clearance is not registered'),
-          motionRun?.result.error?.remediation ?? fix,
-        );
-      const minimum = isRecord(motionRun?.result.data) ? motionRun.result.data['minClearance'] : null;
-      closestMm = isRecord(minimum) && typeof minimum['mm'] === 'number' ? minimum['mm'] : null;
-      const dynamicsResult = runDynamicsCheck(checked, { duration: durationS }, context, sharedRun);
-      const dynamicsRun: Sub = { result: dynamicsResult, check: isCheck(dynamicsResult.data) ? dynamicsResult.data : null };
-      const base =
-        dynamicsRun?.check ??
-        skippedCheck('dynamics', 'FPR_NO_MOTION', reasonOf(dynamicsRun?.result.summary ?? 'check_dynamics is not registered'), fix);
-      dynamicsCheck = mergeChecks('dynamics', [base, ...engineParts(context, checked, durationS)]);
+      ({ motion, dynamicsCheck, closestMm } = motionChecks(context, checked, { durationS, crankAxis, shared, fix: stop.fix }));
     }
 
     const checks = [assembly, mechanism, motion, dynamicsCheck].map((check) => withDispositions(check, dispositions));
@@ -249,13 +295,7 @@ export const checkPrototype = defineCommand({
       { parts: partCount, dof: mobility?.dof ?? null, durationS: stopReason === null ? durationS : null, closestMm, stale: stale.length },
       verdict,
     );
-    const count = (status: string): number => checks.flatMap((check) => check.items).filter((item) => item.status === status).length;
-    const summary =
-      `${NAME}: ${verdict} — ${checks.map((check) => `${check.check} ${check.status}`).join(', ')}; ${count('fail')} fail, ${count('warn')} warn, ` +
-      `${count('not_run')} not_run${stale.length > 0 ? `, ${stale.length} stale disposition(s)` : ''}. ` +
-      (verdict === 'blocked' ? 'Next: fix the fails (see remediation), then re-run.' : 'Next: a qualified engineer reviews the checks.') +
-      ' Computed by llull, not approved — needs a qualified engineer.';
-    return report(doc, summary, {
+    return report(doc, summaryOf(checks, verdict, stale.length), {
       verdict,
       ownerSummary: summaryText,
       checks,

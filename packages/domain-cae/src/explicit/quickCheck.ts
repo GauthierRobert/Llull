@@ -4,6 +4,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { refuseExplicit } from './codes';
+import { pow } from '@lib/pow';
 
 export const EXPLICIT_CHECKS = [
   'wave_speed',
@@ -75,10 +76,10 @@ function evaluate(check: ExplicitCheck, inputs: Values): Output {
     case 'johnson_cook_flow': {
       const rateTerm = 1 + get('C') * Math.log(Math.max(get('rate_per_s') / get('ref_rate_per_s'), 1));
       const Tstar = homologous(inputs);
-      const thermal = 1 - (Tstar > 0 ? Tstar ** get('m') : 0);
+      const thermal = 1 - (Tstar > 0 ? pow(Tstar, get('m')) : 0);
       return {
         values: {
-          sigma_y_Pa: (get('A_Pa') + get('B_Pa') * get('eps_p') ** get('n')) * rateTerm * thermal,
+          sigma_y_Pa: (get('A_Pa') + get('B_Pa') * pow(get('eps_p'), get('n'))) * rateTerm * thermal,
           rate_term: rateTerm,
           thermal_term: thermal,
         },

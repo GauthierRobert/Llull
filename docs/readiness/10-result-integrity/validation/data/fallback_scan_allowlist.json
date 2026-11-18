@@ -327,12 +327,12 @@
       "reason": "summary text when no comparison value exists; display only"
     },
     {
-      "file": "domain-cae/src/commands/analysis.ts",
+      "file": "domain-cae/src/commands/analysisCreate.ts",
       "match": "return max === undefined || (Number.isFinite(max) && max > (min ?? 0));",
       "reason": "frequency band without a lower bound starts at 0 Hz (band semantics); echoed in the summary"
     },
     {
-      "file": "domain-cae/src/commands/analysis.ts",
+      "file": "domain-cae/src/commands/analysisCreate.ts",
       "match": "modes === undefined ? '' : `, ${modes} mode(s)${band === undefined ? '' : ` in ${band.min ?? 0}-${band.max ?? 'inf'} Hz`}`;",
       "reason": "frequency band without a lower bound starts at 0 Hz (band semantics); echoed in the summary"
     },
@@ -442,17 +442,17 @@
       "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input (the branch is reached only when pinRadiusMm > 0)"
     },
     {
-      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "file": "domain-dynamics/src/commands/transmissionBuild.ts",
       "match": "const ratio = params.ratio ?? fromTeeth ?? 0;",
       "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input (a missing ratio and tooth count is refused before this line)"
     },
     {
-      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "file": "domain-dynamics/src/commands/transmissionBuild.ts",
       "match": "if (!positive(params.meshStiffnessNmPerRad ?? 1) || !positive(params.meshDampingRatio ?? 1))",
       "reason": "validation of optional mesh numbers: absent passes (1 is any positive stand-in), the stored value is the given one or absent (the engine then states DRV_MESH_STIFFNESS_ASSUMED)"
     },
     {
-      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "file": "domain-dynamics/src/commands/transmissionBuild.ts",
       "match": "if (!positive(params.meshStiffnessNPerM ?? 1) || !positive(params.meshDampingRatio ?? 1))",
       "reason": "validation of optional mesh numbers: absent passes (1 is any positive stand-in), the stored value is the given one or absent (the engine then states DRV_MESH_STIFFNESS_ASSUMED)"
     },
@@ -512,7 +512,7 @@
       "reason": "add_rotor: omitted spinInertiaKgM2 means \"no gyroscopic torque\", stated in the param description and in the summary"
     },
     {
-      "file": "domain-dynamics/src/commands/flightAero.ts",
+      "file": "domain-dynamics/src/commands/flightAeroSweep.ts",
       "match": "const neutralDeg = Math.min(maxDeg, Math.max(minDeg, servo?.neutralDeg ?? 0));",
       "reason": "documented param default: neutralDeg omitted means 0 clamped to the servo limits, stated in the generate_aero_table param description"
     },

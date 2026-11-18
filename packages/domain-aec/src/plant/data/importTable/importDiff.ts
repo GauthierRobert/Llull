@@ -118,12 +118,27 @@ export type DiffOutcome =
   | { readonly ok: true; readonly diff: ImportDiff }
   | { readonly ok: false; readonly code: string; readonly message: string; readonly paths: readonly string[] };
 
-export function diffImport(doc: CadDocument, table: SourceTable, keyColumn: KeyColumn): DiffOutcome {
-  const data = getPlantData(doc);
-  const columns: Column[] = table.header.map((header, index) => {
-    const role: Role = header === '' ? 'blank' : (BASE_ROLES[header.toLowerCase()] ?? 'property');
-    return { index, header, role };
-  });
+type Refusal = Extract<DiffOutcome, { readonly ok: false }>;
+
+interface DiffState {
+  readonly data: PlantDataModel;
+  readonly lookup: ClassColumns;
+  readonly changes: ImportChange[];
+  readonly reject: (entry: ImportRejection) => void;
+}
+
+interface CellSite {
+  readonly row: number;
+  readonly column: string;
+  readonly cell: string;
+  readonly tag: string;
+  readonly objectId: string;
+}
+
+type CellResult = 'unchanged' | 'handled' | Refusal;
+
+/** The refusal of a sheet without the key column `keyColumn` asks for, else undefined. */
+function missingKey(table: SourceTable, columns: readonly Column[], keyColumn: KeyColumn): Refusal | undefined {
   const idColumn = columns.find((column) => column.role === 'objectId');
   const tagColumn = columns.find((column) => column.role === 'tag');
   if (
@@ -139,12 +154,11 @@ export function diffImport(doc: CadDocument, table: SourceTable, keyColumn: KeyC
       message: `the sheet has no ${keyColumn === 'auto' ? 'ObjectId or Tag' : keyColumn} column in row 1 (headers: ${table.header.join(', ')})`,
       paths: ['header'],
     };
-  const rejected: ImportRejection[] = [];
-  let rejectedCount = 0;
-  const reject = (entry: ImportRejection): void => {
-    rejectedCount++;
-    if (rejected.length < MAX_REJECTIONS) rejected.push(entry);
-  };
+  return undefined;
+}
+
+/** The property columns no class defines (rejected once, ignored for every row). */
+function unknownColumns(data: PlantDataModel, columns: readonly Column[], reject: (entry: ImportRejection) => void): Set<number> {
   const unknown = new Set<number>();
   for (const column of columns)
     if (column.role === 'property' && !knownProperty(data, column.header)) {
@@ -157,9 +171,100 @@ export function diffImport(doc: CadDocument, table: SourceTable, keyColumn: KeyC
         cell: cellReference(column.index, 1),
       });
     }
-  const lookup = new ClassColumns(columns);
-  const byModel = modelIndex(data);
+  return unknown;
+}
+
+/** A derived column (Tag / Class / Hierarchy): the sheet may repeat the document value but not change it. */
+function derivedCell(state: DiffState, column: Column, cell: SheetRow['cells'][number], here: CellSite, object: PlantObject): CellResult {
+  const current = column.role === 'tag' ? object.tag : column.role === 'class' ? object.className : pathOf(state.data, object.hierarchyId);
+  if (isBlank(cell) || (typeof cell !== 'object' && String(cell).normalize('NFC').trim() === current)) return 'unchanged';
+  state.reject({
+    ...here,
+    code: 'DAT_IMPORT_READONLY_COLUMN',
+    message: `${column.header} of ${object.tag} is derived and read-only (sheet "${String(typeof cell === 'object' ? cell?.detail : cell).slice(0, 60)}", document "${current}")`,
+  });
+  return 'handled';
+}
+
+/** A property column: the change it makes to the object, or its rejection. */
+function propertyCell(
+  state: DiffState,
+  column: Column,
+  cell: SheetRow['cells'][number],
+  here: CellSite,
+  object: PlantObject,
+  resolved: ResolvedClass | null,
+): CellResult {
+  const { reject, changes } = state;
+  const target = resolved === null ? null : state.lookup.of(resolved, column.header);
+  if (target === null) {
+    if (!isBlank(cell))
+      reject({ ...here, code: 'DAT_IMPORT_UNKNOWN_COLUMN', message: `${object.className} has no property headed "${column.header}"` });
+    return 'handled';
+  }
+  const { definition, match } = target;
+  const current = object.properties[definition.name];
+  if (definition.readOnly === true || definition.derivedFrom !== undefined) {
+    const text = typeof cell === 'object' ? null : cell;
+    if (isBlank(cell) || (text !== null && sameValue(current, text as PlantValue))) return 'unchanged';
+    reject({ ...here, code: 'DAT_IMPORT_READONLY_COLUMN', message: `${definition.name} of ${object.tag} is read-only` });
+    return 'handled';
+  }
+  const input = cellToInput(definition, cell, match.unit);
+  if (!input.ok) {
+    reject({
+      ...here,
+      code: typeof cell === 'object' && cell?.unreadable === 'formula' ? 'DAT_IMPORT_FORMULA' : 'DAT_IMPORT_TYPE',
+      message: `${object.tag} ${definition.name}: ${input.message}`,
+    });
+    return 'handled';
+  }
+  const coerced = coerceValue(definition, input.input);
+  if (!coerced.ok) {
+    reject({ ...here, code: 'DAT_IMPORT_TYPE', message: `${object.tag}: ${coerced.message}` });
+    return 'handled';
+  }
+  if (sameValue(current, coerced.value)) return 'unchanged';
+  if (changes.length >= MAX_CHANGES)
+    return {
+      ok: false,
+      code: 'DAT_IMPORT_FORMAT',
+      message: `the sheet changes more than ${MAX_CHANGES} values: split it (export one hierarchy node or class at a time)`,
+      paths: [here.cell],
+    };
+  changes.push({
+    changeId: sha256Hex(`${object.id}|${definition.name}|${JSON.stringify(coerced.value)}`).slice(0, 12),
+    objectId: object.id,
+    tag: object.tag,
+    property: definition.name,
+    from: current ?? null,
+    to: coerced.value,
+    cell: here.cell,
+    row: here.row,
+  });
+  return 'handled';
+}
+
+export function diffImport(doc: CadDocument, table: SourceTable, keyColumn: KeyColumn): DiffOutcome {
+  const data = getPlantData(doc);
+  const columns: Column[] = table.header.map((header, index) => {
+    const role: Role = header === '' ? 'blank' : (BASE_ROLES[header.toLowerCase()] ?? 'property');
+    return { index, header, role };
+  });
+  const idColumn = columns.find((column) => column.role === 'objectId');
+  const tagColumn = columns.find((column) => column.role === 'tag');
+  const refusal = missingKey(table, columns, keyColumn);
+  if (refusal !== undefined) return refusal;
+  const rejected: ImportRejection[] = [];
+  let rejectedCount = 0;
+  const reject = (entry: ImportRejection): void => {
+    rejectedCount++;
+    if (rejected.length < MAX_REJECTIONS) rejected.push(entry);
+  };
+  const unknown = unknownColumns(data, columns, reject);
   const changes: ImportChange[] = [];
+  const state: DiffState = { data, lookup: new ClassColumns(columns), changes, reject };
+  const byModel = modelIndex(data);
   const seenObjects = new Map<string, number>();
   let unchanged = 0;
   let rowsRead = 0;
@@ -192,73 +297,19 @@ export function diffImport(doc: CadDocument, table: SourceTable, keyColumn: KeyC
     for (const column of columns) {
       if (column.role === 'blank' || column.role === 'ignored' || column.role === 'objectId' || unknown.has(column.index)) continue;
       const cell = sheetRow.cells[column.index] ?? null;
-      const here = {
+      const here: CellSite = {
         row: sheetRow.row,
         column: column.header,
         cell: cellReference(column.index, sheetRow.row),
         tag: object.tag,
         objectId: object.id,
       };
-      if (column.role !== 'property') {
-        const current = column.role === 'tag' ? object.tag : column.role === 'class' ? object.className : pathOf(data, object.hierarchyId);
-        if (isBlank(cell) || (typeof cell !== 'object' && String(cell).normalize('NFC').trim() === current)) unchanged++;
-        else
-          reject({
-            ...here,
-            code: 'DAT_IMPORT_READONLY_COLUMN',
-            message: `${column.header} of ${object.tag} is derived and read-only (sheet "${String(typeof cell === 'object' ? cell?.detail : cell).slice(0, 60)}", document "${current}")`,
-          });
-        continue;
-      }
-      const target = resolved === null ? null : lookup.of(resolved, column.header);
-      if (target === null) {
-        if (!isBlank(cell))
-          reject({ ...here, code: 'DAT_IMPORT_UNKNOWN_COLUMN', message: `${object.className} has no property headed "${column.header}"` });
-        continue;
-      }
-      const { definition, match } = target;
-      const current = object.properties[definition.name];
-      if (definition.readOnly === true || definition.derivedFrom !== undefined) {
-        const text = typeof cell === 'object' ? null : cell;
-        if (isBlank(cell) || (text !== null && sameValue(current, text as PlantValue))) unchanged++;
-        else reject({ ...here, code: 'DAT_IMPORT_READONLY_COLUMN', message: `${definition.name} of ${object.tag} is read-only` });
-        continue;
-      }
-      const input = cellToInput(definition, cell, match.unit);
-      if (!input.ok) {
-        reject({
-          ...here,
-          code: typeof cell === 'object' && cell?.unreadable === 'formula' ? 'DAT_IMPORT_FORMULA' : 'DAT_IMPORT_TYPE',
-          message: `${object.tag} ${definition.name}: ${input.message}`,
-        });
-        continue;
-      }
-      const coerced = coerceValue(definition, input.input);
-      if (!coerced.ok) {
-        reject({ ...here, code: 'DAT_IMPORT_TYPE', message: `${object.tag}: ${coerced.message}` });
-        continue;
-      }
-      if (sameValue(current, coerced.value)) {
-        unchanged++;
-        continue;
-      }
-      if (changes.length >= MAX_CHANGES)
-        return {
-          ok: false,
-          code: 'DAT_IMPORT_FORMAT',
-          message: `the sheet changes more than ${MAX_CHANGES} values: split it (export one hierarchy node or class at a time)`,
-          paths: [here.cell],
-        };
-      changes.push({
-        changeId: sha256Hex(`${object.id}|${definition.name}|${JSON.stringify(coerced.value)}`).slice(0, 12),
-        objectId: object.id,
-        tag: object.tag,
-        property: definition.name,
-        from: current ?? null,
-        to: coerced.value,
-        cell: here.cell,
-        row: sheetRow.row,
-      });
+      const result =
+        column.role === 'property'
+          ? propertyCell(state, column, cell, here, object, resolved)
+          : derivedCell(state, column, cell, here, object);
+      if (result === 'unchanged') unchanged++;
+      else if (result !== 'handled') return result;
     }
   }
   return { ok: true, diff: { changes, rejected, rejectedCount, unchanged, rowsRead, rowsMatched } };

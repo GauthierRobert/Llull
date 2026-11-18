@@ -94,6 +94,31 @@ function transformer(spec: {
   };
 }
 
+interface EditArguments {
+  readonly translate: Vec3 | undefined;
+  readonly rotate: { readonly axis: Vec3 } | undefined;
+  readonly scale: Vec3 | undefined;
+  readonly crease: boolean | undefined;
+  readonly levels: number | undefined;
+  readonly radius: number;
+  readonly axis: Vec3 | null | undefined;
+  readonly resolved: number;
+}
+
+/** First problem of the edit arguments, in check order, or null. */
+function argumentProblem(entity: SubdivisionEntity, args: EditArguments): { code: string; message: string; path: string[] } | null {
+  const { translate, rotate, scale, crease, radius } = args;
+  if (translate === undefined && rotate === undefined && scale === undefined && crease === undefined && args.levels === undefined)
+    return { code: 'DIR_NOTHING_TO_DO', message: 'give at least one of translate, rotate, scale, crease or levels', path: [] };
+  if (!(radius >= 0)) return { code: 'DIR_FALLOFF_INVALID', message: `falloff must be >= 0 (got ${radius})`, path: ['params.falloff'] };
+  if (scale !== undefined && !scale.every((s) => s > 0))
+    return { code: 'DIR_SCALE_NONPOSITIVE', message: `scale factors must be > 0 (got [${scale}])`, path: ['params.scale'] };
+  if (rotate !== undefined && args.axis === null)
+    return { code: 'DIR_NOTHING_TO_DO', message: 'rotate.axis must be a non-zero vector', path: ['params.rotate.axis'] };
+  const size = sizeProblem(entity, args.resolved);
+  return size === null ? null : { code: size.code, message: size.message, path: [] };
+}
+
 /**
  * @affects modifies 1 subdivision entity (cage vertices, creases, levels; topology and element ids unchanged)
  * @invariant order scale -> rotate -> translate about the pivot; a symmetric cage stays symmetric (each mirror orbit follows its lowest-index driven vertex; on-plane vertices stay on the plane)
@@ -151,20 +176,22 @@ export const editSubdivisionCage = defineCommand({
     const reject = (code: string, message: string, path: string[] = []): CommandResult =>
       dirRejection(doc, COMMAND, code, message, [entity.id], path);
     const { translate, rotate, scale, pivot, crease } = params;
-    if (translate === undefined && rotate === undefined && scale === undefined && crease === undefined && params.levels === undefined)
-      return reject('DIR_NOTHING_TO_DO', 'give at least one of translate, rotate, scale, crease or levels');
     const falloff = typeof params.falloff === 'number' ? { radius: params.falloff } : (params.falloff ?? { radius: 0 });
     const shape: FalloffShape = ('shape' in falloff ? falloff.shape : undefined) ?? 'smooth';
     const metric = ('metric' in falloff ? falloff.metric : undefined) ?? 'euclidean';
-    if (!(falloff.radius >= 0)) return reject('DIR_FALLOFF_INVALID', `falloff must be >= 0 (got ${falloff.radius})`, ['params.falloff']);
-    if (scale !== undefined && !scale.every((s) => s > 0))
-      return reject('DIR_SCALE_NONPOSITIVE', `scale factors must be > 0 (got [${scale}])`, ['params.scale']);
     const axis = rotate === undefined ? undefined : unitAxisOrNull(rotate.axis);
-    if (rotate !== undefined && axis === null)
-      return reject('DIR_NOTHING_TO_DO', 'rotate.axis must be a non-zero vector', ['params.rotate.axis']);
     const levels = params.levels ?? entity.levels;
-    const size = sizeProblem(entity, levels);
-    if (size !== null) return reject(size.code, size.message);
+    const problem = argumentProblem(entity, {
+      translate,
+      rotate,
+      scale,
+      crease,
+      levels: params.levels,
+      radius: falloff.radius,
+      axis,
+      resolved: levels,
+    });
+    if (problem !== null) return reject(problem.code, problem.message, problem.path);
     const input: SelectionInput = params;
     const selection = resolveSelection(entity, input);
     if ('code' in selection) return reject(selection.code, selection.message, [selection.path]);

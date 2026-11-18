@@ -1539,7 +1539,7 @@
     }
   },
   "fill_tangent_near": {
-    "digest": "63f5d09d618aa92ec6c830049b26d8802247f10e4534731526b45375340275f4",
+    "digest": "b5ee6e624144308902efb00132f4e333b97b127a3832ac87cf8f4e8672296511",
     "report": {
       "totalLoops": 2,
       "filled": [
@@ -1719,7 +1719,7 @@
     }
   },
   "repair_close_holes_greedy": {
-    "digest": "7a28a8d57438861d7e464e7492d2ab273859b7ac900026588bf688c692ae460d",
+    "digest": "a3e18d5349eb33134993e144c862813506e07f2573076d3ae6356584a0a27612",
     "report": {
       "mode": "close_holes",
       "changes": {

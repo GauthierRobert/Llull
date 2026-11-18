@@ -14,6 +14,7 @@ import { pairVertices, symmetricTopologyProblem } from '../../geometry/subd/symm
 import { buildTopology } from '../../geometry/subd/topology';
 import { dirRejection } from './codes';
 import { MAX_CAGE_VERTICES, MAX_REFINED_QUADS, cageData, cageText } from './shared';
+import { pow } from '../../lib/pow';
 
 /**
  * The edited entity, or the refusal: the cage must stay valid and within the size cap, and a symmetric cage must stay symmetric (its
@@ -28,7 +29,7 @@ export function finishedCage(
   const reject = (code: string, message: string): CommandResult => dirRejection(doc, command, code, message, [entity.id]);
   if (state.vertices.length > MAX_CAGE_VERTICES)
     return reject('DIR_CAGE_TOO_LARGE', `the result would have ${state.vertices.length} vertices (max ${MAX_CAGE_VERTICES})`);
-  if (state.faces.length * 4 ** entity.levels > MAX_REFINED_QUADS)
+  if (state.faces.length * pow(4, entity.levels) > MAX_REFINED_QUADS)
     return reject(
       'DIR_CAGE_TOO_LARGE',
       `the result would have ${state.faces.length} faces, which refine to over ${MAX_REFINED_QUADS} quads at ${entity.levels} levels`,

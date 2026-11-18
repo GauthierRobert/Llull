@@ -12,8 +12,12 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { hardOverlap, reviewFixture, reviewWith, thinWall, withAccepted } from './reviewFixtures';
 import { resetStore } from '../helpers/componentEntities';
 import { localDispatch } from '../helpers/storeTestHelpers';
+import { connectFakeBackend } from '../helpers/fakeBackend';
+import type { PhysicsJobRequest } from '@app/physicsJob';
+import { setPhysicsWorkerFactory } from '@ui/services/physicsRun';
+import { inProcessPhysicsWorker } from '../helpers/inProcessPhysicsWorker';
 
-/** A full check_prototype run in the page (physics load included) can take long under a loaded full suite. */
+/** A full check_prototype run (the fake backend runs it in-process) can take long under a loaded full suite. */
 const RUN_TIMEOUT = 60_000;
 
 function show(review = reviewFixture): void {
@@ -48,7 +52,6 @@ describe('ReviewPanel running check_prototype', () => {
       expect(screen.getByTestId('review-run')).toBeEnabled();
       fireEvent.click(screen.getByTestId('review-run'));
       expect(useReviewStore.getState().busy).toBe(true);
-      // the run loads the physics engine and checks the model: wait for its end, however slow the machine is
       await waitFor(() => expect(useReviewStore.getState().busy).toBe(false), { timeout: RUN_TIMEOUT });
       expect(dispatch).not.toHaveBeenCalled();
     },
@@ -56,14 +59,45 @@ describe('ReviewPanel running check_prototype', () => {
   );
 
   it(
+    'disconnected, runs the review in the in-page physics worker',
+    async () => {
+      const jobs: PhysicsJobRequest[] = [];
+      setPhysicsWorkerFactory(() => inProcessPhysicsWorker(jobs));
+      // the real worker installs Manifold itself (src/physics.worker.ts); the in-process one uses this process's kernel
+      setGeometryKernel(await createManifoldKernel());
+      try {
+        render(<ReviewPanel />);
+        fireEvent.click(screen.getByTestId('review-run'));
+        await waitFor(() => expect(useReviewStore.getState().busy).toBe(false), { timeout: RUN_TIMEOUT });
+        expect(jobs.map((job) => job.command)).toEqual(['check_prototype']);
+        expect(useReviewStore.getState().result, useReviewStore.getState().status).not.toBeNull();
+      } finally {
+        setPhysicsWorkerFactory(null);
+        setGeometryKernel(null);
+      }
+    },
+    2 * RUN_TIMEOUT,
+  );
+
+  it('disconnected and without workers, says what is missing instead of loading a physics engine in the page', async () => {
+    render(<ReviewPanel />);
+    fireEvent.click(screen.getByTestId('review-run'));
+    await waitFor(() => expect(useReviewStore.getState().busy).toBe(false));
+    expect(useReviewStore.getState().status).toMatch(/check_prototype needs the llull backend/);
+    expect(useReviewStore.getState().result).toBeNull();
+  });
+
+  it(
     'two overlapping boxes come back as a failing interference finding',
     async () => {
       setGeometryKernel(await createManifoldKernel());
       localDispatch('add_box', { size: [10, 10, 10], position: [0, 0, 5] });
       localDispatch('add_box', { size: [10, 10, 10], position: [5, 0, 5] });
+      const disconnect = connectFakeBackend();
       render(<ReviewPanel />);
       fireEvent.click(screen.getByTestId('review-run'));
       await waitFor(() => expect(useReviewStore.getState().busy).toBe(false), { timeout: RUN_TIMEOUT });
+      disconnect();
       const assembly = useReviewStore.getState().result?.checks.find((check) => check.check === 'assembly');
       expect(assembly?.items.some((item) => item.code === 'FPR_PAIR_HARD' && item.status === 'fail')).toBe(true);
       expect(await screen.findByTestId('review-verdict')).toHaveTextContent(/blocked/);

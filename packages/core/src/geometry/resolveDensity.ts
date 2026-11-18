@@ -8,6 +8,7 @@ import type { CadDocument } from '../model/types';
 import type { Basis } from '../model/propertyModel';
 import { evaluatePropertyModel, isRefused, resolvePropertyModel, type PropertyEvaluationRefused } from '../model/propertyModelEval';
 import { toMetres } from '../model/units';
+import { powInt } from '../lib/powInt';
 
 /** Temperature at which a density model is read when the caller names none (the PHY-01 room temperature). */
 const ROOM_TEMPERATURE_K = 293.15;
@@ -46,7 +47,7 @@ interface DensityRefused {
 export type DensityResolution = ResolvedDensity | DensityRefused;
 
 /** Cubic metres in one document unit³. */
-const cubicMetresPerUnit3 = (doc: Pick<CadDocument, 'units'>): number => toMetres(doc, 1) ** 3;
+const cubicMetresPerUnit3 = (doc: Pick<CadDocument, 'units'>): number => powInt(toMetres(doc, 1), 3);
 
 /** g/(document unit)³ → kg/m³. */
 export const kgPerM3FromDocDensity = (doc: Pick<CadDocument, 'units'>, gPerDocUnit3: number): number =>

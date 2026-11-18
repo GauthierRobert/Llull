@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /** Hertz contact formulas (PHY-06 §5.2), operation for operation as validation/generate_cnt_reference.py (TR-CNT-20). Units N, mm, MPa. */
 
 /** 1/E* = (1 - nu1^2)/E1 + (1 - nu2^2)/E2. */
@@ -15,7 +16,7 @@ export function hertzLine(loadPerLength: number, R: number, Es: number): { reado
 
 /** Point contact under force P: radius a, peak pressure p0, approach delta. */
 export function hertzPointForce(P: number, R: number, Es: number): { readonly a: number; readonly p0: number; readonly approach: number } {
-  const a = ((3 * P * R) / (4 * Es)) ** (1 / 3);
+  const a = pow((3 * P * R) / (4 * Es), 1 / 3);
   return { a, p0: (3 * P) / (2 * Math.PI * a * a), approach: (a * a) / R };
 }
 
@@ -27,7 +28,7 @@ export function hertzPointApproach(
 ): { readonly a: number; readonly p0: number; readonly force: number } {
   const a = Math.sqrt(R * delta);
   const p0 = ((2 * Es) / Math.PI) * Math.sqrt(delta / R);
-  return { a, p0, force: (4 / 3) * Es * Math.sqrt(R) * delta ** 1.5 };
+  return { a, p0, force: (4 / 3) * Es * Math.sqrt(R) * pow(delta, 1.5) };
 }
 
 /** Max shear / p0 on the axis below a sphere contact at depth z/a (Johnson 1985 eq. 3.45, not fetched). */

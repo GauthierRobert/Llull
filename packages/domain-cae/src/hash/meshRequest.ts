@@ -10,6 +10,7 @@ import { analysisLengthMetres } from '../shared/defaults';
 import { implicitFieldConflict } from '../fieldMesh/controls';
 import { analysisInputHash } from './inputHash';
 import { keyedTargets, type KeyedTarget } from './targets';
+import { powInt } from '@lib/powInt';
 
 /** Named guard (05 §5.5 VNV_LEVEL cap analogue): most tetrahedra a mesh request may be expected to produce. */
 const MAX_ESTIMATED_ELEMENTS = 2e6;
@@ -29,11 +30,12 @@ function estimatedElements(doc: CadDocument, entityIds: readonly string[], contr
     const entity = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
     if (entity === undefined) continue;
     if (controls.source === 'implicit_field' && entity.kind === 'mesh') {
-      total += (Math.abs(signedMeshVolume(entity.mesh.positions, entity.mesh.indices)) / controls.globalSize ** 3) * FIELD_TETS_PER_CUBE;
+      total +=
+        (Math.abs(signedMeshVolume(entity.mesh.positions, entity.mesh.indices)) / powInt(controls.globalSize, 3)) * FIELD_TETS_PER_CUBE;
       continue;
     }
     const { min, max } = entityBoundsInDoc(doc, entity);
-    total += (((max[0] - min[0]) * (max[1] - min[1]) * (max[2] - min[2])) / controls.globalSize ** 3) * TETS_PER_CUBE;
+    total += (((max[0] - min[0]) * (max[1] - min[1]) * (max[2] - min[2])) / powInt(controls.globalSize, 3)) * TETS_PER_CUBE;
   }
   return total;
 }

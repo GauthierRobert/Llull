@@ -19,6 +19,7 @@ import { dofComponents, isMappingFailure, mapTarget, nodeSets, type MappedTarget
 import { densityOf, elasticOf } from './material';
 import { regionMasks, voxelsAroundNodes } from './regions';
 import { artifactGrid, domainTriangles, gridOver, insideMask, isGridRefusal, type TopologyGrid } from './voxel';
+import { powInt } from '@lib/powInt';
 
 interface TopologyLoadCase {
   readonly name: string;
@@ -122,13 +123,20 @@ function extrusionAxis(grid: TopologyGrid, axis: WorldAxis): { readonly axis: Wo
     : { axis: name };
 }
 
-/**
- * Builds the job of `study` from the document.
- * @failure an asset-backed solid of the domain or of a region that the document holds only as its display mesh -> MESH_ASSET_LOD_ONLY
- * @failure unknown analysis / invalid domain / grid above the cap / unmappable target / no supports or loads / unsupported load or constraint
- *   kind / mixed or missing material / min_volume without mma -> a coded refusal (TOP_*), never a throw
- */
-export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): TopologyJobResult {
+type AnalysisCase = NonNullable<ReturnType<typeof caseOf>>;
+type CaseLoads = Map<string, { dofs: Map<number, number>; gravity: number[] | null }>;
+
+interface TopologyDomain {
+  readonly analysisCase: AnalysisCase;
+  readonly grid: TopologyGrid;
+  readonly active: Uint8Array;
+  readonly activeCount: number;
+  readonly keepIn: Uint8Array;
+  readonly keepOut: Uint8Array;
+}
+
+/** Analysis case, grid, active voxels and the keep-in / keep-out masks of the study, or the refusal. */
+function domainOf(doc: CadDocument, study: TopologyStudy): TopologyDomain | TopologyJobRefusal {
   const regionIds = [...study.keepIn, ...study.keepOut].flatMap((region) =>
     region.kind === 'entity' ? [region.entityId] : region.kind === 'box' ? [] : [region.target.entityId],
   );
@@ -148,7 +156,15 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
   if ('error' in keepIn) return refuse('TOP_REGION_OUTSIDE_DOMAIN', `keep-in region ${keepIn.index}: ${keepIn.error}`, [study.id]);
   const keepOut = regionMasks(doc, grid, active, study.keepOut);
   if ('error' in keepOut) return refuse('TOP_REGION_OUTSIDE_DOMAIN', `keep-out region ${keepOut.index}: ${keepOut.error}`, [study.id]);
+  return { analysisCase, grid, active, activeCount, keepIn: keepIn.mask, keepOut: keepOut.mask };
+}
 
+/** The elastic material and the grid extrusion axis, or the refusal. */
+function setupOf(
+  doc: CadDocument,
+  study: TopologyStudy,
+  grid: TopologyGrid,
+): { readonly elastic: Exclude<ReturnType<typeof elasticOf>, string>; readonly extrusion: WorldAxis | undefined } | TopologyJobRefusal {
   const elastic = elasticOf(doc, study);
   if (typeof elastic === 'string') return refuse('TOP_SETUP_INVALID', elastic, study.designDomain);
   const { settings } = study;
@@ -156,27 +172,28 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
     return refuse('TOP_OPTIMIZER_MISMATCH', 'the min_volume objective needs optimizer mma', [study.id]);
   const extruded = study.manufacturing.extrusion === undefined ? undefined : extrusionAxis(grid, study.manufacturing.extrusion.axis);
   if (extruded !== undefined && 'error' in extruded) return refuse('TOP_SETUP_INVALID', extruded.error, [study.id]);
-  const extrusion = extruded?.axis;
+  return { elastic, extrusion: extruded?.axis };
+}
 
-  const unitSystem = analysisCase.unitSystem;
-  const lengthFactor = toMetres(doc, 1) / analysisLengthMetres(unitSystem);
-  const idealization = analysisCase.parts[study.designDomain[0] ?? ''];
-  const thicknessDoc = idealization?.kind === 'plane_stress' ? idealization.thickness : grid.thickness;
-  const thickness = study.dimension === 2 ? thicknessDoc * lengthFactor : 1;
-  const voxelAnalysis = study.voxel * lengthFactor;
-  const voxelVolume = study.dimension === 3 ? voxelAnalysis ** 3 : voxelAnalysis ** 2 * thickness;
+const trianglesOf = (doc: CadDocument, entityId: string): ReturnType<typeof entityToTriangles> | null => {
+  const entity = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
+  return entity !== undefined && is3D(entity) ? entityToTriangles(entity, doc) : null;
+};
 
-  const sets = nodeSets(grid, active);
-  const trianglesOf = (entityId: string): ReturnType<typeof entityToTriangles> | null => {
-    const entity = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
-    return entity !== undefined && is3D(entity) ? entityToTriangles(entity, doc) : null;
-  };
+/** The dofs the analysis constraints fix and the grid nodes they touch, or the refusal. */
+function supportsOf(
+  doc: CadDocument,
+  study: TopologyStudy,
+  analysisCase: AnalysisCase,
+  grid: TopologyGrid,
+  sets: ReturnType<typeof nodeSets>,
+): { readonly supportNodes: number[]; readonly fixed: Set<number> } | TopologyJobRefusal {
   const supportNodes: number[] = [];
   const fixed = new Set<number>();
   for (const id of analysisCase.constraintOrder) {
     const constraint = analysisCase.constraints[id];
     if (constraint === undefined) continue;
-    const surface = study.designDomain.includes(constraint.target.entityId) ? trianglesOf(constraint.target.entityId) : null;
+    const surface = study.designDomain.includes(constraint.target.entityId) ? trianglesOf(doc, constraint.target.entityId) : null;
     if (surface === null) return refuse('TOP_TARGET_UNMAPPED', `constraint '${id}' is not on a design-domain entity`, [id]);
     const mapped = mapTarget(grid, sets, surface, constraint.target);
     if (isMappingFailure(mapped)) return refuse('TOP_TARGET_UNMAPPED', `constraint '${id}': ${mapped.error}`, [id]);
@@ -185,7 +202,24 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
     supportNodes.push(...mapped.nodes);
     for (const node of mapped.nodes) for (const axis of axes) fixed.add(dofComponents(grid) * node + axis);
   }
-  const byCase = new Map<string, { dofs: Map<number, number>; gravity: number[] | null }>();
+  return { supportNodes, fixed };
+}
+
+interface LoadContext {
+  readonly grid: TopologyGrid;
+  readonly sets: ReturnType<typeof nodeSets>;
+  readonly voxelVolume: number;
+  readonly lengthFactor: number;
+}
+
+/** Nodal forces and gravity accumulated per load case, and the grid nodes the loads touch, or the refusal. */
+function loadsOf(
+  doc: CadDocument,
+  study: TopologyStudy,
+  analysisCase: AnalysisCase,
+  { grid, sets, voxelVolume, lengthFactor }: LoadContext,
+): { readonly byCase: CaseLoads; readonly loadNodes: number[] } | TopologyJobRefusal {
+  const byCase: CaseLoads = new Map();
   const loadNodes: number[] = [];
   let density: number | string | null = null;
   for (const id of analysisCase.loadOrder) {
@@ -193,7 +227,7 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
     if (load === undefined) continue;
     const accumulated = byCase.get(load.loadCase) ?? { dofs: new Map<number, number>(), gravity: null };
     if (load.kind === 'gravity') {
-      density ??= densityOf(doc, study, unitSystem);
+      density ??= densityOf(doc, study, analysisCase.unitSystem);
       if (typeof density === 'string') return refuse('TOP_SETUP_INVALID', `gravity '${id}': ${density}`, [id]);
       const perVoxel = gravityPerVoxel(load, grid, density, voxelVolume);
       if (typeof perVoxel === 'string') return refuse('TOP_SETUP_INVALID', perVoxel, [id]);
@@ -213,7 +247,7 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
         `load '${id}' (${load.kind}) is not supported: force and pressure loads on a target, and gravity, are`,
         [id],
       );
-    const surface = trianglesOf(load.target.entityId);
+    const surface = trianglesOf(doc, load.target.entityId);
     if (surface === null || !study.designDomain.includes(load.target.entityId))
       return refuse('TOP_LOAD_OUTSIDE_DOMAIN', `load '${id}' is not on a design-domain entity`, [id]);
     const mapped = mapTarget(grid, sets, surface, load.target);
@@ -224,19 +258,12 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
     byCase.set(load.loadCase, accumulated);
     loadNodes.push(...mapped.nodes);
   }
-  if (fixed.size === 0)
-    return refuse('TOP_SETUP_INVALID', 'the analysis has no support that fixes a degree of freedom of the grid', [analysisCase.id]);
-  if (byCase.size === 0) return refuse('TOP_SETUP_INVALID', 'the analysis has no force, pressure or gravity load', [analysisCase.id]);
+  return { byCase, loadNodes };
+}
 
-  const protectedVoxels = settings.protectLoadSupport.value ? voxelsAroundNodes(grid, active, [...supportNodes, ...loadNodes], 1) : null;
-  const keepInFinal = Uint8Array.from(
-    keepIn.mask,
-    (flag, voxel) => (flag | (protectedVoxels?.[voxel] ?? 0)) & ~(keepOut.mask[voxel] ?? 0) & 1,
-  );
-  const keepOutFinal = Uint8Array.from(keepOut.mask);
-  const count = (mask: Uint8Array): number => mask.reduce((sum, flag) => sum + flag, 0);
-  const weights = study.objective.loadCaseWeights;
-  const loadCases = [...byCase.entries()].map(([name, { dofs, gravity }]): TopologyLoadCase => {
+/** Sparse nodal load cases (dofs ascending) with their objective weights (default 1). */
+function loadCasesOf(byCase: CaseLoads, weights: TopologyStudy['objective']['loadCaseWeights']): TopologyLoadCase[] {
+  return [...byCase.entries()].map(([name, { dofs, gravity }]): TopologyLoadCase => {
     const ordered = [...dofs.entries()].sort((a, b) => a[0] - b[0]);
     return {
       name,
@@ -246,10 +273,81 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
       ...(gravity === null ? {} : { gravity }),
     };
   });
+}
+
+/** Solver settings in voxel units. */
+function settingsOf(study: TopologyStudy, extrusion: WorldAxis | undefined, radiusVoxels: number): TopologyJob['settings'] {
+  const { settings } = study;
+  const { projection } = settings;
+  const minMemberSize = study.manufacturing.minMemberSize;
+  return {
+    penal: settings.penal.value,
+    eminRatio: settings.eminRatio.value,
+    move: settings.move.value,
+    changeTol: settings.changeTol.value,
+    maxIterations: settings.maxIterations.value,
+    filter: { kind: settings.filter.kind, radiusVoxels },
+    threshold: settings.threshold.value,
+    optimizer: settings.optimizer,
+    ...(projection === undefined
+      ? {}
+      : {
+          projection: {
+            beta: projection.beta.value,
+            eta: projection.eta.value,
+            betaStart: projection.betaStart.value,
+            betaEvery: projection.betaEvery.value,
+          },
+        }),
+    ...(extrusion === undefined ? {} : { extrusion }),
+    ...(minMemberSize === undefined
+      ? {}
+      : { minMemberRule: { minMemberSize, radiusVoxels, raised: minMemberSize / 2 > settings.filter.radius.value } }),
+  };
+}
+
+/**
+ * Builds the job of `study` from the document.
+ * @failure an asset-backed solid of the domain or of a region that the document holds only as its display mesh -> MESH_ASSET_LOD_ONLY
+ * @failure unknown analysis / invalid domain / grid above the cap / unmappable target / no supports or loads / unsupported load or constraint
+ *   kind / mixed or missing material / min_volume without mma -> a coded refusal (TOP_*), never a throw
+ */
+export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): TopologyJobResult {
+  const domain = domainOf(doc, study);
+  if ('ok' in domain) return domain;
+  const { analysisCase, grid, active, activeCount, keepIn, keepOut } = domain;
+  const setup = setupOf(doc, study, grid);
+  if ('ok' in setup) return setup;
+  const { elastic, extrusion } = setup;
+  const { settings } = study;
+
+  const unitSystem = analysisCase.unitSystem;
+  const lengthFactor = toMetres(doc, 1) / analysisLengthMetres(unitSystem);
+  const idealization = analysisCase.parts[study.designDomain[0] ?? ''];
+  const thicknessDoc = idealization?.kind === 'plane_stress' ? idealization.thickness : grid.thickness;
+  const thickness = study.dimension === 2 ? thicknessDoc * lengthFactor : 1;
+  const voxelAnalysis = study.voxel * lengthFactor;
+  const voxelVolume = study.dimension === 3 ? powInt(voxelAnalysis, 3) : voxelAnalysis ** 2 * thickness;
+
+  const sets = nodeSets(grid, active);
+  const supports = supportsOf(doc, study, analysisCase, grid, sets);
+  if ('ok' in supports) return supports;
+  const { supportNodes, fixed } = supports;
+  const loads = loadsOf(doc, study, analysisCase, { grid, sets, voxelVolume, lengthFactor });
+  if ('ok' in loads) return loads;
+  const { byCase, loadNodes } = loads;
+  if (fixed.size === 0)
+    return refuse('TOP_SETUP_INVALID', 'the analysis has no support that fixes a degree of freedom of the grid', [analysisCase.id]);
+  if (byCase.size === 0) return refuse('TOP_SETUP_INVALID', 'the analysis has no force, pressure or gravity load', [analysisCase.id]);
+
+  const protectedVoxels = settings.protectLoadSupport.value ? voxelsAroundNodes(grid, active, [...supportNodes, ...loadNodes], 1) : null;
+  const keepInFinal = Uint8Array.from(keepIn, (flag, voxel) => (flag | (protectedVoxels?.[voxel] ?? 0)) & ~(keepOut[voxel] ?? 0) & 1);
+  const keepOutFinal = Uint8Array.from(keepOut);
+  const count = (mask: Uint8Array): number => mask.reduce((sum, flag) => sum + flag, 0);
+  const loadCases = loadCasesOf(byCase, study.objective.loadCaseWeights);
   const minMemberSize = study.manufacturing.minMemberSize;
   const radiusDoc = minMemberSize === undefined ? settings.filter.radius.value : Math.max(settings.filter.radius.value, minMemberSize / 2);
   const radiusVoxels = radiusDoc / study.voxel;
-  const { projection } = settings;
   return {
     ok: true,
     job: {
@@ -275,30 +373,7 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
         study.objective.kind === 'min_volume'
           ? { kind: 'min_volume', maxCompliance: study.objective.maxCompliance }
           : { kind: 'min_compliance' },
-      settings: {
-        penal: settings.penal.value,
-        eminRatio: settings.eminRatio.value,
-        move: settings.move.value,
-        changeTol: settings.changeTol.value,
-        maxIterations: settings.maxIterations.value,
-        filter: { kind: settings.filter.kind, radiusVoxels },
-        threshold: settings.threshold.value,
-        optimizer: settings.optimizer,
-        ...(projection === undefined
-          ? {}
-          : {
-              projection: {
-                beta: projection.beta.value,
-                eta: projection.eta.value,
-                betaStart: projection.betaStart.value,
-                betaEvery: projection.betaEvery.value,
-              },
-            }),
-        ...(extrusion === undefined ? {} : { extrusion }),
-        ...(minMemberSize === undefined
-          ? {}
-          : { minMemberRule: { minMemberSize, radiusVoxels, raised: minMemberSize / 2 > settings.filter.radius.value } }),
-      },
+      settings: settingsOf(study, extrusion, radiusVoxels),
       inputHash: topologyInputHash(doc, study),
       settingsHash: topologySettingsHash(settings),
     },

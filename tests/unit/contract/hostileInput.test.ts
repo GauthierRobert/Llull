@@ -15,6 +15,7 @@ import { hostileCases } from '../../helpers/hostile/cases';
 import { HOSTILE_READERS } from '../../helpers/hostileReaders';
 import { EXCLUDED_COMMANDS, EXCLUDED_FUNCTIONS } from '../../helpers/hostile/exclusions';
 import { measureLinearity } from '../../helpers/hostile/linearity';
+import { timeBudgetMs } from '../../helpers/timeBudget';
 
 /** PR mode (default): cheap structural cases for every reader; heavy cases and the linearity ratio for 1 reader in SAMPLE (by name hash). */
 const FULL = process.env['HOSTILE_FULL'] === '1';
@@ -39,7 +40,7 @@ describe.each(HOSTILE_READERS.map((reader) => [reader.name, reader] as const))('
         const input = entry.input();
         const started = performance.now();
         expect(() => reader.read(input)).not.toThrow();
-        expect(performance.now() - started).toBeLessThan(reader.budgetMs ?? CASE_BUDGET_MS);
+        expect(performance.now() - started).toBeLessThan(timeBudgetMs(reader.budgetMs ?? CASE_BUDGET_MS));
       },
       (reader.budgetMs ?? CASE_BUDGET_MS) + CASE_TIMEOUT_MS,
     );

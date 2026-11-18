@@ -3,8 +3,8 @@
 import { round6 } from '@lib/compactNumber';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
-import type { CommandResult } from '@core/commands/types';
-import type { Vec3 } from '@core/model/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, len3, scale3, sub3 } from '@lib/vec3';
 import { nextId } from '@lib/id';
 import { refuse, remediationFor } from './codes';
@@ -50,6 +50,146 @@ interface Violation {
 
 const inches = (q: { value: number; unit: string }): number => (toTicks(q.value, q.unit, 'in') ?? 0) / 1e6;
 
+type RowParams = z.infer<typeof rowSchema>;
+type Selector = (current: CadDocument, point: Vec3, stackIds: readonly string[]) => SelectionOutcome;
+
+/** Row geometry: fastener count, spacing and positions, or the refusal of an invalid line / pitch / count. */
+function layoutOf(
+  doc: CadDocument,
+  params: RowParams,
+): { readonly failure: CommandResult } | { readonly count: number; readonly stepDoc: number; readonly points: Vec3[] } {
+  const line = sub3(params.to, params.from);
+  const length = len3(line);
+  if (
+    length === 0 ||
+    (params.pitch === undefined) === (params.count === undefined) ||
+    (params.count !== undefined && (params.count < 1 || params.count > MAX_ROW))
+  )
+    return {
+      failure: refuse(
+        doc,
+        'insert_fastener_row',
+        'FAST_ROW_INVALID',
+        'from and to must differ and exactly one of pitch / count (1..500) is required',
+        [],
+        ['from', 'to', 'pitch', 'count'],
+      ),
+    };
+  const pitchDoc = params.pitch === undefined ? null : quantityToDoc(doc, params.pitch.value, params.pitch.unit);
+  if (params.pitch !== undefined && (pitchDoc === null || !(pitchDoc > 0)))
+    return { failure: refuse(doc, 'insert_fastener_row', 'FAST_ROW_INVALID', 'pitch must be a positive length', [], ['pitch']) };
+  const count = params.count ?? Math.max(1, Math.round(length / (pitchDoc ?? length))) + 1;
+  if (count > MAX_ROW)
+    return {
+      failure: refuse(
+        doc,
+        'insert_fastener_row',
+        'FAST_ROW_INVALID',
+        `row would place ${count} fasteners (limit ${MAX_ROW})`,
+        [],
+        ['pitch', 'count'],
+      ),
+    };
+  const stepDoc = count === 1 ? 0 : length / (count - 1);
+  const direction = scale3(line, 1 / length);
+  const points: Vec3[] = Array.from({ length: count }, (_, k) => add3(params.from, scale3(direction, k * stepDoc)));
+  return { count, stepDoc, points };
+}
+
+/** The selection of one stack position with the row's shared selection params. */
+function selectorFor(params: RowParams): Selector {
+  const shared = Object.fromEntries(
+    Object.keys(sharedFields).flatMap((key) =>
+      key in params && (params as Record<string, unknown>)[key] !== undefined ? [[key, (params as Record<string, unknown>)[key]]] : [],
+    ),
+  );
+  return (current, point, stackIds) => runSelection(current, { ...shared, stackIds: [...stackIds], axisPoint: point } as SelectionParams);
+}
+
+/** Pitch and edge-distance checks against the minima (rivet rows: the selection's 3 D / 2 D). */
+function rowViolations(
+  doc: CadDocument,
+  params: RowParams,
+  isRivet: boolean,
+  selectionData: Record<string, unknown>,
+  count: number,
+  stepDoc: number,
+): { violations: Violation[]; minPitchIn: number | null; minEdgeIn: number | null; pitchIn: number | null } {
+  const minPitchIn = isRivet ? (selectionData['minPitchIn'] as number) : params.minPitch === undefined ? null : inches(params.minPitch);
+  const minEdgeIn = isRivet
+    ? (selectionData['minEdgeDistanceIn'] as number)
+    : params.minEdgeDistance === undefined
+      ? null
+      : inches(params.minEdgeDistance);
+  const violations: Violation[] = [];
+  const pitchIn = count > 1 ? round6(docToInches(doc, stepDoc)) : null;
+  if (pitchIn !== null && minPitchIn !== null && pitchIn < minPitchIn - 1e-9)
+    violations.push({
+      code: 'FAST_PITCH',
+      message: `pitch ${pitchIn} in is below the minimum ${minPitchIn} in${isRivet ? ' (3 D)' : ''}`,
+      valueIn: pitchIn,
+      minIn: minPitchIn,
+    });
+  const edgeIn = params.edgeDistance === undefined ? null : inches(params.edgeDistance);
+  if (edgeIn !== null && minEdgeIn !== null && edgeIn < minEdgeIn - 1e-9)
+    violations.push({
+      code: 'FAST_EDGE_DISTANCE',
+      message: `edge distance ${edgeIn} in is below the minimum ${minEdgeIn} in${isRivet ? ' (2 D)' : ''}`,
+      valueIn: edgeIn,
+      minIn: minEdgeIn,
+    });
+  return { violations, minPitchIn, minEdgeIn, pitchIn };
+}
+
+interface RowPlacement {
+  readonly params: RowParams;
+  readonly points: readonly Vec3[];
+  readonly select: Selector;
+  readonly mode: HoleMode;
+  readonly diameter: number;
+  readonly rowId: string;
+}
+
+/** Places one stack per point (later positions follow plates replaced by earlier cuts); all or nothing. */
+function placeRow(
+  doc: CadDocument,
+  ctx: ExecutionContext | undefined,
+  { params, points, select, mode, diameter, rowId }: RowPlacement,
+):
+  | { readonly failure: CommandResult }
+  | { readonly current: CadDocument; readonly affected: string[]; readonly stackIds: string[]; readonly representative: Set<string> } {
+  let current = doc;
+  let plateIds: string[] = [...params.stackIds];
+  const affected: string[] = [];
+  const stackIds: string[] = [];
+  const representative = new Set<string>();
+  for (const point of points) {
+    const outcome = select(current, point, plateIds);
+    if (!outcome.ok || outcome.resolved === null)
+      return {
+        failure: {
+          ...refuse(
+            doc,
+            'insert_fastener_row',
+            outcome.failure?.code ?? 'FAST_STACK_OUT_OF_RANGE',
+            `position ${stackIds.length + 1}: ${outcome.failure?.message ?? 'selection failed'}`,
+            outcome.failure?.ids ?? [],
+          ),
+          data: outcome.data,
+        },
+      };
+    const placed = placeStack(current, ctx, outcome.resolved, mode, diameter, rowId);
+    if (!placed.ok)
+      return { failure: refuse(doc, 'insert_fastener_row', placed.code, `position ${stackIds.length + 1}: ${placed.message}`, placed.ids) };
+    current = placed.document;
+    plateIds = plateIds.map((id) => placed.replaced[id] ?? id);
+    affected.push(...placed.affected);
+    stackIds.push(placed.stack.id);
+    placed.representative.forEach((partNumber) => representative.add(partNumber));
+  }
+  return { current, affected, stackIds, representative };
+}
+
 /**
  * @affects plates (cut), components, instances and fasteners.stacks for every position; one feature step
  * @invariant stacks of one row share rowId; plate ids replaced by an earlier cut are followed by the later positions
@@ -65,44 +205,10 @@ export const insertFastenerRow = defineCommand({
     'data.violations) unless allowViolations is true, which places it with warnings. Selection params as in select_fastener; needs stackIds. With pitch, the pitch is adjusted (count = round(length/pitch)+1) so the last fastener lands on `to`. Returns data.rowId, data.stackIds, data.count, data.pitchIn (actual) and data.requestedPitchIn.',
   params: rowSchema,
   run: (doc, params, ctx): CommandResult => {
-    const line = sub3(params.to, params.from);
-    const length = len3(line);
-    if (
-      length === 0 ||
-      (params.pitch === undefined) === (params.count === undefined) ||
-      (params.count !== undefined && (params.count < 1 || params.count > MAX_ROW))
-    )
-      return refuse(
-        doc,
-        'insert_fastener_row',
-        'FAST_ROW_INVALID',
-        'from and to must differ and exactly one of pitch / count (1..500) is required',
-        [],
-        ['from', 'to', 'pitch', 'count'],
-      );
-    const pitchDoc = params.pitch === undefined ? null : quantityToDoc(doc, params.pitch.value, params.pitch.unit);
-    if (params.pitch !== undefined && (pitchDoc === null || !(pitchDoc > 0)))
-      return refuse(doc, 'insert_fastener_row', 'FAST_ROW_INVALID', 'pitch must be a positive length', [], ['pitch']);
-    const count = params.count ?? Math.max(1, Math.round(length / (pitchDoc ?? length))) + 1;
-    if (count > MAX_ROW)
-      return refuse(
-        doc,
-        'insert_fastener_row',
-        'FAST_ROW_INVALID',
-        `row would place ${count} fasteners (limit ${MAX_ROW})`,
-        [],
-        ['pitch', 'count'],
-      );
-    const stepDoc = count === 1 ? 0 : length / (count - 1);
-    const direction = scale3(line, 1 / length);
-    const points: Vec3[] = Array.from({ length: count }, (_, k) => add3(params.from, scale3(direction, k * stepDoc)));
-    const shared = Object.fromEntries(
-      Object.keys(sharedFields).flatMap((key) =>
-        key in params && (params as Record<string, unknown>)[key] !== undefined ? [[key, (params as Record<string, unknown>)[key]]] : [],
-      ),
-    );
-    const select = (current: typeof doc, point: Vec3, stackIds: readonly string[]): SelectionOutcome =>
-      runSelection(current, { ...shared, stackIds: [...stackIds], axisPoint: point } as SelectionParams);
+    const layout = layoutOf(doc, params);
+    if ('failure' in layout) return layout.failure;
+    const { count, stepDoc, points } = layout;
+    const select = selectorFor(params);
     const first = select(doc, points[0] as Vec3, params.stackIds);
     if (!first.ok || first.resolved === null)
       return {
@@ -116,30 +222,14 @@ export const insertFastenerRow = defineCommand({
         data: first.data,
       };
 
-    const isRivet = first.resolved.mode === 'rivet';
-    const minPitchIn = isRivet ? (first.data['minPitchIn'] as number) : params.minPitch === undefined ? null : inches(params.minPitch);
-    const minEdgeIn = isRivet
-      ? (first.data['minEdgeDistanceIn'] as number)
-      : params.minEdgeDistance === undefined
-        ? null
-        : inches(params.minEdgeDistance);
-    const violations: Violation[] = [];
-    const pitchIn = count > 1 ? round6(docToInches(doc, stepDoc)) : null;
-    if (pitchIn !== null && minPitchIn !== null && pitchIn < minPitchIn - 1e-9)
-      violations.push({
-        code: 'FAST_PITCH',
-        message: `pitch ${pitchIn} in is below the minimum ${minPitchIn} in${isRivet ? ' (3 D)' : ''}`,
-        valueIn: pitchIn,
-        minIn: minPitchIn,
-      });
-    const edgeIn = params.edgeDistance === undefined ? null : inches(params.edgeDistance);
-    if (edgeIn !== null && minEdgeIn !== null && edgeIn < minEdgeIn - 1e-9)
-      violations.push({
-        code: 'FAST_EDGE_DISTANCE',
-        message: `edge distance ${edgeIn} in is below the minimum ${minEdgeIn} in${isRivet ? ' (2 D)' : ''}`,
-        valueIn: edgeIn,
-        minIn: minEdgeIn,
-      });
+    const { violations, minPitchIn, minEdgeIn, pitchIn } = rowViolations(
+      doc,
+      params,
+      first.resolved.mode === 'rivet',
+      first.data,
+      count,
+      stepDoc,
+    );
     if (violations.length > 0 && params.allowViolations !== true) {
       const code = (violations[0] as Violation).code;
       return {
@@ -165,33 +255,9 @@ export const insertFastenerRow = defineCommand({
     if (typeof diameter !== 'number')
       return { ...refuse(doc, 'insert_fastener_row', diameter.code, diameter.message, diameter.ids), data: first.data };
     const rowId = nextId('frow');
-    let current = doc;
-    let plateIds: string[] = [...params.stackIds];
-    const affected: string[] = [];
-    const stackIds: string[] = [];
-    const representative = new Set<string>();
-    for (const point of points) {
-      const outcome = select(current, point, plateIds);
-      if (!outcome.ok || outcome.resolved === null)
-        return {
-          ...refuse(
-            doc,
-            'insert_fastener_row',
-            outcome.failure?.code ?? 'FAST_STACK_OUT_OF_RANGE',
-            `position ${stackIds.length + 1}: ${outcome.failure?.message ?? 'selection failed'}`,
-            outcome.failure?.ids ?? [],
-          ),
-          data: outcome.data,
-        };
-      const placed = placeStack(current, ctx, outcome.resolved, mode, diameter, rowId);
-      if (!placed.ok)
-        return refuse(doc, 'insert_fastener_row', placed.code, `position ${stackIds.length + 1}: ${placed.message}`, placed.ids);
-      current = placed.document;
-      plateIds = plateIds.map((id) => placed.replaced[id] ?? id);
-      affected.push(...placed.affected);
-      stackIds.push(placed.stack.id);
-      placed.representative.forEach((partNumber) => representative.add(partNumber));
-    }
+    const placement = placeRow(doc, ctx, { params, points, select, mode, diameter, rowId });
+    if ('failure' in placement) return placement.failure;
+    const { current, affected, stackIds, representative } = placement;
     const warnings = [
       ...violations.map((violation) => ({ code: violation.code, message: violation.message, remediation: remediationFor(violation.code) })),
       ...[...representative].map((partNumber) => ({

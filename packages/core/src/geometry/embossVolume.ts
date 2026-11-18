@@ -13,6 +13,7 @@ import { dot3, cross3, normalize3, scale3, add3 } from '../lib/vec3';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { EmbossParams, UvLoop } from '../model/wrap';
 import { integrateDu } from './uvIntegrals';
+import { powInt } from '../lib/powInt';
 
 export interface UvAreas {
   /** Area of the loop in the (u, v) plane (absolute). */
@@ -142,7 +143,7 @@ export function embossClosedForm(
     const offsetVolume = (e: number): number =>
       type === 'sphere'
         ? area * (e + (e * e) / radius + (e * e * e) / (3 * radius * radius))
-        : major * (radius * e + (e * e) / 2) * uv + (((radius + e) ** 3 - radius ** 3) / 3) * cosInt;
+        : major * (radius * e + (e * e) / 2) * uv + ((powInt(radius + e, 3) - powInt(radius, 3)) / 3) * cosInt;
     const reach = (node.mode === 'deboss' ? -1 : 1) * (convex ? 1 : -1) * d;
     return { area, delta: volume(sign * Math.abs(offsetVolume(reach))), convex };
   }

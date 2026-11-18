@@ -5,6 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { sectionProperties, STEEL_DENSITY_KG_M3 } from '../../catalog/sectionProperties';
 import { refuse } from '../codes';
+import { powInt } from '@lib/powInt';
 
 /**
  * @affects none; data = { forceN, momentNmm, stressMPa, rawStressMPa, sif, minLegMm?, ratio?, withinAllowable?, section, formulas, reviewRequired, provenance, warnings }
@@ -60,7 +61,7 @@ export const guidedCantilever = defineCommand({
       );
     const { legMm: length, displacementMm: delta, EMPa: modulus, SAMPa: allowable } = params;
     const stiffness = modulus * section.secondMomentMm4;
-    const forceN = (12 * stiffness * delta) / length ** 3;
+    const forceN = (12 * stiffness * delta) / powInt(length, 3);
     const momentNmm = (6 * stiffness * delta) / length ** 2;
     const intensification = params.sif ?? 1;
     const rawStressMPa = momentNmm / section.sectionModulusMm3;

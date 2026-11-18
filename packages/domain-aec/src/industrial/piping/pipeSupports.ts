@@ -1,28 +1,24 @@
 /** Pipe supports: shoes / guides / anchors on steel below, hangers from steel above. */
 
-import type { PipeSupportElement } from '@aec/building/types';
-import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { failedWith } from '@core/commands/noop';
-import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
-import { fromMm } from '@core/model/units';
-import { nextElementId, nextMark, elementAffected, withElement } from '../../building/model';
+import { elementAffected } from '../../building/model';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
-import { toVec3 } from '../common/memberSupport';
 import { modelUnits, collectSteelBars } from '../steelDesign/steelMemberBars';
-import { nearestOnRoute, pointAtArc, routeLength } from './routeSupport';
-import { SAME_SUPPORT_DISTANCE, endCarriers, pipeRunsOf, supportStations, supportsOfPipe, type PipeRun } from './pipeSupportLayout';
-import { autoSupportArcs, isPlaceable } from './pipeSupportPlacement';
-import { spanWarnings, steelCrossingArcs } from './pipeSupportSnap';
-import { pipeSpanLimit } from './pipeSpans';
-import { isRunCarrier } from './pipeCarrier';
-import { getPiping } from '../../plant/piping/model';
-import { PLAN_TOLERANCE, REACH, attachmentFields, clean, isRiserPoint, resolveBearing } from './pipeSupportAttach';
+import { pipeRunsOf, type PipeRun } from './pipeSupportLayout';
+import {
+  placeSupports,
+  planFromPoints,
+  planFromSpacing,
+  resolveLimits,
+  selectTargets,
+  snappedSpanIssues,
+  supportsSummary,
+  type Plan,
+} from './pipeSupportsPlan';
 
 const SUPPORT_TYPES = ['shoe', 'hanger', 'guide', 'anchor'] as const;
-const SNAP_DISTANCE = 500;
-const MAX_SUPPORTS_PER_RUN = 500;
 
 /**
  * @affects creates one pipe support element per position (block / rod geometry on layer P-SUPP), in model order
@@ -132,154 +128,30 @@ export const addPipeSupport = defineCommand({
     if ([pipeId, runId, line].filter((value) => value !== undefined).length !== 1)
       return fail('give exactly one of pipeId, runId or line.');
     if ((at === undefined) === (spacing === undefined)) return fail('give exactly one of at (list of points) or spacing.');
-    const below = type !== 'hanger';
-    const unit = fromMm(doc, 1);
-    const limits = {
-      maxReach: (params.maxReach ?? fromMm(doc, REACH[below ? 'below' : 'above'])) / unit,
-      planTolerance: (params.planTolerance ?? fromMm(doc, PLAN_TOLERANCE)) / unit,
-    };
-    const snapDistance = (params.snapDistance ?? fromMm(doc, SNAP_DISTANCE)) / unit;
-    const positive = [spacing ?? 1, limits.maxReach, snapDistance];
-    if (!positive.every(isPositiveNumber) || !isNonNegativeNumber(limits.planTolerance))
-      return fail('spacing, maxReach and snapDistance must be > 0 and planTolerance >= 0.');
+    const resolved = resolveLimits(doc, type, spacing, params);
+    if (typeof resolved === 'string') return fail(resolved);
+    const { limits, unit } = resolved;
     const units = modelUnits(doc);
-    const { building } = units;
     const runs = pipeRunsOf(units);
-    const isRun = (run: PipeRun): boolean => isRunCarrier(doc, building, run.element.id);
-    const targets =
-      pipeId !== undefined
-        ? runs.filter((run) => run.element.id === pipeId && !isRun(run))
-        : runId !== undefined
-          ? runs.filter((run) => run.element.id === runId && isRun(run))
-          : runs.filter((run) => run.element.line === line?.trim());
-    if (targets.length === 0) {
-      return fail(
-        pipeId !== undefined
-          ? `'${pipeId}' is not a pipe element (add_pipe_run; a spec-driven run is selected with runId).`
-          : runId !== undefined
-            ? `'${runId}' is not a pipe run (route_pipe).`
-            : `no pipe or run carries line '${line ?? ''}'.`,
-      );
-    }
-    const broken = targets.find((run) => isRun(run) && getPiping(doc).runs[run.element.id]?.broken !== undefined);
-    if (broken)
-      return fail(
-        `run ${broken.element.id} is broken (${getPiping(doc).runs[broken.element.id]?.broken?.reason ?? ''}): repair it first (edit_route, or move the equipment back).`,
-      );
-    const homeless = targets.find((run) => building.levels[run.element.levelId] === undefined);
-    if (homeless) return fail(`${homeless.element.mark} has no building level to hold its supports (add_level first).`);
-    if (spacing !== undefined) {
-      const spacingMm = spacing / unit;
-      const crowded = targets.find((run) => routeLength(run.points) / spacingMm > MAX_SUPPORTS_PER_RUN);
-      if (crowded) {
-        return fail(
-          `spacing ${spacing} ${doc.units} would put over ${MAX_SUPPORTS_PER_RUN} supports on ${crowded.element.mark} (${Math.round(routeLength(crowded.points) / spacingMm)}); use a larger spacing.`,
-        );
-      }
-    }
-    if (at !== undefined && at.length > MAX_SUPPORTS_PER_RUN)
-      return fail(`give at most ${MAX_SUPPORTS_PER_RUN} points per call (got ${at.length}).`);
+    const targets = selectTargets(doc, units, runs, { pipeId, runId, line }, spacing, at, unit);
+    if (typeof targets === 'string') return fail(targets);
     const bars = collectSteelBars(doc);
     const explicit = memberId === undefined ? undefined : bars.find((bar) => bar.id === memberId);
     if (memberId !== undefined && !explicit) return fail(`memberId '${memberId}' is not a steel member.`);
-    const wanted: Array<{ run: PipeRun; arc: number }> = [];
-    const skipped: string[] = [];
-    const snappedRuns = new Map<string, PipeRun>();
-    if (at !== undefined) {
-      for (const raw of at) {
-        const point = raw.length === 3 ? toVec3(raw) : null;
-        if (point === null) {
-          skipped.push(`point [${raw.join(', ')}] is not [x, y, z]`);
-          continue;
-        }
-        const world: Vec3 = [point[0] / unit, point[1] / unit, point[2] / unit];
-        const snaps = targets.flatMap((run) => {
-          const snap = nearestOnRoute(run.points, world);
-          return snap ? [{ run, snap }] : [];
-        });
-        const best = snaps.sort((a, b) => a.snap.distance - b.snap.distance)[0];
-        if (!best || best.snap.distance > snapDistance) {
-          skipped.push(
-            `point [${raw.join(', ')}] is ${best ? Math.round(best.snap.distance * unit * 1000) / 1000 : '?'} from the pipe(s) (snapDistance ${params.snapDistance ?? fromMm(doc, SNAP_DISTANCE)})`,
-          );
-        } else if (type === 'hanger' && !isPlaceable(best.run, best.snap.arc)) {
-          skipped.push(`point [${raw.join(', ')}] is on a riser (steep segment): a hanger cannot hang there, use a guide, shoe or anchor`);
-        } else wanted.push({ run: best.run, arc: best.snap.arc });
-      }
-    } else {
-      for (const run of targets) {
-        const existing = supportStations(units, run, supportsOfPipe(units, run.element.id)).map((station) => station.arc);
-        const crossings = snapToSteel ? steelCrossingArcs(run, bars, type, limits, explicit) : [];
-        if (crossings.length > 0) {
-          snappedRuns.set(run.element.id, run);
-          for (const arc of crossings)
-            if (existing.every((other) => Math.abs(other - arc) >= SAME_SUPPORT_DISTANCE)) wanted.push({ run, arc });
-          continue;
-        }
-        if (snapToSteel) skipped.push(`${run.element.mark}: crosses no steel, placed by spacing only`);
-        const arcs = autoSupportArcs(run, endCarriers(units, run, runs), existing, (spacing as number) / unit);
-        for (const arc of arcs) wanted.push({ run, arc });
-      }
-    }
-    let next = building;
-    const created: PipeSupportElement[] = [];
-    for (const { run, arc } of wanted) {
-      const placed = supportStations(units, run, supportsOfPipe({ ...units, building: next }, run.element.id));
-      if (placed.some((station) => Math.abs(station.arc - arc) < SAME_SUPPORT_DISTANCE)) {
-        skipped.push(`${run.element.mark} at ${Math.round(arc)} mm: a support is already there`);
-        continue;
-      }
-      const at3 = pointAtArc(run.points, arc);
-      if (!at3) continue;
-      const riser = isRiserPoint(run.points, at3.point);
-      const hit = resolveBearing(bars, type, at3.point, run.diameterMm, limits, riser, explicit);
-      if (typeof hit === 'string') return fail(`${hit}; no support was added.`);
-      const support: PipeSupportElement = {
-        id: nextElementId(next, 'pipeSupport'),
-        category: 'pipeSupport',
-        mark: nextMark(next, 'pipeSupport'),
-        entityIds: [],
-        levelId: run.element.levelId,
-        pipeId: run.element.id,
-        type,
-        position: [
-          clean(fromMm(doc, at3.point[0])),
-          clean(fromMm(doc, at3.point[1])),
-          clean(fromMm(doc, at3.point[2] - units.elevationMm(run.element.levelId))),
-        ],
-        ...attachmentFields(doc, type, hit),
-      };
-      next = withElement(next, support);
-      created.push(support);
-    }
+    const plan: Plan = { wanted: [], skipped: [], snappedRuns: new Map<string, PipeRun>() };
+    if (at !== undefined) planFromPoints(doc, at, targets, type, resolved, params.snapDistance, plan);
+    else planFromSpacing(units, targets, runs, bars, type, resolved, explicit, snapToSteel, spacing as number, plan);
+    const placed = placeSupports(doc, units, bars, type, limits, explicit, plan);
+    if (typeof placed === 'string') return fail(placed);
+    const { next, created } = placed;
+    const { skipped } = plan;
     if (created.length === 0) return fail(`no support could be placed${skipped.length > 0 ? ` (${skipped.join('; ')})` : ''}.`);
     const document = regenerateBuilding(doc, next);
     const unattached = created.filter((support) => support.memberId === null);
-    const after = { ...units, building: next };
-    const spanIssues = [...snappedRuns.values()].flatMap((run) =>
-      spanWarnings(
-        run,
-        supportStations(after, run, supportsOfPipe(after, run.element.id)).map((station) => station.arc),
-        endCarriers(after, run, runs),
-        (spacing as number) / unit,
-        pipeSpanLimit(run.element.dn, run.diameterMm, run.element.service).spanM * 1000,
-      ),
-    );
-    const marks = created.map((support) => support.mark);
-    const pipeMarks = [
-      ...new Set(created.map((support) => runs.find((run) => run.element.id === support.pipeId)?.element.mark ?? support.pipeId)),
-    ];
+    const spanIssues = snappedSpanIssues(units, next, runs, plan, spacing, unit);
     return {
       document,
-      summary:
-        `Added ${created.length} ${type}(s) ${marks.join(', ')} on pipe ${pipeMarks.join(', ')}` +
-        `, bearing on ${[...new Set(created.flatMap((support) => (support.memberId === null ? [] : [building.elements[support.memberId]?.mark ?? support.memberId])))].join(', ') || 'no steel'}` +
-        (unattached.length > 0
-          ? `; WARNING ${unattached.length} unattached (no steel member ${below ? 'below or beside' : 'above'} the pipe within reach): ${unattached.map((support) => support.mark).join(', ')}`
-          : '') +
-        (spanIssues.length > 0 ? `; WARNING ${spanIssues.join('; ')}` : '') +
-        (skipped.length > 0 ? `; skipped ${skipped.length}: ${skipped.join('; ')}` : '') +
-        '.',
+      summary: supportsSummary(units, runs, type, created, spanIssues, skipped),
       affected: elementAffected(
         document,
         created.map((support) => support.id),

@@ -1,6 +1,5 @@
 /** Aerodynamic surfaces of a flying body (13 FLT M4): generate_aero_table sweeps the vortex-lattice query over angle of attack and pivot angle. */
 
-import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
@@ -9,10 +8,9 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { idOrNext } from '@lib/explicitId';
 import { hashText } from '@lib/hash';
 import type { AeroSurface } from '../flight/aeroModel';
-import { assembleTable, aeroDesignHash, type LatticeRow } from '../flight/aeroTable';
-import { flowSections, latticeRows, toFlow } from '../flight/aeroSweep';
+import { assembleTable, aeroDesignHash } from '../flight/aeroTable';
 import { flightOf, idTakenInDynamicsOrFlight, ISA_SEA_LEVEL_DENSITY } from '../flight/model';
-import { dynamicsOf } from './bodies';
+import { latticeSweep, servoLimits, sweepProblem, type SweepInput } from './flightAeroSweep';
 
 /** Profile drag coefficient of a surface without a stated polar (a clean thin wing section at moderate Reynolds number). */
 const DEFAULT_PROFILE_DRAG = 0.01;
@@ -47,16 +45,6 @@ const surfaceSchema = z.object({
     .optional()
     .describe('The surface turns with the pivot angle (a servo-pivoted wing, an all-moving tail). Default false.'),
 });
-
-/** Why `bodyId` cannot carry a surface (missing or fixed), or null. */
-function bodyProblem(doc: CadDocument, bodyId: string): string | null {
-  const bodies = dynamicsOf(doc).bodies;
-  const body = Object.hasOwn(bodies, bodyId) ? bodies[bodyId] : undefined;
-  if (body === undefined) return `body '${bodyId}' is not a rigid body (add_rigid_body first)`;
-  return body.fixed ? `body '${bodyId}' is fixed to the ground; an aero surface needs a moving body` : null;
-}
-
-const increasing = (values: readonly number[]): boolean => values.every((value, i) => i === 0 || value > (values[i - 1] ?? Infinity));
 
 /**
  * @affects adds 1 aero surface (table CL / CD / Cm over alpha and pivot) to doc.flight.aeroSurfaces (affected: [surfaceId]); data { table, polar, ... }
@@ -150,68 +138,26 @@ export const generateAeroTable = defineCommand({
   }),
   run: (doc, params, ctx): CommandResult => {
     const fail = failer(doc, 'generate_aero_table');
-    const problem = bodyProblem(doc, params.body);
-    if (problem !== null) return fail(problem);
     const alphas = params.alphasDeg ?? DEFAULT_ALPHAS_DEG;
-    if (!increasing(alphas) || alphas.some((alpha) => !(Math.abs(alpha) <= 20)))
-      return fail('alphasDeg must strictly increase and lie within -20..20 degrees');
     const pivots = params.pivotsDeg ?? [0];
-    if (!increasing(pivots)) return fail('pivotsDeg must strictly increase');
-    const sweeping = pivots.length > 1;
-    if (sweeping && !params.surfaces.some((surface) => surface.pivots === true))
-      return fail('a pivot sweep needs at least one surface with pivots: true');
-    if (sweeping && (params.pivotPoint === undefined || params.servo === undefined))
-      return fail('a pivot sweep needs pivotPoint and servo');
-    if (!sweeping && params.servo !== undefined) return fail('servo needs pivotsDeg with more than one angle');
-    const low = pivots[0] ?? 0;
-    const high = pivots[pivots.length - 1] ?? 0;
     const servo = params.servo;
-    const minDeg = servo?.minDeg ?? low;
-    const maxDeg = servo?.maxDeg ?? high;
-    if (servo !== undefined && !(low <= minDeg && minDeg <= maxDeg && maxDeg <= high))
-      return fail(`servo limits [${minDeg}, ${maxDeg}] must be ordered and lie inside the pivot sweep [${low}, ${high}]`);
-    const neutralDeg = Math.min(maxDeg, Math.max(minDeg, servo?.neutralDeg ?? 0));
+    const input: SweepInput = { body: params.body, alphas, pivots, surfaces: params.surfaces, pivotPoint: params.pivotPoint, servo };
+    const problem = sweepProblem(doc, input);
+    if (problem !== null) return fail(problem);
+    const { minDeg, maxDeg, neutralDeg } = servoLimits(servo, pivots);
     const id = idOrNext(params.id, 'aero');
     if (idTakenInDynamicsOrFlight(doc, id)) return fail(`id '${id}' is already used`);
     const lattice = ctx?.registry('analyze_vortex_lattice');
     if (lattice === undefined) return fail('analyze_vortex_lattice is not registered (the aerodynamics plugin is not installed)');
     const forward = params.forward ?? '+x';
-    const pivotPoint = toFlow(params.pivotPoint ?? [0, 0, 0], forward);
-    const referencePoint = toFlow(params.momentCentre, forward);
-    const callFor = (pivotDeg: number, area?: number, chord?: number): Record<string, unknown> => ({
-      surfaces: params.surfaces.map((surface) => ({
-        name: surface.name,
-        sections: flowSections(surface.sections, forward, surface.pivots === true ? { point: pivotPoint, deg: pivotDeg } : null),
-        ...(surface.mirror === undefined ? {} : { mirror: surface.mirror }),
-        ...(surface.spanwisePanels === undefined ? {} : { spanwisePanels: surface.spanwisePanels }),
-        ...(surface.chordwisePanels === undefined ? {} : { chordwisePanels: surface.chordwisePanels }),
-        ...(surface.naca === undefined ? {} : { naca: surface.naca }),
-        ...(surface.zeroLiftAngleDeg === undefined ? {} : { zeroLiftAngleDeg: surface.zeroLiftAngleDeg }),
-      })),
-      alphasDeg: alphas,
-      referencePoint,
-      ...(area === undefined ? {} : { referenceArea: area }),
-      ...(chord === undefined ? {} : { referenceChord: chord }),
+    const sweep = latticeSweep(doc, ctx, lattice, input, {
+      forward,
+      referenceArea: params.referenceArea,
+      referenceChord: params.referenceChord,
+      momentCentre: params.momentCentre,
     });
-    // the reference area and chord come from the call nearest zero pivot (the un-pivoted planform) and are held for the others
-    const smallestPivot = Math.min(...pivots.map(Math.abs));
-    const zeroIndex = pivots.findIndex((pivot) => Math.abs(pivot) === smallestPivot);
-    const call = (pivotDeg: number, area?: number, chord?: number): { rows: LatticeRow[]; data: Record<string, unknown> } | string => {
-      const result = lattice.run(doc, callFor(pivotDeg, area, chord), ctx);
-      const rows = latticeRows(result.data);
-      return rows === null ? result.summary : { rows, data: result.data as Record<string, unknown> };
-    };
-    const first = call(pivots[zeroIndex] ?? 0, params.referenceArea, params.referenceChord);
-    if (typeof first === 'string') return fail(`the vortex-lattice query refused: ${first}`);
-    const reference = first.data['reference'] as { area: number; chord: number; span: number };
-    const area = params.referenceArea ?? reference.area;
-    const chord = params.referenceChord ?? reference.chord;
-    const rowsByPivot: (readonly LatticeRow[])[] = [];
-    for (let p = 0; p < pivots.length; p++) {
-      const result = p === zeroIndex ? first : call(pivots[p] ?? 0, area, chord);
-      if (typeof result === 'string') return fail(`the vortex-lattice query refused at pivot ${pivots[p]}°: ${result}`);
-      rowsByPivot.push(result.rows);
-    }
+    if ('refused' in sweep) return fail(sweep.refused);
+    const { first, rowsByPivot, reference, area, chord, zeroIndex } = sweep;
     const profile = params.profileDrag;
     const cd0 = profile?.cd0 ?? DEFAULT_PROFILE_DRAG;
     const clMax = profile?.clMax ?? null;

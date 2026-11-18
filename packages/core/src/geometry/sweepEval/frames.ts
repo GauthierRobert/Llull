@@ -16,6 +16,7 @@ import { segmentLengths } from '../../lib/polyline';
 import { clamp01 } from '../../lib/clamp';
 import { chainLength, isClosedChain, minCurvatureRadius, segmentPoint, segmentSteps, segmentTangent } from '../curveSegments';
 import { ellipseCurvature, ellipseLengthTo } from '../ellipseSegment';
+import { powInt } from '../../lib/powInt';
 
 /** One path sample with its section axes. */
 export interface SweepFrame {
@@ -400,7 +401,7 @@ function endCurvature(segment: CurveSegment<Vec3>, end: boolean): number {
     ? [sub3(p3, p2), scale3(add3(sub3(p3, scale3(p2, 2)), p1), 2)]
     : [sub3(p1, p0), scale3(add3(sub3(p2, scale3(p1, 2)), p0), 2)];
   const speed = len3(d1);
-  return speed > 1e-12 ? len3(cross3(d1, d2)) / (3 * speed ** 3) : 0;
+  return speed > 1e-12 ? len3(cross3(d1, d2)) / (3 * powInt(speed, 3)) : 0;
 }
 
 /**

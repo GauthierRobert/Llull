@@ -12,6 +12,8 @@
  * between child elements is dropped; an element with text only keeps it verbatim. Line ends are normalised to LF; literal tab / LF in attribute values become spaces.
  */
 
+import { isBadControl, isNameChar, isNameStart, isSpace, isXmlChar } from './xmlChars';
+
 export const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
 const XML_NAMESPACE = 'http://www.w3.org/XML/1998/namespace';
 
@@ -108,9 +110,6 @@ const XML_DEFAULT_LIMITS = {
 const MAX_NAME_LENGTH = 1024;
 const PREDEFINED: Readonly<Record<string, string>> = { lt: '<', gt: '>', amp: '&', apos: "'", quot: '"' };
 const CHAR_REF = /^#(?:x([0-9A-Fa-f]{1,8})|([0-9]{1,9}))$/;
-/** XML 1.0 Char excludes C0 controls other than TAB, LF, CR, and U+FFFE / U+FFFF. */
-const isBadControl = (code: number): boolean =>
-  (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) || code === 0xfffe || code === 0xffff;
 const DECL_PAIR = /\s*([A-Za-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/y;
 
 class XmlFailure {
@@ -123,45 +122,6 @@ class XmlFailure {
 
 const NOT_SPACE = /[^ \t\r\n]/;
 const hasContent = (value: string): boolean => NOT_SPACE.test(value);
-const isSpace = (code: number): boolean => code === 0x20 || code === 0x09 || code === 0x0a || code === 0x0d;
-
-function isNameStart(code: number): boolean {
-  return (
-    code === 0x3a ||
-    code === 0x5f ||
-    (code >= 0x41 && code <= 0x5a) ||
-    (code >= 0x61 && code <= 0x7a) ||
-    (code >= 0xc0 && code <= 0xd6) ||
-    (code >= 0xd8 && code <= 0xf6) ||
-    (code >= 0xf8 && code <= 0x2ff) ||
-    (code >= 0x370 && code <= 0x37d) ||
-    (code >= 0x37f && code <= 0x1fff) ||
-    (code >= 0x200c && code <= 0x200d) ||
-    (code >= 0x2070 && code <= 0x218f) ||
-    (code >= 0x2c00 && code <= 0x2fef) ||
-    (code >= 0x3001 && code <= 0xd7ff) ||
-    (code >= 0xf900 && code <= 0xfdcf) ||
-    (code >= 0xfdf0 && code <= 0xfffd) ||
-    (code >= 0x10000 && code <= 0xeffff)
-  );
-}
-
-const isNameChar = (code: number): boolean =>
-  isNameStart(code) ||
-  code === 0x2d ||
-  code === 0x2e ||
-  (code >= 0x30 && code <= 0x39) ||
-  code === 0xb7 ||
-  (code >= 0x300 && code <= 0x36f) ||
-  (code >= 0x203f && code <= 0x2040);
-
-const isXmlChar = (code: number): boolean =>
-  code === 0x9 ||
-  code === 0xa ||
-  code === 0xd ||
-  (code >= 0x20 && code <= 0xd7ff) ||
-  (code >= 0xe000 && code <= 0xfffd) ||
-  (code >= 0x10000 && code <= 0x10ffff);
 
 interface MutableElement {
   type: 'element';
@@ -458,6 +418,58 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
       return cursor;
     };
 
+    const readEndTag = (at: number): number => {
+      const top = stack[stack.length - 1];
+      const nameEnd = readName(at + 2);
+      if (!top) fail(root ? 'XML_TRAILING_CONTENT' : 'XML_SYNTAX', 'an end tag without a start tag', at);
+      const endName = text.slice(at + 2, nameEnd);
+      const close = skipSpace(nameEnd);
+      if (text.charCodeAt(close) !== 0x3e)
+        fail(close >= length ? 'XML_UNCLOSED' : 'XML_SYNTAX', `the end tag </${endName}> is not closed with >`, at);
+      if (top && endName !== top.name)
+        fail('XML_MISMATCHED_TAG', `</${endName}> closes <${top.name}> (opened at line ${top.line}, column ${top.column})`, at);
+      flushText();
+      closeElement(stack.pop() as MutableElement);
+      popBindings(declaredStack.pop() ?? []);
+      return close + 1;
+    };
+
+    const readMarkupDeclaration = (at: number): number => {
+      if (text.startsWith('<!--', at)) {
+        const end = text.indexOf('-->', at + 4);
+        if (end < 0) fail('XML_UNCLOSED', 'the comment is not closed with -->', at);
+        const body = text.slice(at + 4, end);
+        if (body.includes('--') || body.endsWith('-'))
+          fail('XML_SYNTAX', 'a comment cannot contain --', at + 4 + (body.includes('--') ? body.indexOf('--') : body.length - 1));
+        checkChars(body, at + 4, 'comment');
+        return end + 3;
+      }
+      if (text.startsWith('<![CDATA[', at)) {
+        if (stack.length === 0) fail(root ? 'XML_TRAILING_CONTENT' : 'XML_SYNTAX', 'CDATA outside the root element', at);
+        const end = text.indexOf(']]>', at + 9);
+        if (end < 0) fail('XML_UNCLOSED', 'the CDATA section is not closed with ]]>', at);
+        const body = text.slice(at + 9, end);
+        checkChars(body, at + 9, 'CDATA');
+        pendingText += lineEnds(body);
+        return end + 3;
+      }
+      if (text.startsWith('<!DOCTYPE', at))
+        fail('XML_DTD_FORBIDDEN', 'a DOCTYPE / DTD is refused (no entity expansion, no external entities)', at);
+      return fail('XML_SYNTAX', 'unknown markup declaration', at);
+    };
+
+    const readInstruction = (at: number): number => {
+      const end = text.indexOf('?>', at + 2);
+      if (end < 0) fail('XML_UNCLOSED', 'the processing instruction is not closed with ?>', at);
+      const targetEnd = readName(at + 2);
+      const target = text.slice(at + 2, targetEnd);
+      if (targetEnd === at + 2 || (targetEnd < end && !isSpace(text.charCodeAt(targetEnd))))
+        fail('XML_SYNTAX', 'a processing instruction needs a target name', at);
+      if (target.toLowerCase() === 'xml') fail('XML_SYNTAX', 'the XML declaration is only allowed at the very start', at);
+      checkChars(text.slice(at + 2, end), at + 2, 'processing instruction');
+      return end + 2;
+    };
+
     for (;;) {
       if (at >= length) break;
       const lt = text.indexOf('<', at);
@@ -476,51 +488,10 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
       if (lt < 0) break;
       at = lt;
       const next = text.charCodeAt(at + 1);
-      if (next === 0x2f) {
-        const top = stack[stack.length - 1];
-        const nameEnd = readName(at + 2);
-        if (!top) fail(root ? 'XML_TRAILING_CONTENT' : 'XML_SYNTAX', 'an end tag without a start tag', at);
-        const endName = text.slice(at + 2, nameEnd);
-        const close = skipSpace(nameEnd);
-        if (text.charCodeAt(close) !== 0x3e)
-          fail(close >= length ? 'XML_UNCLOSED' : 'XML_SYNTAX', `the end tag </${endName}> is not closed with >`, at);
-        if (top && endName !== top.name)
-          fail('XML_MISMATCHED_TAG', `</${endName}> closes <${top.name}> (opened at line ${top.line}, column ${top.column})`, at);
-        flushText();
-        closeElement(stack.pop() as MutableElement);
-        popBindings(declaredStack.pop() ?? []);
-        at = close + 1;
-      } else if (next === 0x21) {
-        if (text.startsWith('<!--', at)) {
-          const end = text.indexOf('-->', at + 4);
-          if (end < 0) fail('XML_UNCLOSED', 'the comment is not closed with -->', at);
-          const body = text.slice(at + 4, end);
-          if (body.includes('--') || body.endsWith('-'))
-            fail('XML_SYNTAX', 'a comment cannot contain --', at + 4 + (body.includes('--') ? body.indexOf('--') : body.length - 1));
-          checkChars(body, at + 4, 'comment');
-          at = end + 3;
-        } else if (text.startsWith('<![CDATA[', at)) {
-          if (stack.length === 0) fail(root ? 'XML_TRAILING_CONTENT' : 'XML_SYNTAX', 'CDATA outside the root element', at);
-          const end = text.indexOf(']]>', at + 9);
-          if (end < 0) fail('XML_UNCLOSED', 'the CDATA section is not closed with ]]>', at);
-          const body = text.slice(at + 9, end);
-          checkChars(body, at + 9, 'CDATA');
-          pendingText += lineEnds(body);
-          at = end + 3;
-        } else if (text.startsWith('<!DOCTYPE', at)) {
-          fail('XML_DTD_FORBIDDEN', 'a DOCTYPE / DTD is refused (no entity expansion, no external entities)', at);
-        } else fail('XML_SYNTAX', 'unknown markup declaration', at);
-      } else if (next === 0x3f) {
-        const end = text.indexOf('?>', at + 2);
-        if (end < 0) fail('XML_UNCLOSED', 'the processing instruction is not closed with ?>', at);
-        const targetEnd = readName(at + 2);
-        const target = text.slice(at + 2, targetEnd);
-        if (targetEnd === at + 2 || (targetEnd < end && !isSpace(text.charCodeAt(targetEnd))))
-          fail('XML_SYNTAX', 'a processing instruction needs a target name', at);
-        if (target.toLowerCase() === 'xml') fail('XML_SYNTAX', 'the XML declaration is only allowed at the very start', at);
-        checkChars(text.slice(at + 2, end), at + 2, 'processing instruction');
-        at = end + 2;
-      } else {
+      if (next === 0x2f) at = readEndTag(at);
+      else if (next === 0x21) at = readMarkupDeclaration(at);
+      else if (next === 0x3f) at = readInstruction(at);
+      else {
         if (root && stack.length === 0) fail('XML_TRAILING_CONTENT', 'a second root element', at);
         at = readStartTag(at);
         if (stack.length === 0 && root) closeElement(root);

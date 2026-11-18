@@ -140,11 +140,6 @@ export function guardRead(): RequestHandler {
   };
 }
 
-/** Guard for `POST /live/ticket`: header auth ONLY (never a ticket). */
-export function guardTicketIssue(): RequestHandler {
-  return buildGuard(false);
-}
-
 function buildGuard(isRead: boolean): RequestHandler {
   return (req, res, next) => {
     const token = process.env['LLULL_AUTH_TOKEN'];
@@ -218,6 +213,25 @@ export function setHtmlSecurityHeaders(res: Response): void {
   res.setHeader('Content-Security-Policy', contentSecurityPolicy());
 }
 
+/** A built asset of the renderer: `assets/<name>-<hash>.<ext>`. */
+const HASHED_ASSET = /[\\/]assets[\\/][^\\/]+-[\w-]{8,}\.\w+$/;
+
+/** The renderer's in-page physics worker (`src/physics.worker.ts`), as Vite names its bundle. */
+const PHYSICS_WORKER_FILE = /[\\/]physics\.worker-[\w-]+\.js$/;
+
+/**
+ * A dedicated worker takes its policy from its own script response, not from the page. The physics worker is the one place that may
+ * evaluate strings: MuJoCo's bindings build their call wrappers with the Function constructor. Everything else stays shut: same-origin
+ * scripts and fetches (its chunks, the engine's WASM), nothing else. Every other response keeps the page policy or none.
+ */
+export function setAssetHeaders(res: Response, filePath: string): void {
+  // Vite names every file under assets/ after its content hash: it never changes, so the renderer may keep it for good. That also lets a
+  // new physics worker reload the engine from the browser cache while the backend is away (index.html itself is always re-fetched).
+  if (HASHED_ASSET.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  if (!PHYSICS_WORKER_FILE.test(filePath)) return;
+  res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src 'self'");
+}
+
 /** Baseline hardening headers on every response. */
 export function securityHeaders(): RequestHandler {
   return (_req, res, next) => {
@@ -228,13 +242,21 @@ export function securityHeaders(): RequestHandler {
   };
 }
 
-/** Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). */
+/**
+ * Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). A request with the valid bearer token is
+ * not counted: every client is loopback, so one bucket would let the desktop UI (drag previews) and a CLI agent throttle each other, and the
+ * token is the protection there. Token-less requests stay limited.
+ */
 function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
   return rateLimit({
     windowMs: positiveInteger(process.env[windowVariable], 60_000),
     max: positiveInteger(process.env[maxVariable], 600),
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+      const token = process.env['LLULL_AUTH_TOKEN'];
+      return token !== undefined && token !== '' && hasValidBearer(req, token);
+    },
     message: { error: 'Too many requests — please slow down.' },
   });
 }

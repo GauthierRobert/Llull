@@ -15,7 +15,7 @@ import {
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
 import { useRecoveryStore } from '@ui/store/recoveryStore';
 import { useSessionStore } from '@ui/store/sessionStore';
-import { browserStorage, readAutosave } from '@ui/store/autosave';
+import { browserStorage, readAutosave, writeAutosave } from '@ui/store/autosave';
 
 const dispatchId = (name: string, params: unknown): string => localDispatch(name, params).affected[0]!;
 const order = (): string[] => getState().document.order;
@@ -64,6 +64,15 @@ const DEFAULT_RESPONSE: ServerCommandResponse = {
 
 describe('CadStore — networked dispatch', () => {
   useCleanStoreHooks();
+
+  it('a coalesced dispatch asks the backend to fold it into the previous undo step; a plain one does not', async () => {
+    const spy = mockFetch(DEFAULT_RESPONSE);
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    getState().dispatch('fit_view', { direction: 'iso' }, { coalesce: true });
+    await flushPromises();
+    const bodies = spy.mock.calls.map((call) => JSON.parse((call[1] as RequestInit).body as string) as { coalesce?: boolean });
+    expect(bodies.map((body) => body.coalesce)).toEqual([undefined, true]);
+  });
 
   it('dispatch POSTs name and params to /command and adopts the response summary / flags, not the document', async () => {
     const spy = mockFetch({ ...DEFAULT_RESPONSE, summary: 'Box created at origin.' });
@@ -255,6 +264,23 @@ describe('CadStore — offline fallback', () => {
     expect(useRecoveryStore.getState().offlineEditsKept).toBe(true);
   });
 
+  it('once the backend keeps the offline edits, the device autosave copy is dropped (the same work is not offered twice)', async () => {
+    offline();
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const storage = browserStorage();
+    if (storage === null) throw new Error('no storage in this test environment');
+    writeAutosave(storage, { savedAt: 1, json: serializeDocument(getState().document) });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, slots: [] }) })),
+    );
+    online();
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
+    await flushPromises();
+    expect(useRecoveryStore.getState().offlineEditsKept).toBe(true);
+    expect(readAutosave(storage)).toBeNull();
+  });
+
   it('offline edits that leave NO entity (deleted everything) are kept too, filed under the path the edits started from (review 7)', async () => {
     const base = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     useStore.setState({ liveBase: base, liveEpoch: TEST_EPOCH, liveSeq: 1 });
@@ -356,6 +382,17 @@ describe('CadStore — live command log and epochs', () => {
     getState().select([order()[0]!]);
     expect(getState().liveBase.selection).toEqual([]);
     expect(selection()).toHaveLength(1);
+  });
+
+  it('adopts the backend history flags from a snapshot and a command from another source; absent flags leave them alone', () => {
+    getState().hydrateLiveDocument({ ...liveSnapshot(createEmptyDocument(), 3), canUndo: true, canRedo: true });
+    expect([getState().canUndo, getState().canRedo]).toEqual([true, true]);
+    const after = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    const event = { epoch: TEST_EPOCH, seq: 4, name: 'add_box', params: { size: [1, 1, 1] }, stateHash: liveSnapshot(after).stateHash };
+    expect(getState().applyLiveCommand({ ...event, source: 'cli', canUndo: true, canRedo: false })).toBe(true);
+    expect([getState().canUndo, getState().canRedo]).toEqual([true, false]);
+    getState().hydrateLiveDocument(liveSnapshot(after, 5));
+    expect([getState().canUndo, getState().canRedo]).toEqual([true, false]);
   });
 
   it('refuses a gap or a mismatching hash so the caller resyncs', () => {

@@ -6,6 +6,7 @@
 
 import { HEAD_STANDARDS } from '../data/headStandards';
 import type { HeadSpec } from '../model';
+import { powInt } from '@lib/powInt';
 
 interface TorisphericalGeometry {
   readonly crownRadius: number;
@@ -104,7 +105,7 @@ function torisphericalFilled(radius: number, shape: HeadShape & { kind: 'torisph
   const d1 = 2 * crownRadius * Math.sin(alpha);
   const s = (knuckleRadius * Math.sin(alpha)) ** 2;
   const t = 2 * a2;
-  const base = (Math.PI / 4) * ((2 * a1 ** 3) / 3 + (a1 * d1 * d1) / 2);
+  const base = (Math.PI / 4) * ((2 * powInt(a1, 3)) / 3 + (a1 * d1 * d1) / 2);
   const knuckle = (radius - knuckleRadius) ** 2 + s;
   const ring = 2 * Math.PI * (radius - knuckleRadius);
   if (x < a1 + a2) {
@@ -114,7 +115,7 @@ function torisphericalFilled(radius: number, shape: HeadShape & { kind: 'torisph
       base +
       Math.PI * u * knuckle +
       (Math.PI * t * u * u) / 2 -
-      (Math.PI * u ** 3) / 3 +
+      (Math.PI * powInt(u, 3)) / 3 +
       ring *
         (((2 * u - t) / 4) * Math.sqrt(Math.max(0, s + t * u - u * u)) + (t * Math.sqrt(s)) / 4 + (knuckleRadius ** 2 / 2) * (arc - alpha))
     );
@@ -122,7 +123,7 @@ function torisphericalFilled(radius: number, shape: HeadShape & { kind: 'torisph
   return (
     base +
     (Math.PI * t * knuckle) / 2 +
-    (Math.PI * t ** 3) / 12 +
+    (Math.PI * powInt(t, 3)) / 12 +
     ring * ((t * Math.sqrt(s)) / 4 + (knuckleRadius ** 2 / 2) * Math.asin(Math.cos(alpha)))
   );
 }

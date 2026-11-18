@@ -1,16 +1,23 @@
+import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 /** Single-phase incompressible pipe flow: water properties, Colebrook-White friction, bend loss coefficients, material roughness. */
 
 /** Water density (kg/m³) at `celsius` (Kell 1975, 0..100 °C, atmospheric pressure). */
 export function waterDensity(celsius: number): number {
   const t = celsius;
   const numerator =
-    999.83952 + 16.945176 * t - 7.9870401e-3 * t ** 2 - 46.170461e-6 * t ** 3 + 105.56302e-9 * t ** 4 - 280.54253e-12 * t ** 5;
+    999.83952 +
+    16.945176 * t -
+    7.9870401e-3 * t ** 2 -
+    46.170461e-6 * powInt(t, 3) +
+    105.56302e-9 * powInt(t, 4) -
+    280.54253e-12 * powInt(t, 5);
   return numerator / (1 + 16.87985e-3 * t);
 }
 
 /** Water dynamic viscosity (Pa·s) at `celsius` (Vogel / Reid-Prausnitz-Poling fit, 0..100 °C): 2.414e-5 · 10^(247.8 / (T[K] − 140)). */
 export function waterViscosity(celsius: number): number {
-  return 2.414e-5 * 10 ** (247.8 / (celsius + 273.15 - 140));
+  return 2.414e-5 * pow(10, 247.8 / (celsius + 273.15 - 140));
 }
 
 /** Absolute roughness (mm) by pipe material text (Moody / Crane TP-410 typical values); carbon steel 0.045 for unrecognised materials. */
@@ -42,7 +49,7 @@ export function bendK(type: BendType, deflectionDegrees: number): number {
 /** Darcy friction factor: laminar 64/Re below Re 2300, else Colebrook-White solved by fixed-point iteration (Swamee-Jain start). */
 export function frictionFactor(reynolds: number, relativeRoughness: number): { readonly f: number; readonly iterations: number } {
   if (reynolds < 2300) return { f: 64 / reynolds, iterations: 0 };
-  let inverseRoot = -2 * Math.log10(relativeRoughness / 3.7 + 5.74 / reynolds ** 0.9);
+  let inverseRoot = -2 * Math.log10(relativeRoughness / 3.7 + 5.74 / pow(reynolds, 0.9));
   let iterations = 0;
   for (; iterations < 100; iterations++) {
     const next = -2 * Math.log10(relativeRoughness / 3.7 + 2.51 * (inverseRoot / reynolds));

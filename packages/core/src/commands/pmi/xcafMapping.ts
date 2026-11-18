@@ -256,108 +256,128 @@ function readTolerance(dimension: Dimension): PmiTolerance {
     : { type: 'plusMinus', upper: deviation.plus, lower: -deviation.minus };
 }
 
+type PointsOf = (faces: readonly number[]) => readonly Vec3[] | null;
+
+function datumDraft(
+  datum: ExchangePmi['datums'][number],
+  facesNear: readonly Vec3[] | null,
+  boundary: Map<string, DatumReference['boundary']>,
+): PmiDraft | null {
+  const lost: string[] = [];
+  for (const modifier of datum.modifiers ?? []) {
+    if (modifier === 'maximum_material_requirement') boundary.set(datum.label, 'MMB');
+    else if (modifier === 'least_material_requirement') boundary.set(datum.label, 'LMB');
+    else lost.push(`datum modifier ${modifier}`);
+  }
+  if (datum.modifierWithValue !== undefined) lost.push(`datum modifier ${datum.modifierWithValue.kind} ${datum.modifierWithValue.value}`);
+  if (facesNear === null || facesNear.length === 0) return null;
+  return { kind: 'datum_feature', label: datum.label, ...unmodelled(lost), facesNear: mutable(facesNear) };
+}
+
+function toleranceDraft(
+  tolerance: ExchangePmi['tolerances'][number],
+  facesNear: readonly Vec3[],
+  boundary: ReadonlyMap<string, DatumReference['boundary']>,
+): PmiDraft {
+  const lost: string[] = [];
+  const modifiers: ZoneModifier[] = [];
+  let condition: 'MMC' | 'LMC' | undefined =
+    tolerance.materialRequirement === undefined ? undefined : tolerance.materialRequirement === 'maximum' ? 'MMC' : 'LMC';
+  for (const modifier of tolerance.modifiers ?? []) {
+    if (modifier === 'maximum_material_requirement') condition ??= 'MMC';
+    else if (modifier === 'least_material_requirement') condition ??= 'LMC';
+    else {
+      const mapped = ZONE_FROM_TRANSPORT[modifier];
+      if (mapped === undefined) lost.push(`modifier ${modifier}`);
+      else modifiers.push(mapped);
+    }
+  }
+  const zone = {
+    value: tolerance.value,
+    ...(tolerance.diameterZone ? { diametral: true } : {}),
+    ...(tolerance.sphericalZone === true ? { spherical: true } : {}),
+  };
+  const extra: { projectedLength?: number; unequallyDisposed?: number; maxValue?: number } = {};
+  if (tolerance.zoneModifier === 'projected' && tolerance.zoneModifierValue !== undefined)
+    extra.projectedLength = tolerance.zoneModifierValue;
+  else if (tolerance.zoneModifier === 'non_uniform' && tolerance.zoneModifierValue !== undefined)
+    extra.unequallyDisposed = tolerance.zoneModifierValue;
+  else if (tolerance.zoneModifier !== undefined) lost.push(`zone modifier ${tolerance.zoneModifier}`);
+  if (tolerance.maxValue !== undefined) extra.maxValue = tolerance.maxValue;
+  return {
+    kind: 'geometric_tolerance',
+    characteristic: FROM_TRANSPORT[tolerance.characteristic],
+    zone: { ...zone, ...extra },
+    ...(condition === undefined ? {} : { materialCondition: condition }),
+    ...(modifiers.length === 0 ? {} : { modifiers }),
+    datums: tolerance.datums.map((label) => ({
+      label,
+      ...(boundary.get(label) === undefined ? {} : { boundary: boundary.get(label) as 'MMB' | 'LMB' }),
+    })),
+    ...unmodelled(lost),
+    facesNear: mutable(facesNear),
+  };
+}
+
+/** The draft of one read dimension, or null when it is unmapped. */
+function dimensionDraft(dimension: Dimension, pointsOf: PointsOf): PmiDraft | null {
+  const first = pointsOf(dimension.faces);
+  const sizeKind = SIZE_FROM_TRANSPORT[dimension.type];
+  const lost: string[] = dimension.qualifier === undefined ? [] : [`dimension qualifier ${dimension.qualifier}`];
+  const codes: NonNullable<Extract<PmiDraft, { kind: 'size_dimension' }>['sizeModifiers']> = [];
+  for (const modifier of dimension.modifiers ?? []) {
+    const code = SIZE_MODIFIER_FROM_TRANSPORT[modifier];
+    if (sizeKind !== undefined && code !== undefined) codes.push(code);
+    else lost.push(`dimension modifier ${modifier}`);
+  }
+  if (sizeKind !== undefined) {
+    if (first === null || first.length === 0) return null;
+    return {
+      kind: 'size_dimension',
+      sizeKind,
+      tolerance: readTolerance(dimension),
+      ...statedNominal(dimension),
+      ...(codes.length === 0 ? {} : { sizeModifiers: codes }),
+      ...unmodelled(lost),
+      facesNear: mutable(first),
+    };
+  }
+  const second = pointsOf(dimension.facesSecond ?? []);
+  const measure = dimension.type === 'location_angular' ? 'angle' : dimension.type === 'location_linear_distance' ? 'distance' : null;
+  if (measure === null || first === null || first.length === 0 || second === null || second.length === 0) return null;
+  return {
+    kind: 'location_dimension',
+    measure,
+    tolerance: readTolerance(dimension),
+    ...statedNominal(dimension),
+    ...unmodelled(lost),
+    from: mutable(first),
+    to: mutable(second),
+  };
+}
+
 /**
  * `apply_pmi_set` drafts of one solid's transport PMI (document units); `pointsOf` maps face indices to one world point ON each face, null
  * when an index names no face of the solid (the item is then unmapped). Attributes the model has no field for are listed in `unmodelled`.
  */
-export function fromExchangePmi(pmi: ExchangePmi, pointsOf: (faces: readonly number[]) => readonly Vec3[] | null): ImportedPmiDrafts {
+export function fromExchangePmi(pmi: ExchangePmi, pointsOf: PointsOf): ImportedPmiDrafts {
   const drafts: PmiDraft[] = [];
   let unmapped = 0;
   const boundary = new Map<string, DatumReference['boundary']>();
   for (const datum of pmi.datums) {
-    const facesNear = pointsOf(datum.faces);
-    const lost: string[] = [];
-    for (const modifier of datum.modifiers ?? []) {
-      if (modifier === 'maximum_material_requirement') boundary.set(datum.label, 'MMB');
-      else if (modifier === 'least_material_requirement') boundary.set(datum.label, 'LMB');
-      else lost.push(`datum modifier ${modifier}`);
-    }
-    if (datum.modifierWithValue !== undefined) lost.push(`datum modifier ${datum.modifierWithValue.kind} ${datum.modifierWithValue.value}`);
-    if (facesNear === null || facesNear.length === 0) unmapped += 1;
-    else drafts.push({ kind: 'datum_feature', label: datum.label, ...unmodelled(lost), facesNear: mutable(facesNear) });
+    const draft = datumDraft(datum, pointsOf(datum.faces), boundary);
+    if (draft === null) unmapped += 1;
+    else drafts.push(draft);
   }
   for (const tolerance of pmi.tolerances) {
     const facesNear = pointsOf(tolerance.faces);
-    if (facesNear === null || facesNear.length === 0) {
-      unmapped += 1;
-      continue;
-    }
-    const lost: string[] = [];
-    const modifiers: ZoneModifier[] = [];
-    let condition: 'MMC' | 'LMC' | undefined =
-      tolerance.materialRequirement === undefined ? undefined : tolerance.materialRequirement === 'maximum' ? 'MMC' : 'LMC';
-    for (const modifier of tolerance.modifiers ?? []) {
-      if (modifier === 'maximum_material_requirement') condition ??= 'MMC';
-      else if (modifier === 'least_material_requirement') condition ??= 'LMC';
-      else {
-        const mapped = ZONE_FROM_TRANSPORT[modifier];
-        if (mapped === undefined) lost.push(`modifier ${modifier}`);
-        else modifiers.push(mapped);
-      }
-    }
-    const zone = {
-      value: tolerance.value,
-      ...(tolerance.diameterZone ? { diametral: true } : {}),
-      ...(tolerance.sphericalZone === true ? { spherical: true } : {}),
-    };
-    const extra: { projectedLength?: number; unequallyDisposed?: number; maxValue?: number } = {};
-    if (tolerance.zoneModifier === 'projected' && tolerance.zoneModifierValue !== undefined)
-      extra.projectedLength = tolerance.zoneModifierValue;
-    else if (tolerance.zoneModifier === 'non_uniform' && tolerance.zoneModifierValue !== undefined)
-      extra.unequallyDisposed = tolerance.zoneModifierValue;
-    else if (tolerance.zoneModifier !== undefined) lost.push(`zone modifier ${tolerance.zoneModifier}`);
-    if (tolerance.maxValue !== undefined) extra.maxValue = tolerance.maxValue;
-    drafts.push({
-      kind: 'geometric_tolerance',
-      characteristic: FROM_TRANSPORT[tolerance.characteristic],
-      zone: { ...zone, ...extra },
-      ...(condition === undefined ? {} : { materialCondition: condition }),
-      ...(modifiers.length === 0 ? {} : { modifiers }),
-      datums: tolerance.datums.map((label) => ({
-        label,
-        ...(boundary.get(label) === undefined ? {} : { boundary: boundary.get(label) as 'MMB' | 'LMB' }),
-      })),
-      ...unmodelled(lost),
-      facesNear: mutable(facesNear),
-    });
+    if (facesNear === null || facesNear.length === 0) unmapped += 1;
+    else drafts.push(toleranceDraft(tolerance, facesNear, boundary));
   }
   for (const dimension of pmi.dimensions) {
-    const first = pointsOf(dimension.faces);
-    const sizeKind = SIZE_FROM_TRANSPORT[dimension.type];
-    const lost: string[] = dimension.qualifier === undefined ? [] : [`dimension qualifier ${dimension.qualifier}`];
-    const codes: NonNullable<Extract<PmiDraft, { kind: 'size_dimension' }>['sizeModifiers']> = [];
-    for (const modifier of dimension.modifiers ?? []) {
-      const code = SIZE_MODIFIER_FROM_TRANSPORT[modifier];
-      if (sizeKind !== undefined && code !== undefined) codes.push(code);
-      else lost.push(`dimension modifier ${modifier}`);
-    }
-    if (sizeKind !== undefined) {
-      if (first === null || first.length === 0) unmapped += 1;
-      else
-        drafts.push({
-          kind: 'size_dimension',
-          sizeKind,
-          tolerance: readTolerance(dimension),
-          ...statedNominal(dimension),
-          ...(codes.length === 0 ? {} : { sizeModifiers: codes }),
-          ...unmodelled(lost),
-          facesNear: mutable(first),
-        });
-      continue;
-    }
-    const second = pointsOf(dimension.facesSecond ?? []);
-    const measure = dimension.type === 'location_angular' ? 'angle' : dimension.type === 'location_linear_distance' ? 'distance' : null;
-    if (measure === null || first === null || first.length === 0 || second === null || second.length === 0) unmapped += 1;
-    else
-      drafts.push({
-        kind: 'location_dimension',
-        measure,
-        tolerance: readTolerance(dimension),
-        ...statedNominal(dimension),
-        ...unmodelled(lost),
-        from: mutable(first),
-        to: mutable(second),
-      });
+    const draft = dimensionDraft(dimension, pointsOf);
+    if (draft === null) unmapped += 1;
+    else drafts.push(draft);
   }
   return { drafts, unmapped };
 }

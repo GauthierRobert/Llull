@@ -9,6 +9,7 @@ import { analysisOf } from '../../shared/access';
 import { quantitySchema } from '../../shared/schemas';
 import { refuseFll } from '../codes';
 import { fitPowerLaw, type PowerFit } from './homogenize';
+import { pow } from '@lib/pow';
 
 export const sourceSchema = z.object({
   citation: z.string().describe('Where the value comes from: a test report id, a data sheet, a paper (required, non-empty).'),
@@ -189,7 +190,7 @@ export const fitPrintInfillExponent = defineCommand({
           density: coupon.infillDensity,
           modulusMpa: coupon.modulusMpa,
           coreModulusMpa: coreModulus(coupon, solid),
-          fittedCoreMpa: fit.C * coupon.infillDensity ** fit.m,
+          fittedCoreMpa: fit.C * pow(coupon.infillDensity, fit.m),
         })),
         warning: exactFromTwo ? 'two coupons fix m and C exactly: the zero residual is not evidence of the power law' : null,
       },

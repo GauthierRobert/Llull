@@ -1,3 +1,4 @@
+import { powInt } from '@lib/powInt';
 /**
  * Closed-form reference solutions for FE sanity checks (05 FR-FEA-21; mirrors validation/generate_fea_analytic.py): Euler-Bernoulli cantilever and
  * simply supported beam, cantilever natural frequencies, Euler column buckling, simply supported plate buckling, Kirsch stress concentration.
@@ -60,8 +61,8 @@ const NU_OPTIONAL: InputSpec = {
 /** Rectangular section properties: area and the second moments about the width axis (bending in the depth direction) and the depth axis. */
 const rectangle = (b: number, h: number): { area: number; inertiaDepth: number; inertiaWidth: number } => ({
   area: b * h,
-  inertiaDepth: (b * h ** 3) / 12,
-  inertiaWidth: (h * b ** 3) / 12,
+  inertiaDepth: (b * powInt(h, 3)) / 12,
+  inertiaWidth: (h * powInt(b, 3)) / 12,
 });
 
 const cantilever: CheckSpec = {
@@ -77,7 +78,7 @@ const cantilever: CheckSpec = {
       number,
     ];
     const { area, inertiaDepth } = rectangle(b, h);
-    const bending = (load * length ** 3) / (3 * young * inertiaDepth);
+    const bending = (load * powInt(length, 3)) / (3 * young * inertiaDepth);
     const nu = input['nu'];
     const results: AnalyticResult[] = [
       result('tip_deflection_mm', bending, 'mm', 'delta = P L^3 / (3 E I), I = b h^3 / 12'),
@@ -98,7 +99,7 @@ const cantilever: CheckSpec = {
         'MPa',
         'sigma = M c / I, c = h / 2 (outer fibre at the root)',
       ),
-      result('tip_stiffness_N_per_mm', (3 * young * inertiaDepth) / length ** 3, 'N/mm', 'k = 3 E I / L^3'),
+      result('tip_stiffness_N_per_mm', (3 * young * inertiaDepth) / powInt(length, 3), 'N/mm', 'k = 3 E I / L^3'),
       result('second_moment_mm4', inertiaDepth, 'mm^4', 'I = b h^3 / 12'),
     ];
     return {
@@ -175,7 +176,7 @@ const simplySupportedBeam: CheckSpec = {
       results: [
         result(
           'midspan_deflection_mm',
-          (point * length ** 3) / (48 * young * inertiaDepth) + (5 * uniform * length ** 4) / (384 * young * inertiaDepth),
+          (point * powInt(length, 3)) / (48 * young * inertiaDepth) + (5 * uniform * powInt(length, 4)) / (384 * young * inertiaDepth),
           'mm',
           'delta = P L^3 / (48 E I) + 5 w L^4 / (384 E I)',
         ),
@@ -295,7 +296,7 @@ const kirsch: CheckSpec = {
     const stress = input['S_MPa'] ?? 1;
     const profile = input['y_over_a'];
     const angle = input['theta_deg'];
-    const transverse = (q: number): number => 1 + 0.5 * q ** 2 + 1.5 * q ** 4;
+    const transverse = (q: number): number => 1 + 0.5 * q ** 2 + 1.5 * powInt(q, 4);
     return {
       results: [
         result('Kt_gross', 3, '1', 'sigma_tt(a, 90 deg) = S (1 - 2 cos 180 deg) = 3 S'),

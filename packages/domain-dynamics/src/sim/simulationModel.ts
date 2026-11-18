@@ -155,16 +155,19 @@ function loopHalfSpan(doc: CadDocument, bodies: readonly (RigidBody | undefined)
   return Math.max(MIN_HALF_SPAN, extents.length === 0 ? 0 : Math.min(...extents) / 2);
 }
 
-/** The simulation model of the document's dynamics at integration step `timestep` (s), or the first problem that prevents simulating it. */
-export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?: GeometryKernel | null): BuiltSimulation | BuildRefusal {
-  const dynamics = doc.dynamics;
-  if (dynamics === undefined || Object.keys(dynamics.bodies).length === 0) return { error: 'no rigid bodies (add_rigid_body first)' };
-  const metres = toMetres(doc, 1);
-  const topology = buildTopology(dynamics);
-  if (isRefusal(topology)) return topology;
-  const settings = solverSettingsOf(dynamics);
-  const speeds = { ...initialVelocities(dynamics), ...consistentSpeeds(topology, initialVelocities(dynamics), metres) };
-  const extras = motorJointExtras(dynamics);
+/** Simulation bodies (topology order) and their mass properties, or the first body that cannot be built. */
+function buildBodies(
+  doc: CadDocument,
+  dynamics: DynamicsModel,
+  topology: Topology,
+  input: {
+    readonly extras: Record<string, { armature: number; friction: number }>;
+    readonly speeds: Record<string, number>;
+    readonly metres: number;
+    readonly kernel: GeometryKernel | null | undefined;
+  },
+): { readonly mass: Record<string, BodyMassProperties>; readonly bodies: SimulationBody[] } | BuildRefusal {
+  const { extras, speeds, metres, kernel } = input;
   const mass: Record<string, BodyMassProperties> = {};
   const bodies: SimulationBody[] = [];
   for (const id of topology.bodyOrder) {
@@ -203,6 +206,22 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
       fixed: body.fixed,
     });
   }
+  return { mass, bodies };
+}
+
+/** The simulation model of the document's dynamics at integration step `timestep` (s), or the first problem that prevents simulating it. */
+export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?: GeometryKernel | null): BuiltSimulation | BuildRefusal {
+  const dynamics = doc.dynamics;
+  if (dynamics === undefined || Object.keys(dynamics.bodies).length === 0) return { error: 'no rigid bodies (add_rigid_body first)' };
+  const metres = toMetres(doc, 1);
+  const topology = buildTopology(dynamics);
+  if (isRefusal(topology)) return topology;
+  const settings = solverSettingsOf(dynamics);
+  const speeds = { ...initialVelocities(dynamics), ...consistentSpeeds(topology, initialVelocities(dynamics), metres) };
+  const extras = motorJointExtras(dynamics);
+  const built = buildBodies(doc, dynamics, topology, { extras, speeds, metres, kernel });
+  if ('error' in built) return built;
+  const { mass, bodies } = built;
   const simulated = new Map(bodies.flatMap((body) => (body.joint === null ? [] : [[body.joint.id, body.joint] as const])));
   const closing = new Set(topology.loops.map((loop) => loop.id));
   const dangling = danglingReference(dynamics, new Set(simulated.keys()), closing);

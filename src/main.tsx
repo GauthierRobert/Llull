@@ -19,7 +19,7 @@ import { refreshBackendKernelStatus } from '@ui/services/backendKernel';
 
 // Renderer kernel: Manifold (WASM, in-process) runs the commands this renderer executes itself (local mode while
 // the backend restarts, read-only queries, panel analyses). Exact B-rep work runs in the local backend (LLULL_KERNEL).
-// Injected asynchronously: first render never blocks; commands no-op until it resolves (L9). Retired in LC1 step 5.
+// Injected asynchronously: first render never blocks; commands no-op until it resolves (L9).
 createManifoldKernel()
   .then((kernel) => {
     setGeometryKernel(kernel);

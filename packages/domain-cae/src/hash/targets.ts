@@ -19,6 +19,34 @@ const keyed = (key: string, target: FeaTarget): KeyedTarget => ({ key, ...target
 /** Mesh target key of the slave (S) / master (M) faces of a structural contact pair. */
 export const pairTargetKey = (pairId: string, side: 'S' | 'M'): string => `CP_${pairId}_${side}`;
 
+type ThermalCase = AnalysisCase['thermal'];
+
+/** Boundary condition, cavity face and thermal contact targets, in that order. */
+function pushThermalSurfaceTargets(out: KeyedTarget[], thermal: ThermalCase): void {
+  for (const id of thermal?.bcOrder ?? []) {
+    const bc = thermal?.bcs[id]?.bc;
+    if (bc !== undefined && 'target' in bc) out.push(keyed(`B_${id}`, bc.target));
+  }
+  for (const cavity of Object.values(thermal?.cavities ?? {}))
+    cavity.faces.forEach((face, index) => out.push(keyed(`V_${cavity.id}_${index}`, face.target)));
+  for (const contact of Object.values(thermal?.contacts ?? {})) {
+    out.push(keyed(`K_${contact.id}_M`, contact.master));
+    out.push(keyed(`K_${contact.id}_S`, contact.slave));
+  }
+}
+
+/** Displacement-controlled step targets, then curve probe targets. */
+function pushNonlinearTargets(out: KeyedTarget[], analysisCase: AnalysisCase): void {
+  for (const id of analysisCase.nonlinear?.stepOrder ?? []) {
+    const control = analysisCase.nonlinear?.steps[id]?.control;
+    if (control?.kind === 'displacement') out.push(keyed(`S_${id}`, control.target));
+  }
+  for (const id of analysisCase.nonlinear?.probeOrder ?? []) {
+    const probe = analysisCase.nonlinear?.probes[id];
+    if (probe !== undefined) out.push({ key: `N_${id}`, entityId: null, pointsNear: [probe.displacement.point] });
+  }
+}
+
 /**
  * Every target of `analysisCase` with its key: `C_<constraintId>`, `L_<loadId>`, `B_<thermalBcId>`, `V_<cavityId>_<faceIndex>`, `K_<contactId>_M|S` (master / slave of a thermal contact), `CP_<pairId>_S|M` (slave / master of a structural contact pair), `R_<refinementIndex>`,
  * `P_<probeId>`, `S_<stepId>` (displacement-controlled nonlinear step), `N_<curveProbeId>` (nearest node of a curve probe), `T_<limitId>`. Loads without a target (gravity), heat generation and entity-scoped limits have no key.
@@ -35,16 +63,7 @@ export function keyedTargets(analysisCase: AnalysisCase): KeyedTarget[] {
     if (target !== undefined) out.push(keyed(`L_${id}`, target));
   }
   const thermal = analysisCase.thermal ?? analysisCase.thermomech?.thermal;
-  for (const id of thermal?.bcOrder ?? []) {
-    const bc = thermal?.bcs[id]?.bc;
-    if (bc !== undefined && 'target' in bc) out.push(keyed(`B_${id}`, bc.target));
-  }
-  for (const cavity of Object.values(thermal?.cavities ?? {}))
-    cavity.faces.forEach((face, index) => out.push(keyed(`V_${cavity.id}_${index}`, face.target)));
-  for (const contact of Object.values(thermal?.contacts ?? {})) {
-    out.push(keyed(`K_${contact.id}_M`, contact.master));
-    out.push(keyed(`K_${contact.id}_S`, contact.slave));
-  }
+  pushThermalSurfaceTargets(out, thermal);
   for (const id of analysisCase.contact?.pairOrder ?? []) {
     const pair = analysisCase.contact?.pairs[id];
     if (pair === undefined) continue;
@@ -53,14 +72,7 @@ export function keyedTargets(analysisCase: AnalysisCase): KeyedTarget[] {
   }
   analysisCase.mesh.refinements.forEach((refinement, index) => out.push(keyed(`R_${index}`, refinement.target)));
   for (const [id, probe] of Object.entries(analysisCase.probes)) out.push({ key: `P_${id}`, entityId: null, pointsNear: [probe.point] });
-  for (const id of analysisCase.nonlinear?.stepOrder ?? []) {
-    const control = analysisCase.nonlinear?.steps[id]?.control;
-    if (control?.kind === 'displacement') out.push(keyed(`S_${id}`, control.target));
-  }
-  for (const id of analysisCase.nonlinear?.probeOrder ?? []) {
-    const probe = analysisCase.nonlinear?.probes[id];
-    if (probe !== undefined) out.push({ key: `N_${id}`, entityId: null, pointsNear: [probe.displacement.point] });
-  }
+  pushNonlinearTargets(out, analysisCase);
   for (const id of thermal?.limitOrder ?? []) {
     const scope = thermal?.limits[id]?.scope;
     if (scope !== undefined && 'target' in scope) out.push(keyed(`T_${id}`, scope.target));

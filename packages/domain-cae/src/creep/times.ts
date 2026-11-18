@@ -2,6 +2,7 @@
 
 import type { CreepStepSpec } from '@core/model/creep';
 import { num } from '../decks/format';
+import { pow } from '@lib/pow';
 
 /**
  * Strictly increasing output times in seconds, the last one exactly `durationS`. Log: `count` times from the first increment to the end; linear: every
@@ -14,7 +15,7 @@ export function outputTimesS(spec: Pick<CreepStepSpec, 'durationS' | 'initialInc
   if (outputTimes.kind === 'log') {
     const first = Math.min(initialIncrementS, durationS);
     for (let index = 0; index < outputTimes.count - 1; index += 1)
-      times.push(first * (durationS / first) ** (index / (outputTimes.count - 1)));
+      times.push(first * pow(durationS / first, index / (outputTimes.count - 1)));
   } else {
     for (let k = 1; k * outputTimes.everyS < durationS * (1 - 1e-12); k += 1) times.push(k * outputTimes.everyS);
   }

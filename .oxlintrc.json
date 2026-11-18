@@ -127,7 +127,14 @@
             "skipBlankLines": true,
             "skipComments": true
           }
-        ]
+        ],
+        "complexity": [
+          "error",
+          {
+            "max": 40
+          }
+        ],
+        "llull/no-builtin-pow": "error"
       }
     },
     {

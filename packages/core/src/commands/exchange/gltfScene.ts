@@ -25,6 +25,7 @@ import { InstanceTransforms } from './gltfInstancing';
 import { indexedMesh, placementMatrix, positionKey, sharedGeometryGroups } from './gltfMeshData';
 import { exactShapeKeyOf } from './gltfPrototypes';
 import { instanceIdExtras } from './gltfIds';
+import { pow } from '../../lib/pow';
 
 /** Metalness / roughness of a solid without an assigned material (matches the viewport). */
 export const DEFAULT_METALNESS = 0.08;
@@ -241,7 +242,7 @@ export function collectDecalParts(doc: CadDocument, ids: readonly string[]): Dec
 
 /** One sRGB channel (0..1) to linear light. */
 function srgbToLinear(c: number): number {
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4);
 }
 
 /** `#rrggbb` → linear RGBA factor; malformed input falls back to mid grey. */

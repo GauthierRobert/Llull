@@ -88,10 +88,15 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
     if (previous !== null && previous !== next && previous.documentPath !== next?.documentPath) previous.release();
   };
   let savedHash: string | null = null;
+  const UNSAVED_CHECK_TIMEOUT_MS = 10_000;
   const RESTORED_UNSAVED = 'restored-from-recovery'; // never equals a state hash: a restored document is unsaved
 
-  const snapshot = async (): Promise<Snapshot> => {
-    const { ok, status, body } = await requestJson(`${options.url}/live/snapshot`, { token: options.token, fetchImpl: options.fetchImpl });
+  const snapshot = async (timeoutMs?: number): Promise<Snapshot> => {
+    const { ok, status, body } = await requestJson(`${options.url}/live/snapshot`, {
+      token: options.token,
+      fetchImpl: options.fetchImpl,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    });
     if (!ok || !isRecord(body) || typeof body['stateHash'] !== 'string')
       throw new Error(`cannot read the document from the backend (HTTP ${status})`);
     return { stateHash: body['stateHash'], document: body['document'] as CadDocument };
@@ -256,7 +261,8 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       await markRecoverySaved(savedHash, null);
     },
     async hasUnsavedChanges() {
-      const current = await snapshot();
+      // bounded: this gates File > New / Open and quitting, and a hung backend must reject (the caller words it), never wait forever
+      const current = await snapshot(UNSAVED_CHECK_TIMEOUT_MS);
       return savedHash === null ? Object.keys(current.document.entities).length > 0 : current.stateHash !== savedHash;
     },
   };

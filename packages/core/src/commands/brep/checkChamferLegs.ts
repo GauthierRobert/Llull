@@ -9,8 +9,9 @@
  */
 
 import { chamferNodes, legFilletNodes, lawsOfNode } from '../../geometry/blend/blendInfo';
-import type { GeometryKernel } from '../../geometry/kernel';
-import type { Entity, Vec3 } from '../../model/types';
+import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
+import type { ShapeHandle } from '../../geometry/kernelTypes';
+import type { EdgeRadius, Entity, Vec3 } from '../../model/types';
 import { roundSignificant } from '../../lib/significant';
 import { REMEDIATION, type Finding } from './checkBlendFindings';
 
@@ -108,6 +109,238 @@ function crossing(lines: readonly (readonly Vec3[])[], point: Vec3, tangent: Vec
   return nearest;
 }
 
+type Query = NonNullable<GeometryKernel['faceQuery']>;
+type Graph = NonNullable<ReturnType<Query['faceGraph']>>;
+type Station = NonNullable<ReturnType<Query['edgeSamples']>>[number];
+type LegNode = ReturnType<typeof chamferNodes>[number] | ReturnType<typeof legFilletNodes>[number];
+type LegOp = ChamferRow['op'];
+type LegRow = ChamferRow['legs'][number];
+
+interface LegScope {
+  readonly entityId: string;
+  readonly query: Query;
+  readonly node: LegNode;
+  readonly op: LegOp;
+  readonly source: ShapeHandle | null;
+  readonly built: ShapeHandle | null;
+  readonly before: ShapeTopology | null;
+  readonly after: ShapeTopology | null;
+  readonly sourceGraph: Graph | null;
+  readonly resultGraph: Graph | null;
+}
+
+interface EdgeReadout {
+  readonly row: ChamferRow;
+  readonly finding?: Finding;
+}
+
+const otherName = (names: readonly string[], first: string): string => names.find((value) => value !== first) as string;
+
+/** The legs the recipe asked for on `node` (or on its per-edge `law`): both legs as start/end pairs and the angle of a distance-angle chamfer. */
+function requestedLegs(
+  node: LegNode,
+  law: EdgeRadius | undefined,
+): { first: readonly [number, number]; second: readonly [number, number]; angle: number | undefined } {
+  const first: readonly [number, number] = law === undefined ? [node.size, node.sizeEnd ?? node.size] : [law.size, law.sizeEnd ?? law.size];
+  const angle = law === undefined ? node.angleDeg : undefined;
+  const second: readonly [number, number] =
+    law?.size2 !== undefined
+      ? [law.size2, law.size2End ?? law.size2]
+      : node.faces === undefined
+        ? first
+        : [node.size2 ?? node.size, node.size2End ?? node.size2 ?? node.size];
+  return { first, second, angle };
+}
+
+/** The second leg a distance-angle chamfer has at `station`, from the dihedral of the two faces there (null when the faces cannot be queried). */
+function angleSecondLeg(
+  query: Query,
+  source: ShapeHandle,
+  station: Station,
+  expectedFirst: number,
+  angle: number,
+  firstIndex: number | undefined,
+  secondFaceIndex: number | undefined,
+): number | null {
+  // distance-angle: the second leg follows from the dihedral at the station (the angle is measured on the first face)
+  const normals =
+    firstIndex === undefined || secondFaceIndex === undefined
+      ? null
+      : [firstIndex, secondFaceIndex].map((face) => query.projectOnFace(source, face, [station.point])?.[0]?.normal ?? null);
+  const [n0, n1] = normals ?? [null, null];
+  if (n0 === null || n0 === undefined || n1 === null || n1 === undefined) return null;
+  const phi = Math.PI - Math.acos(Math.max(-1, Math.min(1, dot(n0, n1))));
+  const a = (angle * Math.PI) / 180;
+  return (expectedFirst * Math.sin(a)) / Math.sin(phi + a);
+}
+
+interface LegSides {
+  readonly linesFirst: Vec3[][];
+  readonly linesSecond: Vec3[][];
+  readonly firstIndex: number | undefined;
+  readonly secondFaceIndex: number | undefined;
+}
+
+/** The contact lines of the blend face on each of the two faces of the source edge; null with a row note when the edge or the lines cannot be read. */
+function sideLines(
+  scope: LegScope,
+  edge: number,
+  at: number,
+  law: EdgeRadius | undefined,
+  chamfer: { readonly index: number },
+  before: ShapeTopology,
+  after: ShapeTopology,
+  sourceGraph: Graph,
+  resultGraph: Graph,
+  built: ShapeHandle,
+): { readonly sides: LegSides } | { readonly note: string } {
+  const { query, node } = scope;
+  // the two faces of the source edge, by name, and which of them carries the first leg
+  const sourceFaces = [...new Set(sourceGraph.edgeFaces[edge] ?? [])];
+  const names = sourceFaces.map((face) => before.faces[face]?.name).filter((value): value is string => value !== undefined);
+  const firstIndex = law === undefined ? (node.faces === undefined ? undefined : (node.faces[at] as number)) : law.sideFace;
+  const firstFace = firstIndex === undefined ? undefined : before.faces[firstIndex]?.name;
+  if (names.length !== 2 || new Set(names).size !== 2) return { note: 'the edge does not join two named faces, the legs are not measured' };
+  const otherFace = names.find((value) => value !== firstFace) as string;
+  const contacts = (resultGraph.faces[chamfer.index]?.loops ?? []).flat().flatMap((contact) => {
+    const other = (resultGraph.edgeFaces[contact] ?? []).find((face) => face !== chamfer.index);
+    const otherFaceName = other === undefined ? undefined : after.faces[other]?.name;
+    return otherFaceName !== undefined && names.includes(otherFaceName) ? [{ contact, side: otherFaceName }] : [];
+  });
+  const linesOf = (side: string): Vec3[][] =>
+    contacts
+      .filter((entry) => entry.side === side)
+      .flatMap((entry) => {
+        const points = query.edgeSamples(built, entry.contact, CONTACT_SAMPLES)?.map((sample) => sample.point);
+        return points === undefined ? [] : [points];
+      });
+  const firstSide = firstFace ?? (names[0] as string);
+  const linesFirst = linesOf(firstSide);
+  const linesSecond = linesOf(firstFace === undefined ? (names[1] as string) : otherName(names, firstFace));
+  const secondFaceIndex = sourceFaces.find((face) => before.faces[face]?.name === otherFace);
+  return { sides: { linesFirst, linesSecond, firstIndex, secondFaceIndex } };
+}
+
+interface LegMeasure {
+  readonly legs: LegRow[];
+  readonly skipped: number;
+  readonly worst: number;
+}
+
+/** The legs at each station against the law (`first`, `second`, or the angle of a distance-angle chamfer). */
+function measureLegs(
+  query: Query,
+  source: ShapeHandle,
+  stations: readonly Station[],
+  sides: LegSides,
+  first: readonly [number, number],
+  second: readonly [number, number],
+  angle: number | undefined,
+): LegMeasure {
+  const legs: LegRow[] = [];
+  let worst = 0;
+  let skipped = 0;
+  const length = stations[stations.length - 1]?.s || 1;
+  for (const station of stations) {
+    const along = station.s / length;
+    const legOne = crossing(sides.linesFirst, station.point, station.tangent);
+    const legTwo = crossing(sides.linesSecond, station.point, station.tangent);
+    const expectedFirst = first[0] + (first[1] - first[0]) * along;
+    let expectedSecond: number | null = second[0] + (second[1] - second[0]) * along;
+    if (angle !== undefined)
+      expectedSecond = angleSecondLeg(query, source, station, expectedFirst, angle, sides.firstIndex, sides.secondFaceIndex);
+    if (legOne === null || legTwo === null) {
+      skipped += 1;
+      continue;
+    }
+    legs.push({
+      s: sig(along),
+      first: sig(legOne),
+      second: sig(legTwo),
+      expectedFirst: sig(expectedFirst),
+      expectedSecond: expectedSecond === null ? null : sig(expectedSecond),
+    });
+    worst = Math.max(worst, Math.abs(legOne - expectedFirst) / expectedFirst);
+    if (expectedSecond !== null) worst = Math.max(worst, Math.abs(legTwo - expectedSecond) / expectedSecond);
+  }
+  return { legs, skipped, worst };
+}
+
+function legFinding(entityId: string, op: LegOp, face: number, edge: number, worst: number, unit: string): Finding {
+  return {
+    code: op === 'fillet' ? 'BLD_CHECK_BLEND_LEGS' : 'BLD_CHECK_CHAMFER_LEGS',
+    severity: 'fail',
+    entityId,
+    face,
+    edge,
+    value: sig(worst),
+    limit: LEG_TOLERANCE,
+    unit,
+    remediation: op === 'fillet' ? REMEDIATION.BLD_CHECK_BLEND_LEGS : REMEDIATION.BLD_CHECK_CHAMFER_LEGS,
+    message: `a leg of the ${op === 'fillet' ? 'blend' : 'chamfer'} of edge ${edge} is off its law by ${sig(worst)} (relative), more than ${LEG_TOLERANCE}`,
+  };
+}
+
+/** The row (and finding) of one edge of a chamfer or two-leg fillet node; null for a fillet edge without size2 (no legs to read). */
+function readEdgeLegs(scope: LegScope, edge: number, at: number, unit: string): EdgeReadout | null {
+  const { entityId, query, node, op, source, built, before, after, sourceGraph, resultGraph } = scope;
+  // a fillet gives its legs per edge (radii[at]); an edge of it without size2 is a circular blend with no legs to read
+  const law = op === 'fillet' ? lawsOfNode(node)[at] : undefined;
+  if (op === 'fillet' && law?.size2 === undefined) return null;
+  const name = before?.edges[edge]?.name ?? null;
+  const { first, second, angle } = requestedLegs(node, law);
+  const faceName = op === 'fillet' ? 'blend' : 'chamfer';
+  const row = (extra: Partial<ChamferRow>): EdgeReadout => ({
+    row: {
+      entityId,
+      op,
+      edge,
+      name,
+      face: null,
+      requested: { first, second: angle === undefined ? second : { angleDeg: angle } },
+      legs: [],
+      skipped: 0,
+      maxDeviation: null,
+      ...extra,
+    },
+  });
+  if (
+    source === null ||
+    built === null ||
+    before === null ||
+    after === null ||
+    sourceGraph === null ||
+    resultGraph === null ||
+    name === null
+  )
+    return row({ note: `the kernel could not rebuild the ${faceName === 'blend' ? 'blend' : 'chamfer'} to read its legs` });
+  const chamfer = after.faces.find((face) => face.name === `${faceName}(${name})`);
+  if (chamfer === undefined) return row({ note: `the result has no face named ${faceName}(${name}): the legs are not measured` });
+  const found = sideLines(scope, edge, at, law, chamfer, before, after, sourceGraph, resultGraph, built);
+  if ('note' in found) return row({ face: chamfer.index, note: found.note });
+  const stations = query.edgeSamples(source, edge, MAX_STATIONS);
+  if (found.sides.linesFirst.length === 0 || found.sides.linesSecond.length === 0 || stations === null)
+    return row({ face: chamfer.index, note: 'the contact lines of the chamfer face could not be read, the legs are not measured' });
+  const { legs, skipped, worst } = measureLegs(query, source, stations, found.sides, first, second, angle);
+  if (legs.length === 0 || skipped > MAX_SKIPPED_FRACTION * stations.length)
+    return row({
+      face: chamfer.index,
+      legs,
+      skipped,
+      note: `the contact lines cross the plane of the edge at ${legs.length} of ${stations.length} stations, the legs are not verified`,
+    });
+  if (legs.some((entry) => entry.expectedSecond === null))
+    return row({
+      face: chamfer.index,
+      legs,
+      skipped,
+      maxDeviation: sig(worst),
+      note: 'the second leg of a distance-angle chamfer needs the faces of the edge to be queried: only the first leg is compared',
+    });
+  const done = row({ face: chamfer.index, legs, skipped, maxDeviation: sig(worst) });
+  return worst > LEG_TOLERANCE ? { ...done, finding: legFinding(entityId, op, chamfer.index, edge, worst, unit) } : done;
+}
+
 /** The leg rows of every variable or asymmetric chamfer node and every two-leg fillet node of `entity`'s recipe, and a finding for each leg off its law. */
 export function readChamferLegs(kernel: GeometryKernel, entity: Entity, unit: string): { rows: ChamferRow[]; findings: Finding[] } {
   const rows: ChamferRow[] = [];
@@ -126,159 +359,13 @@ export function readChamferLegs(kernel: GeometryKernel, entity: Entity, unit: st
     const after = built === null ? null : kernel.topology(built);
     const sourceGraph = source === null ? null : query.faceGraph(source);
     const resultGraph = built === null ? null : query.faceGraph(built);
+    const scope: LegScope = { entityId: entity.id, query, node, op, source, built, before, after, sourceGraph, resultGraph };
     node.edges.forEach((edge, at) => {
-      // a fillet gives its legs per edge (radii[at]); an edge of it without size2 is a circular blend with no legs to read
-      const law = op === 'fillet' ? lawsOfNode(node)[at] : undefined;
-      if (op === 'fillet' && law?.size2 === undefined) return;
-      const name = before?.edges[edge]?.name ?? null;
-      const first: readonly [number, number] =
-        law === undefined ? [node.size, node.sizeEnd ?? node.size] : [law.size, law.sizeEnd ?? law.size];
-      const angle = law === undefined ? node.angleDeg : undefined;
-      const second: readonly [number, number] =
-        law?.size2 !== undefined
-          ? [law.size2, law.size2End ?? law.size2]
-          : node.faces === undefined
-            ? first
-            : [node.size2 ?? node.size, node.size2End ?? node.size2 ?? node.size];
-      const faceName = op === 'fillet' ? 'blend' : 'chamfer';
-      const row = (extra: Partial<ChamferRow>): ChamferRow => ({
-        entityId: entity.id,
-        op,
-        edge,
-        name,
-        face: null,
-        requested: { first, second: angle === undefined ? second : { angleDeg: angle } },
-        legs: [],
-        skipped: 0,
-        maxDeviation: null,
-        ...extra,
-      });
-      if (
-        source === null ||
-        built === null ||
-        before === null ||
-        after === null ||
-        sourceGraph === null ||
-        resultGraph === null ||
-        name === null
-      ) {
-        rows.push(row({ note: `the kernel could not rebuild the ${faceName === 'blend' ? 'blend' : 'chamfer'} to read its legs` }));
-        return;
-      }
-      const chamfer = after.faces.find((face) => face.name === `${faceName}(${name})`);
-      if (chamfer === undefined) {
-        rows.push(row({ note: `the result has no face named ${faceName}(${name}): the legs are not measured` }));
-        return;
-      }
-      // the two faces of the source edge, by name, and which of them carries the first leg
-      const sourceFaces = [...new Set(sourceGraph.edgeFaces[edge] ?? [])];
-      const names = sourceFaces.map((face) => before.faces[face]?.name).filter((value): value is string => value !== undefined);
-      const firstIndex = law === undefined ? (node.faces === undefined ? undefined : (node.faces[at] as number)) : law.sideFace;
-      const firstFace = firstIndex === undefined ? undefined : before.faces[firstIndex]?.name;
-      if (names.length !== 2 || new Set(names).size !== 2) {
-        rows.push(row({ face: chamfer.index, note: 'the edge does not join two named faces, the legs are not measured' }));
-        return;
-      }
-      const otherFace = names.find((value) => value !== firstFace) as string;
-      const contacts = (resultGraph.faces[chamfer.index]?.loops ?? []).flat().flatMap((contact) => {
-        const other = (resultGraph.edgeFaces[contact] ?? []).find((face) => face !== chamfer.index);
-        const otherName = other === undefined ? undefined : after.faces[other]?.name;
-        return otherName !== undefined && names.includes(otherName) ? [{ contact, side: otherName }] : [];
-      });
-      const sideLines = (side: string): Vec3[][] =>
-        contacts
-          .filter((entry) => entry.side === side)
-          .flatMap((entry) => {
-            const points = query.edgeSamples(built, entry.contact, CONTACT_SAMPLES)?.map((sample) => sample.point);
-            return points === undefined ? [] : [points];
-          });
-      const firstSide = firstFace ?? (names[0] as string);
-      const linesFirst = sideLines(firstSide);
-      const linesSecond = sideLines(firstFace === undefined ? (names[1] as string) : otherName(names, firstFace));
-      const stations = query.edgeSamples(source, edge, MAX_STATIONS);
-      if (linesFirst.length === 0 || linesSecond.length === 0 || stations === null) {
-        rows.push(row({ face: chamfer.index, note: 'the contact lines of the chamfer face could not be read, the legs are not measured' }));
-        return;
-      }
-      const secondFaceIndex = sourceFaces.find((face) => before.faces[face]?.name === otherFace);
-      const legs: ChamferRow['legs'][number][] = [];
-      let worst = 0;
-      let skipped = 0;
-      const length = stations[stations.length - 1]?.s || 1;
-      for (const station of stations) {
-        const along = station.s / length;
-        const legOne = crossing(linesFirst, station.point, station.tangent);
-        const legTwo = crossing(linesSecond, station.point, station.tangent);
-        const expectedFirst = first[0] + (first[1] - first[0]) * along;
-        let expectedSecond: number | null = second[0] + (second[1] - second[0]) * along;
-        if (angle !== undefined) {
-          // distance-angle: the second leg follows from the dihedral at the station (the angle is measured on the first face)
-          const normals =
-            firstIndex === undefined || secondFaceIndex === undefined
-              ? null
-              : [firstIndex, secondFaceIndex].map((face) => query.projectOnFace(source, face, [station.point])?.[0]?.normal ?? null);
-          const [n0, n1] = normals ?? [null, null];
-          if (n0 === null || n0 === undefined || n1 === null || n1 === undefined) expectedSecond = null;
-          else {
-            const phi = Math.PI - Math.acos(Math.max(-1, Math.min(1, dot(n0, n1))));
-            const a = (angle * Math.PI) / 180;
-            expectedSecond = (expectedFirst * Math.sin(a)) / Math.sin(phi + a);
-          }
-        }
-        if (legOne === null || legTwo === null) {
-          skipped += 1;
-          continue;
-        }
-        legs.push({
-          s: sig(along),
-          first: sig(legOne),
-          second: sig(legTwo),
-          expectedFirst: sig(expectedFirst),
-          expectedSecond: expectedSecond === null ? null : sig(expectedSecond),
-        });
-        worst = Math.max(worst, Math.abs(legOne - expectedFirst) / expectedFirst);
-        if (expectedSecond !== null) worst = Math.max(worst, Math.abs(legTwo - expectedSecond) / expectedSecond);
-      }
-      if (legs.length === 0 || skipped > MAX_SKIPPED_FRACTION * stations.length) {
-        rows.push(
-          row({
-            face: chamfer.index,
-            legs,
-            skipped,
-            note: `the contact lines cross the plane of the edge at ${legs.length} of ${stations.length} stations, the legs are not verified`,
-          }),
-        );
-        return;
-      }
-      if (legs.some((entry) => entry.expectedSecond === null)) {
-        rows.push(
-          row({
-            face: chamfer.index,
-            legs,
-            skipped,
-            maxDeviation: sig(worst),
-            note: 'the second leg of a distance-angle chamfer needs the faces of the edge to be queried: only the first leg is compared',
-          }),
-        );
-        return;
-      }
-      rows.push(row({ face: chamfer.index, legs, skipped, maxDeviation: sig(worst) }));
-      if (worst > LEG_TOLERANCE)
-        findings.push({
-          code: op === 'fillet' ? 'BLD_CHECK_BLEND_LEGS' : 'BLD_CHECK_CHAMFER_LEGS',
-          severity: 'fail',
-          entityId: entity.id,
-          face: chamfer.index,
-          edge,
-          value: sig(worst),
-          limit: LEG_TOLERANCE,
-          unit,
-          remediation: op === 'fillet' ? REMEDIATION.BLD_CHECK_BLEND_LEGS : REMEDIATION.BLD_CHECK_CHAMFER_LEGS,
-          message: `a leg of the ${op === 'fillet' ? 'blend' : 'chamfer'} of edge ${edge} is off its law by ${sig(worst)} (relative), more than ${LEG_TOLERANCE}`,
-        });
+      const read = readEdgeLegs(scope, edge, at, unit);
+      if (read === null) return;
+      rows.push(read.row);
+      if (read.finding !== undefined) findings.push(read.finding);
     });
   }
   return { rows, findings };
 }
-
-const otherName = (names: readonly string[], first: string): string => names.find((value) => value !== first) as string;

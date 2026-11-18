@@ -8,6 +8,7 @@ import { matVec } from './linalg';
 import { solveDecreasing } from './scalar';
 import { deviator, equivalent, mean3, zero6, type Vec6 } from './tensor';
 import { pronyRecursion } from './viscoelastic';
+import { pow } from '../../lib/pow';
 
 interface ViscoState {
   readonly shear: readonly Vec6[];
@@ -81,7 +82,7 @@ function viscoelasticUpdate(model: SmallModel, state: PointState, dEps: readonly
 function creepIncrement(creep: CreepModel, q: number, slice: TimeSlice): number {
   if (creep.kind === 'norton') {
     const effective = nortonEffectiveTime(creep.m, slice.t0 * creep.timePerSecond, slice.t1 * creep.timePerSecond);
-    return creep.A * (q * creep.stressPerMPa) ** creep.n * effective;
+    return creep.A * pow(q * creep.stressPerMPa, creep.n) * effective;
   }
   return garofaloRate(creep.A, creep.alpha, creep.n, creep.activationEnergy, q, creep.temperature) * (slice.t1 - slice.t0);
 }

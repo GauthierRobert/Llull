@@ -1,6 +1,7 @@
 /** Closed forms for a simply supported grating span (06 STA §5.4): bars of one panel per metre of width, all loads per metre of width. */
 
 import { ALLOWABLE_STRESS_MPA, ELASTIC_MODULUS_MPA, sectionPerMetre, type GratingType } from './gratingTypes';
+import { powInt } from '@lib/powInt';
 
 const GRAVITY = 9.80665;
 
@@ -14,11 +15,11 @@ export const allowableConcentratedKNPerM = (type: GratingType, spanMm: number): 
 
 /** Midspan deflection under a uniform load: 5 w L⁴ / (384 E I), mm. */
 export const uniformDeflectionMm = (type: GratingType, spanMm: number, loadKPa: number): number =>
-  (5 * loadKPa * spanMm ** 4) / (384 * ELASTIC_MODULUS_MPA * sectionPerMetre(type).inertia);
+  (5 * loadKPa * powInt(spanMm, 4)) / (384 * ELASTIC_MODULUS_MPA * sectionPerMetre(type).inertia);
 
 /** Midspan deflection under a midspan line load: C L³ / (48 E I), mm. */
 export const concentratedDeflectionMm = (type: GratingType, spanMm: number, loadKNPerM: number): number =>
-  (loadKNPerM * 1000 * spanMm ** 3) / (48 * ELASTIC_MODULUS_MPA * sectionPerMetre(type).inertia);
+  (loadKNPerM * 1000 * powInt(spanMm, 3)) / (48 * ELASTIC_MODULUS_MPA * sectionPerMetre(type).inertia);
 
 /** Self weight of the grating, kPa. */
 export const selfWeightKPa = (type: GratingType): number => (type.massKgM2 * GRAVITY) / 1000;

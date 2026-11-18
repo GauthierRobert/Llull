@@ -16,6 +16,7 @@ import { replaceKeepingBackupAsync, writeFileKeepingBackup } from './writeFileAt
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import type { CadDocument } from '@core/model/types';
+import { pow } from '@lib/pow';
 
 export type AutosaveFailureCode = 'DSF_SAVE_DISK_FULL' | 'DSF_SAVE_IO' | 'DSF_AUTOSAVE_FAILED' | 'DSF_HOLD_EXPIRED';
 
@@ -160,7 +161,7 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
         }
         startAsync();
       },
-      Math.min(retryBaseMs * 2 ** Math.max(0, failures - 1), RETRY_MAX_MS),
+      Math.min(retryBaseMs * pow(2, Math.max(0, failures - 1)), RETRY_MAX_MS),
     );
     retryTimer.unref();
   }

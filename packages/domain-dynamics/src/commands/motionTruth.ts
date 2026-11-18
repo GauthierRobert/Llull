@@ -21,6 +21,7 @@ import { dynamicsOf } from './bodies';
 import { compareSeriesRun, referenceItems } from './engine/referenceSeries';
 import { drivenTimestep, MIN_STEP, profileWindow, SIZING_SAMPLE_RATE } from './sizingRun';
 import { simulateMotion } from './simulate';
+import { pow } from '@lib/pow';
 
 const NAME = 'check_motion_truth';
 const DEFAULT_DURATION = 2;
@@ -67,10 +68,10 @@ function refine(doc: CadDocument, base: RunData, duration: number, levels: numbe
   const runs: RunData[] = [base];
   const steps = [base.timestep];
   for (let k = 1; k <= levels; k++) {
-    const step = base.timestep / 2 ** k;
-    if (step < MIN_STEP) return { runs, steps, stopped: `dt/${2 ** k} = ${step} s is below the smallest step ${MIN_STEP} s` };
+    const step = base.timestep / pow(2, k);
+    if (step < MIN_STEP) return { runs, steps, stopped: `dt/${pow(2, k)} = ${step} s is below the smallest step ${MIN_STEP} s` };
     const run = simulateAt(doc, duration, step, ctx);
-    if (typeof run === 'string') return { runs, steps, stopped: `the run at dt/${2 ** k} did not run: ${run}` };
+    if (typeof run === 'string') return { runs, steps, stopped: `the run at dt/${pow(2, k)} did not run: ${run}` };
     runs.push(run);
     steps.push(step);
   }

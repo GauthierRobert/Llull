@@ -186,6 +186,80 @@ const read = (root: string, relative: string): string | null => {
   }
 };
 
+interface LotarCheck {
+  readonly dir: string;
+  readonly manifest: Record<string, unknown>;
+  readonly archived: ValidationProperties;
+  readonly content: Record<string, unknown>;
+  readonly intact: (file: string | null) => file is string;
+  readonly fail: (code: LotarFinding['code'], message: string, file?: string) => void;
+}
+
+function checkStoredValidation(check: LotarCheck): void {
+  const { dir, archived, intact, fail } = check;
+  const stored = intact('validation/validation-properties.json') ? read(dir, 'validation/validation-properties.json') : undefined;
+  if (stored !== undefined && (stored === null || stored.trim() !== jcsJson(archived)))
+    fail(
+      'PLM_LOTAR_VALIDATION_MISMATCH',
+      'validation/validation-properties.json differs from manifest.lotar.validationProperties',
+      'validation/validation-properties.json',
+    );
+}
+
+function rederiveValidation(check: LotarCheck): boolean {
+  const { dir, archived, content, intact, fail } = check;
+  let rederived = false;
+  const nativePath = typeof content['native'] === 'string' ? content['native'] : null;
+  const snapshot = intact(nativePath) ? read(dir, nativePath) : undefined;
+  const frozen = snapshot === undefined || snapshot === null ? null : documentOfSnapshot(snapshot);
+  if (snapshot === undefined) rederived = false;
+  else if (frozen === null)
+    fail(
+      'PLM_LOTAR_VALIDATION_MISMATCH',
+      'the archived native definition cannot be loaded to re-derive the validation properties',
+      nativePath ?? undefined,
+    );
+  else {
+    rederived = true;
+    for (const message of compareValidation(archived, validationPropertiesOf(frozen)))
+      fail('PLM_LOTAR_VALIDATION_MISMATCH', message, nativePath ?? undefined);
+  }
+  return rederived;
+}
+
+function checkPdmReadBack(check: LotarCheck): void {
+  const { dir, manifest, content, intact, fail } = check;
+  const neutralPath = typeof content['neutral'] === 'string' ? content['neutral'] : null;
+  const step = intact(neutralPath) ? read(dir, neutralPath) : undefined;
+  const model = step === undefined ? undefined : step === null ? 'the PDM file is missing' : readPdm(step);
+  const item = isRecord(manifest['item']) ? manifest['item'] : {};
+  if (typeof model === 'string') fail('PLM_LOTAR_PDM_MISMATCH', `the PDM file does not read back: ${model}`, neutralPath ?? undefined);
+  else if (
+    model !== undefined &&
+    (model.partNumber !== item['partNumber'] ||
+      model.revision !== item['revision'] ||
+      model.integrity.contentHash !== manifest['documentContentHash'] ||
+      !['released', 'superseded', 'obsolete'].includes(model.state))
+  )
+    fail(
+      'PLM_LOTAR_PDM_MISMATCH',
+      'the PDM file does not describe the revision the manifest names (part number, revision, frozen state, content hash)',
+      neutralPath ?? undefined,
+    );
+}
+
+function checkSealedRecords(check: LotarCheck): void {
+  const { dir, content, intact, fail } = check;
+  const recordsPath = typeof content['records'] === 'string' ? content['records'] : 'records/plm-records.json';
+  const records = intact(recordsPath) ? parseJson(read(dir, recordsPath)) : undefined;
+  if (records !== undefined && !isRecord(records))
+    fail('PLM_LOTAR_RECORDS_MISMATCH', 'records/plm-records.json is missing or not JSON', 'records/plm-records.json');
+  else if (isRecord(records))
+    for (const key of ['asBuilt', 'mbom', 'faiResults'] as const)
+      for (const record of Array.isArray(records[key]) ? records[key] : [])
+        if (!isSealed(record)) fail('PLM_LOTAR_RECORDS_MISMATCH', `a ${key} record does not hash to its seal`, 'records/plm-records.json');
+}
+
 /**
  * Verify a LOTAR package folder: everything `verifyReleasePackage` verifies, then the archive checks (validation properties re-derived from the archived definition, PDM read-back, sealed records).
  * @invariant read-only; a package whose manifest has no `lotar` section is not a LOTAR package (PLM_LOTAR_NOT_A_PACKAGE)
@@ -223,53 +297,10 @@ export function verifyLotarPackage(
   const fail = (code: LotarFinding['code'], message: string, file?: string): void => {
     findings.push({ code, message, ...(file === undefined ? {} : { path: file }) });
   };
-  const stored = intact('validation/validation-properties.json') ? read(dir, 'validation/validation-properties.json') : undefined;
-  if (stored !== undefined && (stored === null || stored.trim() !== jcsJson(archived)))
-    fail(
-      'PLM_LOTAR_VALIDATION_MISMATCH',
-      'validation/validation-properties.json differs from manifest.lotar.validationProperties',
-      'validation/validation-properties.json',
-    );
-  let rederived = false;
-  const nativePath = typeof content['native'] === 'string' ? content['native'] : null;
-  const snapshot = intact(nativePath) ? read(dir, nativePath) : undefined;
-  const frozen = snapshot === undefined || snapshot === null ? null : documentOfSnapshot(snapshot);
-  if (snapshot === undefined) rederived = false;
-  else if (frozen === null)
-    fail(
-      'PLM_LOTAR_VALIDATION_MISMATCH',
-      'the archived native definition cannot be loaded to re-derive the validation properties',
-      nativePath ?? undefined,
-    );
-  else {
-    rederived = true;
-    for (const message of compareValidation(archived, validationPropertiesOf(frozen)))
-      fail('PLM_LOTAR_VALIDATION_MISMATCH', message, nativePath ?? undefined);
-  }
-  const neutralPath = typeof content['neutral'] === 'string' ? content['neutral'] : null;
-  const step = intact(neutralPath) ? read(dir, neutralPath) : undefined;
-  const model = step === undefined ? undefined : step === null ? 'the PDM file is missing' : readPdm(step);
-  const item = isRecord(manifest['item']) ? manifest['item'] : {};
-  if (typeof model === 'string') fail('PLM_LOTAR_PDM_MISMATCH', `the PDM file does not read back: ${model}`, neutralPath ?? undefined);
-  else if (
-    model !== undefined &&
-    (model.partNumber !== item['partNumber'] ||
-      model.revision !== item['revision'] ||
-      model.integrity.contentHash !== manifest['documentContentHash'] ||
-      !['released', 'superseded', 'obsolete'].includes(model.state))
-  )
-    fail(
-      'PLM_LOTAR_PDM_MISMATCH',
-      'the PDM file does not describe the revision the manifest names (part number, revision, frozen state, content hash)',
-      neutralPath ?? undefined,
-    );
-  const recordsPath = typeof content['records'] === 'string' ? content['records'] : 'records/plm-records.json';
-  const records = intact(recordsPath) ? parseJson(read(dir, recordsPath)) : undefined;
-  if (records !== undefined && !isRecord(records))
-    fail('PLM_LOTAR_RECORDS_MISMATCH', 'records/plm-records.json is missing or not JSON', 'records/plm-records.json');
-  else if (isRecord(records))
-    for (const key of ['asBuilt', 'mbom', 'faiResults'] as const)
-      for (const record of Array.isArray(records[key]) ? records[key] : [])
-        if (!isSealed(record)) fail('PLM_LOTAR_RECORDS_MISMATCH', `a ${key} record does not hash to its seal`, 'records/plm-records.json');
+  const check: LotarCheck = { dir, manifest, archived, content, intact, fail };
+  checkStoredValidation(check);
+  const rederived = rederiveValidation(check);
+  checkPdmReadBack(check);
+  checkSealedRecords(check);
   return { ok: findings.length === 0, findings, members: base.members, rederived };
 }

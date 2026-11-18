@@ -6,12 +6,12 @@ import type { BranchPoint, PipeRun } from '@aec/plant/types';
 import { add3, scale3, sub3 } from '@lib/vec3';
 import { nextId } from '@lib/id';
 import type { DerivedBranch, RunDerivation } from '../deriveTypes';
-import { angleBetweenDeg, buildPath, legVector, unitVector } from '../legs';
+import { angleBetweenDeg, buildPath, legVector, unitVector, type PathOk } from '../legs';
 import { getPiping, locateOnRun, refuse, runPoints } from '../model';
 import { refuseDerivation, rederive, withRuns } from '../runUpdate';
 import { createSpecLookup, isMiss } from '../specLookup';
 import { takeoffOf } from '../takeoff';
-import { isResolved, legsInput, portOrPoint, resolveEndpoint, viaInput } from './routeInput';
+import { isResolved, legsInput, portOrPoint, resolveEndpoint, viaInput, type ResolvedEndpoint } from './routeInput';
 
 const pieceRows = (runId: string, derivation: RunDerivation): Array<Record<string, unknown>> =>
   takeoffOf([{ runId, derivation }]).pipePieces.map((piece) => ({
@@ -21,6 +21,33 @@ const pieceRows = (runId: string, derivation: RunDerivation): Array<Record<strin
     leg: piece.leg,
     cutLengthMm: piece.cutLengthMm,
   }));
+
+function branchRun(
+  params: { readonly dn: number; readonly angleToleranceDeg?: number | undefined },
+  lineId: string,
+  branchRunId: string,
+  branchId: string,
+  headerId: string,
+  position: Vec3,
+  direction: Vec3,
+  path: PathOk,
+  target: ResolvedEndpoint | undefined,
+): PipeRun {
+  return {
+    id: branchRunId,
+    lineId,
+    dn: params.dn,
+    start: { point: position, direction, ref: { kind: 'branch', runId: headerId, branchId } },
+    end: {
+      point: path.points.at(-1) as Vec3,
+      ...(target?.end.direction === undefined ? {} : { direction: target.end.direction }),
+      ...(target?.ref === undefined ? {} : { ref: target.ref }),
+    },
+    pis: path.points.slice(1, -1),
+    ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
+    ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
+  };
+}
 
 /**
  * @affects adds 1 branch point to the header run (run.branches) and creates 1 branch run (its start references the branch point); derives the
@@ -145,20 +172,7 @@ export const addBranch = defineCommand({
     const branchRunId = nextId('run');
     const branchId = nextId('branch');
     const point: BranchPoint = { id: branchId, leg: where.leg, distance: where.distance, branchRunId };
-    const branch: PipeRun = {
-      id: branchRunId,
-      lineId: branchLine.id,
-      dn: params.dn,
-      start: { point: position, direction, ref: { kind: 'branch', runId: header.id, branchId } },
-      end: {
-        point: path.points.at(-1) as Vec3,
-        ...(target?.end.direction === undefined ? {} : { direction: target.end.direction }),
-        ...(target?.ref === undefined ? {} : { ref: target.ref }),
-      },
-      pis: path.points.slice(1, -1),
-      ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
-      ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
-    };
+    const branch = branchRun(params, branchLine.id, branchRunId, branchId, header.id, position, direction, path, target);
     const nextHeader: PipeRun = { ...header, branches: [...(header.branches ?? []), point] };
     const result = rederive(withRuns(doc, [nextHeader, branch]), [header.id, branchRunId]);
     if (!result.ok) return refuseDerivation(doc, 'add_branch', result, branchRunId);

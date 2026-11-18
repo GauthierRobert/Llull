@@ -1,21 +1,19 @@
 /** Process equipment (machines with maintenance clearances) and pipe runs. */
 
-import type { EquipmentElement, PipeElement } from '@aec/building/types';
+import type { EquipmentElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
-import { fromMm, toMetres, toMm } from '@core/model/units';
+import { fromMm, toMetres } from '@core/model/units';
 import { getBuilding, isVec2, nextElementId, nextMark, resolveLevel, toVec2, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePath } from '../../shared/duplicates';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normaliseEquipmentSize } from './equipmentShape';
-import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from '../piping/pipeSizes';
-import { hasRepeatedPoint, routeLength, routeOrFailure } from '../piping/routeSupport';
+import { routeLength, routeOrFailure } from '../piping/routeSupport';
 import { levelIdParam } from '../../building/levelParams';
-import { refuse } from '../../plant/catalog/codes';
 import { getFabrication } from '../../plant/fabrication/state';
 import { refuse as refuseLine } from '../../plant/piping/model';
-import { bindPipe, isBound, type Bound } from '../../plant/spec/binding';
+import { bindSpec, isRefusal, pipeData, pipeElementOf, pipeLabel, resolveDiameter } from './pipeRunPhases';
 
 /**
  * @affects creates 1 equipment (box or cylindrical vessel on layer Q-EQPM; clearance drawn in plan)
@@ -160,31 +158,11 @@ export const addPipeRun = defineCommand({
       return noop(doc, `add_pipe_run failed: dn must be a positive integer (got ${dn}).`);
     if (spec === undefined && nps !== undefined)
       return noop(doc, 'add_pipe_run failed: nps needs spec (a piping spec id); give dn or diameter for a legacy pipe.');
-    let bound: Bound | undefined;
-    if (spec !== undefined) {
-      if (nps !== undefined && dn !== undefined) return noop(doc, 'add_pipe_run failed: give nps or dn with spec, not both.');
-      const outcome = bindPipe(doc, 'add_pipe_run', { specId: spec, revision, nps, dn });
-      if (!isBound(outcome)) return outcome;
-      if (diameter !== undefined && Math.abs(diameter - fromMm(doc, outcome.binding.odMm)) > fromMm(doc, 0.05))
-        return refuse(
-          doc,
-          'add_pipe_run',
-          'PSC_PIPE_SPEC_MISMATCH',
-          `diameter ${diameter} differs from the outside diameter ${outcome.binding.odMm} mm of spec ${spec} at NPS ${outcome.binding.nps}: omit diameter`,
-          [spec],
-          ['diameter'],
-        );
-      bound = outcome;
-    }
-    const tabulated = bound === undefined && dn !== undefined ? outsideDiameterMm(dn) : null;
-    if (bound === undefined && diameter === undefined && dn !== undefined && tabulated === null) {
-      const known = Object.keys(PIPE_OUTSIDE_DIAMETER_MM).join(', ');
-      return noop(doc, `add_pipe_run failed: DN${dn} is not in the pipe size table (${known}); give an explicit diameter.`);
-    }
-    const resolvedDiameter = bound !== undefined ? fromMm(doc, bound.binding.odMm) : (diameter ?? fromMm(doc, tabulated ?? 114.3));
-    const pipeDn = bound !== undefined ? bound.dn : (dn ?? null);
-    if (hasRepeatedPoint(path) || resolvedDiameter <= 0)
-      return noop(doc, 'add_pipe_run failed: consecutive points must differ and diameter be > 0.');
+    const bound = bindSpec(doc, { spec, revision, nps, dn, diameter });
+    if (bound !== undefined && isRefusal(bound)) return bound;
+    const resolved = resolveDiameter(doc, bound, diameter, dn, path);
+    if (isRefusal(resolved)) return resolved;
+    const { diameter: resolvedDiameter, dn: pipeDn } = resolved;
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_pipe_run failed: ${resolution.reason}.`);
     const pipeTwin = findTwin(
@@ -205,25 +183,20 @@ export const addPipeRun = defineCommand({
         [lineNumber],
         ['line'],
       );
-    const pipe: PipeElement = {
-      id: nextElementId(resolution.building, 'pipe'),
-      category: 'pipe',
-      mark: nextMark(resolution.building, 'pipe'),
-      entityIds: [],
-      levelId: resolution.level.id,
-      points: path,
+    const pipe = pipeElementOf(resolution, {
+      path,
       diameter: resolvedDiameter,
-      service: service?.trim() || 'process',
-      material: material?.trim() || 'steel',
-      ...(lineNumber !== undefined ? { line: lineNumber } : {}),
-      ...(pipeDn !== null ? { dn: pipeDn } : {}),
-      ...(bound !== undefined ? { spec: bound.binding } : {}),
-      ...(origin !== undefined ? { from: origin } : {}),
-      ...(destination !== undefined ? { to: destination } : {}),
-      ...(asBuilt !== undefined ? { asBuilt } : {}),
-    };
+      dn: pipeDn,
+      bound,
+      lineNumber,
+      origin,
+      destination,
+      service,
+      material,
+      asBuilt,
+    });
     const length = routeLength(path);
-    const label = `${lineNumber !== undefined ? ` line ${lineNumber}` : ''}${pipeDn !== null ? ` DN${pipeDn}` : ''}${bound === undefined ? '' : ` spec ${bound.binding.specId} r${bound.binding.revision} NPS ${bound.binding.nps} sch ${bound.binding.schedule ?? '-'} wall ${bound.binding.wallMm} mm${bound.warnings.length === 0 ? '' : ` (${bound.warnings.map((entry) => entry.code).join(', ')})`}`}`;
+    const label = pipeLabel(lineNumber, pipeDn, bound);
     const ends = origin !== undefined || destination !== undefined;
     const committed = commitBuilding(
       doc,
@@ -231,21 +204,7 @@ export const addPipeRun = defineCommand({
       [pipe.id],
       `Added ${pipe.service} pipe ${pipe.mark} (${pipe.id})${label} Ø${resolvedDiameter}, ${toMetres(doc, length).toFixed(2)} m, ` +
         `${path.length - 2} bend(s)${ends ? `, ${origin ?? '?'} → ${destination ?? '?'}` : ''}.`,
-      {
-        elementId: pipe.id,
-        outsideDiameterMm: bound?.binding.odMm ?? toMm(doc, resolvedDiameter),
-        ...(bound === undefined
-          ? {}
-          : {
-              specId: bound.binding.specId,
-              revision: bound.binding.revision,
-              nps: bound.binding.nps,
-              wallMm: bound.binding.wallMm,
-              ...(bound.binding.schedule === undefined ? {} : { schedule: bound.binding.schedule }),
-              verified: bound.binding.verified,
-              ...(bound.warnings.length === 0 ? {} : { warnings: bound.warnings }),
-            }),
-      },
+      pipeData(doc, pipe, bound),
     );
     // The revision the run resolved is replayed as given, so regeneration never depends on which revisions were approved at that moment.
     return bound === undefined ? committed : { ...committed, recordExtras: { revision: bound.binding.revision } };

@@ -1,6 +1,6 @@
 /** add_coil (SC-F2): a round or rectangular section swept along a (optionally conical) helix; also the compression spring (closed ends, free length). */
 
-import type { MeshData, SweepEntity, Vec3 } from '../../model/types';
+import type { Entity, MeshData, SweepEntity, Vec3 } from '../../model/types';
 import { catmullRomBeziers, mapSegment } from '../../geometry/curveSegments';
 import { curveChain } from '../../geometry/nurbsChain';
 import { helixCurve } from '../../lib/helix/helix';
@@ -146,6 +146,62 @@ function exactCoil(
   return newEntity('sweep', id, geometry, frame.worldAt(start), color, { rotation: frame.rotation, name }) as SweepEntity;
 }
 
+const isPositive = (value: number): boolean => Number.isFinite(value) && value > 0;
+
+/** Half extents (radial, axial) of the wire section, or the refusal message. */
+function sectionHalves(
+  round: boolean,
+  given: {
+    sectionRadius: number | undefined;
+    sectionDiameter: number | undefined;
+    sectionWidth: number | undefined;
+    sectionHeight: number | undefined;
+  },
+): { halfWidth: number; halfHeight: number } | string {
+  const { sectionRadius, sectionDiameter, sectionWidth, sectionHeight } = given;
+  const wire = sectionRadius ?? (sectionDiameter === undefined ? undefined : sectionDiameter / 2);
+  if (round && (wire === undefined || !isPositive(wire))) return 'a circle section needs sectionRadius or sectionDiameter > 0';
+  if (!round && (sectionWidth === undefined || sectionHeight === undefined || !isPositive(sectionWidth) || !isPositive(sectionHeight)))
+    return 'a rectangle section needs sectionWidth and sectionHeight > 0';
+  return round
+    ? { halfWidth: wire as number, halfHeight: wire as number }
+    : { halfWidth: (sectionWidth as number) / 2, halfHeight: (sectionHeight as number) / 2 };
+}
+
+interface CoilBuild {
+  readonly shape: CoilShape;
+  readonly round: boolean;
+  readonly halfWidth: number;
+  readonly halfHeight: number;
+  readonly exactHelix: boolean;
+  readonly id: string;
+  readonly frame: Exclude<ReturnType<typeof axisFrame>, string>;
+  readonly color: string;
+  readonly name: string | undefined;
+}
+
+/** The coil entity: exact helix sweep, Catmull-Rom sweep (round wire) or screwed mesh (flat wire); a refusal message when the exact path fails. */
+function coilEntity({ shape, round, halfWidth, halfHeight, exactHelix, id, frame, color, name }: CoilBuild): Entity | string {
+  if (exactHelix && !shape.closedEnds)
+    return exactCoil(shape, round ? { round: halfWidth } : { width: 2 * halfWidth, height: 2 * halfHeight }, id, frame, color, name);
+  if (round) {
+    const points = helixPoints(shape);
+    const startLocal = points[0] as Vec3;
+    const path = catmullRomBeziers(points, false).map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, startLocal)));
+    return newEntity('sweep', id, { path, section: { shape: 'circle', radius: halfWidth } }, frame.worldAt(startLocal), color, {
+      rotation: frame.rotation,
+      name,
+    });
+  }
+  const local = flatWire(shape, 2 * halfWidth, 2 * halfHeight);
+  const positions = Array.from(
+    { length: local.positions.length / 3 },
+    (_, i): Vec3 =>
+      frame.worldAt([local.positions[3 * i] as number, local.positions[3 * i + 1] as number, local.positions[3 * i + 2] as number]),
+  ).flat();
+  return newEntity('mesh', id, { mesh: { positions, indices: local.indices } }, ORIGIN, color, { name });
+}
+
 /**
  * @affects creates 1 entity: a sweep (round wire, or a rectangular wire as an axis_plane screw sweep); with exactHelix false or closedEnds the old path and a mesh for a rectangular wire; position = world start of the wire centre line
  * @invariant section extent along the axis < pitch (turns never touch); section half width < the smallest coil radius; MIN_COIL_TURNS <= turns <= MAX_COIL_TURNS
@@ -225,15 +281,12 @@ export const addCoil = defineCommand({
     },
   ): CommandResult => {
     const fail = failedWith(doc, 'add_coil');
-    const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
+    const positive = isPositive;
     if (![radius, endRadius].every(positive)) return fail('radius and endRadius must be finite and > 0');
     const round = sectionShape === 'circle';
-    const wire = sectionRadius ?? (sectionDiameter === undefined ? undefined : sectionDiameter / 2);
-    if (round && (wire === undefined || !positive(wire))) return fail('a circle section needs sectionRadius or sectionDiameter > 0');
-    if (!round && (sectionWidth === undefined || sectionHeight === undefined || !positive(sectionWidth) || !positive(sectionHeight)))
-      return fail('a rectangle section needs sectionWidth and sectionHeight > 0');
-    const halfWidth = round ? (wire as number) : (sectionWidth as number) / 2;
-    const halfHeight = round ? (wire as number) : (sectionHeight as number) / 2;
+    const section = sectionHalves(round, { sectionRadius, sectionDiameter, sectionWidth, sectionHeight });
+    if (typeof section === 'string') return fail(section);
+    const { halfWidth, halfHeight } = section;
     const resolved = resolveRise(2 * halfHeight, pitchIn, turnsIn, length);
     if (typeof resolved === 'string') return fail(resolved);
     const { turns } = resolved;
@@ -257,35 +310,9 @@ export const addCoil = defineCommand({
     const sectionArea = round ? Math.PI * halfWidth * halfWidth : 4 * halfWidth * halfHeight;
     const centreLineLength = helixLength(shape);
     const analyticVolume = round ? sectionArea * centreLineLength : sectionArea * 2 * Math.PI * ((radius + endRadius) / 2) * turns;
-    let entity;
-    if (exactHelix && !closedEnds) {
-      const exact = exactCoil(
-        shape,
-        round ? { round: halfWidth } : { width: 2 * halfWidth, height: 2 * halfHeight },
-        id,
-        frame,
-        color,
-        name,
-      );
-      if (typeof exact === 'string') return fail(exact);
-      entity = exact;
-    } else if (round) {
-      const points = helixPoints(shape);
-      const startLocal = points[0] as Vec3;
-      const path = catmullRomBeziers(points, false).map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, startLocal)));
-      entity = newEntity('sweep', id, { path, section: { shape: 'circle', radius: halfWidth } }, frame.worldAt(startLocal), color, {
-        rotation: frame.rotation,
-        name,
-      });
-    } else {
-      const local = flatWire(shape, 2 * halfWidth, 2 * halfHeight);
-      const positions = Array.from(
-        { length: local.positions.length / 3 },
-        (_, i): Vec3 =>
-          frame.worldAt([local.positions[3 * i] as number, local.positions[3 * i + 1] as number, local.positions[3 * i + 2] as number]),
-      ).flat();
-      entity = newEntity('mesh', id, { mesh: { positions, indices: local.indices } }, ORIGIN, color, { name });
-    }
+    const built = coilEntity({ shape, round, halfWidth, halfHeight, exactHelix, id, frame, color, name });
+    if (typeof built === 'string') return fail(built);
+    const entity = built;
     const height = resolved.rise + 2 * halfHeight;
     return {
       ...commitSolid(

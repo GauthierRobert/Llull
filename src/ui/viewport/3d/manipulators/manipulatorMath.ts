@@ -4,6 +4,7 @@
 import { type Bounds, boundsOverlap } from '@core/geometry/bounds';
 import { is3D, type CadDocument, type EntityId } from '@core/model/types';
 import { dot3, sub3 } from '@lib/vec3';
+import { pow } from '@lib/pow';
 
 export type Vec3 = readonly [number, number, number];
 
@@ -31,7 +32,7 @@ export function snapToStep(value: number, step: number): number {
 export function stepForScale(scale: number): number {
   if (!(scale > 0)) return 1;
   const raw = scale / 20;
-  const decade = 10 ** Math.floor(Math.log10(raw));
+  const decade = pow(10, Math.floor(Math.log10(raw)));
   const lead = raw / decade;
   return decade * (lead < 1.5 ? 1 : lead < 3.5 ? 2 : lead < 7.5 ? 5 : 10);
 }

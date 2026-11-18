@@ -25,6 +25,7 @@ const isRecorded = (confirmation: unknown): boolean =>
  */
 export const issueIsometric = defineCommand({
   name: 'issue_isometric',
+  annotations: { hostStamped: true },
   description:
     'Issue the isometric of a pipe line for fabrication or construction: a HUMAN act that an agent cannot perform. The line must pass check_isometric with style final (no error: connected, SKEY set, welds numbered, spool limits met); ' +
     'then `confirmation` must be a signature object produced by a human in the desktop app (with a nonce field) over the act, the line, the revision, the purpose and the content hash of the line, verified by the signing port. ' +

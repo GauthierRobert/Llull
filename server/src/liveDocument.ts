@@ -110,14 +110,32 @@ export function getLiveDoc(): CadDocument {
   return _liveDoc;
 }
 
+interface HistoryFlags {
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+}
+
+let _historyFlags: (() => HistoryFlags) | null = null;
+
+/** The history owner (`commandBus`) registers its flags once, so snapshot / command events carry what the REST responses carry (no import cycle). */
+export function setHistoryFlagsSource(source: () => HistoryFlags): void {
+  _historyFlags = source;
+}
+
 /** `GET /live/snapshot` and the SSE `snapshot` event. Values of private material libraries never leave the process (TR-MAT-31). */
 export function getLiveSnapshot(): LiveSnapshotEvent {
-  return { epoch: _epoch, seq: _seq, stateHash: documentHash(_liveDoc), document: withoutPrivateValues(_liveDoc) };
+  return {
+    epoch: _epoch,
+    seq: _seq,
+    stateHash: documentHash(_liveDoc),
+    document: withoutPrivateValues(_liveDoc),
+    ...(_historyFlags?.() ?? {}),
+  };
 }
 
 const _subscribers = new Set<Response>();
 export const MAX_LIVE_SUBSCRIBERS = 64; // further `GET /live` get 503
-/** `LLULL_LIVE_MAX_PER_CLIENT` (default 4): concurrent `GET /live` per client IP; more get 429. */
+/** `LLULL_LIVE_MAX_PER_CLIENT` (default 8): concurrent `GET /live` per client IP; more get 429. */
 export const liveMaxPerClient = (): number => positiveInteger(process.env['LLULL_LIVE_MAX_PER_CLIENT'], 8);
 /** A subscriber whose unsent buffer exceeds this is dropped (it resyncs via `/live/snapshot`). */
 const MAX_SSE_BACKLOG_BYTES = 8 * 1024 * 1024;
@@ -154,8 +172,9 @@ function broadcast(eventType: 'snapshot' | 'command' | 'progress' | 'status' | '
   let frame: string;
   try {
     frame = sseFrame(eventType, payload);
-  } catch {
-    _subscribers.clear();
+  } catch (error) {
+    console.warn(`live: '${eventType}' event could not be serialized; closing subscribers so they resync`, error);
+    closeAllSubscribers();
     return;
   }
   for (const res of _subscribers) if (!writeSseFrame(res, frame)) _subscribers.delete(res);
@@ -187,6 +206,7 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     name: command.name,
     params: withoutConfirmations(command.params),
     stateHash: documentHash(next),
+    ...(_historyFlags?.() ?? {}),
     ...(command.source !== undefined ? { source: command.source } : {}),
     ...(command.commandId !== undefined ? { commandId: command.commandId } : {}),
   };

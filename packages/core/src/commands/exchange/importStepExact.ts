@@ -5,219 +5,81 @@
 
 import type { CadDocument } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
-import type { GeometryKernel } from '../../geometry/kernel';
-import type { ImportedExchange } from '../../geometry/kernelExchange';
-import type { ImportedShapes } from '../../geometry/kernelPorts';
-import { defineCommand, z } from '../schema';
-import { changed, commandError, noop } from '../noop';
-import { currentContext } from '../context';
-import { base64ToText } from '../../lib/base64';
+import { defineCommand } from '../schema';
+import { changed } from '../noop';
 import { sha256Hex } from '../../lib/sha256';
 import { summarizeStep21 } from '../../lib/step21/summary';
-import { makeBlob, withBlob } from '../../model/blobs';
-import { MM_PER_UNIT } from '../../model/units';
-import { modelingToleranceOf, withKernelStamp } from '../../model/kernelSettings';
+import { withKernelStamp } from '../../model/kernelSettings';
 import type { ExchangeModel } from '../../model/exchange';
-import { kernelStampOf } from '../persistence/kernelStamp';
-import { MAX_IMPORT_BODIES } from '../limits';
-import { buildBodies } from './importBodies';
-import { simplifyTree } from './importSimplify';
 import { stepImportReport } from './stepImportReport';
 import { gvpPolicy } from './gvpBands';
-import { buildTreeStructure, instanceDepth, type TreeStructure } from './importTree';
-import { findComponentCycle } from '../assembly/assemblies';
 import { MAX_INSTANCE_DEPTH } from '../brep/stepTargets';
 import { describeProvenance } from './importProvenance';
 import { verifyImportedProducts } from './importVerify';
 import { type PmiImportOutcome, importProductPmi, recordPmiImport } from './importPmi';
+import { importStepExactParams, type StepParams } from './importStepExactSchema';
+import { type Placed, type SourceRead, placeBodies, openStepSource } from './importStepExactRun';
 
-/** Largest STEP accepted (characters of Part 21 text; 64 MiB): the text is also kept in the step params for replay. */
-const MAX_STEP_CHARS = 64 * 1024 * 1024;
+type ExchangeReport = ReturnType<typeof describeProvenance>;
 
-const refuse = (doc: CadDocument, code: string, remediation: string, why: string, paths: readonly string[] = []): CommandResult => ({
-  ...noop(doc, `import_step_exact: ${why}; no-op. [${code}]`),
-  error: commandError(code, remediation, [], paths),
-});
-
-const IMPORT_ERRORS: Readonly<Record<'unreadable' | 'no_solid' | 'tessellated_only' | 'unavailable', readonly [string, string]>> = {
-  unreadable: ['KRN_STEP_UNREADABLE', 'check the file (size, sha256, truncated?) and that it is an ISO 10303-21 STEP file'],
-  tessellated_only: ['KRN_STEP_TESSELLATED_ONLY', "import it as a mesh with the CLI tool import_step (mode 'mesh')"],
-  no_solid: [
-    'KRN_STEP_NO_SOLID',
-    'retry with sew: true and a larger linear tolerance (set_modeling_tolerance, mm); else import the surfaces separately',
-  ],
-  unavailable: ['KRN_NO_EXACT_KERNEL', 'run on the desktop backend or with --kernel occt-native'],
-};
-
-function stepText(params: { stepBase64?: string | undefined; text?: string | undefined }): string | null | undefined {
-  if (params.text !== undefined) return params.text;
-  return params.stepBase64 === undefined ? undefined : base64ToText(params.stepBase64);
+/** The provenance of the product tree and its geometric-validation-property check; the document's exchange model with it merged. */
+function describeExchange(
+  doc: CadDocument,
+  params: StepParams,
+  read: SourceRead,
+  placed: Placed,
+): { readonly exchange: ExchangeModel | undefined; readonly exchangeReport: ExchangeReport | null } {
+  const { kernel, text, tree } = read;
+  const { bodies, structure, solidIds } = placed;
+  if (tree === null || structure === null) return { exchange: doc.exchange, exchangeReport: null };
+  const verify = params.verify !== false;
+  const policy = gvpPolicy(params.gvpPolicy);
+  const summary = summarizeStep21(text);
+  const masses = verify
+    ? bodies.map((body) => {
+        const shape = kernel.evaluate({ op: 'brep', blob: body.blob.sha256, format: 'occt-brep-v1' });
+        return shape === null ? null : (kernel.massProperties?.(shape) ?? null);
+      })
+    : null;
+  const verifications = masses === null ? null : verifyImportedProducts(tree, masses, summary, policy);
+  const perProduct = new Map(tree.products.map((product, index) => [index, product.solids.map((solid) => solidIds[solid] ?? '')] as const));
+  const exchangeReport = describeProvenance({
+    unit: doc.units,
+    imported: tree,
+    placements: structure.placements,
+    solidIds: perProduct,
+    verifications,
+    summary,
+    policy,
+    fileName: params.fileName,
+    sha256: params.sha256 ?? sha256Hex(text),
+  });
+  const flagged = Object.fromEntries(
+    structure.nonRigidParents.flatMap((id) => {
+      const record = exchangeReport.provenance[id];
+      return record === undefined || record.unverified.reasons.includes('non_rigid_occurrence')
+        ? []
+        : [
+            [
+              id,
+              { ...record, unverified: { value: true, reasons: [...record.unverified.reasons, 'non_rigid_occurrence' as const] } },
+            ] as const,
+          ];
+    }),
+  );
+  const exchange: ExchangeModel = { provenance: { ...doc.exchange?.provenance, ...exchangeReport.provenance, ...flagged } };
+  return { exchange, exchangeReport };
 }
 
-type StepRead =
-  | { readonly imported: ImportedShapes; readonly tree: ImportedExchange | null }
-  | 'unreadable'
-  | { readonly error: string; readonly detail: string };
-
-/** The product tree through XDE when the kernel has it and `assembly` is wanted, else the flat shape list. */
-function readStep(
-  kernel: GeometryKernel,
-  format: 'step' | 'iges',
-  text: string,
-  options: { precision: number; maxTolerance: number; heal: boolean; sew: boolean },
-  assembly: boolean,
-): StepRead {
-  if (assembly && kernel.importExchange !== undefined) {
-    const tree = kernel.importExchange(format, text, options);
-    if (tree !== null) return 'error' in tree ? tree : { imported: tree, tree: 'products' in tree ? simplifyTree(tree) : null };
-  }
-  const flat = kernel.importShapes?.(format, text, options) ?? null;
-  if (flat === null) return 'unreadable';
-  return 'error' in flat ? flat : { imported: flat, tree: null };
-}
-
-function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined): CommandResult {
-  const source = params.fileName !== undefined ? 'fileName' : params.text !== undefined ? 'text' : 'stepBase64';
-  if ((params.stepBase64 === undefined) === (params.text === undefined))
-    return {
-      ...noop(doc, 'import_step_exact: give exactly one of stepBase64 or text; no-op.'),
-      error: commandError(
-        'CMD_INVALID_PARAMS',
-        'pass the STEP file as stepBase64 (base64) or text (Part 21), not both',
-        [],
-        ['stepBase64', 'text'],
-      ),
-    };
-  const kernel = (ctx ?? currentContext()).kernel;
-  if (kernel?.importShapes === undefined || kernel.loadBlob === undefined)
-    return refuse(
-      doc,
-      'KRN_NO_EXACT_KERNEL',
-      'run on the desktop backend or with --kernel occt-native',
-      'the active kernel has no exact STEP import (kernel_info shows it)',
-    );
-  const text = stepText(params);
-  if (text === null || text === undefined || text.trim() === '')
-    return refuse(doc, ...IMPORT_ERRORS.unreadable, 'the STEP content is empty or not valid base64 UTF-8 text', [source]);
-  const tolerance = modelingToleranceOf(doc);
-  const heal = params.heal !== false;
-  const options = {
-    precision: tolerance.linear,
-    maxTolerance: Math.max(0.1, tolerance.maxImportTolerance),
-    heal,
-    sew: params.sew !== false,
-  };
-  const read = readStep(kernel, params.format ?? 'step', text, options, params.assembly !== false);
-  if (read === 'unreadable') return refuse(doc, ...IMPORT_ERRORS.unreadable, 'the kernel could not read the file', [source]);
-  if ('error' in read) {
-    const [code, remediation] = IMPORT_ERRORS[read.error as keyof typeof IMPORT_ERRORS] ?? IMPORT_ERRORS.unreadable;
-    return refuse(doc, code, remediation, read.detail, [source]);
-  }
-  const { imported, tree } = read;
-  if (imported.solids.length > MAX_IMPORT_BODIES)
-    return refuse(
-      doc,
-      'KRN_STEP_UNREADABLE',
-      'split the file',
-      `${imported.solids.length} solids exceed MAX_IMPORT_BODIES (${MAX_IMPORT_BODIES})`,
-    );
-  const invalid = imported.solids.flatMap((solid, index) => (solid.validAfterHeal ? [] : [index + 1]));
-  if (invalid.length > 0)
-    return refuse(
-      doc,
-      'KRN_HEAL_FAILED',
-      'try heal: true / sew: false, or another linear tolerance (set_modeling_tolerance); else keep the original and report',
-      `solid${invalid.length > 1 ? 's' : ''} ${invalid.join(', ')} still fail BRepCheck after ${heal ? 'healing' : 'reading (heal is off)'}; nothing imported`,
-      [source],
-    );
-  const bodies = buildBodies(doc, kernel, imported, params.name);
-  if (typeof bodies === 'number')
-    return refuse(
-      doc,
-      'KRN_HEAL_FAILED',
-      'retry the import',
-      `the kernel cannot rebuild healed solid ${bodies + 1} from its stored B-rep`,
-      [source],
-    );
-
-  const mmPerUnit = MM_PER_UNIT[doc.units];
-  const structure: TreeStructure | null =
-    tree === null
-      ? null
-      : buildTreeStructure(
-          tree,
-          bodies.map((body) => body.entity),
-          mmPerUnit,
-        );
-  const cyclic =
-    structure === null ? undefined : Object.keys(structure.components).find((id) => findComponentCycle(structure.components, id) !== null);
-  if (cyclic !== undefined)
-    return refuse(
-      doc,
-      'KRN_STEP_UNREADABLE',
-      'the file is malformed: report it to its sender',
-      `the product tree contains itself (component ${cyclic}); nothing imported`,
-      [source],
-    );
-  const depth = structure === null ? 0 : instanceDepth(structure.components, structure.topLevel);
-  const topLevel = structure?.topLevel ?? bodies.map((body) => body.entity);
-  const stamp = kernelStampOf(kernel);
-  const original = params.keepOriginal === true ? makeBlob(params.format === 'iges' ? 'model/iges' : 'model/step', text) : null;
-  const staged = bodies.reduce((next, body) => withBlob(next, body.blob), original === null ? doc : withBlob(doc, original));
-  const ids = topLevel.map((entity) => entity.id);
-  const solidIds = bodies.map((body) => body.entity.id);
-  const entities = { ...staged.entities, ...Object.fromEntries(topLevel.map((entity) => [entity.id, entity])) };
-  const components = structure === null ? doc.components : { ...doc.components, ...structure.components };
-
-  let exchange: ExchangeModel | undefined = doc.exchange;
-  let exchangeReport: ReturnType<typeof describeProvenance> | null = null;
-  if (tree !== null && structure !== null) {
-    const verify = params.verify !== false;
-    const policy = gvpPolicy(params.gvpPolicy);
-    const summary = summarizeStep21(text);
-    const masses = verify
-      ? bodies.map((body) => {
-          const shape = kernel.evaluate({ op: 'brep', blob: body.blob.sha256, format: 'occt-brep-v1' });
-          return shape === null ? null : (kernel.massProperties?.(shape) ?? null);
-        })
-      : null;
-    const verifications = masses === null ? null : verifyImportedProducts(tree, masses, summary, policy);
-    const perProduct = new Map(
-      tree.products.map((product, index) => [index, product.solids.map((solid) => solidIds[solid] ?? '')] as const),
-    );
-    exchangeReport = describeProvenance({
-      unit: doc.units,
-      imported: tree,
-      placements: structure.placements,
-      solidIds: perProduct,
-      verifications,
-      summary,
-      policy,
-      fileName: params.fileName,
-      sha256: params.sha256 ?? sha256Hex(text),
-    });
-    const flagged = Object.fromEntries(
-      structure.nonRigidParents.flatMap((id) => {
-        const record = exchangeReport?.provenance[id];
-        return record === undefined || record.unverified.reasons.includes('non_rigid_occurrence')
-          ? []
-          : [
-              [
-                id,
-                { ...record, unverified: { value: true, reasons: [...record.unverified.reasons, 'non_rigid_occurrence' as const] } },
-              ] as const,
-            ];
-      }),
-    );
-    exchange = { provenance: { ...doc.exchange?.provenance, ...exchangeReport.provenance, ...flagged } };
-  }
-  const assembled: CadDocument = {
-    ...(doc.kernelSettings === undefined && stamp !== null ? withKernelStamp(staged, stamp) : staged),
-    entities,
-    order: [...doc.order, ...ids],
-    components,
-    ...(exchange === undefined ? {} : { exchange }),
-  };
+/** The semantic PMI of each product of an AP242 file, attached through apply_pmi_set. */
+function importPmi(
+  assembled: CadDocument,
+  params: StepParams,
+  read: SourceRead,
+  solidIds: readonly string[],
+  exchangeReport: ExchangeReport | null,
+): { readonly document: CadDocument; readonly pmiOutcomes: PmiImportOutcome[] } {
+  const { kernel, tree } = read;
   const pmiOutcomes: PmiImportOutcome[] = [];
   let withPmi = assembled;
   if (params.importPmi !== false && exchangeReport !== null && tree !== null) {
@@ -230,7 +92,25 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
     }
     withPmi = recordPmiImport(withPmi, params.fileName ?? 'the STEP file', pmiOutcomes);
   }
-  const document = withPmi;
+  return { document: withPmi, pmiOutcomes };
+}
+
+function run(doc: CadDocument, params: StepParams, ctx: ExecutionContext | undefined): CommandResult {
+  const read = openStepSource(doc, params, ctx);
+  if ('document' in read) return read;
+  const placed = placeBodies(doc, params, read);
+  if ('document' in placed) return placed;
+  const { tolerance, options, imported, tree } = read;
+  const { bodies, structure, depth, original, staged, ids, solidIds, entities, components, stamp } = placed;
+  const { exchange, exchangeReport } = describeExchange(doc, params, read, placed);
+  const assembled: CadDocument = {
+    ...(doc.kernelSettings === undefined && stamp !== null ? withKernelStamp(staged, stamp) : staged),
+    entities,
+    order: [...doc.order, ...ids],
+    components,
+    ...(exchange === undefined ? {} : { exchange }),
+  };
+  const { document, pmiOutcomes } = importPmi(assembled, params, read, solidIds, exchangeReport);
   const pmiTotals = {
     items: pmiOutcomes.reduce((sum, outcome) => sum + outcome.items, 0),
     unresolved: pmiOutcomes.reduce((sum, outcome) => sum + outcome.unresolved, 0),
@@ -291,69 +171,6 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
   };
 }
 
-const paramsSchema = z.object({
-  stepBase64: z
-    .string()
-    .max(Math.ceil((MAX_STEP_CHARS * 4) / 3) + 4)
-    .optional()
-    .describe('The STEP file bytes, base64 encoded (ISO 10303-21 text, UTF-8/ASCII). Give exactly one of stepBase64 or text.'),
-  text: z.string().max(MAX_STEP_CHARS).optional().describe('The STEP file as Part 21 text. Give exactly one of stepBase64 or text.'),
-  fileName: z.string().optional().describe('Original file name, kept in the report and provenance only.'),
-  sha256: z
-    .string()
-    .optional()
-    .describe('sha256 (hex) of the file bytes, computed by the host; kept in the provenance. Default: sha256 of the text.'),
-  format: z
-    .enum(['step', 'iges'])
-    .optional()
-    .describe(
-      '"step" (default, ISO 10303-21) or "iges" (IGES 5.3; same healing, report and refusal codes). The file goes in text / stepBase64 either way.',
-    ),
-  heal: z.boolean().optional().describe('Run shape healing (ShapeFix) on every solid at the document linear tolerance. Default true.'),
-  sew: z.boolean().optional().describe('Sew loose shells and faces into closed solids. Default true.'),
-  name: z
-    .string()
-    .optional()
-    .describe('Entity name overriding the names in the file; several solids get a numeric suffix. Default: the names of the file.'),
-  keepOriginal: z.boolean().optional().describe('Also store the STEP text as a model/step document blob for audit (large). Default false.'),
-  assembly: z
-    .boolean()
-    .optional()
-    .describe(
-      'Keep the assembly structure of the file: one component per product, one instance per placed occurrence (a part used twice is one component). ' +
-        'Default true. False flattens everything into world-space solids.',
-    ),
-  verify: z
-    .boolean()
-    .optional()
-    .describe(
-      'Compare the geometric validation properties the sender embedded (volume, surface area, centroid) with what llull recomputes from the imported B-rep, ' +
-        'per product, and flag the bodies unverified when they disagree or cannot be checked. Never blocks the import. Default true.',
-    ),
-  importPmi: z
-    .boolean()
-    .optional()
-    .describe(
-      'Attach the semantic PMI of an AP242 file (datums, feature control frames, size and location dimensions on faces) to the imported solids through apply_pmi_set: ' +
-        'every item is review-required, an item whose face cannot be mapped is counted in data.report.pmi.unmapped, none is silently dropped. Default true; has no effect on a ' +
-        'file without PMI or with assembly false.',
-    ),
-  gvpPolicy: z
-    .object({
-      greenRel: z.number().optional().describe('Largest relative volume / area difference still green. Default 1e-3.'),
-      yellowRel: z.number().optional().describe('Largest relative volume / area difference still yellow (red beyond). Default 1e-2.'),
-      greenCentroidPerDiag: z
-        .number()
-        .optional()
-        .describe('Largest centroid distance still green, as a fraction of the bounding-box diagonal. Default 1e-3.'),
-      yellowCentroidMm: z.number().optional().describe('Largest centroid distance still yellow, in millimetres. Default 1.'),
-    })
-    .optional()
-    .describe('Band limits of the validation-property check; each omitted limit keeps its default.'),
-});
-
-type Params = z.output<typeof paramsSchema>;
-
 /**
  * @affects adds document blobs (healed BRepTools text per solid, optionally the STEP), creates one `mesh` entity per solid whose `brep` is a
  *   `brep` blob leaf (wrapped in a `scale` node when the document unit is not mm); with a product tree also one component per product, one
@@ -376,6 +193,6 @@ export const importStepExact = defineCommand({
     'document unit. data.report lists per solid validAsRead / validAfterHeal / actions / maxToleranceMm / freeEdges / faces / faceted, the root census, skipped items and ' +
     'warnings (KRN_IMPORT_TOLERANCE_HIGH above kernelSettings maxImportTolerance; XCH_GVP_YELLOW / XCH_GVP_RED / XCH_GVP_NOT_CHECKABLE). Refusals carry error.code: ' +
     'KRN_NO_EXACT_KERNEL, KRN_STEP_UNREADABLE, KRN_STEP_TESSELLATED_ONLY, KRN_STEP_NO_SOLID, KRN_HEAL_FAILED. format: "iges" reads an IGES file the same way (import_iges adds the IGES census, sewing report and unit handling).',
-  params: paramsSchema,
+  params: importStepExactParams,
   run,
 });

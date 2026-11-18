@@ -1,6 +1,7 @@
 /** Unit conversion of the Norton coefficient A in ε̇ = A σⁿ tᵐ (PHY-11 TR-CRP-12); the CalculiX *CREEP card is its conversion to MPa and s. */
 
 import { convertValue, isUnitFailure } from '../../lib/quantity';
+import { pow } from '../../lib/pow';
 
 /** Factor 1 `from` = factor `to`, or the reason when either is not a unit of `dimensionOf` (MPa for stress, s for time). */
 function factor(from: string, to: string, dimensionOf: 'MPa' | 's'): number | string {
@@ -27,5 +28,5 @@ export function convertNortonA(
   if (typeof stress === 'string') return { problem: stress };
   const time = factor(to.time, from.time, 's');
   if (typeof time === 'string') return { problem: time };
-  return { A: A * stress ** -n * time ** (m + 1) };
+  return { A: A * pow(stress, -n) * pow(time, m + 1) };
 }

@@ -17,7 +17,7 @@ import type { CurveSegment } from '@core/model/curve';
 import type { BoxEntity, Entity, RevolutionEntity, Vec3 } from '@core/model/types';
 import type { Vec2 } from '@core/model/vectors';
 import { applyEulerXYZ } from '@lib/eulerRotation';
-import { cross3, normalize3OrZero } from '@lib/vec3';
+import { cross3, normalize3OrZero, map3 } from '@lib/vec3';
 import type { BuildingLevel, EquipmentElement } from '@aec/building/types';
 import { getBuilding } from '../model';
 import { execute } from '@core/commands/registry';
@@ -144,7 +144,7 @@ function revolvedSolid(context: Context, frame: Frame, entity: RevolutionEntity,
 }
 
 function boxSolid(context: Context, frame: Frame, entity: BoxEntity): string {
-  const [length, width, height] = entity.size.map((value) => context.mm(value)) as unknown as Vec3;
+  const [length, width, height] = map3(entity.size, (value) => context.mm(value));
   const xAxis = frame.axis([1, 0, 0], entity.rotation);
   const zAxis = frame.axis([0, 0, 1], entity.rotation);
   const centre = frame.point(entity.position);

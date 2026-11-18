@@ -1,3 +1,4 @@
+import { pow } from './pow';
 /**
  * Physical unit grammar: parse a unit string into a scale, an affine offset and a dimension vector, and convert values between units.
  * Grammar: factors joined by `*`, `·` or `/`, each `symbol[^exponent]`, a prefixed symbol (`mm`, `GPa`, `kJ`), a number (`1e-5`) or a
@@ -102,7 +103,7 @@ interface Term {
 }
 
 const power = (term: Term, exponent: number): Term => ({
-  scale: term.scale ** exponent,
+  scale: pow(term.scale, exponent),
   dimension: term.dimension.map((d) => d * exponent) as unknown as Dimension,
 });
 

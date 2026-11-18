@@ -14,6 +14,8 @@ import { helixCurve } from '../../lib/helix/helix';
 import { newEntity } from '../entity/newEntity';
 import { axisFrame } from '../solids/shared';
 import { toothAzimuth } from './knurlGeometry';
+import { powInt } from '../../lib/powInt';
+import { pow } from '../../lib/pow';
 
 /**
  * Estimated native kernel time of a cut of `grooves` helical grooves that each turn `turns` times along the face (face length / lead), seconds: grooves x 2.3 x (turns / 0.184)^1.8. Fitted to the
@@ -21,7 +23,7 @@ import { toothAzimuth } from './knurlGeometry';
  * 30 degrees 12.6 s (model 13.8), 12 at 30 degrees 30 s (27.6), 8 at 45 degrees 45 s (49.6), more than 120 s for 8 at 60 degrees with a 60 degree V (133). Accurate to about 10 % on that box.
  */
 export function estimatedKernelSeconds(grooves: number, turns: number): number {
-  return grooves * 2.3 * (turns / REFERENCE_TURNS) ** 1.8;
+  return grooves * 2.3 * pow(turns / REFERENCE_TURNS, 1.8);
 }
 const REFERENCE_TURNS = 0.184;
 /** Longest estimated kernel time one cut may take, seconds: the measured 45 s run (model 49.6) with the model's 10 % error stays under the 60 s limit of one kernel call. */
@@ -69,7 +71,7 @@ export function helicalGrooveArea(shape: HelicalKnurl): number {
   const base = r - h;
   const cosBeta = Math.cos((shape.helixDeg * Math.PI) / 180);
   const gamma = Math.tan((shape.toothAngleDeg * Math.PI) / 360);
-  return ((2 * gamma) / (r * cosBeta)) * ((r ** 3 - base ** 3) / 3 - (base * (r * r - base * base)) / 2);
+  return ((2 * gamma) / (r * cosBeta)) * ((powInt(r, 3) - powInt(base, 3)) / 3 - (base * (r * r - base * base)) / 2);
 }
 
 /** Land left between adjacent grooves at the surface (circumferential), document units; negative when they overlap. */

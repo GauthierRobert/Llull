@@ -1,6 +1,7 @@
 /** Thermal quantity kinds, dimension-checked conversion to SI and to the 05 FEA unit systems (PHY-03 TR-THM-04, TECHNICAL_SPEC 5.3). */
 
 import { convertValue, isUnitFailure, parseUnit } from '@lib/quantity';
+import { pow } from '@lib/pow';
 
 /** SI unit of every thermal quantity kind. */
 const SI_UNITS = {
@@ -75,7 +76,7 @@ function systemFactor(kind: ThermalKind, system: UnitSystem): number {
   if (isUnitFailure(parsed)) return Number.NaN;
   const [mass = 0, length = 0, time = 0] = parsed.dimension;
   const scales = baseScales(system);
-  return 1 / (scales.mass ** mass * scales.length ** length * scales.time ** time);
+  return 1 / (pow(scales.mass, mass) * pow(scales.length, length) * pow(scales.time, time));
 }
 
 export const siToSystem = (kind: ThermalKind, value: number, system: UnitSystem): number => value * systemFactor(kind, system);

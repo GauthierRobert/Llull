@@ -5,6 +5,7 @@
 
 import { evaluateForm, isFormFailure, type Point } from './propertyForms';
 import type { PropertyForm, PropertyModel, PropertyVariable } from './propertyModel';
+import { pow } from '../lib/pow';
 
 export const SOLVER_TABLE_REL_TOL = 1e-3;
 const SOLVER_TABLE_MAX_POINTS = 500;
@@ -60,7 +61,7 @@ export function samplePoints(from: number, to: number, count: number, spacing: '
   return Array.from({ length: count }, (_, i) => {
     if (i === count - 1) return to;
     const t = i / (count - 1);
-    return spacing === 'log' ? from * (to / from) ** t : from + (to - from) * t;
+    return spacing === 'log' ? from * pow(to / from, t) : from + (to - from) * t;
   });
 }
 
@@ -127,7 +128,7 @@ export function tabulateModel(
   curve: Curve,
 ): SolverTable | null {
   const log = isLogForm(model.form) && a > 0;
-  const split = (x0: number, x1: number, t: number): number => (log ? x0 * (x1 / x0) ** t : x0 + (x1 - x0) * t);
+  const split = (x0: number, x1: number, t: number): number => (log ? x0 * pow(x1 / x0, t) : x0 + (x1 - x0) * t);
   const relError = (x0: number, y0: number, x1: number, y1: number, x: number): number => {
     const y = curve(x);
     const linear = y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);

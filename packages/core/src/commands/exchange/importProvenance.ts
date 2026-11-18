@@ -12,6 +12,7 @@ import { MM_PER_UNIT } from '../../model/units';
 import { GVP_POLICY_SOURCES, worstBand } from './gvpBands';
 import type { ProductVerification } from './importVerify';
 import type { ProductPlacement } from './importTree';
+import { pow } from '../../lib/pow';
 
 export interface GvpWarning {
   readonly code: 'XCH_GVP_YELLOW' | 'XCH_GVP_RED' | 'XCH_GVP_NOT_CHECKABLE' | 'XCH_PMI_UNMAPPED';
@@ -64,7 +65,7 @@ const UNIT_NAMES: Readonly<Record<string, ImportProvenance['sourceUnit']>> = {
 };
 
 const scaleMm = (value: number | undefined, unit: DocumentUnit, power: number): number | undefined =>
-  value === undefined ? undefined : value / MM_PER_UNIT[unit] ** power;
+  value === undefined ? undefined : value / pow(MM_PER_UNIT[unit], power);
 
 /** PMI read in millimetres, expressed in the document unit (angles and the zone / face data are unchanged). */
 function pmiInUnit(pmi: ExchangePmi, unit: DocumentUnit): ExchangePmi {
@@ -132,6 +133,72 @@ export interface ProvenanceResult {
   readonly reasons: readonly string[];
 }
 
+const embeddedRecord = (
+  verification: ProductVerification | undefined,
+  assembly: boolean,
+  unit: DocumentUnit,
+): { embeddedGvp?: EmbeddedGvp[] } =>
+  verification?.embedded === undefined
+    ? {}
+    : { embeddedGvp: [inDocumentUnit({ ...verification.embedded, target: assembly ? 'assembly' : verification.embedded.target }, unit)] };
+
+/** The coded warning (and the review reason it adds) of a product's GVP band, or null when the band needs none. */
+function bandWarning(
+  band: GvpBand,
+  productName: string,
+  where: readonly string[],
+  worst: readonly string[] | undefined,
+  part: boolean,
+): { reason: string; warning: GvpWarning } | null {
+  if (band === 'yellow')
+    return {
+      reason: 'import_gvp_yellow',
+      warning: {
+        code: 'XCH_GVP_YELLOW',
+        severity: 'warn',
+        message: `product '${productName}': validation properties deviate from the sender's (${worst?.join(', ')})`,
+        entityIds: where,
+        remediation: 'report the numbers to the owner; continue only if the owner accepts the deviation',
+      },
+    };
+  if (band === 'red')
+    return {
+      reason: 'import_gvp_red',
+      warning: {
+        code: 'XCH_GVP_RED',
+        severity: 'fail',
+        message: `product '${productName}': validation properties disagree with the sender's beyond the yellow limit (${worst?.join(', ')})`,
+        entityIds: where,
+        remediation: 'do not deliver; a qualified reviewer decides (the import completed and the bodies are marked unverified)',
+      },
+    };
+  if (band === 'not-checkable' && part)
+    return {
+      reason: 'import_gvp_not_checkable',
+      warning: {
+        code: 'XCH_GVP_NOT_CHECKABLE',
+        severity: 'warn',
+        message: `product '${productName}': the sender embedded no usable validation property (absent or all zero)`,
+        entityIds: where,
+        remediation: 'ask the sender for validation properties or proceed with review; the geometry is marked unverified',
+      },
+    };
+  return null;
+}
+
+const policyReport = (policy: GvpPolicy): ExchangeReport['policy'] =>
+  Object.fromEntries(
+    (['greenRel', 'yellowRel', 'greenCentroidPerDiag', 'yellowCentroidMm'] as const).map((key) => [
+      key,
+      {
+        value: policy[key],
+        unit: key === 'yellowCentroidMm' ? 'mm' : key === 'greenCentroidPerDiag' ? 'x bounding-box diagonal' : 'relative',
+        source: GVP_POLICY_SOURCES[key],
+        defaulted: true,
+      },
+    ]),
+  ) as ExchangeReport['policy'];
+
 export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
   const { unit, imported, placements, solidIds, verifications, summary, policy } = input;
   const fileUnit = summary.lengthUnit;
@@ -197,13 +264,7 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
       sha256: input.sha256,
       productName: product.name,
       sourceUnit,
-      ...(verification?.embedded === undefined
-        ? {}
-        : {
-            embeddedGvp: [
-              inDocumentUnit({ ...verification.embedded, target: product.assembly ? 'assembly' : verification.embedded.target }, unit),
-            ],
-          }),
+      ...embeddedRecord(verification, product.assembly, unit),
       ...(verification === undefined ? {} : { gvpCheck: verification.check }),
       unverified: { value: unverifiedReasons.length > 0, reasons: unverifiedReasons },
     };
@@ -214,33 +275,10 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
     const worst = verification?.check.comparisons
       .filter((entry) => entry.band === band)
       .map((entry) => `${entry.property} delta ${entry.delta.toPrecision(3)}`);
-    if (band === 'yellow') {
-      reasons.add('import_gvp_yellow');
-      warnings.push({
-        code: 'XCH_GVP_YELLOW',
-        severity: 'warn',
-        message: `product '${product.name}': validation properties deviate from the sender's (${worst?.join(', ')})`,
-        entityIds: where,
-        remediation: 'report the numbers to the owner; continue only if the owner accepts the deviation',
-      });
-    } else if (band === 'red') {
-      reasons.add('import_gvp_red');
-      warnings.push({
-        code: 'XCH_GVP_RED',
-        severity: 'fail',
-        message: `product '${product.name}': validation properties disagree with the sender's beyond the yellow limit (${worst?.join(', ')})`,
-        entityIds: where,
-        remediation: 'do not deliver; a qualified reviewer decides (the import completed and the bodies are marked unverified)',
-      });
-    } else if (band === 'not-checkable' && isPart(imported, index)) {
-      reasons.add('import_gvp_not_checkable');
-      warnings.push({
-        code: 'XCH_GVP_NOT_CHECKABLE',
-        severity: 'warn',
-        message: `product '${product.name}': the sender embedded no usable validation property (absent or all zero)`,
-        entityIds: where,
-        remediation: 'ask the sender for validation properties or proceed with review; the geometry is marked unverified',
-      });
+    const flagged = bandWarning(band, product.name, where, worst, isPart(imported, index));
+    if (flagged !== null) {
+      reasons.add(flagged.reason);
+      warnings.push(flagged.warning);
     }
   }
   if ((imported.pmiUnmapped ?? 0) > 0) {
@@ -253,15 +291,6 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
       remediation: 'listed for the reviewer; no PMI is silently dropped (the unsupported items stay in the original file)',
     });
   }
-  const factors = (['greenRel', 'yellowRel', 'greenCentroidPerDiag', 'yellowCentroidMm'] as const).map((key) => [
-    key,
-    {
-      value: policy[key],
-      unit: key === 'yellowCentroidMm' ? 'mm' : key === 'greenCentroidPerDiag' ? 'x bounding-box diagonal' : 'relative',
-      source: GVP_POLICY_SOURCES[key],
-      defaulted: true,
-    },
-  ]);
   return {
     provenance,
     report: {
@@ -275,7 +304,7 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
         verified: verifications !== null,
         unit,
       },
-      policy: Object.fromEntries(factors) as ExchangeReport['policy'],
+      policy: policyReport(policy),
     },
     warnings,
     reasons: [...reasons],

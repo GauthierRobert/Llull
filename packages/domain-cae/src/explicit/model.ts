@@ -73,64 +73,74 @@ function historiesValid(spec: Record<string, unknown>): boolean {
   });
 }
 
-function specErrors(caseId: string, spec: unknown): string[] {
-  const where = `analysis.cases.${caseId}.explicit`;
-  if (!isRecord(spec)) return [`${where} is malformed`];
-  const errors: string[] = [];
+type Spec = Record<string, unknown>;
+
+const timingMalformed = (spec: Spec): boolean => {
   const endTime = spec['endTimeS'];
   const history = spec['historyIntervalS'];
-  if (
+  return (
     !finite(endTime) ||
     !finite(history) ||
     !((endTime as number) > 0) ||
     !((history as number) > 0) ||
     (history as number) > (endTime as number) ||
     !withinHistoryCap(endTime as number, history as number)
-  )
-    errors.push(`${where}: endTimeS / historyIntervalS must satisfy 0 < historyIntervalS <= endTimeS`);
+  );
+};
+
+const namedSettingsMalformed = (spec: Spec): boolean => {
   const bulk = spec['bulkViscosity'];
-  if (
+  return (
     !isNamed(spec['timeStepScale']) ||
     !isNamed(spec['hourglassCoefficient']) ||
     !isRecord(bulk) ||
     !isNamed(bulk['linear']) ||
     !isNamed(bulk['quadratic'])
-  )
-    errors.push(`${where}: named settings are malformed`);
+  );
+};
+
+const meshMalformed = (spec: Spec): boolean => {
   const mesh = spec['mesh'];
-  if (
+  return (
     !isRecord(mesh) ||
     (mesh['kind'] !== 'fea_mesh' && !(mesh['kind'] === 'structured_hex' && finite(mesh['size']) && (mesh['size'] as number) > 0))
-  )
-    errors.push(`${where}.mesh is malformed`);
+  );
+};
+
+const massScalingMalformed = (spec: Spec): boolean => {
   const scaling = spec['massScaling'];
-  if (
+  return (
     !isRecord(scaling) ||
     (scaling['mode'] !== 'none' &&
       !(scaling['mode'] === 'selective' && finite(scaling['targetTimeStepS']) && finite(scaling['maxAddedMassRatio'])))
-  )
-    errors.push(`${where}.massScaling is malformed`);
-  if (spec['gravity'] !== undefined && !isVec(spec['gravity'])) errors.push(`${where}.gravity must be [x, y, z]`);
+  );
+};
+
+const velocitiesMalformed = (spec: Spec): boolean => {
   const velocities = spec['initialVelocities'];
-  if (
+  return (
     !isRecord(velocities) ||
     !Object.values(velocities).every((entry) => isRecord(entry) && typeof entry['entityId'] === 'string' && isVec(entry['velocity']))
-  )
-    errors.push(`${where}.initialVelocities is malformed`);
+  );
+};
+
+const wallsMalformed = (spec: Spec): boolean => {
   const walls = spec['rigidWalls'];
   const order = spec['rigidWallOrder'];
-  if (
+  return (
     !isRecord(walls) ||
     !Array.isArray(order) ||
     order.some((id) => typeof id !== 'string' || !Object.hasOwn(walls, id)) ||
     !Object.values(walls).every(
       (wall) => isRecord(wall) && typeof wall['name'] === 'string' && isVec(wall['point']) && isVec(wall['normal']),
     )
-  )
-    errors.push(`${where}.rigidWalls / rigidWallOrder are malformed`);
+  );
+};
+
+const contactsMalformed = (spec: Spec): boolean => {
   const contacts = spec['contacts'];
   const contactOrder = spec['contactOrder'];
-  if (
+  return (
     contacts !== undefined &&
     (!isRecord(contacts) ||
       !Array.isArray(contactOrder) ||
@@ -143,13 +153,17 @@ function specErrors(caseId: string, spec: unknown): string[] {
           Array.isArray(entry['b']) &&
           isNamed(entry['penaltyScale']),
       ))
-  )
-    errors.push(`${where}.contacts / contactOrder are malformed`);
+  );
+};
+
+const shellsMalformed = (spec: Spec): boolean => {
   const shells = spec['shells'];
-  if (shells !== undefined && (!isRecord(shells) || !Object.values(shells).every((entry) => isRecord(entry) && finite(entry['points']))))
-    errors.push(`${where}.shells is malformed`);
+  return shells !== undefined && (!isRecord(shells) || !Object.values(shells).every((entry) => isRecord(entry) && finite(entry['points'])));
+};
+
+const failureMalformed = (spec: Spec): boolean => {
   const failure = spec['failure'];
-  if (
+  return (
     failure !== undefined &&
     (!isRecord(failure) ||
       !Object.values(failure).every(
@@ -160,11 +174,13 @@ function specErrors(caseId: string, spec: unknown): string[] {
           entry['D'].every(finite) &&
           typeof entry['source'] === 'string',
       ))
-  )
-    errors.push(`${where}.failure is malformed`);
+  );
+};
+
+const motionsMalformed = (spec: Spec): boolean => {
   const motions = spec['imposedMotions'];
   const motionOrder = spec['imposedMotionOrder'];
-  if (
+  return (
     motions !== undefined &&
     (!isRecord(motions) ||
       !Array.isArray(motionOrder) ||
@@ -180,15 +196,34 @@ function specErrors(caseId: string, spec: unknown): string[] {
           Array.isArray(entry['curve']) &&
           entry['curve'].every((point) => Array.isArray(point) && point.length === 2 && point.every(finite)),
       ))
-  )
-    errors.push(`${where}.imposedMotions / imposedMotionOrder are malformed`);
-  if (spec['timeHistories'] !== undefined && !historiesValid(spec)) errors.push(`${where}.timeHistories / timeHistoryOrder are malformed`);
+  );
+};
+
+const heatingMalformed = (spec: Spec): boolean => {
   const heating = spec['heating'];
-  if (
+  return (
     heating !== undefined &&
     (!isRecord(heating) || !Object.values(heating).every((entry) => isRecord(entry) && isNamed(entry['taylorQuinney'])))
-  )
-    errors.push(`${where}.heating is malformed`);
+  );
+};
+
+function specErrors(caseId: string, spec: unknown): string[] {
+  const where = `analysis.cases.${caseId}.explicit`;
+  if (!isRecord(spec)) return [`${where} is malformed`];
+  const errors: string[] = [];
+  if (timingMalformed(spec)) errors.push(`${where}: endTimeS / historyIntervalS must satisfy 0 < historyIntervalS <= endTimeS`);
+  if (namedSettingsMalformed(spec)) errors.push(`${where}: named settings are malformed`);
+  if (meshMalformed(spec)) errors.push(`${where}.mesh is malformed`);
+  if (massScalingMalformed(spec)) errors.push(`${where}.massScaling is malformed`);
+  if (spec['gravity'] !== undefined && !isVec(spec['gravity'])) errors.push(`${where}.gravity must be [x, y, z]`);
+  if (velocitiesMalformed(spec)) errors.push(`${where}.initialVelocities is malformed`);
+  if (wallsMalformed(spec)) errors.push(`${where}.rigidWalls / rigidWallOrder are malformed`);
+  if (contactsMalformed(spec)) errors.push(`${where}.contacts / contactOrder are malformed`);
+  if (shellsMalformed(spec)) errors.push(`${where}.shells is malformed`);
+  if (failureMalformed(spec)) errors.push(`${where}.failure is malformed`);
+  if (motionsMalformed(spec)) errors.push(`${where}.imposedMotions / imposedMotionOrder are malformed`);
+  if (spec['timeHistories'] !== undefined && !historiesValid(spec)) errors.push(`${where}.timeHistories / timeHistoryOrder are malformed`);
+  if (heatingMalformed(spec)) errors.push(`${where}.heating is malformed`);
   return errors;
 }
 

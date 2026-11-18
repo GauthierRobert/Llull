@@ -49,6 +49,49 @@ function layerResolver(doc: CadDocument): LayerResolver {
   };
 }
 
+interface EntitySink {
+  readonly entities: Record<string, Entity>;
+  readonly order: string[];
+  readonly affected: string[];
+  readonly counts: Map<string, number>;
+}
+
+type RegionLoops = Map<number, { loops: Vec2[][]; z: number; layerId: string; color: string }>;
+
+/** Creates the region entities of the collected hatch loops (a region where the loops form one, else one closed polyline per loop). */
+function addRegionEntities(regionLoops: RegionLoops, sink: EntitySink): void {
+  const { entities, order, affected, counts } = sink;
+  for (const { loops, z, layerId, color } of regionLoops.values()) {
+    const region = regionGeometry(loops);
+    const made: Entity[] =
+      region === null
+        ? loops.map((points) => newEntity('polyline', nextId('polyline'), { points, closed: true }, [0, 0, z], color, { layerId }))
+        : [makeRegion(region, z, layerId, color, null)];
+    for (const entity of made) {
+      entities[entity.id] = entity;
+      order.push(entity.id);
+      affected.push(entity.id);
+      const label = region === null ? 'polyline (region loop)' : 'region';
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+}
+
+const importNotes = (
+  created: readonly string[],
+  skipped: ReadonlyMap<string, number>,
+  flattened: number,
+  nonFinite: number,
+  truncated: number,
+): string[] =>
+  [
+    created.length > 0 ? `new layers: ${created.join(', ')}` : '',
+    skipped.size > 0 ? `skipped ${[...skipped].map(([type, count]) => `${count} ${type}`).join(', ')}` : '',
+    flattened > 0 ? `${flattened} 3D line(s)/polyline(s) flattened to their first elevation` : '',
+    nonFinite > 0 ? `${nonFinite} entities with non-finite coordinates (after unit scaling) not imported` : '',
+    truncated > 0 ? `${truncated} entities beyond the ${MAX_DXF_ENTITIES} limit not imported` : '',
+  ].filter((note) => note !== '');
+
 export const importDxf = defineCommand({
   name: 'import_dxf',
   description:
@@ -82,7 +125,7 @@ export const importDxf = defineCommand({
     const order = [...doc.order];
     const affected: string[] = [];
     const counts = new Map<string, number>();
-    const regionLoops = new Map<number, { loops: Vec2[][]; z: number; layerId: string; color: string }>();
+    const regionLoops: RegionLoops = new Map();
     const faces = new Map<string, { positions: number[]; indices: number[]; color: string }>();
     let flattened = 0;
     let truncated = 0;
@@ -134,20 +177,7 @@ export const importDxf = defineCommand({
         counts.set(label, (counts.get(label) ?? 0) + 1);
       });
     }
-    for (const { loops, z, layerId, color } of regionLoops.values()) {
-      const region = regionGeometry(loops);
-      const made: Entity[] =
-        region === null
-          ? loops.map((points) => newEntity('polyline', nextId('polyline'), { points, closed: true }, [0, 0, z], color, { layerId }))
-          : [makeRegion(region, z, layerId, color, null)];
-      for (const entity of made) {
-        entities[entity.id] = entity;
-        order.push(entity.id);
-        affected.push(entity.id);
-        const label = region === null ? 'polyline (region loop)' : 'region';
-        counts.set(label, (counts.get(label) ?? 0) + 1);
-      }
-    }
+    addRegionEntities(regionLoops, { entities, order, affected, counts });
     for (const [layerId, mesh] of faces) {
       const id = nextId('mesh');
       entities[id] = newEntity('mesh', id, { mesh }, [0, 0, 0], mesh.color, { layerId });
@@ -162,13 +192,7 @@ export const importDxf = defineCommand({
           (skipped.size > 0 ? ` (skipped ${[...skipped.keys()].join(', ')}).` : '.'),
       );
     const unitLabel = sourceUnit ?? (headerMm !== null ? `$INSUNITS ${drawing.insUnits}` : `${doc.units} (assumed)`);
-    const notes = [
-      resolver.created.length > 0 ? `new layers: ${resolver.created.join(', ')}` : '',
-      skipped.size > 0 ? `skipped ${[...skipped].map(([type, count]) => `${count} ${type}`).join(', ')}` : '',
-      flattened > 0 ? `${flattened} 3D line(s)/polyline(s) flattened to their first elevation` : '',
-      nonFinite > 0 ? `${nonFinite} entities with non-finite coordinates (after unit scaling) not imported` : '',
-      truncated > 0 ? `${truncated} entities beyond the ${MAX_DXF_ENTITIES} limit not imported` : '',
-    ].filter((note) => note !== '');
+    const notes = importNotes(resolver.created, skipped, flattened, nonFinite, truncated);
     return {
       document: { ...doc, entities, order, layers: resolver.layers, layerOrder: resolver.layerOrder },
       summary:

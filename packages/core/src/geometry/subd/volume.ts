@@ -3,6 +3,7 @@
 import type { Vec3 } from '../../model/types';
 import { cross3, dot3 } from '../../lib/vec3';
 import { type Cage, subdivide } from '../subdivision';
+import { pow } from '../../lib/pow';
 
 /** Signed volume of the fan triangulation of a closed, outward-wound polygon mesh. */
 function polygonMeshVolume(vertices: ReadonlyArray<Vec3>, faces: ReadonlyArray<ReadonlyArray<number>>): number {
@@ -25,7 +26,7 @@ export function levelMeshVolume(cage: Cage, levels: number): number {
 /** Quad count of the level mesh of `cage` at `levels` (without building it). */
 export function levelQuadCount(cage: Cage, levels: number): number {
   const corners = cage.faces.reduce((total, face) => total + face.length, 0);
-  return levels === 0 ? cage.faces.length : corners * 4 ** (levels - 1);
+  return levels === 0 ? cage.faces.length : corners * pow(4, levels - 1);
 }
 
 /**

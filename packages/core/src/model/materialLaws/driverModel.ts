@@ -12,6 +12,7 @@ import type { HillMaterial } from './hill';
 import { arrheniusLnShift, wlfLog10Shift } from './viscoelastic';
 import { convertQuantity, failure, isLawFailure, resolveAll, resolveParameter, type LawFailure, type ResolveEnv } from './resolve';
 import { resolveOrthotropicConstants } from './elasticResolve';
+import { pow } from '../../lib/pow';
 
 interface ElasticModel {
   readonly C: Matrix;
@@ -200,7 +201,7 @@ function resolveProny(model: MaterialModel, temperatureK: number | null): PronyM
       if (isLawFailure(C2)) return C2;
       const log10 = wlfLog10Shift(shift.C1, C2, reference, shift.referenceIsTg, temperatureK);
       if (isLawFailure(log10)) return log10;
-      shiftFactor = 10 ** log10;
+      shiftFactor = pow(10, log10);
     } else {
       const energy = convertQuantity(
         shift.activationEnergy.value,

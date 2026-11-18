@@ -22,6 +22,12 @@ const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): C
   selection: selection.filter((id) => id in doc.entities),
 });
 
+/** The backend's history flags carried by a live event (both optional on the wire: absent leaves the store's flags as they are). */
+const historyFlagsOf = (event: { readonly canUndo?: boolean; readonly canRedo?: boolean }): { canUndo?: boolean; canRedo?: boolean } => ({
+  ...(event.canUndo !== undefined ? { canUndo: event.canUndo } : {}),
+  ...(event.canRedo !== undefined ? { canRedo: event.canRedo } : {}),
+});
+
 const SET_SELECTION = 'set_selection';
 const KEPT_LOCAL_EDITS = 'Backend reconnected: the edits you made while it was offline were kept as a recoverable copy.';
 
@@ -104,6 +110,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
         document: withLocalSelection(reuseUnchanged(get().document, adopted), get().document.selection),
         localUndoStack: [],
         localRedoStack: [],
+        ...historyFlagsOf(snapshot),
         ...(offlineEdits > 0 ? { lastSummary: KEPT_LOCAL_EDITS } : {}),
       });
     },
@@ -114,7 +121,12 @@ export const useStore = create<CadStoreState>()((set, get) => {
       if (event.epoch !== state.liveEpoch) return false; // server restarted (or no snapshot yet)
       const applied = applyLiveCommand(state.liveBase, state.liveSeq, event);
       if (!applied.ok) return false;
-      set({ liveBase: applied.document, liveSeq: event.seq, document: withLocalSelection(applied.document, state.document.selection) });
+      set({
+        liveBase: applied.document,
+        liveSeq: event.seq,
+        document: withLocalSelection(applied.document, state.document.selection),
+        ...historyFlagsOf(event),
+      });
       return true;
     },
 

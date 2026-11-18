@@ -18,6 +18,7 @@ import { intentOf } from '@core/geometry/assemblyGraph';
 import { bisectEdge, goldenMinimum } from './motionRefine';
 import { type MotionPrefetch, prefetchMotion } from './motionPrefetch';
 import type { GeometryQueryEngine } from '@core/geometry/geometryQueries';
+import { pow } from '@lib/pow';
 
 /** Most substeps between two recorded samples (pose interpolation against tunnelling). */
 const MAX_SUBSTEPS = 16;
@@ -456,7 +457,7 @@ export function runMotion(plan: MotionPlan, budget: Budget): MotionOutcome {
         intervals: contact.length,
         firstContactTimeS: contact[0]?.from.timeS ?? 0,
         minDistanceMm: 0,
-        ...(worst.volume === null ? {} : { maxOverlapVolumeMm3: worst.volume * mmPerUnit ** 3 }),
+        ...(worst.volume === null ? {} : { maxOverlapVolumeMm3: worst.volume * pow(mmPerUnit, 3) }),
         ...(worst.depth === null ? {} : { maxPenetrationEstimateMm: worst.depth * mmPerUnit }),
       };
       const witness = momentWitness(worst.worst?.moment ?? worst.from, worst.worst?.witness ?? best?.witness ?? [], mmPerUnit);
@@ -521,7 +522,7 @@ export function runMotion(plan: MotionPlan, budget: Budget): MotionOutcome {
           startCrankDeg: interval.from.crankDeg,
           endCrankDeg: interval.to.crankDeg,
           evaluations: interval.evaluations,
-          overlapVolumeMm3: interval.volume === null ? null : interval.volume * mmPerUnit ** 3,
+          overlapVolumeMm3: interval.volume === null ? null : interval.volume * pow(mmPerUnit, 3),
           penetrationEstimateMm: interval.depth === null ? null : interval.depth * mmPerUnit,
         })),
     });

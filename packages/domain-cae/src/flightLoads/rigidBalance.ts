@@ -11,6 +11,7 @@ import { toMetres } from '@core/model/units';
 import type { Vec3 } from '@core/model/vectors';
 import { densityToAnalysis } from '../decks/units';
 import { analysisLengthMetres } from '../shared/defaults';
+import { powInt } from '@lib/powInt';
 
 /** Relative reaction (residual wrench over the applied load) above which the case is not balanced (spec 14 FLL section 4). */
 export const RELIEF_TOLERANCE = 1e-4;
@@ -68,7 +69,7 @@ function bodyMass(doc: CadDocument, analysis: AnalysisCase, length: number, ctx:
     const densityOf = (solid: { readonly materialId?: string | undefined }): number => {
       const material =
         solid.materialId !== undefined && Object.hasOwn(doc.materials, solid.materialId) ? doc.materials[solid.materialId] : undefined;
-      return material === undefined ? 0 : densityToAnalysis(material.density, doc.units, analysis.unitSystem) * length ** 3;
+      return material === undefined ? 0 : densityToAnalysis(material.density, doc.units, analysis.unitSystem) * powInt(length, 3);
     };
     const resolved = resolveMassProperties(doc, entity, densityOf, ctx);
     if (resolved === null || !(resolved.properties.mass > 0)) return `part '${entityId}' has no mass (material with a density?)`;

@@ -6,6 +6,7 @@
 
 import type { Vec3 } from '@core/model/types';
 import type { IndexedSurface } from './weld';
+import { powInt } from '@lib/powInt';
 
 /** Rows (y, z cells) beyond which the cast is skipped. */
 export const MAX_RAY_ROWS = 4_000_000;
@@ -90,7 +91,7 @@ export function voxelise(surface: IndexedSurface, min: Vec3, max: Vec3, h: numbe
       cells += Math.max(0, last - first);
     }
   }
-  return { cellSizeM: h, cells, volumeM3: cells * h ** 3, oddRows };
+  return { cellSizeM: h, cells, volumeM3: cells * powInt(h, 3), oddRows };
 }
 
 /**

@@ -96,8 +96,8 @@ function useFrontal(bodyIds: readonly string[], flow: Vec3 | null): FrontalMeasu
     const measured = execute(document, 'frontal_area', { entityIds: [...bodyIds], flowDirection: flow });
     const frontal = parseFrontal(measured.data);
     return { measured, frontal, bounds: frontal === null ? null : boundsOf(document, bodyIds) };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `bodies` (entity identities) and `flowKey` stand for document + flow
-  }, [bodies, bodyIds, flowKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `bodies` (entity identities), units and `flowKey` stand for document + flow
+  }, [bodies, bodyIds, flowKey, document.units]);
 }
 
 export function useBodyAnalysis(inputs: AeroInputs): BodyAnalysis {

@@ -135,8 +135,8 @@ a hostile document loaded with `load_document` cannot inject code into `export_s
 | `import_step` | `stepBase64` or `path`, producing `import_mesh` (undoable).                                                                                                |
 | `import_code` | `code` or `path`, `language`, `mode: replace / append`. Produces `apply_code_trace` (undoable).                                                            |
 
-HTTP downloads for the browser: `GET /export/code?language=cadquery|build123d|openscad|freecad`
-and `GET /export/step` (503 when the bridge is not configured).
+HTTP download for the desktop UI: `GET /export/step` (503 when neither the Python bridge nor the exact kernel is available). STL and code
+exports go through `export_stl` / `export_code` (CLI, `POST /exchange`).
 
 ### CLI (agents, desktop app)
 

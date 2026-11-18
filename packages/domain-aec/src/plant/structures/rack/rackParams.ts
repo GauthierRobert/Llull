@@ -68,19 +68,8 @@ type Fields = { [Key in keyof typeof rackFieldParams]?: z.infer<(typeof rackFiel
 
 const problem = (code: RackProblem['code'], message: string, ...paths: string[]): RackProblem => ({ code, message, paths });
 
-/**
- * The spec from `fields` over `current` (null on add). Pushes the defaults it used onto `defaults` on add.
- * @failure missing / contradictory fields -> STA_RACK_SPACING (bays), STA_RACK_TIERS, STA_INVALID_GEOMETRY (profiles, origin, direction)
- */
-export function resolveRack(fields: Fields, current: RackSpec | null, defaults: string[]): RackSpec | RackProblem {
-  const origin = fields.origin ?? current?.origin;
-  const direction = fields.direction ?? current?.direction;
-  if (origin === undefined || direction === undefined)
-    return problem('STA_INVALID_GEOMETRY', 'give origin and direction', 'origin', 'direction');
-  const norm = Math.hypot(direction[0], direction[1]);
-  if (!(norm > 0) || ![...origin, ...direction].every(Number.isFinite))
-    return problem('STA_INVALID_GEOMETRY', 'origin must be finite and direction a non-zero plan vector', 'origin', 'direction');
-
+/** The bent positions: explicit stations, else length + bentSpacing (each over the stored ones), or a problem. */
+function resolveAlong(fields: Fields, current: RackSpec | null): RackSpec['along'] | RackProblem {
   let along: RackSpec['along'] | undefined = current?.along;
   if (fields.stations !== undefined) {
     if (fields.length !== undefined || fields.bentSpacing !== undefined)
@@ -96,20 +85,24 @@ export function resolveRack(fields: Fields, current: RackSpec | null, defaults: 
   }
   if (along === undefined)
     return problem('STA_RACK_SPACING', 'give length with bentSpacing, or stations', 'length', 'bentSpacing', 'stations');
+  return along;
+}
 
+/** The column-line spacing: width or baysAcross (over the stored one), or a problem. */
+function resolveAcross(fields: Fields, current: RackSpec | null): RackSpec['across'] | RackProblem {
   let across: RackSpec['across'] | undefined = current?.across;
   if (fields.width !== undefined && fields.baysAcross !== undefined)
     return problem('STA_RACK_SPACING', 'give width or baysAcross, not both', 'width', 'baysAcross');
   if (fields.width !== undefined) across = { width: fields.width };
   else if (fields.baysAcross !== undefined) across = { baysAcross: fields.baysAcross };
   if (across === undefined) return problem('STA_RACK_SPACING', 'give width or baysAcross', 'width', 'baysAcross');
+  return across;
+}
 
-  const tiers = fields.tiers ?? current?.tiers;
-  if (tiers === undefined) return problem('STA_RACK_TIERS', 'give tiers', 'tiers');
-  const columnProfile = fields.columnProfile ?? current?.columnProfile;
-  const tierBeamProfile = fields.tierBeamProfile ?? current?.tierBeamProfile;
-  if (columnProfile === undefined || tierBeamProfile === undefined)
-    return problem('STA_INVALID_GEOMETRY', 'give columnProfile and tierBeamProfile', 'columnProfile', 'tierBeamProfile');
+type Rest = Pick<RackSpec, 'strutProfile' | 'struts' | 'bracingBays' | 'bracingProfile' | 'baseFixity' | 'gridPrefix'>;
+
+/** Struts, bracing, base fixity and grid prefix: explicit, else stored, else named defaults (recorded on add). */
+function resolveRest(fields: Fields, current: RackSpec | null, defaults: string[], tierBeamProfile: string): Rest {
   const strutProfile = fields.strutProfile ?? current?.strutProfile ?? tierBeamProfile;
   if (current === null && fields.strutProfile === undefined) defaults.push(`strutProfile ${tierBeamProfile} (the tier beam profile)`);
   const struts = fields.struts ?? current?.struts ?? 'every_tier';
@@ -120,6 +113,36 @@ export function resolveRack(fields: Fields, current: RackSpec | null, defaults: 
   if (current === null && baseFixity === undefined) defaults.push('baseFixity unset (pinned unless a base plate fixes it)');
   const gridPrefix = fields.gridPrefix ?? current?.gridPrefix ?? DEFAULT_GRID_PREFIX;
   if (current === null && fields.gridPrefix === undefined) defaults.push(`gridPrefix ${DEFAULT_GRID_PREFIX}`);
+  return { strutProfile, struts, bracingBays, bracingProfile, baseFixity, gridPrefix };
+}
+
+const isProblem = (value: object): value is RackProblem => 'code' in value;
+
+/**
+ * The spec from `fields` over `current` (null on add). Pushes the defaults it used onto `defaults` on add.
+ * @failure missing / contradictory fields -> STA_RACK_SPACING (bays), STA_RACK_TIERS, STA_INVALID_GEOMETRY (profiles, origin, direction)
+ */
+export function resolveRack(fields: Fields, current: RackSpec | null, defaults: string[]): RackSpec | RackProblem {
+  const origin = fields.origin ?? current?.origin;
+  const direction = fields.direction ?? current?.direction;
+  if (origin === undefined || direction === undefined)
+    return problem('STA_INVALID_GEOMETRY', 'give origin and direction', 'origin', 'direction');
+  const norm = Math.hypot(direction[0], direction[1]);
+  if (!(norm > 0) || ![...origin, ...direction].every(Number.isFinite))
+    return problem('STA_INVALID_GEOMETRY', 'origin must be finite and direction a non-zero plan vector', 'origin', 'direction');
+
+  const along = resolveAlong(fields, current);
+  if (isProblem(along)) return along;
+  const across = resolveAcross(fields, current);
+  if (isProblem(across)) return across;
+
+  const tiers = fields.tiers ?? current?.tiers;
+  if (tiers === undefined) return problem('STA_RACK_TIERS', 'give tiers', 'tiers');
+  const columnProfile = fields.columnProfile ?? current?.columnProfile;
+  const tierBeamProfile = fields.tierBeamProfile ?? current?.tierBeamProfile;
+  if (columnProfile === undefined || tierBeamProfile === undefined)
+    return problem('STA_INVALID_GEOMETRY', 'give columnProfile and tierBeamProfile', 'columnProfile', 'tierBeamProfile');
+  const rest = resolveRest(fields, current, defaults, tierBeamProfile);
   return {
     kind: 'pipe_rack',
     origin,
@@ -129,11 +152,11 @@ export function resolveRack(fields: Fields, current: RackSpec | null, defaults: 
     tiers,
     columnProfile,
     tierBeamProfile,
-    strutProfile,
-    struts,
-    bracingBays,
-    ...(bracingProfile === undefined ? {} : { bracingProfile }),
-    ...(baseFixity === undefined ? {} : { baseFixity }),
-    gridPrefix,
+    strutProfile: rest.strutProfile,
+    struts: rest.struts,
+    bracingBays: rest.bracingBays,
+    ...(rest.bracingProfile === undefined ? {} : { bracingProfile: rest.bracingProfile }),
+    ...(rest.baseFixity === undefined ? {} : { baseFixity: rest.baseFixity }),
+    gridPrefix: rest.gridPrefix,
   };
 }

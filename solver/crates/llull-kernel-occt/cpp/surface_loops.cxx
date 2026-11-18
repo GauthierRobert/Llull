@@ -243,7 +243,7 @@ Loop read_loop(Cursor &in, bool outer, bool closed, size_t &budget) {
     } else {
       const Handle(Geom2d_BSplineCurve) curve = read_pcurve(in);
       if (curve->StartPoint().Distance(cursor) > kJoin) throw std::invalid_argument("regions: a curve does not start where the loop is");
-      loop.segments.push_back(Segment{curve, curve->StartPoint(), curve->EndPoint()});
+      loop.segments.push_back(Segment{Handle(Geom2d_Curve)(curve), curve->StartPoint(), curve->EndPoint()});
       cursor = curve->EndPoint();
     }
   }

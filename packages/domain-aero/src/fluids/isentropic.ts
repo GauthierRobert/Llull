@@ -1,6 +1,7 @@
 /** Quasi-1D isentropic flow of a calorically perfect gas (NACA Report 1135 eqs. 43-45, 80): ratios to stagnation / sonic state, inverses. */
 
 import { bisect } from '@lib/bisect';
+import { pow } from '@lib/pow';
 
 export interface IsentropicState {
   readonly mach: number;
@@ -26,7 +27,7 @@ export const stagnationTemperatureFactor = (mach: number, gamma: number): number
 /** A / A* = (1/M) [ (2/(γ+1)) (1 + (γ-1)/2 M²) ]^((γ+1)/(2(γ-1))). */
 export function areaRatio(mach: number, gamma: number): number {
   const exponent = (gamma + 1) / (2 * (gamma - 1));
-  return ((2 / (gamma + 1)) * stagnationTemperatureFactor(mach, gamma)) ** exponent / mach;
+  return pow((2 / (gamma + 1)) * stagnationTemperatureFactor(mach, gamma), exponent) / mach;
 }
 
 /** Prandtl-Meyer function ν(M) in radians, M ≥ 1. */
@@ -42,8 +43,8 @@ export function isentropicState(mach: number, gamma: number): IsentropicState {
   return {
     mach,
     temperatureRatio,
-    pressureRatio: temperatureRatio ** (gamma / (gamma - 1)),
-    densityRatio: temperatureRatio ** (1 / (gamma - 1)),
+    pressureRatio: pow(temperatureRatio, gamma / (gamma - 1)),
+    densityRatio: pow(temperatureRatio, 1 / (gamma - 1)),
     areaRatio: areaRatio(mach, gamma),
     prandtlMeyerDeg: prandtlMeyer(mach, gamma) * DEG,
     machAngleDeg: mach > 1 ? Math.asin(1 / mach) * DEG : 90,
@@ -65,7 +66,7 @@ export function machFromAreaRatio(ratio: number, gamma: number, branch: 'subsoni
 
 /** Mach from p / p0 in (0, 1] (closed form). */
 export const machFromPressureRatio = (ratio: number, gamma: number): number =>
-  Math.sqrt((2 / (gamma - 1)) * (ratio ** (-(gamma - 1) / gamma) - 1));
+  Math.sqrt((2 / (gamma - 1)) * (pow(ratio, -(gamma - 1) / gamma) - 1));
 
 /** Mach from T / T0 in (0, 1] (closed form). */
 export const machFromTemperatureRatio = (ratio: number, gamma: number): number => Math.sqrt((2 / (gamma - 1)) * (1 / ratio - 1));

@@ -11,6 +11,7 @@ import type { BuiltModel } from '../model/build';
 import type { OperatingConditions } from '../model/schema';
 import type { CaseState } from '../solve/run';
 import { computeAllowables } from './allowables';
+import { powInt } from '@lib/powInt';
 
 export interface StressRow {
   readonly case: string;
@@ -89,6 +90,19 @@ export interface CodeStressResult {
   readonly allowables: { readonly f: number; readonly SA1aMPa: number; readonly occasionalFactor: number };
 }
 
+function operatingLimit(
+  type: CaseState['type'],
+  occasionalMPa: number,
+  hydroMPa: number | undefined,
+  sustainedAllowableMPa: number,
+): number {
+  return type === 'OCC' ? occasionalMPa : type === 'HYD' ? (hydroMPa ?? Number.NaN) : sustainedAllowableMPa;
+}
+
+function operatingRule(type: CaseState['type'], b311: boolean): string {
+  return type === 'OCC' ? (b311 ? 'B311-OCC' : 'B313-OCC') : type === 'HYD' ? (b311 ? 'B311-HYD' : 'B313-HYD') : 'B313-SA-1A';
+}
+
 /** Stress rows of every case (sustained and occasional first so the expansion allowable can use S_L per node). */
 export function codeStresses({ built, conditions, states }: CodeStressInput): CodeStressResult {
   const { set } = built;
@@ -135,7 +149,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
       const od = element.odMm;
       const inner = od - 2 * wall;
       const area = (Math.PI / 4) * (od ** 2 - inner ** 2);
-      const pipeZ = (Math.PI / 32) * ((od ** 4 - inner ** 4) / od);
+      const pipeZ = (Math.PI / 32) * ((powInt(od, 4) - powInt(inner, 4)) / od);
       const pressure = state.pressureBar * BAR_TO_MPA;
       for (const s of stations(state.elementForces, index * 12, axes.length, local as [number, number, number])) {
         const node = s.end === null ? null : nodeId(s.end === 'a' ? element.a : element.b);
@@ -187,22 +201,8 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
             stress = Math.sqrt((Math.abs(axial) + Sb) ** 2 + (2 * (s.torsion / (2 * Z))) ** 2);
             equation = 'S_L = sqrt((|S_a| + S_b)^2 + (2 S_t)^2)';
           }
-          limit =
-            state.type === 'OCC'
-              ? base.occasionalMPa
-              : state.type === 'HYD'
-                ? (conditions.hydro?.allowableMPa ?? Number.NaN)
-                : material.ShMPa;
-          rule =
-            state.type === 'OCC'
-              ? b311
-                ? 'B311-OCC'
-                : 'B313-OCC'
-              : state.type === 'HYD'
-                ? b311
-                  ? 'B311-HYD'
-                  : 'B313-HYD'
-                : 'B313-SA-1A';
+          limit = operatingLimit(state.type, base.occasionalMPa, conditions.hydro?.allowableMPa, material.ShMPa);
+          rule = operatingRule(state.type, b311);
           if (state.type === 'SUS' && node !== null) sustainedAtNode.set(node, Math.max(sustainedAtNode.get(node) ?? 0, stress));
         }
         out.push({

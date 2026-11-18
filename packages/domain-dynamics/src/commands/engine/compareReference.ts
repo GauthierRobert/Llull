@@ -1,44 +1,18 @@
 /** Validation of the engine model against stored reference data (compare_to_reference, FR-FPR-77 / 78, TR-FPR-18). */
 
-import type { DynamicsModel } from '@core/model/dynamics';
-import type { ReferenceData, ReferencePoint } from '@core/model/prototype';
-import { couplingsOf } from '@core/model/transmissions';
-import { comparePoint, summariseComparison, type PointComparison } from '../../sim/engine/referenceComparison';
-import type { AccuracyBand } from '../../sim/accuracy';
+import { summariseComparison } from '../../sim/engine/referenceComparison';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { codedRejection, failer, report } from '@core/commands/noop';
-import { type ReviewItem, reviewItem, reviewResult } from '@core/model/reviewEnvelope';
+import { reviewResult } from '@core/model/reviewEnvelope';
 import { dynamicsOf } from '../bodies';
-import { crankOf, runOperatingPoint, type PointRun } from './operatingPoint';
+import { crankOf } from './operatingPoint';
+import { BRAKE_KEYS, compareWork, pointEnv, timestepNumerical, workOf } from './compareReferencePoints';
 import { compareSeriesReferences } from './referenceSeries';
 
 const NAME = 'compare_to_reference';
 /** Operating points per call (TECHNICAL_SPEC 8 budget: Rotax curve of 9 points in under 30 s). */
 const MAX_POINTS = 12;
-/** Mean speed of the last quarter against the one before it above which a free run is reported as not settled. */
-const SETTLED_DRIFT = 0.02;
-const BRAKE_KEYS = { brake_torque_Nm: 'brakeTorqueNm', brake_power_kW: 'brakePowerKW', bmep_bar: 'bmepBar' } as const;
-
-interface Work {
-  readonly reference: ReferenceData;
-  readonly point: ReferencePoint;
-}
-
-const statusOf = (comparison: PointComparison): ReviewItem['status'] => comparison.status;
-
-/** Speed ratio (driven / driver) from `crank` to `joint` through the gear couplings; 1 when they are the same joint, null when unconnected. */
-function ratioFromCrank(dynamics: DynamicsModel, crank: string, joint: string): number | null {
-  let [current, ratio] = [crank, 1];
-  const couplings = couplingsOf(dynamics);
-  for (let guard = 0; guard <= couplings.length; guard++) {
-    if (current === joint) return ratio;
-    const gear = couplings.find((candidate) => candidate.driver === current);
-    if (gear === undefined) return null;
-    [current, ratio] = [gear.driven, ratio * gear.ratio];
-  }
-  return null;
-}
 
 /**
  * @affects nothing — read-only; data { review envelope, points[], summary, numerical }
@@ -116,9 +90,7 @@ export const compareToReference = defineCommand({
     const crank = crankOf(dynamics);
     if (crank === undefined) return fail('the model has no cylinder pressure (add_cylinder_pressure first)');
     const losses = Object.values(dynamics.losses ?? {}).find((record) => record.crank === crank);
-    const wanted = (point: ReferencePoint): boolean =>
-      params.points === undefined || (point.rpm !== undefined && params.points.some((rpm) => Math.abs(rpm - (point.rpm ?? NaN)) < 0.5));
-    const work: Work[] = selected.flatMap((reference) => reference.points.filter(wanted).map((point) => ({ reference, point })));
+    const work = workOf(selected, params.points);
     if (work.length === 0) return fail('no reference point matches the requested rpm points');
     if (work.length > MAX_POINTS)
       return codedRejection(
@@ -140,149 +112,9 @@ export const compareToReference = defineCommand({
         'Run set_engine_losses on the crank (chen_flynn or fmep_table with a source), calibrate the heat release to a brake point, then retry.',
         [crank],
       );
-    const cycles = params.cycles ?? 2;
-    const governed = new Map<number, PointRun | { error: string }>();
-    const governedAt = (rpm: number, timestepS?: number): PointRun | { error: string } =>
-      runOperatingPoint(doc, { mode: 'governed', rpm, cycles, ...(timestepS !== undefined ? { timestepS } : {}) }, context);
-    const items: ReviewItem[] = [];
-    const comparisons: PointComparison[] = [];
-    // U_num: the brake torque at the calibration point (else the first governed point) at dt and dt/2
-    let numericalRel: number | null = null;
-    let numerical: { rpm: number; timestepS: number; halfTimestepS: number; brakeTorqueChange: number } | null = null;
-    const brakeWork = work.filter(({ reference, point }) => reference.quantity in BRAKE_KEYS && point.rpm !== undefined);
-    const anchor = brakeWork.find(({ reference, point }) => reference.calibrationRpm.includes(point.rpm ?? NaN)) ?? brakeWork[0];
-    if (params.timestepHalving !== false && anchor?.point.rpm !== undefined) {
-      const base = governedAt(anchor.point.rpm);
-      governed.set(anchor.point.rpm, base);
-      const baseBrake = 'error' in base ? undefined : base.report.realism?.losses?.brakeTorqueNm;
-      if (!('error' in base) && baseBrake !== undefined) {
-        const fine = governedAt(anchor.point.rpm, base.timestepS / 2);
-        const fineBrake = 'error' in fine ? undefined : fine.report.realism?.losses?.brakeTorqueNm;
-        if (fineBrake !== undefined && baseBrake !== 0) {
-          numericalRel = Math.abs(fineBrake - baseBrake) / Math.abs(baseBrake);
-          numerical = {
-            rpm: anchor.point.rpm,
-            timestepS: base.timestepS,
-            halfTimestepS: base.timestepS / 2,
-            brakeTorqueChange: numericalRel,
-          };
-        }
-      }
-    }
-    const notRun = (entry: Work, why: string): void => {
-      items.push(
-        reviewItem(
-          'dynamics',
-          'FPR_REFERENCE_MISMATCH',
-          'not_run',
-          [entry.reference.id],
-          `${why}: fix the model or the point, then retry.`,
-          {
-            values: entry.point.rpm === undefined ? {} : { rpm: entry.point.rpm },
-            unverified: true,
-            note: why,
-            findingKey: `dynamics:FPR_REFERENCE_MISMATCH:${entry.reference.id}@${entry.point.rpm ?? 'n/a'}`,
-          },
-        ),
-      );
-    };
-    for (const entry of work) {
-      const { reference, point } = entry;
-      let simulated: number;
-      let inputBand: AccuracyBand = null;
-      let outside = false;
-      let drifted: number | null = null;
-      const key = BRAKE_KEYS[reference.quantity as keyof typeof BRAKE_KEYS];
-      if (key !== undefined) {
-        if (point.rpm === undefined) {
-          notRun(entry, `a ${reference.quantity} point needs an rpm`);
-          continue;
-        }
-        const run = governed.get(point.rpm) ?? governedAt(point.rpm);
-        governed.set(point.rpm, run);
-        if ('error' in run) {
-          notRun(entry, `the run at ${point.rpm} rpm failed: ${run.error}`);
-          continue;
-        }
-        const loss = run.report.realism?.losses;
-        if (loss === null || loss === undefined) {
-          notRun(entry, `no brake figures at ${point.rpm} rpm`);
-          continue;
-        }
-        simulated = loss[key] * (key === 'bmepBar' ? 1 : (params.engineCylinders ?? 1));
-        inputBand = run.report.realism?.accuracy[key]?.band ?? null;
-        outside = loss.outsideValidatedRange;
-      } else if (reference.quantity === 'static_rpm' || reference.quantity === 'propeller_rpm') {
-        const propeller = Object.values(dynamics.propellers)[0];
-        if (propeller === undefined) {
-          notRun(entry, `${reference.quantity} needs a propeller on the engine (add_propeller)`);
-          continue;
-        }
-        const start = point.value;
-        const run = runOperatingPoint(
-          doc,
-          { mode: 'free', rpm: start, cycles: Math.max(1, Math.ceil(((params.durationS ?? 2) * start) / 120)) },
-          context,
-        );
-        if ('error' in run) {
-          notRun(entry, `the free run failed: ${run.error}`);
-          continue;
-        }
-        const ratio = reference.quantity === 'propeller_rpm' ? ratioFromCrank(dynamics, crank, propeller.joint) : 1;
-        if (ratio === null) {
-          notRun(entry, `propeller joint '${propeller.joint}' is not coupled to the crank '${crank}' by gears`);
-          continue;
-        }
-        simulated = run.meanRpm * Math.abs(ratio);
-        drifted = run.drift;
-      } else {
-        notRun(entry, `${reference.quantity} is not modelled (no fuel model)`);
-        continue;
-      }
-      // U_num comes from halving at a governed brake point: it does not describe a free-equilibrium rpm (listed missing there)
-      const pointNumerical = reference.quantity in BRAKE_KEYS ? numericalRel : null;
-      const comparison = comparePoint({ reference, point, simulated, numericalRel: pointNumerical, inputBand });
-      comparisons.push(comparison);
-      const where = point.rpm === undefined ? '' : `@${point.rpm}`;
-      items.push(
-        reviewItem(
-          'dynamics',
-          comparison.status === 'pass' || comparison.status === 'info' ? 'FPR_REFERENCE_MATCH' : 'FPR_REFERENCE_MISMATCH',
-          statusOf(comparison),
-          [reference.id],
-          comparison.status === 'fail' || comparison.status === 'warn'
-            ? 'Review the model input with the largest band (friction constants, heat release, burn phasing); away from the calibration point the torque-curve shape is a prediction without a breathing model.'
-            : 'None.',
-          {
-            values: {
-              ...(point.rpm === undefined ? {} : { rpm: point.rpm }),
-              simulated: comparison.simulated,
-              reference: comparison.reference,
-              error: comparison.error,
-              errorRel: comparison.errorRel,
-              bandRel: comparison.bandRel,
-              ...(comparison.uncertainty.validation === null ? {} : { validationUncertainty: comparison.uncertainty.validation }),
-            },
-            findingKey: `dynamics:${comparison.status === 'pass' || comparison.status === 'info' ? 'FPR_REFERENCE_MATCH' : 'FPR_REFERENCE_MISMATCH'}:${reference.id}${where}`,
-            unverified: comparison.origin === 'calibrated',
-            note: `${comparison.origin}${comparison.uncertainty.missing.length > 0 ? `; missing: ${comparison.uncertainty.missing.join(', ')}` : ''}`,
-          },
-        ),
-      );
-      if (outside || (drifted !== null && drifted > SETTLED_DRIFT))
-        items.push(
-          reviewItem(
-            'dynamics',
-            'FPR_OUTSIDE_VALIDATED_RANGE',
-            'warn',
-            [reference.id],
-            outside
-              ? 'The friction table does not cover this speed: add FMEP data for it or restrict the points.'
-              : 'The free run has not settled: lengthen durationS.',
-            { values: point.rpm === undefined ? {} : { rpm: point.rpm }, unverified: true },
-          ),
-        );
-    }
+    const env = pointEnv(doc, params, context, dynamics, crank);
+    const { rel: numericalRel, numerical } = timestepNumerical(env, work);
+    const { items, comparisons } = compareWork(env, work, numericalRel);
     const summary = summariseComparison(comparisons);
     const result = reviewResult(
       'dynamics',

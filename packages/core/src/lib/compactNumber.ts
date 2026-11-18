@@ -1,3 +1,4 @@
+import { pow } from './pow';
 export function fixedNumber(v: number, decimals: number): string {
   return parseFloat(v.toFixed(decimals)).toString();
 }
@@ -7,7 +8,7 @@ export function compactNumber(v: number): string {
 }
 
 export function roundTo(v: number, decimals: number): number {
-  const scale = 10 ** decimals;
+  const scale = pow(10, decimals);
   return Math.round(v * scale) / scale;
 }
 

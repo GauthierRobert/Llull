@@ -8,7 +8,7 @@ import { drillTipHeight } from '../../lib/holeMath';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { worldToFrame } from '../../geometry/featureFrame';
-import { dot3 } from '../../lib/vec3';
+import { dot3, map3 } from '../../lib/vec3';
 import type { CommandResult } from '../types';
 import { defineCommand, vec2, z } from '../schema';
 import { currentContext } from '../context';
@@ -153,8 +153,8 @@ export const holeTable = defineCommand({
         id: hole.id,
         x,
         y,
-        face: hole.frame.normal.map(rounded) as unknown as Vec3,
-        at: (part.source === 'authored' ? entityLocalToWorld(entity, hole.position) : hole.position).map(rounded) as unknown as Vec3,
+        face: map3(hole.frame.normal, rounded),
+        at: map3(part.source === 'authored' ? entityLocalToWorld(entity, hole.position) : hole.position, rounded),
         subtype: hole.kind,
         diameter: hole.diameter,
         ...(hole.cskDiameter === undefined ? {} : { cskDiameter: hole.cskDiameter }),

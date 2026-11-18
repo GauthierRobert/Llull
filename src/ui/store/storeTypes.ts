@@ -23,7 +23,7 @@ export interface DispatchOptions {
   onResult?: (result: DispatchResult) => void;
   /** Leave the status-bar summary untouched (automatic UI commands such as framing). */
   quiet?: boolean;
-  /** Local mode: fold into the previous undo step (automatic follow-ups such as framing) so one Undo reverts both. */
+  /** Fold into the previous undo step (automatic follow-ups such as framing, a held nudge key) so one Undo reverts both: local mode and the backend. */
   coalesce?: boolean;
 }
 

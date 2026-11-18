@@ -3,8 +3,8 @@ import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { heatLossPerMetre } from '../heatLoss';
 import { getPiping, refuse } from '../model';
-import { deriveRun } from '../routeParts';
 import { createSpecLookup, isMiss } from '../specLookup';
+import { heatLossBase, heatLossProvenance, inputIssue, insulationConductivity, routedLength, tracingOf } from './lineHeatLossPhases';
 
 /**
  * @affects none (query: returns the same document; results in `data`)
@@ -67,22 +67,8 @@ export const lineHeatLoss = defineCommand({
     const line = piping.lines[params.lineId];
     if (line === undefined) return refuse(doc, 'line_heat_loss', 'RTE_UNKNOWN_LINE', `no pipe line "${params.lineId}"`, [], ['lineId']);
     const bad = (path: string, why: string): CommandResult => refuse(doc, 'line_heat_loss', 'RTE_HEAT_LOSS_INPUT', why, [line.id], [path]);
-    for (const [path, value] of [
-      ['outsideFilmWm2K', params.outsideFilmWm2K],
-      ['steelConductivityWmK', params.steelConductivityWmK],
-      ['insideFilmWm2K', params.insideFilmWm2K],
-      ['insulationConductivityWmK', params.insulationConductivityWmK],
-    ] as const)
-      if (value !== undefined && !(value > 0)) return bad(path, `${path} must be > 0 (got ${value})`);
-    if (params.outsideEmissivity !== undefined && !(params.outsideEmissivity > 0 && params.outsideEmissivity <= 1))
-      return bad('outsideEmissivity', `outsideEmissivity must be in (0, 1] (got ${params.outsideEmissivity})`);
-    if (params.insulationConductivitySlopeWmK2 !== undefined && !Number.isFinite(params.insulationConductivitySlopeWmK2))
-      return bad('insulationConductivitySlopeWmK2', 'insulationConductivitySlopeWmK2 must be a finite number');
-    if ((params.insulationConductivitySlopeWmK2 === undefined) !== (params.insulationConductivityRefTempC === undefined))
-      return bad(
-        'insulationConductivityRefTempC',
-        'insulationConductivitySlopeWmK2 and insulationConductivityRefTempC go together (the temperature at which the conductivity holds)',
-      );
+    const issue = inputIssue(params);
+    if (issue !== undefined) return bad(issue.path, issue.why);
     const lookup = createSpecLookup(doc, line.spec);
     if (isMiss(lookup)) return refuse(doc, 'line_heat_loss', lookup.miss, lookup.detail, [...lookup.ids, line.id], ['lineId']);
     const pipe = lookup.pipe(line.dn);
@@ -91,47 +77,11 @@ export const lineHeatLoss = defineCommand({
     const wall = pipe.dims['wall'];
     if (od === undefined || wall === undefined || !(wall > 0) || !(od > 2 * wall))
       return bad('lineId', `pipe row ${pipe.key} gives no usable outside diameter / wall (${od ?? '?'} / ${wall ?? '?'} mm)`);
-    const defaults: Array<{ input: string; assumed: string }> = [];
+    const conductivity = insulationConductivity(doc, line, lookup, params);
+    if ('document' in conductivity) return conductivity;
+    const { insulationK, defaults } = conductivity;
     const insulation = line.insulation;
-    let insulationK = params.insulationConductivityWmK ?? 0;
-    if (insulation !== undefined && params.insulationConductivityWmK === undefined) {
-      const row = line.designTempC === undefined ? undefined : lookup.insulation(insulation.code, line.dn, line.designTempC);
-      const fromSpec = row === undefined || isMiss(row) ? null : row.conductivityWmK;
-      if (fromSpec === null)
-        return refuse(
-          doc,
-          'line_heat_loss',
-          'RTE_SPEC_NO_COMPONENT',
-          `insulation conductivity of line ${line.lineNumber}: the spec insulation table has no conductivity for code ${insulation.code} (or the line has no design temperature); pass insulationConductivityWmK`,
-          [line.id],
-          ['insulationConductivityWmK'],
-        );
-      insulationK = fromSpec;
-      defaults.push({
-        input: 'insulationConductivityWmK',
-        assumed: `${fromSpec} W/mK from the spec insulation row ${insulation.row ?? insulation.code}`,
-      });
-    }
-    if (params.insideFilmWm2K === undefined)
-      defaults.push({ input: 'insideFilmWm2K', assumed: 'neglected: inside film resistance taken as 0 (h_i infinite)' });
-    if (insulation === undefined) defaults.push({ input: 'insulation', assumed: 'the line has none: bare pipe, D2 = D1' });
-    const base = {
-      ambientTempC: params.ambientTempC,
-      outsideDiameterMm: od,
-      wallMm: wall,
-      insulationThicknessMm: insulation?.thicknessMm ?? 0,
-      steelConductivityWmK: params.steelConductivityWmK,
-      insulationConductivityWmK: insulationK,
-      outsideFilmWm2K: params.outsideFilmWm2K,
-      insideFilmWm2K: params.insideFilmWm2K ?? null,
-      ...(params.outsideEmissivity === undefined ? {} : { emissivity: params.outsideEmissivity }),
-      ...(params.insulationConductivitySlopeWmK2 === undefined || insulation === undefined
-        ? {}
-        : {
-            conductivitySlopeWmK2: params.insulationConductivitySlopeWmK2,
-            conductivityRefTempC: params.insulationConductivityRefTempC as number,
-          }),
-    };
+    const base = heatLossBase(params, line, od, wall, insulationK);
     if (params.insulationConductivitySlopeWmK2 !== undefined && insulation === undefined)
       defaults.push({ input: 'insulationConductivitySlopeWmK2', assumed: 'ignored: the line has no insulation' });
     const result = heatLossPerMetre({ ...base, fluidTempC: params.fluidTempC });
@@ -143,26 +93,9 @@ export const lineHeatLoss = defineCommand({
         'insulationConductivitySlopeWmK2',
         `the insulation conductivity k + slope (T - ref) is not positive at its mean temperature (${result.insulationConductivityMeanWmK ?? 'n/a'} W/mK): check the slope and the reference temperature`,
       );
-    let lengthMm = 0;
-    const skipped: string[] = [];
-    for (const runId of piping.runOrder) {
-      const run = piping.runs[runId];
-      if (run?.lineId !== line.id) continue;
-      const derivation = deriveRun(doc, run);
-      if (derivation.ok) lengthMm += derivation.centrelineLengthMm;
-      else skipped.push(runId);
-    }
+    const { lengthMm, skipped } = routedLength(doc, line);
     const lengthM = Math.round(lengthMm) / 1000;
-    const maintain = line.tracing?.maintainTempC;
-    const tracing =
-      line.tracing === undefined
-        ? null
-        : {
-            type: line.tracing.type,
-            tracers: line.tracing.tracers,
-            maintainTempC: maintain ?? null,
-            heatLossAtMaintainWPerM: maintain === undefined ? null : heatLossPerMetre({ ...base, fluidTempC: maintain }).heatLossWPerM,
-          };
+    const tracing = tracingOf(line, base);
     const unit = result.heatLossWPerM >= 0 ? 'loses' : 'gains';
     return report(
       doc,
@@ -176,15 +109,7 @@ export const lineHeatLoss = defineCommand({
         skippedRuns: skipped,
         tracing,
         defaults,
-        provenance: {
-          formula: "Q' = (Ti - Ta) / [1/(hi pi D0) + ln(D1/D0)/(2 pi ks) + ln(D2/D1)/(2 pi kins) + 1/(ho pi D2)]",
-          sources: [
-            'Incropera, Fundamentals of Heat and Mass Transfer, ch. 3 (radial systems, critical radius)',
-            'ISO 12241 calculation rules for insulation of equipment and pipework',
-          ],
-          pipeRow: pipe.key,
-          model: `steady state, one dimension radial, ${params.insulationConductivitySlopeWmK2 === undefined ? 'constant conductivities' : 'linear k(T) of the insulation at its mean temperature'}, ${params.outsideEmissivity === undefined ? 'no radiation term (the outside film is lumped)' : 'radiation to the ambient linearised at the surface temperature (Stefan-Boltzmann 5.670374419e-8)'}`,
-        },
+        provenance: heatLossProvenance(params, pipe.key),
         reviewRequired: true,
       },
     );

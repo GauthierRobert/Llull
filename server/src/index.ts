@@ -1,7 +1,7 @@
 /**
  * Express entry: middleware + route mounting only (L1, L6).
  *   GET /health            liveness + active kernel (`kernel`), { active, requested, fallbackReason } (`kernelStatus`), autosave; Host allowlist; `insecure: true` when token-less
- *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
+ *   /live /command /undo /redo   `liveRoutes.ts`      /export/step   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
  *
@@ -39,6 +39,7 @@ import {
   jsonErrorHandler,
   securityHeaders,
   setHtmlSecurityHeaders,
+  setAssetHeaders,
 } from './security';
 
 const isChallengeProbe = (challenge: unknown): boolean => typeof challenge === 'string' && challenge !== '';
@@ -108,6 +109,7 @@ if (staticDir !== undefined && staticDir !== '') {
     express.static(staticDir, {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) setHtmlSecurityHeaders(res);
+        else setAssetHeaders(res, filePath);
       },
     }),
   );

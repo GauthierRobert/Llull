@@ -5,6 +5,7 @@ import { cross3, distance3, dot3, len3, normalize3, scale3, sub3 } from '../vec3
 import { curveDerivatives } from './evaluate';
 import { integrateCurve } from './integrate';
 import type { NurbsCurveData } from './types';
+import { powInt } from '../powInt';
 
 export interface CurvatureSample {
   readonly point: Vec3;
@@ -70,20 +71,20 @@ export function curvatureAt(curve: NurbsCurveData, u: number, planeNormal: Vec3 
   const b = cross3(c1, c3);
   const aLength = len3(a);
   const tangent = scale3(c1, 1 / speed);
-  const curvature = aLength / speed ** 3;
-  const normal = aLength < EPSILON * speed ** 3 ? ([0, 0, 0] as Vec3) : normalize3(cross3(a, c1));
+  const curvature = aLength / powInt(speed, 3);
+  const normal = aLength < EPSILON * powInt(speed, 3) ? ([0, 0, 0] as Vec3) : normalize3(cross3(a, c1));
   const speedDot = dot3(c1, c2);
   let dCurvatureDs: number;
   let signedCurvature: number | null = null;
   if (planeNormal !== null) {
-    signedCurvature = dot3(a, planeNormal) / speed ** 3;
-    dCurvatureDs = (dot3(b, planeNormal) / speed ** 3 - (3 * dot3(a, planeNormal) * speedDot) / speed ** 5) / speed;
-  } else if (aLength < EPSILON * speed ** 3) {
-    dCurvatureDs = len3(b) / speed ** 4;
+    signedCurvature = dot3(a, planeNormal) / powInt(speed, 3);
+    dCurvatureDs = (dot3(b, planeNormal) / powInt(speed, 3) - (3 * dot3(a, planeNormal) * speedDot) / powInt(speed, 5)) / speed;
+  } else if (aLength < EPSILON * powInt(speed, 3)) {
+    dCurvatureDs = len3(b) / powInt(speed, 4);
   } else {
-    dCurvatureDs = (dot3(a, b) / (aLength * speed ** 3) - (3 * aLength * speedDot) / speed ** 5) / speed;
+    dCurvatureDs = (dot3(a, b) / (aLength * powInt(speed, 3)) - (3 * aLength * speedDot) / powInt(speed, 5)) / speed;
   }
-  const torsion = aLength < EPSILON * speed ** 3 ? 0 : dot3(a, c3) / (aLength * aLength);
+  const torsion = aLength < EPSILON * powInt(speed, 3) ? 0 : dot3(a, c3) / (aLength * aLength);
   return { point: c0, tangent, normal, curvature, signedCurvature, dCurvatureDs, torsion, degenerate: false };
 }
 

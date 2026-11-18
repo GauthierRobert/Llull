@@ -7,6 +7,8 @@ import { refuseImplicit } from './codes';
 import { compileScalarField } from './compile';
 import { type DistanceTarget, type FieldNode, type Law, type ScalarNode, fieldOf, withField } from './model';
 import { closedSolidMesh } from './solidMesh';
+import type { CadDocument } from '@core/model/types';
+import type { Vec3 } from '@core/model/vectors';
 
 const lawSchema = z.union([z.number(), z.string()]);
 
@@ -31,6 +33,146 @@ function referenceProblem(
       return lawProblem(node.a, 'a') ?? lawProblem(node.b, 'b');
     default:
       return null;
+  }
+}
+
+interface Problem {
+  readonly code: string;
+  readonly message: string;
+  readonly path: string;
+  readonly ids: string[];
+}
+
+const problem = (code: string, message: string, path: string, ids: string[] = []): Problem => ({ code, message, path, ids });
+
+/** The params the node builders read. */
+interface ScalarParams {
+  readonly kind: ScalarNode['kind'];
+  readonly axis?: 'x' | 'y' | 'z' | undefined;
+  readonly toPoint?: Vec3 | undefined;
+  readonly toPlane?: { readonly origin: Vec3; readonly normal: Vec3 } | undefined;
+  readonly toEntity?: string | undefined;
+  readonly toField?: string | undefined;
+  readonly input?: string | undefined;
+  readonly inMin?: number | undefined;
+  readonly inMax?: number | undefined;
+  readonly outMin?: number | undefined;
+  readonly outMax?: number | undefined;
+  readonly clamp?: boolean | undefined;
+  readonly easing?: 'linear' | 'smoothstep' | undefined;
+  readonly a?: Law | undefined;
+  readonly b?: Law | undefined;
+  readonly factor?: Law | undefined;
+  readonly operation?: 'add' | 'subtract' | 'multiply' | 'divide' | 'min' | 'max' | undefined;
+  readonly seed?: number | undefined;
+  readonly frequency?: number | undefined;
+  readonly octaves?: number | undefined;
+  readonly studyId?: string | undefined;
+  readonly caseId?: string | undefined;
+  readonly quantity?: 'von_mises' | 'u_mag' | undefined;
+  readonly step?: number | undefined;
+  readonly name?: string | undefined;
+}
+
+type Label = { readonly name?: string };
+
+function distanceNode(doc: CadDocument, p: ScalarParams, id: string, label: Label): ScalarNode | Problem {
+  const targets = [p.toPoint, p.toPlane, p.toEntity, p.toField].filter((t) => t !== undefined).length;
+  if (targets !== 1)
+    return problem('IMP_PARAM_CONFLICT', `distance needs exactly one of toPoint, toPlane, toEntity, toField (got ${targets})`, 'toPoint');
+  let to: DistanceTarget;
+  if (p.toPoint !== undefined) to = { point: p.toPoint };
+  else if (p.toPlane !== undefined) {
+    if (!(Math.hypot(...p.toPlane.normal) > 0)) return problem('IMP_PARAM_RANGE', 'toPlane.normal must be non-zero', 'toPlane.normal');
+    to = { plane: p.toPlane };
+  } else if (p.toEntity !== undefined) {
+    const solid = closedSolidMesh(doc, p.toEntity);
+    if (!solid.ok) return problem(solid.code, solid.message, 'toEntity', [p.toEntity]);
+    to = { entityId: p.toEntity };
+  } else {
+    const field = p.toField as string;
+    if (fieldOf(doc, field) === undefined) return problem('IMP_FIELD_NOT_FOUND', `no field '${field}'`, 'toField', [field]);
+    to = { field };
+  }
+  return { id, op: 'scalar', kind: 'distance', to, ...label };
+}
+
+function rampNode(p: ScalarParams, id: string, label: Label): ScalarNode | Problem {
+  const { input, inMin, inMax, outMin, outMax } = p;
+  if (input === undefined || inMin === undefined || inMax === undefined || outMin === undefined || outMax === undefined)
+    return problem('IMP_PARAM_RANGE', 'ramp needs input, inMin, inMax, outMin and outMax', 'input');
+  if (![inMin, inMax, outMin, outMax].every(Number.isFinite) || inMin === inMax)
+    return problem('IMP_PARAM_RANGE', `ramp needs finite values and inMin != inMax (got ${inMin}, ${inMax})`, 'inMax');
+  if (p.clamp === false && p.easing === 'smoothstep')
+    return problem('IMP_PARAM_RANGE', 'smoothstep needs clamp (it is defined on [0, 1])', 'clamp');
+  return {
+    id,
+    op: 'scalar',
+    kind: 'ramp',
+    input,
+    inMin,
+    inMax,
+    outMin,
+    outMax,
+    clamp: p.clamp ?? true,
+    easing: p.easing ?? 'linear',
+    ...label,
+  };
+}
+
+function noiseNode(p: ScalarParams, id: string, label: Label): ScalarNode | Problem {
+  const octaves = p.octaves ?? 1;
+  if (!(p.frequency !== undefined && Number.isFinite(p.frequency) && p.frequency > 0))
+    return problem('IMP_PARAM_RANGE', `noise needs frequency > 0 (got ${String(p.frequency)})`, 'frequency');
+  if (!(Number.isInteger(octaves) && octaves >= 1 && octaves <= 6))
+    return problem('IMP_PARAM_RANGE', `octaves must be an integer 1..6 (got ${octaves})`, 'octaves');
+  if (p.seed !== undefined && !Number.isInteger(p.seed))
+    return problem('IMP_PARAM_RANGE', `seed must be an integer (got ${p.seed})`, 'seed');
+  return { id, op: 'scalar', kind: 'noise', seed: p.seed ?? 0, frequency: p.frequency, octaves, ...label };
+}
+
+function feaResultNode(p: ScalarParams, id: string, label: Label): ScalarNode | Problem {
+  if (p.caseId === undefined || p.quantity === undefined)
+    return problem('IMP_PARAM_RANGE', 'fea_result needs caseId and quantity (von_mises or u_mag)', 'caseId');
+  if (p.step !== undefined && !(Number.isInteger(p.step) && p.step >= 1))
+    return problem('IMP_PARAM_RANGE', `step must be an integer >= 1 (got ${p.step})`, 'step');
+  return {
+    id,
+    op: 'scalar',
+    kind: 'fea_result',
+    caseId: p.caseId,
+    quantity: p.quantity,
+    ...(p.step === undefined ? {} : { step: p.step }),
+    ...label,
+  };
+}
+
+/** The scalar node of `p` (the checks of its kind, in order), or the first problem. */
+function scalarNodeOf(doc: CadDocument, p: ScalarParams, id: string): ScalarNode | Problem {
+  const label: Label = p.name === undefined ? {} : { name: p.name };
+  switch (p.kind) {
+    case 'coordinate':
+      if (p.axis === undefined) return problem('IMP_PARAM_RANGE', 'coordinate needs axis x, y or z', 'axis');
+      return { id, op: 'scalar', kind: 'coordinate', axis: p.axis, ...label };
+    case 'distance':
+      return distanceNode(doc, p, id, label);
+    case 'ramp':
+      return rampNode(p, id, label);
+    case 'mix':
+      if (p.a === undefined || p.b === undefined || p.factor === undefined)
+        return problem('IMP_PARAM_RANGE', 'mix needs a, b and factor', 'factor');
+      return { id, op: 'scalar', kind: 'mix', a: p.a, b: p.b, factor: p.factor, ...label };
+    case 'arith':
+      if (p.a === undefined || p.b === undefined || p.operation === undefined)
+        return problem('IMP_PARAM_RANGE', 'arith needs operation, a and b', 'operation');
+      return { id, op: 'scalar', kind: 'arith', operation: p.operation, a: p.a, b: p.b, ...label };
+    case 'topology_density':
+      if (p.studyId === undefined) return problem('IMP_PARAM_RANGE', 'topology_density needs studyId', 'studyId');
+      return { id, op: 'scalar', kind: 'topology_density', studyId: p.studyId, ...label };
+    case 'fea_result':
+      return feaResultNode(p, id, label);
+    case 'noise':
+      return noiseNode(p, id, label);
   }
 }
 
@@ -96,104 +238,11 @@ export const createScalarField = defineCommand({
     const fail = (code: string, message: string, path: string, ids: string[] = []): CommandResult =>
       refuseImplicit(doc, 'create_scalar_field', code, message, ids, [`params.${path}`]);
     const id = nextId('fld');
-    const label = p.name === undefined ? {} : { name: p.name };
-    let node: ScalarNode;
-    switch (p.kind) {
-      case 'coordinate':
-        if (p.axis === undefined) return fail('IMP_PARAM_RANGE', 'coordinate needs axis x, y or z', 'axis');
-        node = { id, op: 'scalar', kind: 'coordinate', axis: p.axis, ...label };
-        break;
-      case 'distance': {
-        const targets = [p.toPoint, p.toPlane, p.toEntity, p.toField].filter((t) => t !== undefined).length;
-        if (targets !== 1)
-          return fail(
-            'IMP_PARAM_CONFLICT',
-            `distance needs exactly one of toPoint, toPlane, toEntity, toField (got ${targets})`,
-            'toPoint',
-          );
-        let to: DistanceTarget;
-        if (p.toPoint !== undefined) to = { point: p.toPoint };
-        else if (p.toPlane !== undefined) {
-          if (!(Math.hypot(...p.toPlane.normal) > 0)) return fail('IMP_PARAM_RANGE', 'toPlane.normal must be non-zero', 'toPlane.normal');
-          to = { plane: p.toPlane };
-        } else if (p.toEntity !== undefined) {
-          const solid = closedSolidMesh(doc, p.toEntity);
-          if (!solid.ok) return fail(solid.code, solid.message, 'toEntity', [p.toEntity]);
-          to = { entityId: p.toEntity };
-        } else {
-          const field = p.toField as string;
-          if (fieldOf(doc, field) === undefined) return fail('IMP_FIELD_NOT_FOUND', `no field '${field}'`, 'toField', [field]);
-          to = { field };
-        }
-        node = { id, op: 'scalar', kind: 'distance', to, ...label };
-        break;
-      }
-      case 'ramp': {
-        const { input, inMin, inMax, outMin, outMax } = p;
-        if (input === undefined || inMin === undefined || inMax === undefined || outMin === undefined || outMax === undefined)
-          return fail('IMP_PARAM_RANGE', 'ramp needs input, inMin, inMax, outMin and outMax', 'input');
-        if (![inMin, inMax, outMin, outMax].every(Number.isFinite) || inMin === inMax)
-          return fail('IMP_PARAM_RANGE', `ramp needs finite values and inMin != inMax (got ${inMin}, ${inMax})`, 'inMax');
-        if (p.clamp === false && p.easing === 'smoothstep')
-          return fail('IMP_PARAM_RANGE', 'smoothstep needs clamp (it is defined on [0, 1])', 'clamp');
-        node = {
-          id,
-          op: 'scalar',
-          kind: 'ramp',
-          input,
-          inMin,
-          inMax,
-          outMin,
-          outMax,
-          clamp: p.clamp ?? true,
-          easing: p.easing ?? 'linear',
-          ...label,
-        };
-        break;
-      }
-      case 'mix':
-        if (p.a === undefined || p.b === undefined || p.factor === undefined)
-          return fail('IMP_PARAM_RANGE', 'mix needs a, b and factor', 'factor');
-        node = { id, op: 'scalar', kind: 'mix', a: p.a, b: p.b, factor: p.factor, ...label };
-        break;
-      case 'arith':
-        if (p.a === undefined || p.b === undefined || p.operation === undefined)
-          return fail('IMP_PARAM_RANGE', 'arith needs operation, a and b', 'operation');
-        node = { id, op: 'scalar', kind: 'arith', operation: p.operation, a: p.a, b: p.b, ...label };
-        break;
-      case 'topology_density':
-        if (p.studyId === undefined) return fail('IMP_PARAM_RANGE', 'topology_density needs studyId', 'studyId');
-        node = { id, op: 'scalar', kind: 'topology_density', studyId: p.studyId, ...label };
-        break;
-      case 'fea_result':
-        if (p.caseId === undefined || p.quantity === undefined)
-          return fail('IMP_PARAM_RANGE', 'fea_result needs caseId and quantity (von_mises or u_mag)', 'caseId');
-        if (p.step !== undefined && !(Number.isInteger(p.step) && p.step >= 1))
-          return fail('IMP_PARAM_RANGE', `step must be an integer >= 1 (got ${p.step})`, 'step');
-        node = {
-          id,
-          op: 'scalar',
-          kind: 'fea_result',
-          caseId: p.caseId,
-          quantity: p.quantity,
-          ...(p.step === undefined ? {} : { step: p.step }),
-          ...label,
-        };
-        break;
-      case 'noise': {
-        const octaves = p.octaves ?? 1;
-        if (!(p.frequency !== undefined && Number.isFinite(p.frequency) && p.frequency > 0))
-          return fail('IMP_PARAM_RANGE', `noise needs frequency > 0 (got ${String(p.frequency)})`, 'frequency');
-        if (!(Number.isInteger(octaves) && octaves >= 1 && octaves <= 6))
-          return fail('IMP_PARAM_RANGE', `octaves must be an integer 1..6 (got ${octaves})`, 'octaves');
-        if (p.seed !== undefined && !Number.isInteger(p.seed))
-          return fail('IMP_PARAM_RANGE', `seed must be an integer (got ${p.seed})`, 'seed');
-        node = { id, op: 'scalar', kind: 'noise', seed: p.seed ?? 0, frequency: p.frequency, octaves, ...label };
-        break;
-      }
-    }
-    const problem = referenceProblem(doc, node);
-    if (problem !== null) return fail(problem.code, problem.message, problem.path, problem.ids);
+    const made = scalarNodeOf(doc, p, id);
+    if ('code' in made) return fail(made.code, made.message, made.path, made.ids);
+    const node = made;
+    const referenced = referenceProblem(doc, node);
+    if (referenced !== null) return fail(referenced.code, referenced.message, referenced.path, referenced.ids);
     const next = withField(doc, node as FieldNode);
     const compiled = compileScalarField(next, id);
     if (!compiled.ok) return refuseImplicit(doc, 'create_scalar_field', compiled.code, compiled.message, compiled.ids);

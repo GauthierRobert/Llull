@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /**
  * Shock response spectrum (PHY-09 §5.5, TR-DYN-50/51): Smallwood ramp-invariant recursive filter for the absolute acceleration of an
  * SDOF base-excited by a(t), coefficients as pyYeti `absacce` (BSD-3): zeta = 1/(2Q), wd = wn sqrt(1 - zeta^2), E = exp(-zeta wn dt),
@@ -59,7 +60,7 @@ export function historySrs(fnHz: number, q: number, values: readonly number[], d
 export function octaveFrequencies(fMinHz: number, fMaxHz: number, octaveFraction: number): number[] {
   const out: number[] = [];
   for (let k = 0; ; k += 1) {
-    const f = fMinHz * 2 ** (k / octaveFraction);
+    const f = fMinHz * pow(2, k / octaveFraction);
     if (f > fMaxHz * (1 + 1e-9)) return out;
     out.push(f);
   }

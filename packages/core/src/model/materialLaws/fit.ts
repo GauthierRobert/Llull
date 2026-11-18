@@ -7,6 +7,7 @@
 import { solveLeastSquares } from '../../lib/leastSquares';
 import { nominalStress, polynomialDerivatives, type HyperMode, type ResolvedHyper } from './hyperelastic';
 import { failure, type LawFailure } from './resolve';
+import { pow } from '../../lib/pow';
 
 export type FitObjective = 'absolute' | 'relative';
 export type HyperFitKind = 'hyper_neo_hooke' | 'hyper_mooney_rivlin' | 'hyper_yeoh' | 'hyper_polynomial' | 'hyper_reduced_polynomial';
@@ -229,7 +230,7 @@ export function fitRambergOsgood(
       'check that the rows are (total strain, stress) beyond yield',
     );
   const sigma02 = Math.exp((Math.log(0.002) - intercept) / n);
-  const residuals = rows.map(([strain, stress]) => stress / youngModulus + 0.002 * (stress / sigma02) ** n - strain);
+  const residuals = rows.map(([strain, stress]) => stress / youngModulus + 0.002 * pow(stress / sigma02, n) - strain);
   const observed = rows.map(([strain]) => strain);
   return {
     law: {

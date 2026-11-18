@@ -166,12 +166,8 @@ function endContexts(sections: readonly NurbsCurveData[], faceTolerance: number)
 const endRequest = (request: EndRequest | undefined): Exclude<EndRequest, { type: 'point' }> | null =>
   request === undefined || request.type === 'point' ? null : request;
 
-/**
- * The faces of a loft through `input` sections (world curves).
- * @invariant the sections are reproduced (section deviation reported); with guides the faces contain the guides (Gordon); ends reproduce the requested directions within `endAngleTolerance` after up to 3 refinements
- * @failure < 2 sections, closed with < 3 -> SRF_LOFT_SECTIONS_TOO_FEW / SWG_LOFT_CLOSED_TOO_FEW; open sections of a solid -> SWG_SECTION_INVALID; unsupported combinations -> SWG_PARAM_INVALID; the coded refusals of ends, coupling, centreline and guides
- */
-export function buildLoft(input: readonly NurbsCurveData[], options: LoftOptions): LoftBuilt | LoftIssue {
+/** The first refused option or input of a loft (section count, closed / open sections, seams, incompatible combinations), or null. */
+function loftOptionIssue(input: readonly NurbsCurveData[], options: LoftOptions): LoftIssue | null {
   if (input.length < 2) return { code: 'SRF_LOFT_SECTIONS_TOO_FEW', message: `a loft needs at least 2 sections (got ${input.length})` };
   if (options.closed && input.length < 3) return { code: 'SWG_LOFT_CLOSED_TOO_FEW', message: 'a closed loft needs at least 3 sections' };
   if (options.solid) {
@@ -193,6 +189,11 @@ export function buildLoft(input: readonly NurbsCurveData[], options: LoftOptions
     return { code: 'SWG_PARAM_INVALID', message: 'a centreline loft takes exactly 2 sections, not closed and not coupled' };
   if (options.closed && (conditioned || options.coupling !== undefined || options.ruled))
     return { code: 'SWG_PARAM_INVALID', message: 'a closed loft is smooth and takes no end conditions or coupling' };
+  return null;
+}
+
+/** The sections wound (solids), seam-aligned and, with a centreline, generated along it. */
+function preparedSections(input: readonly NurbsCurveData[], options: LoftOptions): NurbsCurveData[] | LoftIssue {
   let sections: NurbsCurveData[] = options.solid ? windSections(input) : [...input];
   if (options.alignment !== 'none') {
     const aligned = alignSections(sections, options.alignment, options.seams, options.closed);
@@ -206,27 +207,36 @@ export function buildLoft(input: readonly NurbsCurveData[], options: LoftOptions
     if (!Array.isArray(placed)) return placed;
     sections = placed;
   }
-  const seamTwistMaxRad = options.solid ? seamTwist(sections, options.closed) : 0;
-  const contexts = endContexts(sections, options.faceTolerance);
-  const base = { seamTwistMaxRad, guideDeviation: null as number | null };
-  if (guided) {
-    const made = compatible(sections);
-    if (!Array.isArray(made)) return made;
-    const gordon = gordonSurface(made, options.guides as readonly NurbsCurveData[], options.guideTolerance);
-    if ('code' in gordon)
-      return { code: gordon.code, message: gordon.message, ...(gordon.section === undefined ? {} : { section: gordon.section }) };
-    const report: LoftReport = {
-      sectionDeviation: gordon.deviation,
-      startAngleRad: null,
-      endAngleRad: null,
-      faceCount: 1,
-      fitDeviation: 0,
-      seamTwistMaxRad: base.seamTwistMaxRad,
-      guideDeviation: gordon.guideDeviation,
-      closureJumpRad: null,
-    };
-    return { faces: [gordon.surface], sections: made, report };
-  }
+  return sections;
+}
+
+/** A Gordon surface through the sections and the guides: one face. */
+function guidedLoft(sections: NurbsCurveData[], options: LoftOptions, seamTwistMaxRad: number): LoftBuilt | LoftIssue {
+  const made = compatible(sections);
+  if (!Array.isArray(made)) return made;
+  const gordon = gordonSurface(made, options.guides as readonly NurbsCurveData[], options.guideTolerance);
+  if ('code' in gordon)
+    return { code: gordon.code, message: gordon.message, ...(gordon.section === undefined ? {} : { section: gordon.section }) };
+  const report: LoftReport = {
+    sectionDeviation: gordon.deviation,
+    startAngleRad: null,
+    endAngleRad: null,
+    faceCount: 1,
+    fitDeviation: 0,
+    seamTwistMaxRad,
+    guideDeviation: gordon.guideDeviation,
+    closureJumpRad: null,
+  };
+  return { faces: [gordon.surface], sections: made, report };
+}
+
+/** One skinned face per coupled segment of the sections. */
+function skinnedLoft(
+  sections: NurbsCurveData[],
+  options: LoftOptions,
+  contexts: { start: EndContext; end: EndContext },
+  seamTwistMaxRad: number,
+): LoftBuilt | LoftIssue {
   const coupled = coupleSections(sections, options);
   if ('code' in coupled) return coupled;
   const apex: Apex = {
@@ -257,9 +267,25 @@ export function buildLoft(input: readonly NurbsCurveData[], options: LoftOptions
     endAngleRad: endAngle,
     faceCount: faces.length,
     fitDeviation: coupled.fitDeviation,
-    seamTwistMaxRad: base.seamTwistMaxRad,
+    seamTwistMaxRad,
     guideDeviation: null,
     closureJumpRad: options.closed ? Math.max(...faces.map(closureJump)) : null,
   };
   return { faces, sections, report };
+}
+
+/**
+ * The faces of a loft through `input` sections (world curves).
+ * @invariant the sections are reproduced (section deviation reported); with guides the faces contain the guides (Gordon); ends reproduce the requested directions within `endAngleTolerance` after up to 3 refinements
+ * @failure < 2 sections, closed with < 3 -> SRF_LOFT_SECTIONS_TOO_FEW / SWG_LOFT_CLOSED_TOO_FEW; open sections of a solid -> SWG_SECTION_INVALID; unsupported combinations -> SWG_PARAM_INVALID; the coded refusals of ends, coupling, centreline and guides
+ */
+export function buildLoft(input: readonly NurbsCurveData[], options: LoftOptions): LoftBuilt | LoftIssue {
+  const refused = loftOptionIssue(input, options);
+  if (refused !== null) return refused;
+  const sections = preparedSections(input, options);
+  if (!Array.isArray(sections)) return sections;
+  const seamTwistMaxRad = options.solid ? seamTwist(sections, options.closed) : 0;
+  const contexts = endContexts(sections, options.faceTolerance);
+  if ((options.guides?.length ?? 0) > 0) return guidedLoft(sections, options, seamTwistMaxRad);
+  return skinnedLoft(sections, options, contexts, seamTwistMaxRad);
 }

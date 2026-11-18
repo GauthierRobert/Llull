@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /** Mean skin-friction coefficient of one side of a smooth flat plate at Reynolds number Re_L (incompressible). */
 
 export const FRICTION_MODELS = {
@@ -14,9 +15,9 @@ export function skinFrictionCoefficient(model: FrictionModel, reynolds: number):
     case 'laminar_blasius':
       return 1.328 / Math.sqrt(reynolds);
     case 'turbulent_power_law':
-      return 0.074 / reynolds ** 0.2;
+      return 0.074 / pow(reynolds, 0.2);
     case 'turbulent_prandtl_schlichting':
-      return 0.455 / Math.log10(reynolds) ** 2.58;
+      return 0.455 / pow(Math.log10(reynolds), 2.58);
     case 'ittc_1957':
       return 0.075 / (Math.log10(reynolds) - 2) ** 2;
   }

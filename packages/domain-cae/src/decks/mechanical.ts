@@ -1,6 +1,7 @@
 /** 05 §5.6 mechanical deck sections: material cards, boundary conditions, loads and the static step (solid tets only). */
 
 import type { FeaConstraint, FeaLoad, TemperatureScale } from '@core/model/analysis';
+import type { Vec3 } from '@core/model/vectors';
 import { ALL_ELEMENTS, isDeckRefusal, loadCasesOf, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import { densityToAnalysis, stressPerMpa } from './units';
 import { elasticConstants, elasticTable, isElasticRefusal, propertyTemperatureK } from './elastic';
@@ -181,6 +182,137 @@ export interface StepLoadOptions {
   readonly addLoadCases?: readonly string[];
 }
 
+/** Loads of a case gathered before they are written: nodal forces, element pressures, the gravity field and the inertial terms. */
+interface LoadAccumulator {
+  readonly forces: Map<string, readonly [node: number, dof: number, value: number]>;
+  readonly pressures: Map<string, readonly [element: number, face: number, value: number]>;
+  readonly gravity: number[];
+  readonly gravityDirection: number[];
+  inertialCount: number;
+  readonly centrifugal: InertialTerms['centrifugal'][number][];
+  readonly angular: InertialTerms['angular'][number][];
+}
+
+type Vector = Vec3;
+
+const nodesOfSet = (ctx: DeckContext, key: string): readonly number[] =>
+  Object.hasOwn(ctx.mesh.nodeSets, key) ? (ctx.mesh.nodeSets[key] ?? []) : [];
+
+function addGravity(acc: LoadAccumulator, vector: Vector, factor: number): void {
+  vector.forEach((component, axis) => {
+    acc.gravity[axis] = (acc.gravity[axis] ?? 0) + component * factor;
+    acc.gravityDirection[axis] = (acc.gravityDirection[axis] ?? 0) + component;
+  });
+}
+
+function addInertial(ctx: DeckContext, acc: LoadAccumulator, id: string, load: FeaLoad, factor: number): DeckRefusal | null {
+  if (acc.inertialCount > 0)
+    return refusal(
+      'FEA_LOAD_INVALID',
+      `load case '${load.loadCase}' carries more than one inertial load ('${id}'): one rigid-body state per load case`,
+      [id],
+    );
+  acc.inertialCount += 1;
+  const part = inertialContribution(ctx, load, factor);
+  part.field.forEach((component, axis) => {
+    acc.gravity[axis] = (acc.gravity[axis] ?? 0) + component;
+    acc.gravityDirection[axis] = (acc.gravityDirection[axis] ?? 0) + component;
+  });
+  if (part.centrifugal !== undefined) acc.centrifugal.push(part.centrifugal);
+  if (part.angular !== undefined) acc.angular.push(part.angular);
+  return null;
+}
+
+function addForce(ctx: DeckContext, acc: LoadAccumulator, id: string, load: FeaLoad, vector: Vector, factor: number): DeckRefusal | null {
+  const key = `L_${id}`;
+  const nodes = nodesOfSet(ctx, key);
+  if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `force '${id}' (${load.name}) has no nodes in the mesh`, [id]);
+  const weights = load.distribution === 'per_node' ? null : consistentWeights(ctx, key);
+  const shares: [number, number][] =
+    weights !== null
+      ? [...weights]
+      : nodes.map((node) => [node, load.distribution === 'per_node' ? 1 : 1 / nodes.length] as [number, number]);
+  for (const [node, share] of shares)
+    vector.forEach((component, axis) => {
+      const mapKey = `${node}:${axis + 1}`;
+      acc.forces.set(mapKey, [node, axis + 1, (acc.forces.get(mapKey)?.[2] ?? 0) + component * share * factor]);
+    });
+  return null;
+}
+
+function addMoment(ctx: DeckContext, acc: LoadAccumulator, id: string, load: FeaLoad, vector: Vector, factor: number): DeckRefusal | null {
+  const nodes = nodesOfSet(ctx, `L_${id}`);
+  if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `moment '${id}' (${load.name}) has no nodes in the mesh`, [id]);
+  const couple = momentForces(ctx.mesh, nodes, vector);
+  if ('refusal' in couple) return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}): ${couple.refusal}`, [id]);
+  for (const [node, force] of couple.forces)
+    force.forEach((component, axis) => {
+      const mapKey = `${node}:${axis + 1}`;
+      acc.forces.set(mapKey, [node, axis + 1, (acc.forces.get(mapKey)?.[2] ?? 0) + component * factor]);
+    });
+  return null;
+}
+
+function addPressure(
+  ctx: DeckContext,
+  acc: LoadAccumulator,
+  id: string,
+  load: FeaLoad,
+  magnitude: number,
+  factor: number,
+): DeckRefusal | null {
+  const faces = ctx.faces(`L_${id}`);
+  const kind = targetKind(ctx, load.target?.entityId);
+  if (kind === 'plane_stress')
+    return refusal('FEA_LOAD_INVALID', `pressure '${id}' (${load.name}) on a plane-stress part is not built: apply a force on the edge`, [
+      id,
+    ]);
+  if (faces.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `pressure '${id}' (${load.name}) has no faces in the mesh`, [id]);
+  for (const [element, face] of faces) {
+    // Shells: label P on the element; the mesher's face 1 = loaded from the top (+normal) side, 2 = from the bottom side. CalculiX 2.21
+    // moves a shell ALONG its normal under a positive P (measured, server/tests/feaShellSolve.test.ts), so a load pushing into the material
+    // from the top side is -p and from the bottom side +p.
+    const shellSign = face === 2 ? 1 : -1;
+    const label = kind === 'shell' ? 0 : face;
+    const mapKey = `${element}:${label}`;
+    const value = magnitude * factor * (kind === 'shell' ? shellSign : 1);
+    acc.pressures.set(mapKey, [element, label, (acc.pressures.get(mapKey)?.[2] ?? 0) + value]);
+  }
+  return null;
+}
+
+/** Adds one load to the accumulator; a load of another kind, or without its vector / magnitude, adds nothing. */
+function accumulateLoad(ctx: DeckContext, acc: LoadAccumulator, id: string, load: FeaLoad, factor: number): DeckRefusal | null {
+  if (load.kind === 'gravity' && load.vector !== undefined) {
+    addGravity(acc, load.vector, factor);
+    return null;
+  }
+  if (load.kind === 'inertial') return addInertial(ctx, acc, id, load, factor);
+  if (load.kind === 'force' && load.vector !== undefined) return addForce(ctx, acc, id, load, load.vector, factor);
+  if (load.kind === 'moment' && load.vector !== undefined) return addMoment(ctx, acc, id, load, load.vector, factor);
+  if (load.kind === 'pressure' && load.magnitude !== undefined) return addPressure(ctx, acc, id, load, load.magnitude, factor);
+  return null;
+}
+
+/** The `*DLOAD` data lines: element pressures and the gravity / inertial body force. */
+function dloadLines(ctx: DeckContext, acc: LoadAccumulator, nonlinear: boolean): string[] | DeckRefusal {
+  const { gravity, gravityDirection } = acc;
+  const dloads = [...acc.pressures.values()]
+    .sort(byNumbers)
+    .map(([element, face, value]) => row(element, face === 0 ? 'P' : `P${face}`, value));
+  const magnitude = Math.hypot(gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0);
+  const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
+  const inertial = inertialDloadLines(ctx, gravity, { centrifugal: acc.centrifugal, angular: acc.angular }, nonlinear);
+  if ('code' in inertial) return inertial;
+  if (inertial.perElement) appendAll(dloads, inertial.lines);
+  else if (magnitude > 0)
+    dloads.push(`${ALL_ELEMENTS}, GRAV, ${num(magnitude)}, ${gravity.map((component) => num(component / magnitude)).join(', ')}`);
+  else if (nonlinear && directionLength > 0)
+    dloads.push(`${ALL_ELEMENTS}, GRAV, 0, ${gravityDirection.map((component) => num(component / directionLength)).join(', ')}`);
+  if (!inertial.perElement) appendAll(dloads, inertial.lines);
+  return dloads;
+}
+
 /**
  * Mechanical `*BOUNDARY, OP=NEW` / `*CLOAD, OP=NEW` / `*DLOAD, OP=NEW` lines for one step.
  * Force: the vector is the TOTAL load, consistent with the face integration when the target has faces (a linear face gives each corner A / 3, a quadratic face its
@@ -196,83 +328,21 @@ export interface StepLoadOptions {
 export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options?: StepLoadOptions): DeckSections {
   const boundary = options?.boundary === false ? [] : boundaryData(ctx);
   if (!Array.isArray(boundary)) return boundary;
-  const forces = new Map<string, readonly [node: number, dof: number, value: number]>();
-  const pressures = new Map<string, readonly [element: number, face: number, value: number]>();
-  const gravity = [0, 0, 0];
-  const gravityDirection = [0, 0, 0];
-  let inertialCount = 0;
-  const centrifugal: InertialTerms['centrifugal'][number][] = [];
-  const angular: InertialTerms['angular'][number][] = [];
+  const acc: LoadAccumulator = {
+    forces: new Map(),
+    pressures: new Map(),
+    gravity: [0, 0, 0],
+    gravityDirection: [0, 0, 0],
+    inertialCount: 0,
+    centrifugal: [],
+    angular: [],
+  };
   for (const id of ctx.analysis.loadOrder) {
     const load = ctx.analysis.loads[id];
     if (load === undefined || (loadCase !== undefined && load.loadCase !== loadCase && !options?.addLoadCases?.includes(load.loadCase)))
       continue;
-    const factor = options === undefined ? 1 : options.scale(load);
-    const key = `L_${id}`;
-    if (load.kind === 'gravity' && load.vector !== undefined) {
-      load.vector.forEach((component, axis) => {
-        gravity[axis] = (gravity[axis] ?? 0) + component * factor;
-        gravityDirection[axis] = (gravityDirection[axis] ?? 0) + component;
-      });
-    } else if (load.kind === 'inertial') {
-      if (inertialCount > 0)
-        return refusal(
-          'FEA_LOAD_INVALID',
-          `load case '${load.loadCase}' carries more than one inertial load ('${id}'): one rigid-body state per load case`,
-          [id],
-        );
-      inertialCount += 1;
-      const part = inertialContribution(ctx, load, factor);
-      part.field.forEach((component, axis) => {
-        gravity[axis] = (gravity[axis] ?? 0) + component;
-        gravityDirection[axis] = (gravityDirection[axis] ?? 0) + component;
-      });
-      if (part.centrifugal !== undefined) centrifugal.push(part.centrifugal);
-      if (part.angular !== undefined) angular.push(part.angular);
-    } else if (load.kind === 'force' && load.vector !== undefined) {
-      const nodes = Object.hasOwn(ctx.mesh.nodeSets, key) ? (ctx.mesh.nodeSets[key] ?? []) : [];
-      if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `force '${id}' (${load.name}) has no nodes in the mesh`, [id]);
-      const weights = load.distribution === 'per_node' ? null : consistentWeights(ctx, key);
-      const shares: [number, number][] =
-        weights !== null
-          ? [...weights]
-          : nodes.map((node) => [node, load.distribution === 'per_node' ? 1 : 1 / nodes.length] as [number, number]);
-      for (const [node, share] of shares)
-        load.vector.forEach((component, axis) => {
-          const mapKey = `${node}:${axis + 1}`;
-          forces.set(mapKey, [node, axis + 1, (forces.get(mapKey)?.[2] ?? 0) + component * share * factor]);
-        });
-    } else if (load.kind === 'moment' && load.vector !== undefined) {
-      const nodes = Object.hasOwn(ctx.mesh.nodeSets, key) ? (ctx.mesh.nodeSets[key] ?? []) : [];
-      if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `moment '${id}' (${load.name}) has no nodes in the mesh`, [id]);
-      const couple = momentForces(ctx.mesh, nodes, load.vector);
-      if ('refusal' in couple) return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}): ${couple.refusal}`, [id]);
-      for (const [node, force] of couple.forces)
-        force.forEach((component, axis) => {
-          const mapKey = `${node}:${axis + 1}`;
-          forces.set(mapKey, [node, axis + 1, (forces.get(mapKey)?.[2] ?? 0) + component * factor]);
-        });
-    } else if (load.kind === 'pressure' && load.magnitude !== undefined) {
-      const faces = ctx.faces(key);
-      const kind = targetKind(ctx, load.target?.entityId);
-      if (kind === 'plane_stress')
-        return refusal(
-          'FEA_LOAD_INVALID',
-          `pressure '${id}' (${load.name}) on a plane-stress part is not built: apply a force on the edge`,
-          [id],
-        );
-      if (faces.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `pressure '${id}' (${load.name}) has no faces in the mesh`, [id]);
-      for (const [element, face] of faces) {
-        // Shells: label P on the element; the mesher's face 1 = loaded from the top (+normal) side, 2 = from the bottom side. CalculiX 2.21
-        // moves a shell ALONG its normal under a positive P (measured, server/tests/feaShellSolve.test.ts), so a load pushing into the material
-        // from the top side is -p and from the bottom side +p.
-        const shellSign = face === 2 ? 1 : -1;
-        const label = kind === 'shell' ? 0 : face;
-        const mapKey = `${element}:${label}`;
-        const value = load.magnitude * factor * (kind === 'shell' ? shellSign : 1);
-        pressures.set(mapKey, [element, label, (pressures.get(mapKey)?.[2] ?? 0) + value]);
-      }
-    }
+    const refused = accumulateLoad(ctx, acc, id, load, options === undefined ? 1 : options.scale(load));
+    if (refused !== null) return refused;
   }
   const lines: string[] = [];
   if (boundary.length > 0) {
@@ -280,20 +350,9 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
     appendAll(lines, boundary);
   }
   const parameters = options === undefined ? ', OP=NEW' : options.parameters;
-  const cloads = [...forces.values()].filter((entry) => options !== undefined || entry[2] !== 0).sort(byNumbers);
-  const dloads = [...pressures.values()]
-    .sort(byNumbers)
-    .map(([element, face, value]) => row(element, face === 0 ? 'P' : `P${face}`, value));
-  const magnitude = Math.hypot(gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0);
-  const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
-  const inertial = inertialDloadLines(ctx, gravity, { centrifugal, angular }, options !== undefined);
-  if ('code' in inertial) return inertial;
-  if (inertial.perElement) appendAll(dloads, inertial.lines);
-  else if (magnitude > 0)
-    dloads.push(`${ALL_ELEMENTS}, GRAV, ${num(magnitude)}, ${gravity.map((component) => num(component / magnitude)).join(', ')}`);
-  else if (options !== undefined && directionLength > 0)
-    dloads.push(`${ALL_ELEMENTS}, GRAV, 0, ${gravityDirection.map((component) => num(component / directionLength)).join(', ')}`);
-  if (!inertial.perElement) appendAll(dloads, inertial.lines);
+  const cloads = [...acc.forces.values()].filter((entry) => options !== undefined || entry[2] !== 0).sort(byNumbers);
+  const dloads = dloadLines(ctx, acc, options !== undefined);
+  if (!Array.isArray(dloads)) return dloads;
   if (options === undefined || cloads.length > 0) {
     lines.push(`*CLOAD${parameters}`);
     appendAll(

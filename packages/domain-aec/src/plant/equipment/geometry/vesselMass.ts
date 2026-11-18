@@ -9,6 +9,7 @@ import { headMetalVolume } from './headOffset';
 import { headVolume } from './heads';
 import { horizontalVolume, verticalVolume } from './partialVolume';
 import { skirtRadii, type VesselGeometry } from './vesselFrame';
+import { powInt } from '@lib/powInt';
 
 export interface MassPart {
   readonly part: string;
@@ -96,7 +97,7 @@ export function vesselMass(
   geometry: VesselGeometry,
   design: VesselDesignData | undefined,
 ): VesselMass {
-  const cubic = scale ** 3;
+  const cubic = powInt(scale, 3);
   const densityDefaulted = design?.materialDensityKgM3 === undefined;
   const density = design?.materialDensityKgM3 ?? STEEL_DENSITY_KG_PER_M3;
   const { radius, length, first, second } = geometry;

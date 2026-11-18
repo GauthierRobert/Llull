@@ -6,6 +6,7 @@
 
 import { convertQuantity, failure, isLawFailure, type LawFailure } from './resolve';
 import type { HyperLaw } from './hyperResolve';
+import { pow } from '../../lib/pow';
 
 export interface Volumetric {
   /** Initial bulk modulus 2/D1 (MPa). */
@@ -62,7 +63,7 @@ export function resolveVolumetric(law: HyperLaw): Volumetric | null | LawFailure
   const terms = d.flatMap((value, i) => (value > 0 ? [{ power: 2 * (i + 1), coefficient: 1 / value }] : []));
   return {
     bulkModulus: 2 / first,
-    energy: (J) => terms.reduce((sum, { power, coefficient }) => sum + coefficient * (J - 1) ** power, 0),
-    pressure: (J) => terms.reduce((sum, { power, coefficient }) => sum + coefficient * power * (J - 1) ** (power - 1), 0),
+    energy: (J) => terms.reduce((sum, { power, coefficient }) => sum + coefficient * pow(J - 1, power), 0),
+    pressure: (J) => terms.reduce((sum, { power, coefficient }) => sum + coefficient * power * pow(J - 1, power - 1), 0),
   };
 }

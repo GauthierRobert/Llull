@@ -220,11 +220,18 @@ fn stages_come_in_order_with_rising_fractions_and_do_not_change_the_result() {
     assert_eq!((heard.positions, heard.quads), (silent.positions, silent.quads));
 }
 
+/// A mesh QuadriFlow extracts no quad from at this target, on every platform (`tetrahedron_six_quads_is_an_error`). An inconsistently wound
+/// box used to stand in for "a failure" here, but whether QuadriFlow trips an assertion on it depends on the last bits of the platform's math
+/// library: it does with MSVC and not with glibc.
+fn unquaddable() -> (Vec<f64>, Vec<u32>, QuadParams) {
+    (vec![1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0], vec![0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3], params(6))
+}
+
 #[test]
 fn a_failure_still_reports_the_stages_it_reached() {
-    let (positions, triangles) = box_mesh(1, false);
+    let (positions, triangles, target) = unquaddable();
     let mut reached = 0;
-    let error = quad_remesh_with_stages(&positions, &triangles, &params(50), &mut |_, _| reached += 1).expect_err("a singular system");
+    let error = quad_remesh_with_stages(&positions, &triangles, &target, &mut |_, _| reached += 1).expect_err("no quad can come out");
     assert!(!error.0.is_empty() && reached >= 1);
 }
 
@@ -313,18 +320,38 @@ fn adaptive_size_still_gives_a_closed_quad_mesh() {
 }
 
 #[test]
-fn an_inconsistently_wound_input_is_an_error_not_an_abort() {
-    let (positions, triangles) = box_mesh(1, false);
-    let error = quad_remesh(&positions, &triangles, &params(50)).expect_err("a singular system must come back as an error");
-    assert!(error.0.contains("assertion failed"), "{error}");
+fn input_that_would_end_the_process_is_refused_before_the_pipeline() {
+    let triangle = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+    let refusal = |positions: &[f64], triangles: &[u32]| quad_remesh(positions, triangles, &params(50)).expect_err("refused").0;
+    // an empty mesh divided by zero (SIGFPE) and a zero-area triangle never returned: both ended the process
+    assert_eq!(refusal(&[], &[]), "quad_remesh refused: the mesh is empty");
+    assert_eq!(refusal(&triangle, &[]), "quad_remesh refused: the mesh is empty");
+    assert_eq!(
+        refusal(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0], &[0, 1, 2]),
+        "quad_remesh refused: triangle 0 has no area (its three corners are on one line or coincide)"
+    );
+    assert_eq!(
+        refusal(&triangle, &[0, 1, 1]),
+        "quad_remesh refused: triangle 0 has no area (its three corners are on one line or coincide)"
+    );
+    assert_eq!(
+        refusal(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, f64::NAN, 1.0, 0.0], &[0, 1, 2]),
+        "quad_remesh refused: vertex 2 has a coordinate that is not a finite number"
+    );
+    assert_eq!(refusal(&triangle, &[0, 1, 3]), "quad_remesh refused: triangle 0 names vertex 3, but the mesh has 3 vertices");
+    assert_eq!(
+        refusal(&[0.0, 0.0, 0.0, 1.0], &[0, 1, 2]),
+        "quad_remesh refused: positions and triangles must hold three values per vertex and per triangle"
+    );
+    // a valid triangle is still remeshed
+    assert!(quad_remesh(&triangle, &[0, 1, 2], &params(50)).is_ok());
 }
 
 #[test]
 fn tetrahedron_six_quads_is_an_error() {
     // QuadriFlow extracts no quad here; upstream then solved an empty system and divided by zero inside Eigen's sparse LU (the process died)
-    let positions = vec![1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0];
-    let triangles = vec![0u32, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
-    let error = quad_remesh(&positions, &triangles, &params(6)).expect_err("a target too small for the mesh must come back as an error");
+    let (positions, triangles, target) = unquaddable();
+    let error = quad_remesh(&positions, &triangles, &target).expect_err("a target too small for the mesh must come back as an error");
     assert!(error.0.contains("no quad"), "{error}");
 }
 

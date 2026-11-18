@@ -15,23 +15,14 @@ export interface HostIdentity {
 
 const FILLED = ['at', 'by'] as const;
 
-/** Human-gated acts outside the plm toolset that stamp the time of the act (`at`): the host fills it, exactly like a plm act. Other plant gates (review issues) carry no time stamp. */
-const HOST_STAMPED: ReadonlySet<string> = new Set([
-  'approve_pipe_spec',
-  'approve_pipe_stress',
-  'set_deliverable_status',
-  'issue_isometric',
-  'accept_pid_finding',
-  'issue_pid_sheet',
-]);
-
 /** ISO-8601 UTC without milliseconds, e.g. 2026-11-02T09:30:00Z. */
 export const isoSeconds = (date: Date): string => `${date.toISOString().slice(0, 19)}Z`;
 
 function fillCommand(name: string, params: unknown, host: HostIdentity): unknown {
-  // Only the plm toolset and the named stamped gates: other commands declare their own `at` / `by` params (add_door, edit_nurbs, ...).
-  if (toolsetOf(name) !== 'plm' && !HOST_STAMPED.has(name)) return params;
-  const properties = getCommand(name)?.paramsSchema.properties;
+  // Only the plm toolset and the commands annotated `hostStamped`: other commands declare their own `at` / `by` params (add_door, edit_nurbs, ...).
+  const definition = getCommand(name);
+  if (toolsetOf(name) !== 'plm' && definition?.annotations?.hostStamped !== true) return params;
+  const properties = definition?.paramsSchema.properties;
   if (properties === undefined || !FILLED.some((key) => key in properties)) return params;
   const filled: Record<string, unknown> = { ...(isRecord(params) ? params : {}) };
   if ('at' in properties) filled['at'] = isoSeconds(host.now); // the host clock always: a caller-supplied time is never trusted on a gated act

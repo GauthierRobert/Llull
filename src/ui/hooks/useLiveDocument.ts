@@ -14,6 +14,7 @@ import { noteApplied } from '@ui/store/commandCancel';
 import { hasApiToken, liveStreamUrl, liveTicketStreamUrl } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
+import { pow } from '@lib/pow';
 
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
@@ -83,7 +84,7 @@ export function useLiveDocument(): void {
 
     const scheduleReconnect = (): void => {
       if (disposed || retryTimer !== null) return;
-      const delay = Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS);
+      const delay = Math.min(RETRY_BASE_MS * pow(2, attempt), RETRY_MAX_MS);
       attempt += 1;
       retryTimer = setTimeout(() => {
         retryTimer = null;

@@ -8,6 +8,7 @@ import type { Vec2 } from '@core/model/types';
 import type { CurveSegment } from '@core/model/curve';
 import type { BeadForm, FlangedHoleForm } from '@core/model/sheetMetal';
 import { sampleProfile } from '@core/geometry/curveSegments';
+import { powInt } from '@lib/powInt';
 
 export interface Section {
   readonly curves: CurveSegment<Vec2>[];
@@ -76,7 +77,8 @@ export function lipVolume(form: FlangedHoleForm, thickness: number): number {
   if (lip === null) return 0;
   const { angle, lipRadius: r } = form;
   const outer = r + thickness;
-  const bend = 2 * Math.PI * ((lip.cutRadius * angle * (outer ** 2 - r ** 2)) / 2 - ((1 - Math.cos(angle)) * (outer ** 3 - r ** 3)) / 3);
+  const bend =
+    2 * Math.PI * ((lip.cutRadius * angle * (outer ** 2 - r ** 2)) / 2 - ((1 - Math.cos(angle)) * (powInt(outer, 3) - powInt(r, 3))) / 3);
   const wallStart = lip.cutRadius - (r + thickness / 2) * Math.sin(angle);
   const wall = 2 * Math.PI * thickness * (lip.wall * wallStart - (Math.cos(angle) * lip.wall ** 2) / 2);
   return bend + wall;

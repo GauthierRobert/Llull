@@ -221,6 +221,137 @@ function orphanOf(doc: CadDocument, data: PlantDataModel, id: string, className:
     : undefined;
 }
 
+interface Bound {
+  readonly target: PlantObjectTarget;
+  readonly provider: PlantObjectProvider | undefined;
+  readonly element: ProviderElement | undefined;
+}
+
+/** The model object (and its provider) the plant object stands for, or the reserved placeholder; a target already tagged is refused. */
+function bindTarget(doc: CadDocument, data: PlantDataModel, input: AssignInput): Outcome<{ readonly bound: Bound }> {
+  if (input.target === 'reserved') return { ok: true, bound: { target: { kind: 'reserved' }, provider: undefined, element: undefined } };
+  const found = resolveTarget(doc, input.target);
+  if (!found.ok) return failure('DAT_TARGET_UNKNOWN', found.message, ['target']);
+  const { target, provider, element } = found;
+  const twinId = objectRegistry(data).byTarget.get(targetKey(target) as string);
+  const twin = twinId === undefined ? undefined : data.objects[twinId];
+  if (twin !== undefined)
+    return failure('DAT_TARGET_ALREADY_TAGGED', `${element.label} already is ${twin.tag} (${twin.id})`, ['target'], [twin.id]);
+  return { ok: true, bound: { target, provider, element } };
+}
+
+/** The tag the caller typed (normalised), or the one adopted from a model object whose provider cannot rename it. */
+function explicitTagOf(input: AssignInput, bound: Bound): Outcome<{ readonly explicit: string | undefined }> {
+  const { provider, element } = bound;
+  let explicit = input.tag === undefined ? undefined : normaliseTag(input.tag);
+  if (explicit === '') return failure('DAT_TAG_FORMAT', 'tag is empty', ['tag']);
+  if (provider !== undefined && element !== undefined && provider.writeTags === undefined) {
+    if (explicit !== undefined && element.tag !== explicit)
+      return failure(
+        'DAT_TARGET_TAG_READONLY',
+        `${element.label} carries the tag ${element.tag ?? '(none)'} and its provider cannot rename it`,
+        ['tag'],
+      );
+    if (explicit === undefined && element.tag === undefined)
+      return failure('DAT_TARGET_TAG_READONLY', `${element.label} has no tag to adopt and its provider cannot rename it`, ['target']);
+    explicit ??= element.tag === undefined ? undefined : normaliseTag(element.tag);
+  }
+  return { ok: true, explicit };
+}
+
+interface Claim {
+  readonly doc: CadDocument;
+  readonly data: PlantDataModel;
+  readonly bound: Bound;
+  readonly tag: string;
+  readonly withAdded: TagEnv;
+  readonly parts: readonly TagPart[] | null;
+  readonly scope: ScopeInfo;
+  readonly className: string;
+}
+
+/** The orphan the tag re-binds (undefined for a fresh object), or a refusal when the tag is invalid for the provider or held elsewhere. */
+function claimTag(claim: Claim): Outcome<{ readonly orphan: PlantObject | undefined }> {
+  const { doc, data, bound, tag, scope } = claim;
+  const { provider, element } = bound;
+  if (provider?.writeTags !== undefined && element !== undefined && element.tag !== tag) {
+    const problem = provider.tagProblem?.(doc, element.id, tag) ?? null;
+    if (problem !== null) return failure('DAT_TAG_FORMAT', `tag ${tag} for ${element.label}: ${problem}`, ['tag']);
+  }
+  const holders = collidingHolders(data, objectRegistry(data), scope, tag);
+  const modelHolders = foreignTagHolders(doc, tag).filter(
+    (holder) => !(element !== undefined && holder.element.id === element.id && holder.provider === provider?.id),
+  );
+  const orphan = holders.length === 1 && modelHolders.length === 0 ? orphanOf(doc, data, holders[0] as string, claim.className) : undefined;
+  if ((holders.length > 0 && orphan === undefined) || modelHolders.length > 0) {
+    const free = freeTagNear(doc, data, claim.withAdded, claim.parts, scope);
+    const ids = [...holders, ...modelHolders.map((holder) => holder.element.id)];
+    return failure(
+      'DAT_TAG_DUPLICATE',
+      `tag ${tag} is already held by ${ids.join(', ')}${free === undefined ? '' : `; the next free tag is ${free}`}`,
+      ['tag'],
+      ids,
+      free === undefined ? undefined : { nextFreeTag: free },
+    );
+  }
+  return { ok: true, orphan };
+}
+
+interface Draft {
+  readonly resolved: ResolvedClass;
+  readonly nodeId: string;
+  readonly bound: Bound;
+  readonly values: Values;
+  readonly lineId: string | undefined;
+  readonly tag: string;
+  readonly added: Readonly<Record<string, PlantValue>>;
+  readonly orphan: PlantObject | undefined;
+}
+
+/** The new plant object; a re-bound orphan keeps the values it had, so only what the caller sent overrides them. */
+function newObject(draft: Draft, id: string): PlantObject {
+  const { resolved, values, added, orphan, tag } = draft;
+  const properties: Record<string, PlantValue> = { ...orphan?.properties, ...values.properties };
+  const tagFields: Record<string, PlantValue> = { ...orphan?.tagFields, ...values.tagFields };
+  const provenance = { ...orphan?.provenance, ...values.provenance };
+  const lineLink = draft.lineId ?? orphan?.lineId;
+  // A re-bound orphan keeps the values it had; only what the caller sent overrides them, not the defaults read from the new model object.
+  for (const name of values.seeded)
+    if (orphan !== undefined && name in orphan.properties) properties[name] = orphan.properties[name] as PlantValue;
+  for (const [name, value] of Object.entries(added)) (definitionOf(resolved, name) === undefined ? tagFields : properties)[name] = value;
+  return {
+    id,
+    className: resolved.name,
+    hierarchyId: draft.nodeId,
+    target: draft.bound.target,
+    tagFields,
+    tag,
+    properties,
+    ...(Object.keys(provenance).length === 0 ? {} : { provenance }),
+    ...(lineLink === undefined ? {} : { lineId: lineLink }),
+  };
+}
+
+/** The document with `object` stored (appended in place on a scratch record) and the registry extended for a fresh object. */
+function storeObject(
+  doc: CadDocument,
+  data: PlantDataModel,
+  object: PlantObject,
+  fresh: boolean,
+  scratch: boolean,
+): { readonly next: CadDocument; readonly nextData: PlantDataModel } {
+  const objects = scratch ? (data.objects as Record<string, PlantObject>) : { ...data.objects };
+  objects[object.id] = object;
+  const nextData: PlantDataModel = {
+    ...data,
+    objects,
+    objectOrder: fresh && !scratch ? [...data.objectOrder, object.id] : data.objectOrder,
+  };
+  if (fresh) extendRegistry(data, nextData, object);
+  if (fresh && scratch) (data.objectOrder as string[]).push(object.id);
+  return { next: withPlantData(doc, nextData), nextData };
+}
+
 /**
  * @param scratch the caller owns `doc`'s plant data record (a private copy made for a batch): the new object is appended to its `objects`
  * and `objectOrder` in place instead of copying them, which keeps a bulk assign linear. Never set on a document that is returned unchanged.
@@ -248,18 +379,10 @@ export function assignObject(
         : `the code "${input.hierarchy}" names several nodes: pass the path (S1/P1/U10)`,
       ['hierarchy'],
     );
-  let target: PlantObjectTarget = { kind: 'reserved' };
-  let provider: PlantObjectProvider | undefined;
-  let element: ProviderElement | undefined;
-  if (input.target !== 'reserved') {
-    const found = resolveTarget(doc, input.target);
-    if (!found.ok) return failure('DAT_TARGET_UNKNOWN', found.message, ['target']);
-    ({ target, provider, element } = found);
-    const twinId = objectRegistry(data).byTarget.get(targetKey(target) as string);
-    const twin = twinId === undefined ? undefined : data.objects[twinId];
-    if (twin !== undefined)
-      return failure('DAT_TARGET_ALREADY_TAGGED', `${element.label} already is ${twin.tag} (${twin.id})`, ['target'], [twin.id]);
-  }
+  const binding = bindTarget(doc, data, input);
+  if (!binding.ok) return binding;
+  const { bound } = binding;
+  const { provider, element } = bound;
   let lineId: string | undefined;
   if (input.line !== undefined) {
     const found = lineObjectOf(data, input.line);
@@ -272,75 +395,20 @@ export function assignObject(
   if (!collected.ok) return collected;
   const { values } = collected;
   const scope: ScopeInfo = { key: scopeKey(data, node.id, resolved.tagScope), kind: resolved.tagScope };
-  let explicit = input.tag === undefined ? undefined : normaliseTag(input.tag);
-  if (explicit === '') return failure('DAT_TAG_FORMAT', 'tag is empty', ['tag']);
-  if (provider !== undefined && element !== undefined && provider.writeTags === undefined) {
-    if (explicit !== undefined && element.tag !== explicit)
-      return failure(
-        'DAT_TARGET_TAG_READONLY',
-        `${element.label} carries the tag ${element.tag ?? '(none)'} and its provider cannot rename it`,
-        ['tag'],
-      );
-    if (explicit === undefined && element.tag === undefined)
-      return failure('DAT_TARGET_TAG_READONLY', `${element.label} has no tag to adopt and its provider cannot rename it`, ['target']);
-    explicit ??= element.tag === undefined ? undefined : normaliseTag(element.tag);
-  }
+  const explicitTag = explicitTagOf(input, bound);
+  if (!explicitTag.ok) return explicitTag;
   const env = envOf(data, resolved, { hierarchyId: node.id, tagFields: values.tagFields, properties: values.properties });
-  const tagged = resolveTag(doc, data, input, parts, env, scope, explicit);
+  const tagged = resolveTag(doc, data, input, parts, env, scope, explicitTag.explicit);
   if (!tagged.ok) return tagged;
   const { tag, added } = tagged.tagged;
   const withAdded: TagEnv = { ...env, values: { ...env.values, ...added } };
-  if (provider?.writeTags !== undefined && element !== undefined && element.tag !== tag) {
-    const problem = provider.tagProblem?.(doc, element.id, tag) ?? null;
-    if (problem !== null) return failure('DAT_TAG_FORMAT', `tag ${tag} for ${element.label}: ${problem}`, ['tag']);
-  }
-  const holders = collidingHolders(data, objectRegistry(data), scope, tag);
-  const modelHolders = foreignTagHolders(doc, tag).filter(
-    (holder) => !(element !== undefined && holder.element.id === element.id && holder.provider === provider?.id),
-  );
-  const orphan = holders.length === 1 && modelHolders.length === 0 ? orphanOf(doc, data, holders[0] as string, resolved.name) : undefined;
-  if ((holders.length > 0 && orphan === undefined) || modelHolders.length > 0) {
-    const free = freeTagNear(doc, data, withAdded, parts, scope);
-    const ids = [...holders, ...modelHolders.map((holder) => holder.element.id)];
-    return failure(
-      'DAT_TAG_DUPLICATE',
-      `tag ${tag} is already held by ${ids.join(', ')}${free === undefined ? '' : `; the next free tag is ${free}`}`,
-      ['tag'],
-      ids,
-      free === undefined ? undefined : { nextFreeTag: free },
-    );
-  }
-  const id = orphan?.id ?? nextId('plantobj');
-  const properties: Record<string, PlantValue> = { ...orphan?.properties, ...values.properties };
-  const tagFields: Record<string, PlantValue> = { ...orphan?.tagFields, ...values.tagFields };
-  const provenance = { ...orphan?.provenance, ...values.provenance };
-  const lineLink = lineId ?? orphan?.lineId;
-  // A re-bound orphan keeps the values it had; only what the caller sent overrides them, not the defaults read from the new model object.
-  for (const name of values.seeded)
-    if (orphan !== undefined && name in orphan.properties) properties[name] = orphan.properties[name] as PlantValue;
-  for (const [name, value] of Object.entries(added)) (definitionOf(resolved, name) === undefined ? tagFields : properties)[name] = value;
-  const object: PlantObject = {
-    id,
-    className: resolved.name,
-    hierarchyId: node.id,
-    target,
-    tagFields,
-    tag,
-    properties,
-    ...(Object.keys(provenance).length === 0 ? {} : { provenance }),
-    ...(lineLink === undefined ? {} : { lineId: lineLink }),
-  };
-  const objects = scratch ? (data.objects as Record<string, PlantObject>) : { ...data.objects };
-  objects[id] = object;
-  const nextData: PlantDataModel = {
-    ...data,
-    objects,
-    objectOrder: orphan === undefined && !scratch ? [...data.objectOrder, id] : data.objectOrder,
-  };
-  if (orphan === undefined) extendRegistry(data, nextData, object);
-  if (orphan === undefined && scratch) (data.objectOrder as string[]).push(id);
-  const next = withPlantData(doc, nextData);
+  const claimed = claimTag({ doc, data, bound, tag, withAdded, parts, scope, className: resolved.name });
+  if (!claimed.ok) return claimed;
+  const { orphan } = claimed;
+  const object = newObject({ resolved, nodeId: node.id, bound, values, lineId, tag, added, orphan }, orphan?.id ?? nextId('plantobj'));
+  const { next, nextData } = storeObject(doc, data, object, orphan === undefined, scratch);
   const rebound = orphan !== undefined;
+  const id = object.id;
   if (provider?.writeTags === undefined || element === undefined || element.tag === tag)
     return {
       ok: true,

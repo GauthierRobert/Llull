@@ -1,3 +1,4 @@
+import { powInt } from '../powInt';
 /**
  * Classical Laminate Theory (06 CMP §5.2, Jones 1999 ch. 2-4, NASA RP-1351). N, mm, MPa; plies bottom to top; engineering shear strain.
  * Pure leaf shared by the composites plugin (`@aero`) and the margin recovery of `@cae`; the lamina record is described structurally
@@ -98,7 +99,7 @@ export function laminateStiffness(stack: readonly StackPly[]): Laminate {
         const value = (q[i] as number[])[j] as number;
         (A[i] as number[])[j] = ((A[i] as number[])[j] as number) + value * (upper - lower);
         (B[i] as number[])[j] = ((B[i] as number[])[j] as number) + (value * (upper * upper - lower * lower)) / 2;
-        (D[i] as number[])[j] = ((D[i] as number[])[j] as number) + (value * (upper ** 3 - lower ** 3)) / 3;
+        (D[i] as number[])[j] = ((D[i] as number[])[j] as number) + (value * (powInt(upper, 3) - powInt(lower, 3))) / 3;
       }
   }
   return { A, B, D, thickness, z };
@@ -157,7 +158,7 @@ const constantsOf = (a: Matrix, thickness: number): EngineeringConstants => {
 /** Flexural constants of an equivalent homogeneous plate from D inverse: E = 12 / (h^3 d). */
 const flexuralOf = (d: Matrix, thickness: number): EngineeringConstants => {
   const at = (i: number, j: number): number => (d[i] as number[])[j] as number;
-  const scale = 12 / thickness ** 3;
+  const scale = 12 / powInt(thickness, 3);
   return { Ex: scale / at(0, 0), Ey: scale / at(1, 1), Gxy: scale / at(2, 2), nuxy: -at(0, 1) / at(0, 0) };
 };
 

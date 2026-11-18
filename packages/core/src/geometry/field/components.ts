@@ -6,6 +6,7 @@
 
 import type { Vec3 } from '../../model/types';
 import type { FieldComponent } from './engineTypes';
+import { powInt } from '../../lib/powInt';
 
 /** The member node nearest the centroid of the component (a point inside it, not just any boundary node). */
 function representative(members: Int32Array, nodes: readonly [number, number, number], voxel: number, origin: Vec3): Vec3 {
@@ -66,7 +67,7 @@ function label(
     }
     found.push({
       voxels: tail,
-      volume: tail * voxel ** 3,
+      volume: tail * powInt(voxel, 3),
       point: representative(queue.subarray(0, tail), nodes, voxel, origin),
       enclosed: !solid && !touchesBoundary,
     });

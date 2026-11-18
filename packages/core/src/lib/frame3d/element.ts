@@ -1,4 +1,5 @@
 import type { FrameElement, FramePoint } from './types';
+import { powInt } from '../powInt';
 
 /** |cos| above which a reference direction counts as parallel to the element axis. */
 const PARALLEL = 0.999999;
@@ -37,9 +38,9 @@ export function localStiffness(element: FrameElement, length: number): Float64Ar
     [1, 5, 1],
     [2, 4, -1],
   ] as const) {
-    set(v, v, (12 * c) / L ** 3);
-    set(v + 6, v + 6, (12 * c) / L ** 3);
-    set(v, v + 6, (-12 * c) / L ** 3);
+    set(v, v, (12 * c) / powInt(L, 3));
+    set(v + 6, v + 6, (12 * c) / powInt(L, 3));
+    set(v, v + 6, (-12 * c) / powInt(L, 3));
     set(v, r, (s * 6 * c) / L ** 2);
     set(v, r + 6, (s * 6 * c) / L ** 2);
     set(v + 6, r, (-s * 6 * c) / L ** 2);

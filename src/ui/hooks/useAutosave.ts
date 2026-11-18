@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
+import { desktopBridge } from '@ui/desktopBridge';
 import { type KeyValueStorage, browserStorage, clearAutosave, readAutosave, writeAutosave } from '@ui/store/autosave';
 
 export const AUTOSAVE_DELAY_MS = 1500;
@@ -105,7 +106,8 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       if (document.visibilityState === 'hidden') flush();
     };
     const onBeforeUnload = (event: BeforeUnloadEvent): void => {
-      if (!useSessionStore.getState().dirty) return;
+      // The desktop app asks about unsaved changes itself (main process, from the backend's state): blocking the unload there would block quitting.
+      if (desktopBridge() !== null || !useSessionStore.getState().dirty) return;
       event.preventDefault();
       event.returnValue = '';
     };

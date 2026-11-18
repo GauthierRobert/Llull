@@ -12,6 +12,7 @@ import { fitFailureOr, type NonlinearBase } from './fitCommon';
 import { searchFit, type FitControl, type ParamSpec } from './fitSearch';
 import { failure, type LawFailure } from './resolve';
 import { pronyRatio } from './viscoelastic';
+import { pow } from '../../lib/pow';
 
 type Rows = ReadonlyArray<readonly [number, number]>;
 
@@ -53,7 +54,7 @@ export function fitPronyFreeTau(rows: Rows, G0: number, terms: number, weight: n
     const lo = tMin * spread;
     const hi = tMax / spread;
     const tau = Array.from({ length: terms }, (_, i) =>
-      lo < hi && terms > 1 ? lo * (hi / lo) ** (i / (terms - 1)) : Math.sqrt(lo * hi > 0 ? lo * hi : tMin * tMax),
+      lo < hi && terms > 1 ? lo * pow(hi / lo, i / (terms - 1)) : Math.sqrt(lo * hi > 0 ? lo * hi : tMin * tMax),
     );
     const fit = solveLeastSquares(
       rows.map(([t]) => tau.map((value) => 1 - Math.exp(-t / value))),
@@ -112,14 +113,14 @@ export function fitRambergOsgoodTrue(
   const usable = rows.filter(([, stress]) => stress !== 0);
   if (usable.length < 3) return insufficient(usable.length, 2);
   const strain = (alpha: number, n: number, stress: number): number =>
-    stress / E + (alpha / E) * (Math.abs(stress) / sigma0) ** (n - 1) * stress;
+    stress / E + (alpha / E) * pow(Math.abs(stress) / sigma0, n - 1) * stress;
   const specs: ParamSpec[] = [
     { name: 'alpha', lower: 1e-9, upper: Number.POSITIVE_INFINITY },
     { name: 'n', lower: 1.001, upper: 300 },
   ];
   const starts: number[][] = [];
   for (const n of [2, 3, 5, 10, 20, 40]) {
-    const basis = usable.map(([, stress]) => ((Math.abs(stress) / sigma0) ** (n - 1) * stress) / E);
+    const basis = usable.map(([, stress]) => (pow(Math.abs(stress) / sigma0, n - 1) * stress) / E);
     const plastic = usable.map(([e, stress]) => e - stress / E);
     const alpha = basis.reduce((sum, b, i) => sum + b * (plastic[i] ?? 0), 0) / Math.max(sumSquares(basis), Number.MIN_VALUE);
     starts.push([Math.max(alpha, 1e-6), n]);

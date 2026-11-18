@@ -34,6 +34,73 @@ export function isEditingKeyEvent(e: KeyboardEvent): boolean {
   return origin instanceof Element && origin.closest('[role="dialog"]') !== null;
 }
 
+type AppState = ReturnType<typeof useStore.getState>;
+type ToolState = ReturnType<typeof useToolStore.getState>;
+
+/** Ctrl/Cmd and Alt+H chords; true when one matched (and was consumed). */
+function handleChord(e: KeyboardEvent, state: AppState, modifier: boolean, key: string): boolean {
+  if (modifier && key === 'z') {
+    e.preventDefault();
+    if (e.shiftKey) state.redo();
+    else state.undo();
+  } else if (modifier && key === 'y') {
+    e.preventDefault();
+    state.redo();
+  } else if (modifier && key === 'd') {
+    e.preventDefault();
+    duplicateSelection();
+  } else if (modifier && key === 'b') {
+    e.preventDefault();
+    useLayoutStore.getState().toggleSidebar();
+  } else if (e.altKey && !modifier && (key === 'h' || e.code === 'KeyH')) {
+    e.preventDefault();
+    useViewportStore.getState().showAllEntities();
+  } else {
+    return false;
+  }
+  return true;
+}
+
+function nudgeSelection(e: KeyboardEvent, state: AppState): void {
+  if (state.document.selection.length === 0) return;
+  e.preventDefault();
+  const [dx, dy] = ARROW_DIRECTIONS[e.key] ?? [0, 0];
+  const step = e.shiftKey ? NUDGE_STEP * NUDGE_LARGE_FACTOR : NUDGE_STEP;
+  const delta: Vec3 = [dx * step, dy * step, 0];
+  // Repeats fold into the first press's undo step.
+  moveSelection(delta, { joinPrevious: e.repeat });
+}
+
+function runSingleKeyShortcut(e: KeyboardEvent, tools: ToolState): void {
+  const action = resolveShortcut(tools.viewMode, e.key);
+  if (action === null) return;
+  if (action.kind === 'draw') tools.setDrawTool(action.tool);
+  else if (action.kind === 'gizmo') tools.setGizmoMode(action.mode);
+  else tools.setViewMode(action.viewMode);
+}
+
+/** Unmodified keys (no Ctrl/Cmd/Alt). */
+function handlePlainKey(e: KeyboardEvent, state: AppState, tools: ToolState, key: string): void {
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (state.document.selection.length === 0) return;
+    e.preventDefault();
+    deleteSelection();
+  } else if (e.key === 'Escape') {
+    state.clearSelection();
+  } else if (key === 'h') {
+    if (e.shiftKey) isolateSelection();
+    else hideSelection();
+  } else if (key === 'n') {
+    useLayoutStore.getState().toggleInspector();
+  } else if (e.key === '?') {
+    tools.setShortcutsOpen(true);
+  } else if (e.key in ARROW_DIRECTIONS) {
+    nudgeSelection(e, state);
+  } else {
+    runSingleKeyShortcut(e, tools);
+  }
+}
+
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -59,52 +126,9 @@ export function useKeyboardShortcuts(): void {
       const modifier = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
-      if (modifier && key === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) state.redo();
-        else state.undo();
-      } else if (modifier && key === 'y') {
-        e.preventDefault();
-        state.redo();
-      } else if (modifier && key === 'd') {
-        e.preventDefault();
-        duplicateSelection();
-      } else if (modifier && key === 'b') {
-        e.preventDefault();
-        useLayoutStore.getState().toggleSidebar();
-      } else if (e.altKey && !modifier && (key === 'h' || e.code === 'KeyH')) {
-        e.preventDefault();
-        useViewportStore.getState().showAllEntities();
-      } else if (modifier || e.altKey) {
-        return;
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (state.document.selection.length === 0) return;
-        e.preventDefault();
-        deleteSelection();
-      } else if (e.key === 'Escape') {
-        state.clearSelection();
-      } else if (key === 'h') {
-        if (e.shiftKey) isolateSelection();
-        else hideSelection();
-      } else if (key === 'n') {
-        useLayoutStore.getState().toggleInspector();
-      } else if (e.key === '?') {
-        tools.setShortcutsOpen(true);
-      } else if (e.key in ARROW_DIRECTIONS) {
-        if (state.document.selection.length === 0) return;
-        e.preventDefault();
-        const [dx, dy] = ARROW_DIRECTIONS[e.key] ?? [0, 0];
-        const step = e.shiftKey ? NUDGE_STEP * NUDGE_LARGE_FACTOR : NUDGE_STEP;
-        const delta: Vec3 = [dx * step, dy * step, 0];
-        // Repeats fold into the first press's undo step.
-        moveSelection(delta, { joinPrevious: e.repeat });
-      } else {
-        const action = resolveShortcut(tools.viewMode, e.key);
-        if (action === null) return;
-        if (action.kind === 'draw') tools.setDrawTool(action.tool);
-        else if (action.kind === 'gizmo') tools.setGizmoMode(action.mode);
-        else tools.setViewMode(action.viewMode);
-      }
+      if (handleChord(e, state, modifier, key)) return;
+      if (modifier || e.altKey) return;
+      handlePlainKey(e, state, tools, key);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

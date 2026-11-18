@@ -134,6 +134,60 @@ export const propagateUncertainty = defineCommand({
 
 const METHODS = ['form', 'sorm', 'mc', 'is', 'fosm'] as const;
 
+interface MethodStudies {
+  pf: Record<string, number | null>;
+  data: Record<string, unknown>;
+  compared: { method: string; value: number | null } | null;
+  interval: [number, number] | null;
+}
+
+const runMethods = (
+  context: StudyContext,
+  params: {
+    limitState: string;
+    seed?: number | undefined;
+    sampling?: 'mc' | 'lhs' | 'lhs_centred' | undefined;
+    maxIterations?: number | undefined;
+    tolerance?: number | undefined;
+  },
+  methods: ReadonlySet<string>,
+  samples: number,
+): MethodStudies => {
+  const pf: Record<string, number | null> = {};
+  const data: Record<string, unknown> = { limitState: params.limitState, unit: context.limitState.unit, reviewRequired: true };
+  const iterations = params.maxIterations ?? 100;
+  const tolerance = params.tolerance ?? 1e-8;
+  let compared: { method: string; value: number | null } | null = null;
+  if (methods.has('form') || methods.has('sorm')) {
+    const study = formStudy(context, methods.has('sorm'), iterations, tolerance);
+    if (methods.has('form')) {
+      data['form'] = study.data;
+      pf['form'] = study.pf;
+    }
+    if (methods.has('sorm')) data['sorm'] = study.data;
+    if (methods.has('sorm')) pf['sorm'] = study.pfSorm;
+    compared = methods.has('form') ? { method: 'FORM', value: study.pf } : { method: 'SORM', value: study.pfSorm };
+  }
+  let interval: [number, number] | null = null;
+  if (methods.has('mc')) {
+    const study = monteCarloStudy(context, params.sampling ?? 'lhs', samples, params.seed ?? 0);
+    data['monteCarlo'] = study.data;
+    pf['mc'] = study.pf;
+    interval = study.wilson95;
+  }
+  if (methods.has('is')) {
+    const study = importanceStudy(context, samples, params.seed ?? Number.NaN, iterations, tolerance);
+    data['importanceSampling'] = study.data;
+    pf['is'] = study.pf;
+  }
+  if (methods.has('fosm')) {
+    const study = fosmStudy(context);
+    data['fosm'] = study.data;
+    pf['fosm'] = study.pf;
+  }
+  return { pf, data, compared, interval };
+};
+
 /**
  * @affects nothing; read-only, data { form?, sorm?, monteCarlo?, fosm?, comparison { pf per method, formInsideMonteCarloInterval? }, items, reviewRequired: true }
  * @invariant FORM / SORM / FOSM are deterministic; Monte Carlo is deterministic for its seed; PRB_FORM_MC_DISAGREE when the Pf of the requested FORM (SORM when only SORM is requested) lies outside the Wilson 95 % interval
@@ -185,39 +239,8 @@ export const runReliabilityStudy = defineCommand({
             `the limit state reads a response: ${samples} samples exceed ${MAX_RESPONSE_EVALUATIONS} registry evaluations`,
             'samples',
           );
-        const pf: Record<string, number | null> = {};
         const items: unknown[] = [];
-        const data: Record<string, unknown> = { limitState: params.limitState, unit: context.limitState.unit, reviewRequired: true };
-        const iterations = params.maxIterations ?? 100;
-        const tolerance = params.tolerance ?? 1e-8;
-        let compared: { method: string; value: number | null } | null = null;
-        if (methods.has('form') || methods.has('sorm')) {
-          const study = formStudy(context, methods.has('sorm'), iterations, tolerance);
-          if (methods.has('form')) {
-            data['form'] = study.data;
-            pf['form'] = study.pf;
-          }
-          if (methods.has('sorm')) data['sorm'] = study.data;
-          if (methods.has('sorm')) pf['sorm'] = study.pfSorm;
-          compared = methods.has('form') ? { method: 'FORM', value: study.pf } : { method: 'SORM', value: study.pfSorm };
-        }
-        let interval: [number, number] | null = null;
-        if (methods.has('mc')) {
-          const study = monteCarloStudy(context, params.sampling ?? 'lhs', samples, params.seed ?? 0);
-          data['monteCarlo'] = study.data;
-          pf['mc'] = study.pf;
-          interval = study.wilson95;
-        }
-        if (methods.has('is')) {
-          const study = importanceStudy(context, samples, params.seed ?? Number.NaN, iterations, tolerance);
-          data['importanceSampling'] = study.data;
-          pf['is'] = study.pf;
-        }
-        if (methods.has('fosm')) {
-          const study = fosmStudy(context);
-          data['fosm'] = study.data;
-          pf['fosm'] = study.pf;
-        }
+        const { pf, data, compared, interval } = runMethods(context, params, methods, samples);
         const comparedPf = compared?.value ?? null;
         const inside = comparedPf !== null && interval !== null ? comparedPf >= interval[0] && comparedPf <= interval[1] : null;
         if (inside === false)

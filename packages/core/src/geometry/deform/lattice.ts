@@ -9,6 +9,8 @@
 
 import type { DeformLaw } from '../../model/deform';
 import type { Vec3 } from '../../model/vectors';
+import { map3 } from '../../lib/vec3';
+import { pow } from '../../lib/pow';
 
 export type LatticeLaw = Extract<DeformLaw, { kind: 'lattice' }>;
 
@@ -28,7 +30,7 @@ const binomial = (n: number, k: number): number => {
 /** B_i^n(t) for i = 0..n. */
 function bernsteinBasis(n: number, t: number): number[] {
   const out: number[] = [];
-  for (let i = 0; i <= n; i++) out.push(binomial(n, i) * t ** i * (1 - t) ** (n - i));
+  for (let i = 0; i <= n; i++) out.push(binomial(n, i) * pow(t, i) * pow(1 - t, n - i));
   return out;
 }
 
@@ -395,7 +397,7 @@ export function determinantBounds(law: LatticeLaw): DeterminantBounds {
   const { splineDegrees } = law;
   if (splineDegrees !== undefined) {
     const marks = AXES.map((a) => breakpoints(law, a));
-    const degrees = splineDegrees.map((p) => 3 * p - 1) as unknown as Vec3;
+    const degrees = map3(splineDegrees, (p) => 3 * p - 1);
     let boundMin = Infinity;
     let boundMax = -Infinity;
     let sampledMin = Infinity;
@@ -451,7 +453,7 @@ export function determinantBounds(law: LatticeLaw): DeterminantBounds {
     sampledMax = Math.max(sampledMax, highest.value);
     return { boundMin, boundMax, sampledMin, sampledMax, sampledMinAt: pointAt(law, lowest.at[0], lowest.at[1], lowest.at[2]) };
   }
-  const degrees = law.degrees.map((degree) => 3 * degree - 1) as unknown as Vec3;
+  const degrees = map3(law.degrees, (degree) => 3 * degree - 1);
   const whole = patchBound(law, [0, 0, 0], [1, 1, 1], degrees);
   let { sampledMin, sampledMax } = whole;
   let minNode = whole.minNode;

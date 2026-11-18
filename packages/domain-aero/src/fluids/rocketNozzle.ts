@@ -4,6 +4,7 @@
  */
 
 import { isentropicState, machFromAreaRatio, machFromPressureRatio, areaRatio } from './isentropic';
+import { pow } from '@lib/pow';
 
 /** Universal gas constant J/(kmol·K) (CODATA 2018 exact: N_A k_B). */
 export const UNIVERSAL_GAS_CONSTANT = 8314.462618;
@@ -50,7 +51,7 @@ export interface NozzleResult {
 }
 
 /** Γ(γ) = √γ (2/(γ+1))^((γ+1)/(2(γ-1))): the Vandenkerckhove function. */
-export const vandenkerckhove = (gamma: number): number => Math.sqrt(gamma) * (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1)));
+export const vandenkerckhove = (gamma: number): number => Math.sqrt(gamma) * pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
 
 /** c* = √(R T_c) / Γ(γ). */
 export const characteristicVelocity = (gasConstant: number, chamberTemperatureK: number, gamma: number): number =>
@@ -58,7 +59,7 @@ export const characteristicVelocity = (gasConstant: number, chamberTemperatureK:
 
 /** Momentum part of C_F: Γ √( 2γ/(γ-1) (1 - (p_e/p_c)^((γ-1)/γ)) ). */
 export function momentumThrustCoefficient(gamma: number, exitPressureRatio: number): number {
-  return vandenkerckhove(gamma) * Math.sqrt(((2 * gamma) / (gamma - 1)) * (1 - exitPressureRatio ** ((gamma - 1) / gamma)));
+  return vandenkerckhove(gamma) * Math.sqrt(((2 * gamma) / (gamma - 1)) * (1 - pow(exitPressureRatio, (gamma - 1) / gamma)));
 }
 
 /** Conical-nozzle divergence factor λ = (1 + cos α)/2 for half-angle α (rad) (Malina 1940; Sutton eq. 3-34). */

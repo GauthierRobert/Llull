@@ -5,6 +5,7 @@
 
 import { solveLinear } from './linalg';
 import { contract, deviator, vonMises, type Vec6 } from './tensor';
+import { pow } from '../../lib/pow';
 
 export interface RambergOsgoodMaterial {
   readonly E: number;
@@ -26,7 +27,7 @@ export function roStrain(material: RambergOsgoodMaterial, stress: readonly numbe
   const trace = (stress[0] ?? 0) + (stress[1] ?? 0) + (stress[2] ?? 0);
   const s = deviator(stress);
   const equivalent = vonMises(stress);
-  const plastic = equivalent > 0 ? ((1.5 * alpha) / E) * (equivalent / sigma0) ** (n - 1) : 0;
+  const plastic = equivalent > 0 ? ((1.5 * alpha) / E) * pow(equivalent / sigma0, n - 1) : 0;
   const strain: Vec6 = [0, 0, 0, 0, 0, 0];
   for (let i = 0; i < 3; i += 1) strain[i] = ((1 + nu) * (stress[i] ?? 0) - nu * trace) / E + plastic * (s[i] ?? 0);
   for (let i = 3; i < 6; i += 1) strain[i] = (2 * (1 + nu) * (stress[i] ?? 0)) / E + 2 * plastic * (s[i] ?? 0);
@@ -45,7 +46,7 @@ export interface RoSolution {
 
 /** Uniaxial inverse σ(ε) by the same solver (used by tests as a cross-check of the 1D formula). */
 export const roUniaxialStrain = (material: RambergOsgoodMaterial, sigma: number): number =>
-  sigma / material.E + (material.alpha / material.E) * (Math.abs(sigma) / material.sigma0) ** (material.n - 1) * sigma;
+  sigma / material.E + (material.alpha / material.E) * pow(Math.abs(sigma) / material.sigma0, material.n - 1) * sigma;
 
 /**
  * Solve the mixed boundary problem of the deformation theory: strain targets on some components, stress targets on the rest.

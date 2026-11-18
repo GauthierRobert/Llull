@@ -17,10 +17,8 @@ playwright-report
 .cache
 __pycache__
 
-# License vendor key material
+# Key material
 *.pem
-server/users.json
-server/audit.jsonl*
 
 # Rust native workspace (RS1)
 solver/target

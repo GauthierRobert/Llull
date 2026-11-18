@@ -11,6 +11,7 @@ import { type ReviewItem, reviewItem } from '@core/model/reviewEnvelope';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
 import { unboundedEffort } from '../sim/driveReport';
+import { pow } from '@lib/pow';
 
 /** No real static propeller exceeds a figure of merit of ~0.75 (NACA TR-684); above 0.8 the Ct / Cp pair is not physical (named default). */
 const MAX_FIGURE_OF_MERIT: CheckThreshold = {
@@ -121,7 +122,7 @@ function effortItems(doc: CadDocument): ReviewItem[] {
 function propellerItems(doc: CadDocument): ReviewItem[] {
   return Object.values(dynamicsOf(doc).propellers).map((propeller): ReviewItem => {
     const merit =
-      propeller.powerCoefficient > 0 ? propeller.thrustCoefficient ** 1.5 / (propeller.powerCoefficient * Math.sqrt(Math.PI / 2)) : null;
+      propeller.powerCoefficient > 0 ? pow(propeller.thrustCoefficient, 1.5) / (propeller.powerCoefficient * Math.sqrt(Math.PI / 2)) : null;
     const over = merit !== null && merit > MAX_FIGURE_OF_MERIT.value;
     return item(
       'FPR_UNREALISTIC',

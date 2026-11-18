@@ -11,6 +11,7 @@ import type { CurveSegment } from '../../model/curve';
 import { sampleSegment, type PlaneSegment } from '../../geometry/planeSegments';
 import { pointAt2 } from '../../lib/nurbs/curve2d';
 import { cross3, dot3, sub3 } from '../../lib/vec3';
+import { powInt } from '../../lib/powInt';
 
 export interface Outline {
   /** Lines and Beziers of the outline, joined end to start (absent for a sampled polygon). */
@@ -34,7 +35,7 @@ function uvOnPiece(piece: PlaneSegment, s: number): Vec2 {
 }
 
 const bezierAt = (p: readonly [Vec2, Vec2, Vec2, Vec2], s: number): Vec2 => {
-  const [a, b, c, d] = [(1 - s) ** 3, 3 * s * (1 - s) ** 2, 3 * s * s * (1 - s), s ** 3];
+  const [a, b, c, d] = [powInt(1 - s, 3), 3 * s * (1 - s) ** 2, 3 * s * s * (1 - s), powInt(s, 3)];
   return [a * p[0][0] + b * p[1][0] + c * p[2][0] + d * p[3][0], a * p[0][1] + b * p[1][1] + c * p[2][1] + d * p[3][1]];
 };
 

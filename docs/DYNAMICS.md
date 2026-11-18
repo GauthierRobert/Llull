@@ -3,7 +3,9 @@
 llull can run a mechanism forward in time with real physics: mass and inertia from the CAD geometry, joints, gear
 trains, engines and propellers, integrated by **MuJoCo** (Google DeepMind's C engine, official WASM build
 `@mujoco/mujoco`, pinned) behind the injected `PhysicsEngine` interface (`@core/dynamics/physicsEngine`, architecture L9).
-The same commands run in the desktop app (WASM loaded on the first Simulate), in the `llull` CLI and on the local backend.
+The same commands run in the `llull` CLI, on the local backend (what the desktop app uses while connected) and, while the backend is
+unreachable, in the desktop app's own physics worker (`src/physics.worker.ts`: MuJoCo's WASM off the UI thread, warmed when the Physics
+or Review panel opens).
 
 ## The model (document data, `doc.dynamics`)
 

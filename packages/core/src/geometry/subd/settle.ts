@@ -10,6 +10,7 @@
 
 import { type Cage, subdivide } from '../subdivision';
 import { SHARP_MAX } from './sharpness';
+import { pow } from '../../lib/pow';
 
 type SettleSource = Pick<Cage, 'edgeSharpness' | 'vertexSharpness'>;
 
@@ -26,7 +27,7 @@ export function fullSettleLevels(cage: SettleSource): number {
 
 /** Quads of `cage` refined `levels` times (>= 1): every face, an n-gon included, becomes quads at the first step. */
 const refinedQuads = (cage: Pick<Cage, 'faces'>, levels: number): number =>
-  cage.faces.reduce((total, face) => total + face.length, 0) * 4 ** (levels - 1);
+  cage.faces.reduce((total, face) => total + face.length, 0) * pow(4, levels - 1);
 
 /** Settling of `cage` (0 when nothing is semi-sharp): `fullSettleLevels`, lowered until the settled cage is within SETTLE_QUAD_BUDGET (never below 1). */
 export function settleLevels(cage: SettleSource & Pick<Cage, 'faces'>): number {

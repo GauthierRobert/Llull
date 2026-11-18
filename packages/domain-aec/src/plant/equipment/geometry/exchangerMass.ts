@@ -9,6 +9,7 @@ import type { ExchangerTemplate } from '../plantData';
 import { exchangerVolumes, type ExchangerEnd, type ExchangerGeometry } from './exchangerFrame';
 import { headMetalVolume } from './headOffset';
 import { TEST_WATER_KG_PER_M3, type MassPart } from './vesselMass';
+import { powInt } from '@lib/powInt';
 
 export interface FluidSide {
   readonly volumeM3: number;
@@ -31,7 +32,7 @@ const annulus = (outer: number, inner: number): number => Math.PI * (outer * out
 
 /** @param scale metres per document unit */
 export function exchangerMass(scale: number, template: ExchangerTemplate, geometry: ExchangerGeometry): ExchangerMass {
-  const cubic = scale ** 3;
+  const cubic = powInt(scale, 3);
   const density = template.design?.materialDensityKgM3 ?? STEEL_DENSITY_KG_PER_M3;
   const { radius, shellThickness } = geometry;
   const { tubes } = template;

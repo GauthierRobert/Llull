@@ -3,6 +3,7 @@
 import type { Vec3 } from '../../model/vectors';
 import { evaluateSurface } from '../../lib/nurbs/surface';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
+import { powInt } from '../../lib/powInt';
 
 /** Ring points wanted around one section (spread over its knot spans). */
 const RING_POINTS = 48;
@@ -27,7 +28,7 @@ function planarSpan(face: NurbsSurfaceData, u0: number, u1: number): boolean {
     const volume =
       ab[0] * (ac[1] * ad[2] - ac[2] * ad[1]) - ab[1] * (ac[0] * ad[2] - ac[2] * ad[0]) + ab[2] * (ac[0] * ad[1] - ac[1] * ad[0]);
     const side = Math.max(Math.hypot(...ab), Math.hypot(...ac), Math.hypot(...ad), 1e-12);
-    if (Math.abs(volume) > PLANAR_TOLERANCE * side ** 3) return false;
+    if (Math.abs(volume) > PLANAR_TOLERANCE * powInt(side, 3)) return false;
   }
   return true;
 }

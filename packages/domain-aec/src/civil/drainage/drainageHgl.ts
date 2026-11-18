@@ -13,6 +13,7 @@ import { fullArea, solvePartialFlow } from './hydraulics';
 import type { DrainageCriteria } from './drainageCriteria';
 import type { FlowResult } from './drainageFlow';
 import { manholesUpstreamFirst, pipePlanLength, pipeSlope } from './drainageTopology';
+import { pow } from '@lib/pow';
 
 const LEVEL_TOLERANCE_M = 1e-6;
 
@@ -46,7 +47,7 @@ function pipeState(doc: CadDocument, civil: CivilModel, pipe: PipeObject, design
   const slope = pipeSlope(civil, pipe);
   const partial = solvePartialFlow(diameterM, slope, pipe.manningN, flowM3s);
   const area = fullArea(diameterM);
-  const conveyance = area * (diameterM / 4) ** (2 / 3);
+  const conveyance = area * pow(diameterM / 4, 2 / 3);
   return {
     diameterM,
     normalDepthM: partial.depthRatio * diameterM,

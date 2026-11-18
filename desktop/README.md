@@ -10,8 +10,8 @@ Electron main (src/main.ts: wiring only)
   │     LLULL_PYTHON = resources/python (CadQuery: import_step / export_step;
   │     import_code runs arbitrary Python: only when the app is launched with LLULL_ALLOW_CODE_EXECUTION=1)
   │     LLULL_NATIVE_DIR = resources/native, only when bundled (llull-compute jobs; llull-kernel)
-  │     LLULL_KERNEL = occt-native when the bundle holds llull-kernel (native OCCT 7.9.2, KI7), else occt (WASM OCC);
-  │       an inherited LLULL_KERNEL=manifold or occt is kept as a diagnostic override
+  │     LLULL_KERNEL = occt-native (native OCCT 7.9.2, KI7); without a bundled llull-kernel the backend falls back to Manifold with a warning;
+  │       an inherited LLULL_KERNEL=manifold is kept as a diagnostic override
   ├─ BrowserWindow → http://127.0.0.1:<port>/#token=…   (sandboxed, navigation pinned)
   ├─ File menu → DocumentSession (load_document / clear_document / snapshot → .llull file)
   └─ ~/.llull/desktop.json → `llull --app …` (Claude Code drives the open document)

@@ -184,6 +184,38 @@ function longestRun(runs: readonly IsoRun[], project: (point: Vec3) => Vec2): Is
   return best?.run;
 }
 
+function addFlowArrows(
+  runs: readonly IsoRun[],
+  lineId: string,
+  sheet: (point: Vec3) => Vec2,
+  primitives: IsoPrimitive[],
+  arrows: GaArrow[],
+): void {
+  for (const run of runs) {
+    const [first, last] = [run.points[0], run.points[run.points.length - 1]];
+    if (first === undefined || last === undefined || distance3(first, last) <= FLOW_ARROW_MIN_MM) continue;
+    const [p, q] = [sheet(first), sheet(last)];
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (length < 8) continue;
+    const u: Vec2 = [(q[0] - p[0]) / length, (q[1] - p[1]) / length];
+    const tip = mix(p, q, 0.5);
+    const back: Vec2 = [tip[0] - u[0] * 3.5, tip[1] - u[1] * 3.5];
+    primitives.push(
+      { t: 'line', layer: 'ISO-SYMB', a: back, b: tip },
+      { t: 'line', layer: 'ISO-SYMB', a: tip, b: [tip[0] - u[0] * 1.8 - u[1] * 1, tip[1] - u[1] * 1.8 + u[0] * 1] },
+      { t: 'line', layer: 'ISO-SYMB', a: tip, b: [tip[0] - u[0] * 1.8 + u[1] * 1, tip[1] - u[1] * 1.8 - u[0] * 1] },
+    );
+    const span = distance3(first, last);
+    arrows.push({
+      lineId,
+      run: run.id,
+      at: [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2, (first[2] + last[2]) / 2],
+      direction: [(last[0] - first[0]) / span, (last[1] - first[1]) / span, (last[2] - first[2]) / span],
+      sheet: [round2(tip[0]), round2(tip[1])],
+    });
+  }
+}
+
 export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga {
   const project = projector(options);
   const [width, height] = PAPER_MM[options.paper];
@@ -337,30 +369,7 @@ export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga 
         });
       }
     }
-    if (options.annotate.includes('flow_arrow'))
-      for (const run of runs) {
-        const [first, last] = [run.points[0], run.points[run.points.length - 1]];
-        if (first === undefined || last === undefined || distance3(first, last) <= FLOW_ARROW_MIN_MM) continue;
-        const [p, q] = [sheet(first), sheet(last)];
-        const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
-        if (length < 8) continue;
-        const u: Vec2 = [(q[0] - p[0]) / length, (q[1] - p[1]) / length];
-        const tip = mix(p, q, 0.5);
-        const back: Vec2 = [tip[0] - u[0] * 3.5, tip[1] - u[1] * 3.5];
-        primitives.push(
-          { t: 'line', layer: 'ISO-SYMB', a: back, b: tip },
-          { t: 'line', layer: 'ISO-SYMB', a: tip, b: [tip[0] - u[0] * 1.8 - u[1] * 1, tip[1] - u[1] * 1.8 + u[0] * 1] },
-          { t: 'line', layer: 'ISO-SYMB', a: tip, b: [tip[0] - u[0] * 1.8 + u[1] * 1, tip[1] - u[1] * 1.8 - u[0] * 1] },
-        );
-        const span = distance3(first, last);
-        arrows.push({
-          lineId: line.network.lineId,
-          run: run.id,
-          at: [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2, (first[2] + last[2]) / 2],
-          direction: [(last[0] - first[0]) / span, (last[1] - first[1]) / span, (last[2] - first[2]) / span],
-          sheet: [round2(tip[0]), round2(tip[1])],
-        });
-      }
+    if (options.annotate.includes('flow_arrow')) addFlowArrows(runs, line.network.lineId, sheet, primitives, arrows);
   }
   const north: Vec2 = [width - 40, height - 40];
   const frame: IsoPrimitive[] = [

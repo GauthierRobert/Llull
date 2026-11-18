@@ -122,6 +122,23 @@ function topOfSteelShift(doc: Pick<CadDocument, 'units'>, member: SteelMemberEle
   return fromMm(doc, (old.h - section.h) / 2);
 }
 
+type Fixities = { [K in 'startJoint' | 'endJoint' | 'baseFixity']: SteelMemberElement[K] | undefined };
+
+function fixitiesOf(
+  nextRole: SteelMemberElement['role'],
+  requested: Fixities,
+  previous: Fixities,
+): { [K in keyof Fixities]?: NonNullable<Fixities[K]> } {
+  const startJoint = requested.startJoint ?? previous.startJoint;
+  const endJoint = requested.endJoint ?? previous.endJoint;
+  const baseFixity = requested.baseFixity ?? previous.baseFixity;
+  return {
+    ...(nextRole === 'beam' && startJoint ? { startJoint } : {}),
+    ...(nextRole === 'beam' && endJoint ? { endJoint } : {}),
+    ...(nextRole === 'column' && baseFixity ? { baseFixity } : {}),
+  };
+}
+
 /** @failure unknown member / profile / role, zero length -> no-op */
 export const updateSteelMember = defineCommand({
   name: 'update_steel_member',
@@ -171,12 +188,11 @@ export const updateSteelMember = defineCommand({
     const problem = fixityProblem(nextRole, { startJoint, endJoint, baseFixity });
     if (problem) return noop(doc, `update_steel_member failed: ${problem}.`);
     const { startJoint: oldStart, endJoint: oldEnd, baseFixity: oldBase, ...rest } = member;
-    const isBeam = nextRole === 'beam';
-    const fixities = {
-      ...(isBeam && (startJoint ?? oldStart) ? { startJoint: startJoint ?? oldStart } : {}),
-      ...(isBeam && (endJoint ?? oldEnd) ? { endJoint: endJoint ?? oldEnd } : {}),
-      ...(nextRole === 'column' && (baseFixity ?? oldBase) ? { baseFixity: baseFixity ?? oldBase } : {}),
-    };
+    const fixities = fixitiesOf(
+      nextRole,
+      { startJoint, endJoint, baseFixity },
+      { startJoint: oldStart, endJoint: oldEnd, baseFixity: oldBase },
+    );
     const updated: SteelMemberElement = {
       ...rest,
       ...fixities,

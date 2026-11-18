@@ -4,6 +4,7 @@
  */
 
 import type { PropertyForm, PropertyVariable } from './propertyModel';
+import { pow } from '../lib/pow';
 
 /** R = N_A · k_B, exact since the 2019 SI redefinition. */
 export const GAS_CONSTANT = 6.02214076e23 * 1.380649e-23;
@@ -101,6 +102,23 @@ function table2d(form: Extract<PropertyForm, { kind: 'table2d' }>, at: Point, wr
   return { value, derivative: 0 };
 }
 
+function nistRational(form: Extract<PropertyForm, { kind: 'nistRational' }>, at: Point, wrt: PropertyVariable | undefined): FormResult {
+  const t = at['T'];
+  if (t === undefined) return missing('T');
+  const [a = 0, b = 0, c = 0, d = 0, e = 0, f = 0, g = 0, h = 0, i = 0] = form.coefficients;
+  const s = Math.sqrt(t);
+  const numerator = a + c * s + e * t + g * t * s + i * t * t;
+  const denominator = 1 + b * s + d * t + f * t * s + h * t * t;
+  const value = pow(10, numerator / denominator);
+  const dN = c / (2 * s) + e + 1.5 * g * s + 2 * i * t;
+  const dD = b / (2 * s) + d + 1.5 * f * s + 2 * h * t;
+  return withDerivative(
+    value,
+    wrt === 'T' ? (value * Math.LN10 * (dN * denominator - numerator * dD)) / denominator ** 2 : 0,
+    wrt !== undefined,
+  );
+}
+
 /** Value (and d/d`wrt` when asked) of `form` at `at`. A variable the form does not read has derivative 0. */
 export function evaluateForm(form: PropertyForm, at: Point, wrt?: PropertyVariable, base?: BaseEvaluator): FormResult {
   const read = (variable: PropertyVariable): number | undefined => at[variable];
@@ -126,37 +144,23 @@ export function evaluateForm(form: PropertyForm, at: Point, wrt?: PropertyVariab
       const x = read(form.variable);
       if (x === undefined) return missing(form.variable);
       const { value: exponent, slope } = polynomialAt(form.coefficients, Math.log10(x));
-      const value = 10 ** exponent;
+      const value = pow(10, exponent);
       return withDerivative(value, wantsFor(form.variable) ? (value * slope) / x : 0, wrt !== undefined);
     }
-    case 'nistRational': {
-      const t = read('T');
-      if (t === undefined) return missing('T');
-      const [a = 0, b = 0, c = 0, d = 0, e = 0, f = 0, g = 0, h = 0, i = 0] = form.coefficients;
-      const s = Math.sqrt(t);
-      const numerator = a + c * s + e * t + g * t * s + i * t * t;
-      const denominator = 1 + b * s + d * t + f * t * s + h * t * t;
-      const value = 10 ** (numerator / denominator);
-      const dN = c / (2 * s) + e + 1.5 * g * s + 2 * i * t;
-      const dD = b / (2 * s) + d + 1.5 * f * s + 2 * h * t;
-      return withDerivative(
-        value,
-        wantsFor('T') ? (value * Math.LN10 * (dN * denominator - numerator * dD)) / denominator ** 2 : 0,
-        wrt !== undefined,
-      );
-    }
+    case 'nistRational':
+      return nistRational(form, at, wrt);
     case 'arrhenius': {
       const t = read('T');
       if (t === undefined) return missing('T');
       const m = form.temperatureExponent ?? 0;
       const q = form.activationEnergyJPerMol;
-      const value = form.preFactor * t ** m * Math.exp(-q / (GAS_CONSTANT * t));
+      const value = form.preFactor * pow(t, m) * Math.exp(-q / (GAS_CONSTANT * t));
       return withDerivative(value, wantsFor('T') ? value * (m / t + q / (GAS_CONSTANT * t * t)) : 0, wrt !== undefined);
     }
     case 'powerLaw': {
       const x = read(form.variable);
       if (x === undefined) return missing(form.variable);
-      const value = form.coefficient * (x / form.reference) ** form.exponent;
+      const value = form.coefficient * pow(x / form.reference, form.exponent);
       return withDerivative(value, wantsFor(form.variable) ? (form.exponent * value) / x : 0, wrt !== undefined);
     }
     case 'piecewise': {
@@ -177,7 +181,7 @@ export function evaluateForm(form: PropertyForm, at: Point, wrt?: PropertyVariab
           wrt !== undefined,
         );
       }
-      const term = (rate / form.D) ** (1 / form.q);
+      const term = pow(rate / form.D, 1 / form.q);
       return withDerivative(1 + term, wantsFor('strainRate') ? term / form.q / rate : 0, wrt !== undefined);
     }
     case 'product':

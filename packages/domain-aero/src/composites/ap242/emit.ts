@@ -3,6 +3,7 @@
 import { entityName, stringsOf } from '@lib/step21/records';
 import { referencesOutsideStrings as referencesOf } from './lex';
 import { quoted, real, unquoted } from './part21';
+import { powInt } from '@lib/powInt';
 
 /** Hands out record ids after the highest existing one and collects the `#n=BODY;` lines. */
 export class Emitter {
@@ -83,7 +84,7 @@ export function makeUnits(out: Emitter, mmPerUnit: number): Units {
     const name = mmPerUnit === 25.4 ? 'INCH' : 'FOOT';
     const lengthFactor = out.add(`LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(${real(mmPerUnit)}),#${baseLength})`);
     const areaFactor = out.add(`AREA_MEASURE_WITH_UNIT(AREA_MEASURE(${real(mmPerUnit * mmPerUnit)}),#${baseArea})`);
-    const volumeFactor = out.add(`VOLUME_MEASURE_WITH_UNIT(VOLUME_MEASURE(${real(mmPerUnit ** 3)}),#${baseVolume})`);
+    const volumeFactor = out.add(`VOLUME_MEASURE_WITH_UNIT(VOLUME_MEASURE(${real(powInt(mmPerUnit, 3))}),#${baseVolume})`);
     length = out.add(`(CONVERSION_BASED_UNIT('${name}',#${lengthFactor}) LENGTH_UNIT() NAMED_UNIT(#${exponents(1)}))`);
     area = out.add(`(AREA_UNIT() CONVERSION_BASED_UNIT('SQUARE ${name}',#${areaFactor}) NAMED_UNIT(#${exponents(2)}))`);
     volume = out.add(`(CONVERSION_BASED_UNIT('CUBIC ${name}',#${volumeFactor}) NAMED_UNIT(#${exponents(3)}) VOLUME_UNIT())`);

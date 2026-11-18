@@ -1,12 +1,13 @@
-// check_prototype for the Review tab (read-only query: kernel + physics). Online it runs on the server (same reason as simulationRun:
-// the served app's CSP blocks the in-page MuJoCo load); offline it runs in the page. Where check_prototype is not registered, the tab
+// check_prototype for the Review tab (read-only query: kernel + physics). Connected, it runs on the backend; disconnected, the checks
+// that simulate run in the in-page physics worker (physicsRun.ts, same reason as simulationRun) and the
+// others in the page. Where check_prototype is not registered, the tab
 // runs the individual checks that are (check_assembly, check_mechanism, check_motion_clearance — each returns one check-result
 // envelope) and wraps them as one review; a check no command provides reads "not run".
 
 import { getCommand } from '@core/commands/registry';
-import { ensurePhysicsEngine } from '@app/physics';
 import { useStore } from '@ui/store';
 import { runQuery } from '@ui/services/localQuery';
+import { runPhysicsQuery } from '@ui/services/physicsRun';
 import { postCommand, ServerCommandError } from '@ui/store/serverCommands';
 
 export const CHECK_COMMAND = 'check_prototype';
@@ -53,16 +54,16 @@ async function runOnServer(command: string, params: Record<string, unknown>): Pr
 const isEnvelope = (data: unknown): boolean => typeof data === 'object' && data !== null && 'check' in data && 'items' in data;
 
 /** Runs every available single check and wraps the envelopes as one review (a failed run is reported, the others still count). */
-async function runSingleChecks(params: Record<string, unknown>, onStatus: (status: string) => void): Promise<PrototypeCheckRun> {
+async function runSingleChecks(params: Record<string, unknown>, onStatus?: (status: string) => void): Promise<PrototypeCheckRun> {
   const online = useStore.getState().liveStatus === 'connected';
-  // check_motion_clearance / check_dynamics simulate the mechanism: offline they need the in-page physics engine first.
-  if (!online && availableParts().some((name) => SIMULATING.has(name))) {
-    onStatus('Loading the physics engine…');
-    await ensurePhysicsEngine();
-  }
-  const runs = await Promise.all(
-    availableParts().map((name) => (online ? runOnServer(name, params) : Promise.resolve(runQuery(name, params)))),
-  );
+  // check_motion_clearance / check_dynamics simulate the mechanism: disconnected, they run in the physics worker.
+  const runOne = (name: string): Promise<PrototypeCheckRun> => {
+    if (online) return runOnServer(name, params);
+    if (SIMULATING.has(name)) return runPhysicsQuery(name, params, onStatus);
+    const { summary, data } = runQuery(name, params);
+    return Promise.resolve({ summary, data });
+  };
+  const runs = await Promise.all(availableParts().map(runOne));
   const checks = runs.flatMap((run) => (isEnvelope(run.data) ? [run.data] : []));
   const summary = runs.map((run) => run.summary).join(' ');
   // The owner reads one line per check (verdict), not the agents' long summaries.
@@ -75,12 +76,9 @@ async function runSingleChecks(params: Record<string, unknown>, onStatus: (statu
   return { summary, data: checks.length === 0 ? undefined : { checks, ownerSummary } };
 }
 
-export async function runPrototypeCheck(params: Record<string, unknown>, onStatus: (status: string) => void): Promise<PrototypeCheckRun> {
+/** @param onStatus progress line while the in-page engine loads (disconnected only) */
+export async function runPrototypeCheck(params: Record<string, unknown>, onStatus?: (status: string) => void): Promise<PrototypeCheckRun> {
   if (reviewCheckCommand() === ASSEMBLY_COMMAND) return runSingleChecks(params, onStatus);
   if (useStore.getState().liveStatus === 'connected') return runOnServer(CHECK_COMMAND, params);
-  onStatus('Loading the physics engine…');
-  if (!(await ensurePhysicsEngine())) return { summary: 'The physics engine could not be loaded (see the console).', data: undefined };
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  const run = runQuery(CHECK_COMMAND, params);
-  return { summary: run.summary, data: run.data };
+  return runPhysicsQuery(CHECK_COMMAND, params, onStatus);
 }

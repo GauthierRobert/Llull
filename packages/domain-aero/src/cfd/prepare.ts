@@ -182,6 +182,21 @@ export function prepareCase(
   return prepareCaseWithStage(doc, cfdCase, kernel, options).report;
 }
 
+/** The blockage check row: not run without a watertight surface, fail above MAX_BLOCKAGE, else pass. */
+function blockageRow(blockage: number | null): CheckRow {
+  return blockage === null
+    ? row('CFD_BLOCKAGE_TOO_HIGH', 'not_run', 'skipped: the surface is not watertight')
+    : blockage > MAX_BLOCKAGE
+      ? row('CFD_BLOCKAGE_TOO_HIGH', 'fail', `blockage ${(blockage * 100).toFixed(2)} % exceeds ${MAX_BLOCKAGE * 100} %`, {
+          blockageRatio: blockage,
+          limit: MAX_BLOCKAGE,
+        })
+      : row('CFD_BLOCKAGE_TOO_HIGH', 'pass', `blockage ${(blockage * 100).toFixed(3)} % <= ${MAX_BLOCKAGE * 100} %`, {
+          blockageRatio: blockage,
+          limit: MAX_BLOCKAGE,
+        });
+}
+
 /** [`prepareCase`] keeping the welded surface (case frame, metres) for the solver export. */
 export function prepareCaseWithStage(
   doc: CadDocument,
@@ -264,19 +279,7 @@ export function prepareCaseWithStage(
 
   const frontal = stage.closed ? frontalArea(stage.surface, stage.bounds.min, stage.bounds.max) : null;
   const blockage = frontal === null ? null : blockageRatio(frontal, sizing.box, halved);
-  checks.push(
-    blockage === null
-      ? row('CFD_BLOCKAGE_TOO_HIGH', 'not_run', 'skipped: the surface is not watertight')
-      : blockage > MAX_BLOCKAGE
-        ? row('CFD_BLOCKAGE_TOO_HIGH', 'fail', `blockage ${(blockage * 100).toFixed(2)} % exceeds ${MAX_BLOCKAGE * 100} %`, {
-            blockageRatio: blockage,
-            limit: MAX_BLOCKAGE,
-          })
-        : row('CFD_BLOCKAGE_TOO_HIGH', 'pass', `blockage ${(blockage * 100).toFixed(3)} % <= ${MAX_BLOCKAGE * 100} %`, {
-            blockageRatio: blockage,
-            limit: MAX_BLOCKAGE,
-          }),
-  );
+  checks.push(blockageRow(blockage));
 
   const solver = flow?.solver ?? null;
   const estimate =

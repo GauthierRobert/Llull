@@ -4,6 +4,7 @@
  */
 
 import type { RuleGrade, RuleSet } from './ruleSets';
+import { pow } from '@lib/pow';
 
 export const SIF_COMPONENTS = [
   'elbow',
@@ -45,7 +46,7 @@ export interface SifRefusal {
 }
 
 const atLeastOne = (value: number): number => Math.max(1, value);
-const power = (h: number): number => h ** (2 / 3);
+const power = (h: number): number => pow(h, 2 / 3);
 
 /** The tee / branch family: h differs by fitting, io = 0.9 / h^(2/3), ii = 0.75 io + 0.25 (B31.1: one value, io). */
 function branchValues(set: RuleSet, h: number, ruleRow: string, formula: string): SifValues {
@@ -114,7 +115,7 @@ export function computeSif(set: RuleSet, input: SifInput): SifValues | SifRefusa
     case 'reinforced_tee': {
       const pad = input.padMm;
       if (pad === undefined) return { reason: 'reinforced_tee needs padMm (the pad or saddle thickness tr)', path: 'padMm' };
-      const h = (wallMm + pad / 2) ** 2.5 / (wallMm ** 1.5 * meanRadius);
+      const h = pow(wallMm + pad / 2, 2.5) / (pow(wallMm, 1.5) * meanRadius);
       return branchValues(
         set,
         h,

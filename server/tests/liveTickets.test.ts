@@ -65,7 +65,7 @@ describe('POST /live/ticket (shared token)', () => {
   it('opens only the live stream: snapshot and exports ignore a ticket', async () => {
     const ticket = await mint();
     expect((await request(app).get('/live/snapshot').query({ ticket })).status).toBe(401);
-    expect((await request(app).get('/export/stl').query({ ticket })).status).toBe(401);
+    expect((await request(app).get('/export/step').query({ ticket })).status).toBe(401);
     expect(consumeTicket(ticket)).toBe(true); // not consumed by the refused requests
   });
 

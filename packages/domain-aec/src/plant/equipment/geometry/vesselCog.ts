@@ -15,6 +15,7 @@ import { horizontalVolume } from './partialVolume';
 import { placeNozzle } from './ports';
 import { TEST_WATER_KG_PER_M3, vesselMass } from './vesselMass';
 import type { VesselGeometry } from './vesselFrame';
+import { powInt } from '@lib/powInt';
 
 export interface CogPart {
   readonly part: string;
@@ -53,7 +54,7 @@ function segment(radius: number, h: number): { area: number; below: number } {
   if (level === 0) return { area: 0, below: 0 };
   const theta = 2 * Math.acos((radius - level) / radius);
   const area = (radius * radius * (theta - Math.sin(theta))) / 2;
-  return { area, below: (4 * radius * Math.sin(theta / 2) ** 3) / (3 * (theta - Math.sin(theta))) };
+  return { area, below: (4 * radius * powInt(Math.sin(theta / 2), 3)) / (3 * (theta - Math.sin(theta))) };
 }
 
 interface Frame {
@@ -172,7 +173,7 @@ export function vesselCog(
     ...lumps,
     ...(nozzles.length === 0 ? [] : nozzleLumpsOf(template, nozzles, nozzleMassParts(scale, geometry, nozzles, mass.densityKgM3))),
   ];
-  const cubic = scale ** 3;
+  const cubic = powInt(scale, 3);
   const vertical = template.orientation === 'vertical';
   const fullLevel = vertical ? geometry.length + geometry.second.depth : 2 * geometry.radius;
   const water = liquidLumps(template, geometry, fullLevel, TEST_WATER_KG_PER_M3 * cubic) ?? [];

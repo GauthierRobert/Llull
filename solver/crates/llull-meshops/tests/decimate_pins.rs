@@ -27,7 +27,7 @@ struct Pin {
 }
 
 fn wavy(x: f64, y: f64) -> f64 {
-    0.4 * (x / 1.5).sin() * (y / 2.0).cos()
+    0.4 * llull_jsmath::sin(x / 1.5) * llull_jsmath::cos(y / 2.0)
 }
 
 const HOLES: [(usize, usize); 3] = [(3, 3), (4, 3), (10, 12)];

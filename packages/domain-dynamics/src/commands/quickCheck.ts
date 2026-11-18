@@ -7,6 +7,7 @@ import { pressureCurve } from '../sim/cylinderPressure';
 import { gaugeAt } from '../sim/pressureCurve';
 import { toMetres } from '@core/model/units';
 import type { CommandResult } from '@core/commands/types';
+import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { failer, report } from '@core/commands/noop';
 import { dynamicsOf } from './bodies';
@@ -17,6 +18,126 @@ import { quickBrake } from '../sim/engine/quickBrake';
 const DEFAULT_CURVE_RPM = 1000;
 
 const DEFAULT_ANGLES = [0, 30, 60, 90, 120, 150, 180];
+
+const quickSchema = z.object({
+  cylinder: z
+    .string()
+    .optional()
+    .describe('Id of a cylinder pressure (add_cylinder_pressure): geometry and pressure are taken from the model.'),
+  crankRadiusMm: z.number().positive().optional().describe('Crank radius (half the stroke), mm. Required without `cylinder`.'),
+  rodLengthMm: z.number().positive().optional().describe('Connecting-rod length between pin centres, mm. Required without `cylinder`.'),
+  offsetMm: z.number().optional().describe('Lateral offset of the cylinder axis from the crank axis, mm (default 0).'),
+  forceN: z
+    .number()
+    .optional()
+    .describe('Constant force on the piston toward the crank, N: adds torque, rod force and side thrust per angle.'),
+  anglesDeg: z.array(z.number()).max(721).optional().describe('Angles in deg. Default 0, 30, ..., 180.'),
+  rpm: z.number().positive().optional().describe('Crank speed, rpm: adds power and piston speed.'),
+  mepBar: z.number().optional().describe('Mean effective pressure, bar: gives the mean torque (needs displacementCm3 or a cylinder).'),
+  displacementCm3: z
+    .number()
+    .positive()
+    .optional()
+    .describe('Swept volume of the engine, cm³ (all cylinders), for the MEP relation. Default: the cylinder or 2·r·π·bore²/4 if known.'),
+  cycle: z.enum(['four_stroke', 'two_stroke']).optional().describe("Cycle for the MEP relation. Default the cylinder's, else four_stroke."),
+});
+
+type QuickParams = z.infer<typeof quickSchema>;
+
+interface PressureModel {
+  readonly gauge: (phi: number) => number;
+  readonly areaM2: number;
+  readonly imepBar: number;
+  readonly peakBar: number;
+}
+
+interface QuickGeometry {
+  readonly radius: number;
+  readonly rod: number;
+  readonly offset: number;
+  readonly cycle: 'four_stroke' | 'two_stroke';
+  readonly displacement: number | undefined;
+  readonly model: PressureModel | undefined;
+  readonly defaulted: Array<{ input: string; value: number; use: string }>;
+}
+
+/** Slider-crank geometry, cycle, displacement and pressure model from the parameters or the cylinder record, or the refusal message. */
+function geometryOf(doc: CadDocument, params: QuickParams): QuickGeometry | string {
+  let radius = params.crankRadiusMm !== undefined ? params.crankRadiusMm / 1000 : undefined;
+  let rod = params.rodLengthMm !== undefined ? params.rodLengthMm / 1000 : undefined;
+  let offset = (params.offsetMm ?? 0) / 1000;
+  let cycle = params.cycle ?? 'four_stroke';
+  let displacement = params.displacementCm3 !== undefined ? params.displacementCm3 * 1e-6 : undefined;
+  const defaulted: Array<{ input: string; value: number; use: string }> = [];
+  let model: PressureModel | undefined;
+  if (params.cylinder !== undefined) {
+    const dynamics = dynamicsOf(doc);
+    const cylinder = dynamics.cylinders?.[params.cylinder];
+    if (cylinder === undefined) return `cylinder '${params.cylinder}' not found (add_cylinder_pressure first)`;
+    const topology = buildTopology(dynamics);
+    if (isRefusal(topology)) return `${topology.code}: ${topology.error}`;
+    const layout = engineLayout(dynamics, topology, cylinder, toMetres(doc, 1));
+    if ('error' in layout) return layout.error;
+    if (params.rpm === undefined) defaulted.push({ input: 'rpm', value: DEFAULT_CURVE_RPM, use: 'cylinder pressure curve' });
+    const curve = pressureCurve(cylinder, layout, params.rpm ?? DEFAULT_CURVE_RPM);
+    if ('error' in curve) return `${curve.code}: ${curve.error}`;
+    [radius, rod, offset, cycle] = [layout.slider.r, layout.slider.l, layout.slider.offset, cylinder.cycle];
+    displacement ??= layout.displacementM3;
+    model = { gauge: (phi) => gaugeAt(curve, phi), areaM2: layout.pistonAreaM2, imepBar: curve.imepPa / 1e5, peakBar: curve.peakPa / 1e5 };
+  }
+  if (radius === undefined || rod === undefined) return 'give crankRadiusMm and rodLengthMm, or a cylinder id';
+  if (rod <= radius + Math.abs(offset)) return 'the rod must be longer than the crank radius plus the offset';
+  return { radius, rod, offset, cycle, displacement, model, defaulted };
+}
+
+/** Travel, rod angle, torque per newton and (with a pressure model or forceN) force, torque, rod force and side thrust per crank angle. */
+function anglesOf(
+  params: QuickParams,
+  slider: ReturnType<typeof createSlider>,
+  model: PressureModel | undefined,
+  omega: number | undefined,
+): Array<Record<string, number | null> & { angleDeg: number; travelMm: number; rodAngleDeg: number; torquePerNewtonNm: number }> {
+  return (params.anglesDeg ?? DEFAULT_ANGLES).map((angleDeg) => {
+    const psi = (angleDeg * Math.PI) / 180;
+    const rate = sliderRate(slider, psi);
+    const beta = rodAngle(slider, psi);
+    const force = model !== undefined ? model.gauge(angleDeg) * model.areaM2 : params.forceN;
+    return {
+      angleDeg,
+      travelMm: sliderTravel(slider, psi) * 1000,
+      rodAngleDeg: (beta * 180) / Math.PI,
+      torquePerNewtonNm: rate,
+      pistonSpeedMs: omega !== undefined ? rate * omega : null,
+      ...(model !== undefined ? { gaugeBar: model.gauge(angleDeg) / 1e5 } : {}),
+      ...(force !== undefined
+        ? { forceN: force, torqueNm: force * rate, rodForceN: force / Math.cos(beta), sideThrustN: force * Math.tan(beta) }
+        : {}),
+    };
+  });
+}
+
+/** Brake torque / power from the cylinder's engine losses, or null without a cylinder record and pressure model. */
+function quickOf(
+  doc: CadDocument,
+  params: QuickParams,
+  model: PressureModel | undefined,
+  displacement: number | undefined,
+  cycle: 'four_stroke' | 'two_stroke',
+): ReturnType<typeof quickBrake> | null {
+  const dynamics = dynamicsOf(doc);
+  const record = params.cylinder === undefined ? undefined : dynamics.cylinders?.[params.cylinder];
+  return record !== undefined && model !== undefined
+    ? quickBrake({
+        model: record.model,
+        losses: Object.values(dynamics.losses ?? {}).find((losses) => losses.crank === record.crank),
+        imepPa: model.imepBar * 1e5,
+        peakPa: model.peakBar * 1e5,
+        rpm: params.rpm,
+        displacementM3: displacement ?? 0,
+        cycle,
+      })
+    : null;
+}
 
 /**
  * @affects nothing — read-only; data { source, geometry, angles[], mean? }
@@ -40,82 +161,16 @@ export const engineQuickCheck = defineCommand({
     'data.brake gives the friction (FMEP), BMEP = IMEP - FMEP, brake torque / power and mechanical efficiency at that speed. data.accuracy states ' +
     'for each number its band (null = "± ?"), basis and origin: "calibrated" at a speed the heat release was calibrated at (not validation ' +
     'evidence), "predicted" elsewhere, "input" for a pressure table or a MEP you give. Read-only; needs no kernel or physics engine.',
-  params: z.object({
-    cylinder: z
-      .string()
-      .optional()
-      .describe('Id of a cylinder pressure (add_cylinder_pressure): geometry and pressure are taken from the model.'),
-    crankRadiusMm: z.number().positive().optional().describe('Crank radius (half the stroke), mm. Required without `cylinder`.'),
-    rodLengthMm: z.number().positive().optional().describe('Connecting-rod length between pin centres, mm. Required without `cylinder`.'),
-    offsetMm: z.number().optional().describe('Lateral offset of the cylinder axis from the crank axis, mm (default 0).'),
-    forceN: z
-      .number()
-      .optional()
-      .describe('Constant force on the piston toward the crank, N: adds torque, rod force and side thrust per angle.'),
-    anglesDeg: z.array(z.number()).max(721).optional().describe('Angles in deg. Default 0, 30, ..., 180.'),
-    rpm: z.number().positive().optional().describe('Crank speed, rpm: adds power and piston speed.'),
-    mepBar: z.number().optional().describe('Mean effective pressure, bar: gives the mean torque (needs displacementCm3 or a cylinder).'),
-    displacementCm3: z
-      .number()
-      .positive()
-      .optional()
-      .describe('Swept volume of the engine, cm³ (all cylinders), for the MEP relation. Default: the cylinder or 2·r·π·bore²/4 if known.'),
-    cycle: z
-      .enum(['four_stroke', 'two_stroke'])
-      .optional()
-      .describe("Cycle for the MEP relation. Default the cylinder's, else four_stroke."),
-  }),
+  params: quickSchema,
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'engine_quick_check');
-    let radius = params.crankRadiusMm !== undefined ? params.crankRadiusMm / 1000 : undefined;
-    let rod = params.rodLengthMm !== undefined ? params.rodLengthMm / 1000 : undefined;
-    let offset = (params.offsetMm ?? 0) / 1000;
-    let cycle = params.cycle ?? 'four_stroke';
-    let displacement = params.displacementCm3 !== undefined ? params.displacementCm3 * 1e-6 : undefined;
-    const defaulted: Array<{ input: string; value: number; use: string }> = [];
-    let model: { gauge: (phi: number) => number; areaM2: number; imepBar: number; peakBar: number } | undefined;
-    if (params.cylinder !== undefined) {
-      const dynamics = dynamicsOf(doc);
-      const cylinder = dynamics.cylinders?.[params.cylinder];
-      if (cylinder === undefined) return fail(`cylinder '${params.cylinder}' not found (add_cylinder_pressure first)`);
-      const topology = buildTopology(dynamics);
-      if (isRefusal(topology)) return fail(`${topology.code}: ${topology.error}`);
-      const layout = engineLayout(dynamics, topology, cylinder, toMetres(doc, 1));
-      if ('error' in layout) return fail(layout.error);
-      if (params.rpm === undefined) defaulted.push({ input: 'rpm', value: DEFAULT_CURVE_RPM, use: 'cylinder pressure curve' });
-      const curve = pressureCurve(cylinder, layout, params.rpm ?? DEFAULT_CURVE_RPM);
-      if ('error' in curve) return fail(`${curve.code}: ${curve.error}`);
-      [radius, rod, offset, cycle] = [layout.slider.r, layout.slider.l, layout.slider.offset, cylinder.cycle];
-      displacement ??= layout.displacementM3;
-      model = {
-        gauge: (phi) => gaugeAt(curve, phi),
-        areaM2: layout.pistonAreaM2,
-        imepBar: curve.imepPa / 1e5,
-        peakBar: curve.peakPa / 1e5,
-      };
-    }
-    if (radius === undefined || rod === undefined) return fail('give crankRadiusMm and rodLengthMm, or a cylinder id');
-    if (rod <= radius + Math.abs(offset)) return fail('the rod must be longer than the crank radius plus the offset');
+    const geometry = geometryOf(doc, params);
+    if (typeof geometry === 'string') return fail(geometry);
+    const { radius, rod, offset, cycle, displacement, model, defaulted } = geometry;
     const slider = createSlider(radius, rod, offset);
     const stroke = sliderStroke(slider);
     const omega = params.rpm !== undefined ? (params.rpm * 2 * Math.PI) / 60 : undefined;
-    const angles = (params.anglesDeg ?? DEFAULT_ANGLES).map((angleDeg) => {
-      const psi = (angleDeg * Math.PI) / 180;
-      const rate = sliderRate(slider, psi);
-      const beta = rodAngle(slider, psi);
-      const force = model !== undefined ? model.gauge(angleDeg) * model.areaM2 : params.forceN;
-      return {
-        angleDeg,
-        travelMm: sliderTravel(slider, psi) * 1000,
-        rodAngleDeg: (beta * 180) / Math.PI,
-        torquePerNewtonNm: rate,
-        pistonSpeedMs: omega !== undefined ? rate * omega : null,
-        ...(model !== undefined ? { gaugeBar: model.gauge(angleDeg) / 1e5 } : {}),
-        ...(force !== undefined
-          ? { forceN: force, torqueNm: force * rate, rodForceN: force / Math.cos(beta), sideThrustN: force * Math.tan(beta) }
-          : {}),
-      };
-    });
+    const angles = anglesOf(params, slider, model, omega);
     const revolutionsPerCycle = cycle === 'four_stroke' ? 2 : 1;
     const mep = params.mepBar !== undefined ? params.mepBar * 1e5 : model !== undefined ? model.imepBar * 1e5 : undefined;
     let mean: Record<string, number> | undefined;
@@ -129,20 +184,7 @@ export const engineQuickCheck = defineCommand({
         ...(omega !== undefined ? { powerKW: (torque * omega) / 1000, rpm: params.rpm ?? 0 } : {}),
       };
     }
-    const dynamics = dynamicsOf(doc);
-    const record = params.cylinder === undefined ? undefined : dynamics.cylinders?.[params.cylinder];
-    const quick =
-      record !== undefined && model !== undefined
-        ? quickBrake({
-            model: record.model,
-            losses: Object.values(dynamics.losses ?? {}).find((losses) => losses.crank === record.crank),
-            imepPa: model.imepBar * 1e5,
-            peakPa: model.peakBar * 1e5,
-            rpm: params.rpm,
-            displacementM3: displacement ?? 0,
-            cycle,
-          })
-        : null;
+    const quick = quickOf(doc, params, model, displacement, cycle);
     const given = accuracy(null, 'mean effective pressure given by the caller; its uncertainty is not stated', 'input', {
       warnings: [RIGID_BODY_WARNING],
     });

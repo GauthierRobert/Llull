@@ -123,6 +123,80 @@ function layoutComponents(
   return { list };
 }
 
+function imposedDisplacements(
+  model: StressModel,
+  finished: Layout,
+  restraints: RestraintSet,
+): BuiltModel['displacements'][number][] | LayoutFailure {
+  const displacements: BuiltModel['displacements'][number][] = [];
+  for (const [index, moved] of model.displacements.entries()) {
+    const node = (finished.attached.get(`displacement:${index}`) as { node: number }).node;
+    if (!restraints.anchors.some((anchor) => anchor.node === node))
+      return failure(
+        'PST_DISPLACEMENT_NOT_ANCHORED',
+        `imposed displacement ${moved.name} acts at node N${node + 1}, which is not an anchor`,
+        [moved.name],
+        [`displacements.${index}`],
+      );
+    const rotation = moved.rotationDeg ?? [0, 0, 0];
+    displacements.push({ name: moved.name, node, values: [...moved.translationMm, ...rotation.map((deg) => (deg * Math.PI) / 180)] });
+  }
+  return displacements;
+}
+
+function modelWarnings(
+  model: StressModel,
+  sources: Sources,
+  finished: Layout,
+  inherited: BuiltModel['warnings'],
+  list: readonly LayoutComponent[],
+  set: RuleSet,
+): BuiltModel['warnings'] {
+  const assumed = finished.junctions.filter((junction) => fittingChoice(model, sources, junction.branchPipeId).origin === 'assumed');
+  const unweighed = list.filter((component) => component.kind !== 'reducer' && component.weightKg === null);
+  const reducers = list.filter((component) => component.kind === 'reducer');
+  return [
+    ...inherited,
+    ...assumed.map((junction) => ({
+      code: 'PST_TEE_FITTING_ASSUMED',
+      message: `branch ${junction.branchPipeId} on ${junction.headerPipeId} is modelled as an unreinforced fabricated tee (set_stress_component fitting to change it)`,
+      ids: [junction.branchPipeId],
+    })),
+    ...(unweighed.length === 0
+      ? []
+      : [
+          {
+            code: 'PST_COMPONENT_WEIGHT_MISSING',
+            message: `${unweighed.map((component) => component.key).join(', ')}: no weight stated, the body carries only the pipe weight (set_stress_component weightKg)`,
+            ids: unweighed.map((component) => component.key),
+          },
+        ]),
+    ...(reducers.length === 0
+      ? []
+      : [
+          {
+            code: 'PST_REDUCER_SIF',
+            message: `${reducers.map((component) => component.key).join(', ')}: reducer stress intensification is 1.0 (no factor in a read source); a manufacturer or B31J value should replace it`,
+            ids: reducers.map((component) => component.key),
+          },
+        ]),
+    ...finished.sharpCorners.map((id) => ({
+      code: 'PST_SHARP_CORNERS',
+      message: `pipe ${id}: corners kept sharp (elbowRadiusFactor 0): k = 1 and i = 1`,
+      ids: [id],
+    })),
+    ...(set.sifBasis === 'b31j'
+      ? [
+          {
+            code: 'PST_SIF_EDITION',
+            message: `${set.id} requires ASME B31J factors (tables not public): code appendix D values are used and may under-state the SIF`,
+            ids: [] as string[],
+          },
+        ]
+      : []),
+  ];
+}
+
 /**
  * @failure document not in mm -> PST_PARAM_INVALID; missing pipe / run -> PST_PIPE_NOT_FOUND; no wall -> PST_WALL_UNKNOWN; corrosion allowance eating the wall
  *   -> PST_CORROSION_EXCEEDS_WALL; geometry failures of `buildLayout`, `mapRestraints`
@@ -286,19 +360,8 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
     hotLoadN: spring.hotLoadN,
     coldLoadN: spring.coldLoadN,
   }));
-  const displacements: BuiltModel['displacements'][number][] = [];
-  for (const [index, moved] of model.displacements.entries()) {
-    const node = (finished.attached.get(`displacement:${index}`) as { node: number }).node;
-    if (!restraints.anchors.some((anchor) => anchor.node === node))
-      return failure(
-        'PST_DISPLACEMENT_NOT_ANCHORED',
-        `imposed displacement ${moved.name} acts at node N${node + 1}, which is not an anchor`,
-        [moved.name],
-        [`displacements.${index}`],
-      );
-    const rotation = moved.rotationDeg ?? [0, 0, 0];
-    displacements.push({ name: moved.name, node, values: [...moved.translationMm, ...rotation.map((deg) => (deg * Math.PI) / 180)] });
-  }
+  const displacements = imposedDisplacements(model, finished, restraints);
+  if (!Array.isArray(displacements)) return displacements;
   const forces = model.forces.map((force, index) => ({
     name: force.name,
     node: (finished.attached.get(`force:${index}`) as { node: number }).node,
@@ -309,49 +372,6 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
     const stored = model.components.find((entry) => 'branchPipeId' in entry.target && entry.target.branchPipeId === junction.branchPipeId);
     return stored?.weightKg === undefined || stored.weightKg === 0 ? [] : [{ node: junction.node, kg: stored.weightKg }];
   });
-  const assumed = finished.junctions.filter((junction) => fittingChoice(model, sources, junction.branchPipeId).origin === 'assumed');
-  const unweighed = components.list.filter((component) => component.kind !== 'reducer' && component.weightKg === null);
-  const reducers = components.list.filter((component) => component.kind === 'reducer');
-  const warnings = [
-    ...restraints.warnings,
-    ...overridden.warnings,
-    ...assumed.map((junction) => ({
-      code: 'PST_TEE_FITTING_ASSUMED',
-      message: `branch ${junction.branchPipeId} on ${junction.headerPipeId} is modelled as an unreinforced fabricated tee (set_stress_component fitting to change it)`,
-      ids: [junction.branchPipeId],
-    })),
-    ...(unweighed.length === 0
-      ? []
-      : [
-          {
-            code: 'PST_COMPONENT_WEIGHT_MISSING',
-            message: `${unweighed.map((component) => component.key).join(', ')}: no weight stated, the body carries only the pipe weight (set_stress_component weightKg)`,
-            ids: unweighed.map((component) => component.key),
-          },
-        ]),
-    ...(reducers.length === 0
-      ? []
-      : [
-          {
-            code: 'PST_REDUCER_SIF',
-            message: `${reducers.map((component) => component.key).join(', ')}: reducer stress intensification is 1.0 (no factor in a read source); a manufacturer or B31J value should replace it`,
-            ids: reducers.map((component) => component.key),
-          },
-        ]),
-    ...finished.sharpCorners.map((id) => ({
-      code: 'PST_SHARP_CORNERS',
-      message: `pipe ${id}: corners kept sharp (elbowRadiusFactor 0): k = 1 and i = 1`,
-      ids: [id],
-    })),
-    ...(set.sifBasis === 'b31j'
-      ? [
-          {
-            code: 'PST_SIF_EDITION',
-            message: `${set.id} requires ASME B31J factors (tables not public): code appendix D values are used and may under-state the SIF`,
-            ids: [] as string[],
-          },
-        ]
-      : []),
-  ];
+  const warnings = modelWarnings(model, sources, finished, [...restraints.warnings, ...overridden.warnings], components.list, set);
   return { sources, layout: finished, restraints, walls, set, forces, displacements, springs, pointWeights, warnings };
 }

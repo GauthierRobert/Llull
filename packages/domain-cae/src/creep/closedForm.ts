@@ -1,6 +1,7 @@
 /** PHY-11 §5.2 closed forms of creep and viscoelastic time response (pure; mirrors validation/generate_creep_reference.py). Units are those of the caller. */
 
 import { nortonCreepStrain } from '@core/model/materialLaws/creep';
+import { pow } from '@lib/pow';
 
 /** Norton creep strain ε = A σⁿ t^(m+1)/(m+1) at constant stress (time hardening, m > −1). */
 export const nortonStrain = nortonCreepStrain;
@@ -8,13 +9,13 @@ export const nortonStrain = nortonCreepStrain;
 /** Stress of a bar held at fixed total strain after time t: [σ0^(1−n) + (n−1) E′ A t]^(1/(1−n)); n = 1 gives σ0 exp(−E′ A t). */
 export function relaxedStress(sigma0: number, effectiveModulus: number, A: number, n: number, t: number): number {
   if (n === 1) return sigma0 * Math.exp(-effectiveModulus * A * t);
-  return (sigma0 ** (1 - n) + (n - 1) * effectiveModulus * A * t) ** (1 / (1 - n));
+  return pow(pow(sigma0, 1 - n) + (n - 1) * effectiveModulus * A * t, 1 / (1 - n));
 }
 
 /** Time for the stress to fall to `fraction` × σ0 (0 < fraction < 1): σ0^(1−n)(f^(1−n) − 1)/((n−1) E′ A); n = 1 gives −ln f/(E′ A). */
 export function timeToFraction(sigma0: number, effectiveModulus: number, A: number, n: number, fraction: number): number {
   if (n === 1) return -Math.log(fraction) / (effectiveModulus * A);
-  return (sigma0 ** (1 - n) * (fraction ** (1 - n) - 1)) / ((n - 1) * effectiveModulus * A);
+  return (pow(sigma0, 1 - n) * (pow(fraction, 1 - n) - 1)) / ((n - 1) * effectiveModulus * A);
 }
 
 /** E′ = E k_m/(k_m + k_b) = E/(1 + k_b/k_m) of a bolt in series with members (k_b/k_m = 0: rigid members). */
@@ -33,8 +34,8 @@ export interface TubeStress {
  */
 export function tubeStationary(p: number, a: number, b: number, n: number, r: number): TubeStress {
   const k = 2 / n;
-  const denominator = (b / a) ** k - 1;
-  const q = (b / r) ** k;
+  const denominator = pow(b / a, k) - 1;
+  const q = pow(b / r, k);
   const radial = (-p * (q - 1)) / denominator;
   const hoop = (p * (1 + (k - 1) * q)) / denominator;
   return { radial, hoop, axial: 0.5 * (radial + hoop), vonMises: (Math.sqrt(3) / 2) * (hoop - radial) };
@@ -42,8 +43,8 @@ export function tubeStationary(p: number, a: number, b: number, n: number, r: nu
 
 /** Stationary creep bending stress of a b × h rectangle at height y from the neutral axis: σ = M |y|^(1/n) sign(y)/Iₙ, Iₙ = 2b(h/2)^(2+1/n)/(2+1/n). */
 export function beamStationary(M: number, b: number, h: number, n: number, y: number): number {
-  const In = (2 * b * (h / 2) ** (2 + 1 / n)) / (2 + 1 / n);
-  return Math.sign(y) * ((M * Math.abs(y) ** (1 / n)) / In);
+  const In = (2 * b * pow(h / 2, 2 + 1 / n)) / (2 + 1 / n);
+  return Math.sign(y) * ((M * pow(Math.abs(y), 1 / n)) / In);
 }
 
 /** Elastic outer-fibre bending stress 6M/(b h²). */

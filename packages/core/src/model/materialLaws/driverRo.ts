@@ -16,6 +16,7 @@ import { roLoadingDirection, roSolve, type RambergOsgoodMaterial, type RoTarget 
 import { failure, isLawFailure, newTrace, resolveAll, type ResolveEnv } from './resolve';
 import { contract, vonMises, zero6, type Vec6 } from './tensor';
 import type { PropertyRecord } from '../propertyModelEval';
+import { pow } from '../../lib/pow';
 
 export interface RoRunInput {
   readonly record: PropertyRecord;
@@ -109,7 +110,7 @@ export function runRambergOsgoodPath(input: RoRunInput): DriverOutcome | DriverF
       }
       previousEquivalent = equivalent;
       const time1 = time + (duration * k) / step.increments;
-      const plasticEquivalent = (material.alpha / material.E) * (equivalent / material.sigma0) ** (material.n - 1) * equivalent;
+      const plasticEquivalent = (material.alpha / material.E) * pow(equivalent / material.sigma0, material.n - 1) * equivalent;
       monitor.check({ T, time: time1, eqPlasticStrain: plasticEquivalent, strainRate: 0, stretch: null }, stepIndex + 1, k);
       if (input.output === 'increments' || k === step.increments)
         rows.push({

@@ -8,6 +8,7 @@ import { resolveMassProperties } from './resolveMassProperties';
 import { resolveDensity, type DensityFallback } from './resolveDensity';
 import { combineMassProperties, type InertiaTensor, type MassProperties } from './massProperties';
 import { scale3 } from '../lib/vec3';
+import { powInt } from '../lib/powInt';
 
 /** kg/m³ of a body entity without a material and without a body density: steel (a named default, AF-31). */
 const DEFAULT_DENSITY: DensityFallback = { kgPerM3: 7850, source: 'default:steel 7850 kg/m^3', defaulted: true };
@@ -36,7 +37,7 @@ export function bodyMassProperties(
   kernel?: GeometryKernel | null,
 ): BodyMassProperties | { error: string } {
   const metres = toMetres(doc, 1);
-  const unitVolume = metres ** 3;
+  const unitVolume = powInt(metres, 3);
   const fallback: DensityFallback =
     body.density !== undefined
       ? { kgPerM3: body.density, source: `body '${body.id}' density ${body.density} kg/m^3`, defaulted: false }

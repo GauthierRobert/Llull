@@ -5,7 +5,7 @@
  * `data`. Designed so AI agents (CLI) can filter and locate entities by meaning rather than juggling generated ids.
  */
 
-import { type EntityKind, SHAPE2D_KINDS, SOLID_KINDS } from '../../model/types';
+import { type CadDocument, type Entity, type EntityKind, SHAPE2D_KINDS, SOLID_KINDS } from '../../model/types';
 import { CURVE_KINDS } from '../../model/curveKinds';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
@@ -43,6 +43,168 @@ const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean => axes.ever
 
 const isInverted = (min: Corner, max: Corner): boolean => axes.some((i) => min[i] > max[i]);
 
+const findEntitiesParams = z.object({
+  kind: z
+    .enum(FILTERABLE_KINDS)
+    .optional()
+    .describe(`Filter by entity kind. One of: ${FILTERABLE_KINDS.map((kind) => `"${kind}"`).join(', ')}. ` + 'Omit to match all kinds.'),
+  layerId: z
+    .string()
+    .optional()
+    .describe('Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.'),
+  name: z
+    .string()
+    .optional()
+    .describe(
+      'Filter by entity name. By default performs a case-insensitive substring match. ' +
+        'Set nameExact:true for a case-sensitive exact match. Omit to match all names.',
+    ),
+  nameExact: z
+    .boolean()
+    .optional()
+    .describe('When true, the name filter requires an exact case-sensitive match instead of a substring match. Default: false.'),
+  tag: z
+    .string()
+    .optional()
+    .describe('Filter to entities that have this exact tag string in their tags array. Omit to match all entities regardless of tags.'),
+  bboxMin: vec3(
+    'World-space minimum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMax. ' +
+      'Only entities whose world-space AABB overlaps this box are returned.',
+  ).optional(),
+  bboxMax: vec3(
+    'World-space maximum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMin. ' +
+      'Only entities whose world-space AABB overlaps this box are returned.',
+  ).optional(),
+  nearPoint: z
+    .object({
+      point: vec3('World-space origin [x, y, z] of the proximity search.'),
+      radius: z.number().describe('Maximum distance from point to entity centroid. Must be > 0.'),
+    })
+    .optional()
+    .describe(
+      'Spatial filter: return only entities whose bbox centroid is within `radius` units (3D euclidean) of `point`. ' +
+        'Provide as { "point": [x, y, z], "radius": number }. radius must be > 0.',
+    ),
+  insideBBox: z
+    .tuple([POINT_3D, POINT_3D])
+    .optional()
+    .describe(
+      'Spatial filter: return only entities whose world-space AABB is FULLY inside the given box. ' +
+        'Provide as [[minX,minY,minZ],[maxX,maxY,maxZ]]. min must be <= max on every axis.',
+    ),
+  overlapsBBox: z
+    .tuple([POINT_3D, POINT_3D])
+    .optional()
+    .describe(
+      'Spatial filter: return only entities whose world-space AABB INTERSECTS the given box. ' +
+        'Provide as [[minX,minY,minZ],[maxX,maxY,maxZ]]. min must be <= max on every axis.',
+    ),
+  touchingId: z
+    .string()
+    .optional()
+    .describe(
+      'Spatial filter: return entities whose world-space AABB overlaps the AABB of the entity with this id. ' +
+        'The reference entity itself is excluded from results. The id must exist in the document.',
+    ),
+  nameFuzzy: z
+    .string()
+    .optional()
+    .describe(
+      'Fuzzy name filter: case-insensitive substring match on entity name. ' +
+        'Matches any entity whose name contains this string. Omit to skip this filter.',
+    ),
+  tagFuzzy: z
+    .string()
+    .optional()
+    .describe(
+      "Fuzzy tag filter: case-insensitive substring match on any tag in the entity's tags array. " +
+        'Matches if ANY tag contains this substring. Omit to skip this filter.',
+    ),
+});
+
+type FindParams = z.infer<typeof findEntitiesParams>;
+
+/** The first refusal message of the filter arguments, or null when they are usable. */
+function filterError(params: FindParams): string | null {
+  const { bboxMin, bboxMax, nearPoint, insideBBox, overlapsBBox } = params;
+  if ((bboxMin === undefined) !== (bboxMax === undefined)) return 'bboxMin and bboxMax must both be provided or both omitted';
+  if (nearPoint !== undefined && nearPoint.radius <= 0) return 'nearPoint.radius must be a finite number > 0';
+  if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1])) return 'insideBBox min must be <= max on every axis';
+  if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1])) return 'overlapsBBox min must be <= max on every axis';
+  return null;
+}
+
+interface Filters {
+  readonly params: FindParams;
+  readonly nameLc: string | undefined;
+  readonly nameFuzzyLc: string | undefined;
+  readonly tagFuzzyLc: string | undefined;
+  readonly nearRadiusSq: number;
+  readonly touchingBounds: Bounds | null;
+}
+
+/** The name, tag, kind and layer filters (no geometry). */
+function passesMetadata(e: Entity, f: Filters): boolean {
+  const { kind, layerId, name, nameExact = false, tag, touchingId } = f.params;
+  if (kind !== undefined && e.kind !== kind) return false;
+  if (layerId !== undefined && e.layerId !== layerId) return false;
+  if (name !== undefined) {
+    if (e.name === undefined) return false;
+    if (nameExact ? e.name !== name : !e.name.toLowerCase().includes(f.nameLc ?? '')) return false;
+  }
+  if (tag !== undefined && !e.tags?.includes(tag)) return false;
+  const { nameFuzzyLc, tagFuzzyLc } = f;
+  if (nameFuzzyLc !== undefined && !e.name?.toLowerCase().includes(nameFuzzyLc)) return false;
+  if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc))) return false;
+  if (touchingId !== undefined && e.id === touchingId) return false;
+  return true;
+}
+
+/** The bounding-box, proximity and touching filters. */
+function passesSpatial(doc: CadDocument, e: Entity, f: Filters): boolean {
+  const { bboxMin, bboxMax, nearPoint, insideBBox, overlapsBBox } = f.params;
+  const { touchingBounds } = f;
+  const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;
+  if (!needsBounds) return true;
+  const b = entityBoundsInDoc(doc, e);
+  if (bboxMin && bboxMax && !boundsOverlap(b, { min: bboxMin, max: bboxMax })) return false;
+  if (nearPoint && distanceSq3(boundsCenter(b), nearPoint.point) > f.nearRadiusSq) return false;
+  if (insideBBox && !insideAabb(b, insideBBox[0], insideBBox[1])) return false;
+  if (overlapsBBox && !boundsOverlap(b, { min: overlapsBBox[0], max: overlapsBBox[1] })) return false;
+  if (touchingBounds && !boundsOverlap(b, touchingBounds)) return false;
+  return true;
+}
+
+function describeFilters(params: FindParams): string {
+  const {
+    kind,
+    layerId,
+    name,
+    nameExact = false,
+    tag,
+    bboxMin,
+    nearPoint,
+    insideBBox,
+    overlapsBBox,
+    touchingId,
+    nameFuzzy,
+    tagFuzzy,
+  } = params;
+  const filterParts: string[] = [];
+  if (kind !== undefined) filterParts.push(`kind=${kind}`);
+  if (layerId !== undefined) filterParts.push(`layerId=${layerId}`);
+  if (name !== undefined) filterParts.push(`name${nameExact ? '==' : '~'}"${name}"`);
+  if (tag !== undefined) filterParts.push(`tag="${tag}"`);
+  if (bboxMin !== undefined) filterParts.push('bbox');
+  if (nearPoint !== undefined) filterParts.push(`nearPoint(r=${nearPoint.radius})`);
+  if (insideBBox !== undefined) filterParts.push('insideBBox');
+  if (overlapsBBox !== undefined) filterParts.push('overlapsBBox');
+  if (touchingId !== undefined) filterParts.push(`touching="${touchingId}"`);
+  if (nameFuzzy !== undefined) filterParts.push(`nameFuzzy~"${nameFuzzy}"`);
+  if (tagFuzzy !== undefined) filterParts.push(`tagFuzzy~"${tagFuzzy}"`);
+  return filterParts.length > 0 ? ` [${filterParts.join(', ')}]` : '';
+}
+
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is FindEntitiesResult; document === input doc
@@ -61,134 +223,25 @@ export const findEntities = defineCommand({
     'overlapsBBox (AABB intersects), touchingId (bbox touches another entity), nameFuzzy (case-insensitive ' +
     'substring on name), tagFuzzy (case-insensitive substring on any tag). All supplied filters are AND-ed. ' +
     'Returns matched entity descriptors (id, kind, layerId, name, tags) in result.data. Does NOT modify the document.',
-  params: z.object({
-    kind: z
-      .enum(FILTERABLE_KINDS)
-      .optional()
-      .describe(`Filter by entity kind. One of: ${FILTERABLE_KINDS.map((kind) => `"${kind}"`).join(', ')}. ` + 'Omit to match all kinds.'),
-    layerId: z
-      .string()
-      .optional()
-      .describe('Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.'),
-    name: z
-      .string()
-      .optional()
-      .describe(
-        'Filter by entity name. By default performs a case-insensitive substring match. ' +
-          'Set nameExact:true for a case-sensitive exact match. Omit to match all names.',
-      ),
-    nameExact: z
-      .boolean()
-      .optional()
-      .describe('When true, the name filter requires an exact case-sensitive match instead of a substring match. Default: false.'),
-    tag: z
-      .string()
-      .optional()
-      .describe('Filter to entities that have this exact tag string in their tags array. Omit to match all entities regardless of tags.'),
-    bboxMin: vec3(
-      'World-space minimum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMax. ' +
-        'Only entities whose world-space AABB overlaps this box are returned.',
-    ).optional(),
-    bboxMax: vec3(
-      'World-space maximum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMin. ' +
-        'Only entities whose world-space AABB overlaps this box are returned.',
-    ).optional(),
-    nearPoint: z
-      .object({
-        point: vec3('World-space origin [x, y, z] of the proximity search.'),
-        radius: z.number().describe('Maximum distance from point to entity centroid. Must be > 0.'),
-      })
-      .optional()
-      .describe(
-        'Spatial filter: return only entities whose bbox centroid is within `radius` units (3D euclidean) of `point`. ' +
-          'Provide as { "point": [x, y, z], "radius": number }. radius must be > 0.',
-      ),
-    insideBBox: z
-      .tuple([POINT_3D, POINT_3D])
-      .optional()
-      .describe(
-        'Spatial filter: return only entities whose world-space AABB is FULLY inside the given box. ' +
-          'Provide as [[minX,minY,minZ],[maxX,maxY,maxZ]]. min must be <= max on every axis.',
-      ),
-    overlapsBBox: z
-      .tuple([POINT_3D, POINT_3D])
-      .optional()
-      .describe(
-        'Spatial filter: return only entities whose world-space AABB INTERSECTS the given box. ' +
-          'Provide as [[minX,minY,minZ],[maxX,maxY,maxZ]]. min must be <= max on every axis.',
-      ),
-    touchingId: z
-      .string()
-      .optional()
-      .describe(
-        'Spatial filter: return entities whose world-space AABB overlaps the AABB of the entity with this id. ' +
-          'The reference entity itself is excluded from results. The id must exist in the document.',
-      ),
-    nameFuzzy: z
-      .string()
-      .optional()
-      .describe(
-        'Fuzzy name filter: case-insensitive substring match on entity name. ' +
-          'Matches any entity whose name contains this string. Omit to skip this filter.',
-      ),
-    tagFuzzy: z
-      .string()
-      .optional()
-      .describe(
-        "Fuzzy tag filter: case-insensitive substring match on any tag in the entity's tags array. " +
-          'Matches if ANY tag contains this substring. Omit to skip this filter.',
-      ),
-  }),
+  params: findEntitiesParams,
   run: (doc, params): CommandResult => {
-    const {
-      kind,
-      layerId,
-      name,
-      nameExact = false,
-      tag,
-      bboxMin,
-      bboxMax,
-      nearPoint,
-      insideBBox,
-      overlapsBBox,
-      touchingId,
-      nameFuzzy,
-      tagFuzzy,
-    } = params;
+    const { name, nearPoint, touchingId, nameFuzzy, tagFuzzy } = params;
     const fail = failer(doc, 'find_entities');
-    if ((bboxMin === undefined) !== (bboxMax === undefined)) return fail('bboxMin and bboxMax must both be provided or both omitted');
-    if (nearPoint !== undefined && nearPoint.radius <= 0) return fail('nearPoint.radius must be a finite number > 0');
-    if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1])) return fail('insideBBox min must be <= max on every axis');
-    if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1]))
-      return fail('overlapsBBox min must be <= max on every axis');
+    const error = filterError(params);
+    if (error !== null) return fail(error);
     const touchingRef = touchingId !== undefined ? entityOfKind(doc, touchingId) : undefined;
     if (typeof touchingRef === 'string') return fail(`touchingId: ${touchingRef}`);
-    const touchingBounds = touchingRef ? entityBoundsInDoc(doc, touchingRef) : null;
-    const nearRadiusSq = nearPoint ? nearPoint.radius * nearPoint.radius : 0;
-    const nameLc = name?.toLowerCase();
-    const nameFuzzyLc = nameFuzzy?.toLowerCase();
-    const tagFuzzyLc = tagFuzzy?.toLowerCase();
+    const filters: Filters = {
+      params,
+      nameLc: name?.toLowerCase(),
+      nameFuzzyLc: nameFuzzy?.toLowerCase(),
+      tagFuzzyLc: tagFuzzy?.toLowerCase(),
+      nearRadiusSq: nearPoint ? nearPoint.radius * nearPoint.radius : 0,
+      touchingBounds: touchingRef ? entityBoundsInDoc(doc, touchingRef) : null,
+    };
     const matches: EntityMatch[] = [];
     for (const e of orderedEntities(doc)) {
-      if (kind !== undefined && e.kind !== kind) continue;
-      if (layerId !== undefined && e.layerId !== layerId) continue;
-      if (name !== undefined) {
-        if (e.name === undefined) continue;
-        if (nameExact ? e.name !== name : !e.name.toLowerCase().includes(nameLc ?? '')) continue;
-      }
-      if (tag !== undefined && !e.tags?.includes(tag)) continue;
-      if (nameFuzzyLc !== undefined && !e.name?.toLowerCase().includes(nameFuzzyLc)) continue;
-      if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc))) continue;
-      if (touchingId !== undefined && e.id === touchingId) continue;
-      const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;
-      if (needsBounds) {
-        const b = entityBoundsInDoc(doc, e);
-        if (bboxMin && bboxMax && !boundsOverlap(b, { min: bboxMin, max: bboxMax })) continue;
-        if (nearPoint && distanceSq3(boundsCenter(b), nearPoint.point) > nearRadiusSq) continue;
-        if (insideBBox && !insideAabb(b, insideBBox[0], insideBBox[1])) continue;
-        if (overlapsBBox && !boundsOverlap(b, { min: overlapsBBox[0], max: overlapsBBox[1] })) continue;
-        if (touchingBounds && !boundsOverlap(b, touchingBounds)) continue;
-      }
+      if (!passesMetadata(e, filters) || !passesSpatial(doc, e, filters)) continue;
       matches.push({
         id: e.id,
         kind: e.kind,
@@ -197,20 +250,7 @@ export const findEntities = defineCommand({
         ...(e.tags !== undefined ? { tags: e.tags } : {}),
       });
     }
-    // --- Build summary ---
-    const filterParts: string[] = [];
-    if (kind !== undefined) filterParts.push(`kind=${kind}`);
-    if (layerId !== undefined) filterParts.push(`layerId=${layerId}`);
-    if (name !== undefined) filterParts.push(`name${nameExact ? '==' : '~'}"${name}"`);
-    if (tag !== undefined) filterParts.push(`tag="${tag}"`);
-    if (bboxMin !== undefined) filterParts.push('bbox');
-    if (nearPoint !== undefined) filterParts.push(`nearPoint(r=${nearPoint.radius})`);
-    if (insideBBox !== undefined) filterParts.push('insideBBox');
-    if (overlapsBBox !== undefined) filterParts.push('overlapsBBox');
-    if (touchingId !== undefined) filterParts.push(`touching="${touchingId}"`);
-    if (nameFuzzy !== undefined) filterParts.push(`nameFuzzy~"${nameFuzzy}"`);
-    if (tagFuzzy !== undefined) filterParts.push(`tagFuzzy~"${tagFuzzy}"`);
-    const filterDesc = filterParts.length > 0 ? ` [${filterParts.join(', ')}]` : '';
+    const filterDesc = describeFilters(params);
     const result: FindEntitiesResult = { matches, count: matches.length };
     return report(
       doc,

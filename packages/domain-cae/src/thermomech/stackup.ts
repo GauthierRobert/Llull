@@ -107,6 +107,52 @@ function valueIn(q: { value: number; unit: string }, unit: string): number | nul
   return isUnitFailure(converted) ? null : converted.value;
 }
 
+/** Resolved contributors of the chain, or the rejection for the first invalid one. */
+function checkedContributors(doc: CadDocument, given: z.infer<typeof contributorSchema>[]): Contributor[] | CommandResult {
+  if (given.length === 0 || given.length > MAX_CONTRIBUTORS)
+    return rejection(
+      doc,
+      'TMC_STACKUP_INVALID',
+      `1 to ${MAX_CONTRIBUTORS} contributors are needed, got ${given.length}`,
+      remediationOf('TMC_STACKUP_INVALID'),
+      'contributors',
+    );
+  const contributors: Contributor[] = [];
+  for (const [index, entry] of given.entries()) {
+    const resolved = resolveContributor(doc, entry);
+    if (typeof resolved === 'string')
+      return rejection(doc, 'TMC_STACKUP_INVALID', resolved, remediationOf('TMC_STACKUP_INVALID'), `contributors[${index}]`);
+    contributors.push(resolved);
+  }
+  const names = new Set<string>();
+  for (const [index, contributor] of contributors.entries()) {
+    const where = `contributors[${index}]`;
+    if (names.has(contributor.name))
+      return rejection(
+        doc,
+        'TMC_STACKUP_INVALID',
+        `contributor name '${contributor.name}' is used twice`,
+        remediationOf('TMC_STACKUP_INVALID'),
+        `${where}.name`,
+      );
+    names.add(contributor.name);
+    if (
+      !(contributor.nominal > 0) ||
+      !(contributor.upper >= contributor.lower) ||
+      contributor.sensitivity === 0 ||
+      !Number.isFinite(contributor.sensitivity ?? 1)
+    )
+      return rejection(
+        doc,
+        'TMC_FIT_LIMITS_MISSING',
+        `contributor '${contributor.name}': nominal must be > 0, upper >= lower, sensitivity non-zero`,
+        'fix the limits of the contributor',
+        where,
+      );
+  }
+  return contributors;
+}
+
 /**
  * @affects nothing — read-only; data { unit, specTemperature, rows[{ temperatureKelvin, mean, worstCase{min,max,halfTolerance}, rss{sigma,min,max,halfRange},
  *   shiftFromSpec, contributions[], status?, code?, unverified, reviewRequired, disposition }], specRow, provenance, assumptions, summary }
@@ -202,47 +248,9 @@ export const stackupAtTemperature = defineCommand({
         );
       kelvins.push(kelvin);
     }
-    if (given.length === 0 || given.length > MAX_CONTRIBUTORS)
-      return rejection(
-        doc,
-        'TMC_STACKUP_INVALID',
-        `1 to ${MAX_CONTRIBUTORS} contributors are needed, got ${given.length}`,
-        remediationOf('TMC_STACKUP_INVALID'),
-        'contributors',
-      );
-    const contributors: Contributor[] = [];
-    for (const [index, entry] of given.entries()) {
-      const resolved = resolveContributor(doc, entry);
-      if (typeof resolved === 'string')
-        return rejection(doc, 'TMC_STACKUP_INVALID', resolved, remediationOf('TMC_STACKUP_INVALID'), `contributors[${index}]`);
-      contributors.push(resolved);
-    }
-    const names = new Set<string>();
-    for (const [index, contributor] of contributors.entries()) {
-      const where = `contributors[${index}]`;
-      if (names.has(contributor.name))
-        return rejection(
-          doc,
-          'TMC_STACKUP_INVALID',
-          `contributor name '${contributor.name}' is used twice`,
-          remediationOf('TMC_STACKUP_INVALID'),
-          `${where}.name`,
-        );
-      names.add(contributor.name);
-      if (
-        !(contributor.nominal > 0) ||
-        !(contributor.upper >= contributor.lower) ||
-        contributor.sensitivity === 0 ||
-        !Number.isFinite(contributor.sensitivity ?? 1)
-      )
-        return rejection(
-          doc,
-          'TMC_FIT_LIMITS_MISSING',
-          `contributor '${contributor.name}': nominal must be > 0, upper >= lower, sensitivity non-zero`,
-          'fix the limits of the contributor',
-          where,
-        );
-    }
+    const checked = checkedContributors(doc, given);
+    if (!Array.isArray(checked)) return checked;
+    const contributors: Contributor[] = checked;
     const { lowerSpecLimit, upperSpecLimit } = params;
     if (lowerSpecLimit !== undefined && upperSpecLimit !== undefined && lowerSpecLimit > upperSpecLimit)
       return rejection(

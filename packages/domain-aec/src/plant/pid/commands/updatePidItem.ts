@@ -1,12 +1,10 @@
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { isValveClass } from '../authoring/classes';
-import { splitInstrumentTag, tagRefusal } from '../authoring/instrumentTag';
-import { moveEquipment, rerouteEnds } from '../authoring/move';
-import { Draft, checkTag, fail, findAny, isFail, refuse, segmentsOf } from '../authoring/refs';
+import { Draft, fail, findAny, isFail, refuse } from '../authoring/refs';
 import { attributesParam, toValues } from '../authoring/values';
 import type { PidItem, PidItemKind } from '../model';
 import { getPid, withPid } from '../state';
+import { placeItem, withLineNumber, withSizing, withTag } from './updatePidItemPhases';
 
 type SetField = 'tag' | 'attributes' | 'dn' | 'pipingClass' | 'fluidCode' | 'lineNumber' | 'at' | 'rotationDeg';
 
@@ -75,71 +73,18 @@ export const updatePidItem = defineCommand({
     let next: PidItem = item;
 
     if (set.tag !== undefined) {
-      const kind =
-        item.kind === 'equipment'
-          ? 'equipment'
-          : item.kind === 'instrument'
-            ? 'instrument'
-            : item.kind === 'inline' && isValveClass(item.dexpiClass)
-              ? 'valve'
-              : undefined;
-      const tag = checkTag(pid, set.tag, kind, 'set.tag', item.id);
-      if (isFail(tag)) return refuse(doc, name, tag);
-      next = { ...next, tag };
-      if (next.kind === 'instrument') {
-        const parts = splitInstrumentTag(tag);
-        if (parts === undefined) return refuse(doc, name, fail('PID_TAG_FORMAT', tagRefusal(tag), ['set.tag']));
-        next = { ...next, category: parts.category, functions: parts.functions, loopNumber: parts.loopNumber };
-      }
+      const tagged = withTag(pid, item, next, set.tag);
+      if (isFail(tagged)) return refuse(doc, name, tagged);
+      next = tagged;
     }
     if (set.lineNumber !== undefined && next.kind === 'line') {
-      const taken = pid.itemOrder.some(
-        (id) =>
-          id !== item.id && pid.items[id]?.kind === 'line' && (pid.items[id] as { lineNumber?: string }).lineNumber === set.lineNumber,
-      );
-      if (taken)
-        return refuse(
-          doc,
-          name,
-          fail('PID_LINE_NUMBER_DUPLICATE', `line number "${set.lineNumber}" is used by another line`, ['set.lineNumber']),
-        );
-      next = { ...next, lineNumber: set.lineNumber };
+      const numbered = withLineNumber(pid, item, next, set.lineNumber);
+      if (isFail(numbered)) return refuse(doc, name, numbered);
+      next = numbered;
     }
-    if (next.kind === 'line') {
-      const oldLine = next;
-      if (set.fluidCode !== undefined) next = { ...next, fluidCode: set.fluidCode };
-      if (set.dn !== undefined) next = { ...next, dn: set.dn };
-      if (set.pipingClass !== undefined) next = { ...next, pipingClass: set.pipingClass };
-      for (const segment of segmentsOf(pid, oldLine)) {
-        const dn = set.dn !== undefined && (segment.dn === undefined || segment.dn === oldLine.dn) ? set.dn : segment.dn;
-        const pipingClass =
-          set.pipingClass !== undefined && (segment.pipingClass === undefined || segment.pipingClass === oldLine.pipingClass)
-            ? set.pipingClass
-            : segment.pipingClass;
-        if (dn !== segment.dn || pipingClass !== segment.pipingClass) {
-          draft.put({ ...segment, ...(dn === undefined ? {} : { dn }), ...(pipingClass === undefined ? {} : { pipingClass }) });
-          affected.push(segment.id);
-        }
-      }
-    } else {
-      if (set.dn !== undefined && (next.kind === 'nozzle' || next.kind === 'segment' || next.kind === 'inline'))
-        next = { ...next, dn: set.dn };
-      if (set.pipingClass !== undefined && (next.kind === 'segment' || next.kind === 'inline'))
-        next = { ...next, pipingClass: set.pipingClass };
-    }
+    next = withSizing(pid, draft, next, set, affected);
     if (set.attributes !== undefined) next = { ...next, attributes: { ...next.attributes, ...toValues(set.attributes) } };
-
-    if ((set.at !== undefined || set.rotationDeg !== undefined) && next.kind === 'equipment') {
-      draft.put(next);
-      const moved = next;
-      affected.push(...moveEquipment(draft, moved, set.at ?? moved.at, set.rotationDeg ?? moved.rotationDeg).slice(1));
-    } else {
-      if (set.at !== undefined) next = { ...next, at: set.at };
-      if (set.rotationDeg !== undefined) next = { ...next, rotationDeg: set.rotationDeg };
-      draft.put(next);
-      if (set.at !== undefined && (next.kind === 'instrument' || next.kind === 'opc' || next.kind === 'actuating'))
-        rerouteEnds(draft, new Map([[next.id, set.at]]));
-    }
+    placeItem(draft, next, set, affected);
     return {
       document: withPid(doc, draft.model()),
       summary: `update_pid_item: ${item.kind} ${item.tag ?? item.id} set ${fields.join(', ')}${affected.length > 1 ? ` (${affected.length} items changed)` : ''}`,

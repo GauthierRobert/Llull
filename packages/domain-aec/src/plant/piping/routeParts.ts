@@ -9,58 +9,24 @@
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { Joint, PipeRun, RoutedPart } from '@aec/plant/types';
-import { add3, len3, scale3, sub3 } from '@lib/vec3';
-import {
-  fail,
-  isFailure,
-  type DerivationFailure,
-  type DerivationWarning,
-  type DerivedInline,
-  type DerivedLeg,
-  type DerivedTurn,
-  type RunDerivation,
-} from './deriveTypes';
-import type { Join } from './connections';
+import { len3, sub3 } from '@lib/vec3';
+import { fail, isFailure, type DerivationFailure, type RunDerivation } from './deriveTypes';
 import { DerivationMemo } from './derivationMemo';
-import { centrelineLength, type ElbowChoice } from './fittings';
-import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
-import { directionLabel, epsilonFor, unitVector } from './legs';
+import { centrelineLength } from './fittings';
+import { defaultMinWeldSpacing } from './jointStack';
+import { epsilonFor, unitVector } from './legs';
 import { getPiping, runPoints } from './model';
 import { legShifts } from './legShifts';
-import { isSloped, legFall } from './slope';
-import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
-import { blindParts, capPart, flangeParts, mintSet, setupEnd } from './routeEnds';
-import { at, makeEnv, partOf, type Mint, type Slot } from './routeEnv';
+import { derivedBranch, layoutBranches, teeSlot } from './routeBranch';
+import { mintSet, setupEnd } from './routeEnds';
+import { makeEnv, type EndSetup, type Env, type Mint, type PipeInfo, type Slot } from './routeEnv';
 import { layoutInline } from './routeInline';
-import { chooseTurns, turnPartFields } from './routeTurns';
-import { dnAfter, endDn, startDn } from './runSizes';
+import { deriveLeg } from './routeLegs';
+import { addEndParts, addStartParts } from './routeRunEnds';
+import type { RunCtx } from './routeRunCtx';
+import { chooseTurns, type Turns } from './routeTurns';
+import { endDn, startDn } from './runSizes';
 import type { SpecLookup } from './specLookup';
-
-const BRANCH_KINDS: ReadonlySet<string> = new Set(['olet', 'stubIn']);
-
-/** Plan length, drop and slope angle of a sloped leg, rounded to micrometres / micro-degrees (float noise out of the answers). */
-function slopeFields(u: Vec3, length: number): Pick<DerivedLeg, 'planLengthMm' | 'dropMm' | 'slopeDeg'> {
-  const fall = legFall(u, length);
-  const round = (value: number): number => Math.round(value * 1e6) / 1e6;
-  return { planLengthMm: round(fall.planLengthMm), dropMm: round(fall.dropMm), slopeDeg: round(fall.slopeDeg) };
-}
-
-/** The kind, root gap and engagement of the joint between the pipe and interval `side` (a butt weld of gap `side.gap` unless the interval has a join). */
-function jointOf(side: Interval, butt: Joint['kind']): Pick<Joint, 'kind' | 'gapMm' | 'engagementMm'> {
-  const join = side.join;
-  if (join === undefined) return { kind: butt, gapMm: side.gap };
-  return { kind: join.joint, gapMm: join.rootGapMm, ...(join.engagementMm > 0 ? { engagementMm: join.engagementMm } : {}) };
-}
-
-/** Warning record of a stack warning on leg `leg`. */
-function warningOf(warning: StackWarning, runId: string, leg: number): DerivationWarning {
-  const ids = [warning.from, warning.to].filter((id) => id.startsWith(`${runId}/`));
-  const message =
-    warning.code === 'RTE_WELD_SPACING'
-      ? `leg ${leg}: pipe piece of ${+warning.cutLengthMm.toFixed(4)} mm is shorter than the weld spacing ${warning.minimumMm} mm (named default max(4 t, 50 mm))`
-      : `leg ${leg}: ${warning.from} and ${warning.to} touch (zero cut length)`;
-  return { code: warning.code, ids, message, detail: { leg, cutLengthMm: warning.cutLengthMm, minimumMm: warning.minimumMm ?? null } };
-}
 
 function unverifiedReasons(lookup: SpecLookup, parts: readonly RoutedPart[]): string[] {
   const reasons: string[] = [];
@@ -87,45 +53,56 @@ function derivedOnce(doc: CadDocument, run: PipeRun, path: readonly string[]): D
   return derivations.get(doc, run) ?? derivations.set(doc, run, derive(doc, run, path));
 }
 
-function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derived {
-  const env = makeEnv(doc, run);
-  if (isFailure(env)) return env;
-  const { line, lookup, tolerance, weld: bw } = env;
-  const dnStart = startDn(run, line.dn);
-  const dnEnd = endDn(run, line.dn);
-  const pipe = env.pipeAt(dnStart);
-  if (isFailure(pipe)) return pipe;
-  const { od, wall } = pipe;
-  if (run.start.ref?.kind === 'branch') {
-    // A branch hangs on its header: when the header does not derive (moved port, missing part) the branch is broken with the header's code.
-    const header = getPiping(doc).runs[run.start.ref.runId];
-    if (header !== undefined && [...path, run.id].includes(header.id))
-      return fail(
-        'RTE_UNKNOWN_RUN',
-        `branch cycle: run ${run.id} hangs on ${header.id}, which hangs on ${run.id} again`,
-        [run.id, header.id],
-        ['start'],
-      );
-    const parent = header === undefined ? null : derivedOnce(doc, header, [...path, run.id]);
-    if (parent !== null && isFailure(parent)) return { ...parent, message: `header ${header?.id}: ${parent.message}` };
-  }
-  const start = setupEnd(env, run.start, 'start', dnStart);
-  if (isFailure(start)) return start;
-  const end = setupEnd(env, run.end, 'end', dnEnd);
-  if (isFailure(end)) return end;
+/** A branch hangs on its header: when the header does not derive (moved port, missing part) the branch is broken with the header's code. */
+function headerFailure(doc: CadDocument, run: PipeRun, path: readonly string[]): DerivationFailure | undefined {
+  if (run.start.ref?.kind !== 'branch') return undefined;
+  const header = getPiping(doc).runs[run.start.ref.runId];
+  if (header !== undefined && [...path, run.id].includes(header.id))
+    return fail(
+      'RTE_UNKNOWN_RUN',
+      `branch cycle: run ${run.id} hangs on ${header.id}, which hangs on ${run.id} again`,
+      [run.id, header.id],
+      ['start'],
+    );
+  const parent = header === undefined ? null : derivedOnce(doc, header, [...path, run.id]);
+  if (parent !== null && isFailure(parent)) return { ...parent, message: `header ${header?.id}: ${parent.message}` };
+  return undefined;
+}
+
+interface RunGeometry {
+  readonly points: readonly Vec3[];
+  readonly lengths: readonly number[];
+  readonly dirs: readonly Vec3[];
+  readonly eps: number;
+}
+
+function runGeometry(run: PipeRun): RunGeometry | DerivationFailure {
   const points = runPoints(run);
-  const legCount = points.length - 1;
-  if (legCount < 1) return fail('RTE_ZERO_LEG', 'the run has no leg', [run.id], []);
+  if (points.length - 1 < 1) return fail('RTE_ZERO_LEG', 'the run has no leg', [run.id], []);
   const eps = epsilonFor(...points);
   const lengths = points.slice(1).map((p, i) => len3(sub3(p, points[i] as Vec3)));
   const zero = lengths.findIndex((length) => !(length > eps));
   if (zero >= 0) return fail('RTE_ZERO_LEG', `leg ${zero} of run ${run.id} has zero length`, [run.id], [`legs.${zero}`], { leg: zero });
   const dirs = points.slice(1).map((p, i) => unitVector(sub3(p, points[i] as Vec3)));
-  const chosen = chooseTurns(env, points, dirs);
-  if (isFailure(chosen)) return chosen;
-  const { elbows, turns, joins: elbowJoins } = chosen;
+  return { points, lengths, dirs, eps };
+}
 
-  // Ids: kinds are counted separately, in route order; the start set is minted first, then the inline components, then the end set.
+interface RunInputs {
+  readonly env: Env;
+  readonly start: EndSetup;
+  readonly end: EndSetup;
+  readonly dnStart: number;
+  readonly dnEnd: number;
+  readonly od: number;
+  readonly geometry: RunGeometry;
+  readonly chosen: Turns;
+}
+
+/** Mints the ids (start set, inline components, end set), lays out inline components and branches, and builds the context the leg walk fills. */
+function layoutRun(i: RunInputs): RunCtx | DerivationFailure {
+  const { env, start, end } = i;
+  const { points, lengths, dirs, eps } = i.geometry;
+  const run = env.run;
   const counters: Record<string, number> = {};
   const mint: Mint = (kind) => `${run.id}/${kind}-${(counters[kind] = (counters[kind] ?? 0) + 1)}`;
   const startIds = start.set === null ? null : mintSet(mint);
@@ -140,266 +117,102 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
   if (isFailure(fits)) return fits;
   const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
   if (isFailure(shifts)) return shifts;
-  const warnings: DerivationWarning[] = [...shifts.warnings, ...chosen.warnings];
   const slotsByLeg = new Map<number, Slot[]>();
   for (const slot of [...inlineSlots, ...fits.filter((fit) => fit.kind === 'tee').map((fit) => teeSlot(env, fit))])
     slotsByLeg.set(slot.leg, [...(slotsByLeg.get(slot.leg) ?? []), slot]);
-  /** Length of a leg from its true start (an eccentric reducer before it moved the corner along its axis). */
-  const trueLengths = lengths.map((length, leg) => length - (shifts.start[leg] as number));
-
-  const parts: RoutedPart[] = [];
   const joints: Joint[] = [];
-  const legs: DerivedLeg[] = [];
-  const inline: DerivedInline[] = [];
-  const addJoint = (joint: Omit<Joint, 'id'>): void => {
-    if (joint.parts.some((id) => id.startsWith('open:'))) return;
-    joints.push({ id: `${run.id}/joint-${joints.length + 1}`, ...joint });
+  return {
+    env,
+    start,
+    end,
+    dnStart: i.dnStart,
+    dnEnd: i.dnEnd,
+    od: i.od,
+    points,
+    dirs,
+    lengths,
+    eps,
+    chosen: i.chosen,
+    shifts,
+    slotsByLeg,
+    fits,
+    mint,
+    startIds,
+    startCapId,
+    startBlindId,
+    endIds,
+    endCapId,
+    endBlindId,
+    flangedKind: env.lookup.connection('FL', 'FL')?.joint ?? 'flanged',
+    parts: [],
+    joints,
+    legs: [],
+    inline: [],
+    warnings: [...shifts.warnings, ...i.chosen.warnings],
+    addJoint: (joint): void => {
+      if (joint.parts.some((id) => id.startsWith('open:'))) return;
+      joints.push({ id: `${run.id}/joint-${joints.length + 1}`, ...joint });
+    },
   };
-  const minWeld = defaultMinWeldSpacing(wall);
-  const first = points[0] as Vec3;
-  const last = points[legCount] as Vec3;
-  const flangedRule = lookup.connection('FL', 'FL');
-  if (start.set !== null && start.port !== null && startIds !== null) {
-    parts.push(...flangeParts(run.id, startIds, start.set, start.port, first, dirs[0] as Vec3, od, true));
-    addJoint({
-      kind: flangedRule?.joint ?? 'flanged',
-      parts: [startIds.flange, start.portId as string],
-      position: first,
-      gapMm: start.set.gasketThickness,
-      accessories: [startIds.gasket, startIds.bolts],
-    });
-  }
-  const startBlind =
-    startIds === null || startBlindId === null ? null : blindParts(run.id, startIds, startBlindId, start, first, dirs[0] as Vec3, od);
-  if (startBlind !== null && startIds !== null) {
-    parts.push(...startBlind.parts);
-    addJoint({
-      kind: flangedRule?.joint ?? 'flanged',
-      parts: [startIds.flange, startBlindId as string],
-      position: startBlind.mating,
-      gapMm: startBlind.gapMm,
-      accessories: [startIds.gasket, startIds.bolts],
-    });
-  }
-  const startCap = startCapId === null ? null : capPart(run.id, startCapId, start, first, dirs[0] as Vec3, dnStart, od);
-  if (startCap !== null) parts.push(startCap);
-  const external = (id: string): boolean => id === start.portId || id === end.portId || id.startsWith('open:');
-  for (let leg = 0; leg < legCount; leg++) {
-    const u = dirs[leg] as Vec3;
-    const origin = points[leg] as Vec3;
-    const length = lengths[leg] as number;
-    const shift = shifts.start[leg] as number;
-    // Eccentric reducers move the axis sideways from their centre on: positions are measured from `axis`, the stored line plus that sideways offset.
-    let sideways: Vec3 = [0, 0, 0];
-    const axis = (): Vec3 => add3(origin, sideways);
-    const mids = slotsByLeg.get(leg) ?? [];
-    const startSide = leg === 0 ? start : null;
-    const endSide = leg === legCount - 1 ? end : null;
-    const head: Interval =
-      startSide !== null
-        ? {
-            id: startIds?.flange ?? startCapId ?? startSide.fittingId ?? startSide.portId ?? 'open:start',
-            start: 0,
-            end: startSide.length,
-            gap: startSide.gap,
-            kind: 'fitting',
-            ...(startSide.join === undefined ? {} : { join: startSide.join }),
-          }
-        : {
-            id: `${run.id}/elbow-${leg}`,
-            start: shift,
-            end: shift + (elbows[leg - 1] as ElbowChoice).centreToEnd,
-            gap: (elbowJoins[leg - 1] as Join).gapMm,
-            kind: 'fitting',
-            join: elbowJoins[leg - 1] as Join,
-          };
-    const tail: Interval =
-      endSide !== null
-        ? {
-            id: endIds?.flange ?? endCapId ?? endSide.portId ?? 'open:end',
-            start: length - endSide.length,
-            end: length,
-            gap: endSide.gap,
-            kind: 'fitting',
-            ...(endSide.join === undefined ? {} : { join: endSide.join }),
-          }
-        : {
-            id: `${run.id}/elbow-${leg + 1}`,
-            start: length - (elbows[leg] as ElbowChoice).centreToEnd,
-            end: length,
-            gap: (elbowJoins[leg] as Join).gapMm,
-            kind: 'fitting',
-            join: elbowJoins[leg] as Join,
-          };
-    const stack = stackLeg(length, [head, ...mids.map((slot) => slot.interval), tail], 0, eps);
-    if (!stack.ok)
-      return fail(
-        stack.code,
-        `leg ${leg}: ${stack.message}`,
-        [run.id, stack.detail.from, stack.detail.to].filter((id) => !external(id)),
-        [`legs.${leg}`],
-        { ...stack.detail, leg },
-      );
-    const slotById = new Map(mids.map((slot) => [slot.interval.id, slot]));
-    const cuts: number[] = [];
-    const legPieces: Array<{ id: string; start: number; end: number }> = [];
-    let dnHere = dnAfter(run, line.dn, leg - 1, Number.POSITIVE_INFINITY);
-    const weld = bw?.joint ?? 'buttWeld';
-    for (let k = 0; k + 1 < stack.order.length; k++) {
-      const [a, b] = [stack.order[k] as Interval, stack.order[k + 1] as Interval];
-      dnHere = slotById.get(a.id)?.dnOut ?? dnHere;
-      const [after, before] = [slotById.get(a.id)?.after ?? a.id, slotById.get(b.id)?.before ?? b.id];
-      const piece = stack.pieces.find((candidate) => candidate.from === a.id && candidate.to === b.id);
-      if (piece !== undefined) {
-        const info = env.pipeAt(dnHere);
-        if (isFailure(info)) return info;
-        // Weld spacing is judged per piece against its own wall (the stack only reports fitting-to-fitting).
-        const minimum = defaultMinWeldSpacing(info.wall);
-        const [pipeStartEnd, pipeEndEnd] = [a.join?.pipeEnd ?? 'BW', b.join?.pipeEnd ?? 'BW'];
-        // The spacing rule is about butt welds: a piece between two socket / threaded joins has none to keep apart.
-        if (piece.cut < minimum && (pipeStartEnd === 'BW' || pipeEndEnd === 'BW'))
-          warnings.push(
-            warningOf({ code: 'RTE_WELD_SPACING', from: a.id, to: b.id, cutLengthMm: piece.cut, minimumMm: minimum }, run.id, leg),
-          );
-        const pieceId = mint('pipe');
-        cuts.push(piece.cut);
-        legPieces.push({ id: pieceId, start: piece.start, end: piece.end });
-        parts.push(
-          partOf(
-            run.id,
-            pieceId,
-            'pipe',
-            info.row,
-            [
-              { position: at(axis(), u, piece.start), direction: scale3(u, -1), dn: dnHere, endType: pipeStartEnd },
-              { position: at(axis(), u, piece.end), direction: u, dn: dnHere, endType: pipeEndEnd },
-            ],
-            { cutLength: piece.cut, leg, dims: { outsideDiameter: info.od, wall: info.wall } },
-          ),
-        );
-        // A stub-in is set on the header by one branch weld (made with the header): no butt weld to the first piece.
-        if (!(startSide?.weldless === true && a.id === head.id))
-          addJoint({ ...jointOf(a, weld), parts: [after, pieceId], position: at(axis(), u, a.end) });
-        addJoint({ ...jointOf(b, weld), parts: [pieceId, before], position: at(axis(), u, b.start) });
-      } else addJoint({ kind: 'fittingToFitting', parts: [after, before], position: at(axis(), u, a.end), gapMm: 0 });
-      const slot = slotById.get(b.id);
-      if (slot !== undefined) {
-        const built = slot.build(axis(), u);
-        parts.push(...built.parts);
-        built.joints.forEach(addJoint);
-        if (built.inline !== undefined) inline.push(built.inline);
-        if (slot.offset !== undefined) sideways = add3(sideways, slot.offset);
-      }
-    }
-    for (const w of stack.warnings) warnings.push(warningOf(w, run.id, leg));
-    for (const fit of fits.filter((candidate) => candidate.point.leg === leg && BRANCH_KINDS.has(candidate.kind))) {
-      const x = fit.point.distance;
-      const margin = fit.branchOd / 2;
-      const host = legPieces.find((piece) => piece.start + margin <= x && x <= piece.end - margin);
-      if (host === undefined)
-        return fail(
-          'RTE_BRANCH_ON_FITTING',
-          `branch ${fit.point.id} at ${+x.toFixed(4)} mm on leg ${leg} does not lie on a pipe piece with ${+margin.toFixed(2)} mm to each end (${fit.typeKey} needs a straight piece)`,
-          [run.id, fit.point.id],
-          ['branches'],
-          { leg, distance: x, marginMm: margin },
-        );
-      const olet = oletPart(env, fit, host.id);
-      parts.push(olet.part);
-      addJoint(olet.joint);
-    }
-    legs.push({
-      index: leg,
-      direction: directionLabel(u),
-      lengthMm: length - shift,
-      start: at(origin, u, shift),
-      end: add3(points[leg + 1] as Vec3, shifts.offset[leg] as Vec3),
-      cutLengthsMm: cuts,
-      ...(isSloped(u) ? slopeFields(u, length - shift) : {}),
-    });
-    if (leg < legCount - 1) {
-      const index = leg + 1;
-      const choice = elbows[leg] as ElbowChoice;
-      const turn = turns[leg] as DerivedTurn;
-      const next = dirs[index] as Vec3;
-      const pi = add3(points[index] as Vec3, shifts.offset[leg] as Vec3);
-      const c = choice.centreToEnd;
-      const dn = dnAfter(run, line.dn, leg, Number.POSITIVE_INFINITY);
-      const info = env.pipeAt(dn);
-      if (isFailure(info)) return info;
-      parts.push(
-        partOf(
-          run.id,
-          turn.partId,
-          'elbow',
-          choice.row,
-          [
-            { position: at(pi, u, -c), direction: scale3(u, -1), dn, endType: (elbowJoins[leg] as Join).end },
-            { position: at(pi, next, c), direction: next, dn, endType: (elbowJoins[leg] as Join).end },
-          ],
-          { centre: pi, angleDeg: choice.turnDeg, radius: choice.radius, ...turnPartFields(choice, info.od) },
-        ),
-      );
-    }
-  }
-  if (end.set !== null && end.port !== null && endIds !== null) {
-    const endPipe = env.pipeAt(dnEnd);
-    if (isFailure(endPipe)) return endPipe;
-    const into = scale3(dirs[legCount - 1] as Vec3, -1);
-    parts.push(...flangeParts(run.id, endIds, end.set, end.port, last, into, endPipe.od, false));
-    addJoint({
-      kind: flangedRule?.joint ?? 'flanged',
-      parts: [endIds.flange, end.portId as string],
-      position: last,
-      gapMm: end.set.gasketThickness,
-      accessories: [endIds.gasket, endIds.bolts],
-    });
-  }
-  if (endIds !== null && endBlindId !== null) {
-    const endPipe = env.pipeAt(dnEnd);
-    if (isFailure(endPipe)) return endPipe;
-    const blind = blindParts(run.id, endIds, endBlindId, end, last, scale3(dirs[legCount - 1] as Vec3, -1), endPipe.od);
-    if (blind !== null) {
-      parts.push(...blind.parts);
-      addJoint({
-        kind: flangedRule?.joint ?? 'flanged',
-        parts: [endIds.flange, endBlindId],
-        position: blind.mating,
-        gapMm: blind.gapMm,
-        accessories: [endIds.gasket, endIds.bolts],
-      });
-    }
-  }
-  if (endCapId !== null) {
-    const endPipe = env.pipeAt(dnEnd);
-    if (isFailure(endPipe)) return endPipe;
-    const cap = capPart(run.id, endCapId, end, last, scale3(dirs[legCount - 1] as Vec3, -1), dnEnd, endPipe.od);
-    if (cap !== null) parts.push(cap);
-  }
+}
+
+function assemble(c: RunCtx, pipe: PipeInfo, dnStart: number, dnEnd: number): RunDerivation {
+  const { env, parts, fits } = c;
+  const { lookup } = env;
   const pieces = parts.filter((part) => part.kind === 'pipe');
   const reasons = unverifiedReasons(lookup, parts);
+  const trueLengths = c.lengths.map((length, leg) => length - (c.shifts.start[leg] as number));
   return {
     ok: true,
     parts,
-    joints,
-    legs,
-    turns,
-    inline,
+    joints: c.joints,
+    legs: c.legs,
+    turns: c.chosen.turns,
+    inline: c.inline,
     branches: fits.map((fit) => derivedBranch(env, fit)),
-    warnings,
-    centrelineLengthMm: centrelineLength(trueLengths, elbows),
+    warnings: c.warnings,
+    centrelineLengthMm: centrelineLength(trueLengths, c.chosen.elbows),
     totalPipeMm: pieces.reduce((sum, part) => sum + (part.cutLength ?? 0), 0),
     spec: { id: lookup.id, revision: lookup.revision, status: lookup.status() },
     unverified: reasons.length > 0,
     unverifiedReasons: reasons,
-    angleTolerance: tolerance,
-    weldGap: { valueMm: bw?.gapMm ?? 0, defaulted: true },
-    weldSpacing: { minimumMm: minWeld, defaulted: true },
-    pipe: { outsideDiameterMm: od, wallMm: wall, key: pipe.row.key },
+    angleTolerance: env.tolerance,
+    weldGap: { valueMm: env.weld?.gapMm ?? 0, defaulted: true },
+    weldSpacing: { minimumMm: defaultMinWeldSpacing(pipe.wall), defaulted: true },
+    pipe: { outsideDiameterMm: pipe.od, wallMm: pipe.wall, key: pipe.row.key },
     dn: { start: dnStart, end: dnEnd },
     studs: parts.reduce((sum, part) => sum + (part.studs ?? 0), 0),
     reviewRequired: fits
       .filter((fit) => fit.reviewRequired)
       .map((fit) => `RTE_STUB_IN_REVIEW: ${fit.point.id} (${fit.fittingCode}) needs a reinforcement check (B31.3, 07 pipe stress)`),
   };
+}
+
+function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derived {
+  const env = makeEnv(doc, run);
+  if (isFailure(env)) return env;
+  const dnStart = startDn(run, env.line.dn);
+  const dnEnd = endDn(run, env.line.dn);
+  const pipe = env.pipeAt(dnStart);
+  if (isFailure(pipe)) return pipe;
+  const header = headerFailure(doc, run, path);
+  if (header !== undefined) return header;
+  const start = setupEnd(env, run.start, 'start', dnStart);
+  if (isFailure(start)) return start;
+  const end = setupEnd(env, run.end, 'end', dnEnd);
+  if (isFailure(end)) return end;
+  const geometry = runGeometry(run);
+  if (isFailure(geometry)) return geometry;
+  const chosen = chooseTurns(env, geometry.points, geometry.dirs);
+  if (isFailure(chosen)) return chosen;
+  const ctx = layoutRun({ env, start, end, dnStart, dnEnd, od: pipe.od, geometry, chosen });
+  if (isFailure(ctx)) return ctx;
+  addStartParts(ctx);
+  for (let leg = 0; leg < geometry.lengths.length; leg++) {
+    const failed = deriveLeg(ctx, leg);
+    if (failed !== undefined) return failed;
+  }
+  const endFailed = addEndParts(ctx);
+  if (endFailed !== undefined) return endFailed;
+  return assemble(ctx, pipe, dnStart, dnEnd);
 }

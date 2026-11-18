@@ -6,6 +6,7 @@
 import { type CheckItem, findingKey } from '../../model/checkResult';
 import type { GeometryKernel, ShapeAnalysis } from '../kernel';
 import { type AssemblyPart, type CheckTolerances, KERNEL_REMEDIATION } from './partTypes';
+import { powInt } from '../../lib/powInt';
 
 /** Absolute volume (mm3) at or below which a part is empty. */
 const EMPTY_VOLUME_MM3 = 1e-6;
@@ -37,7 +38,7 @@ export interface PartValidity {
 
 function partItems(part: AssemblyPart, analysis: ShapeAnalysis, tolerances: CheckTolerances): CheckItem[] {
   const { mmPerUnit } = tolerances;
-  const volumeMm3 = analysis.volume * mmPerUnit ** 3;
+  const volumeMm3 = analysis.volume * powInt(mmPerUnit, 3);
   const areaMm2 = analysis.area * mmPerUnit ** 2;
   const id = [part.id];
   if (!analysis.valid)
@@ -62,7 +63,7 @@ function partItems(part: AssemblyPart, analysis: ShapeAnalysis, tolerances: Chec
       makeItem('FPR_PART_DISCONNECTED', 'fail', id, 'Split the lumps into separate parts, or join them with material.', {
         values: {
           lumps: analysis.lumps.length,
-          ...Object.fromEntries(analysis.lumps.map((lump, k) => [`lumpVolumeMm3_${k}`, lump.volume * mmPerUnit ** 3])),
+          ...Object.fromEntries(analysis.lumps.map((lump, k) => [`lumpVolumeMm3_${k}`, lump.volume * powInt(mmPerUnit, 3)])),
         },
       }),
     );

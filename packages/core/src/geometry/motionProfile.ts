@@ -6,6 +6,8 @@
 
 import { pchipEvaluate, pchipSlopes } from '../lib/pchip';
 import type { MotionProfile, ProfileQuantity, ProfileSegment } from '../model/drives';
+import { powInt } from '../lib/powInt';
+import { pow } from '../lib/pow';
 
 interface ProfileSample {
   readonly value: number;
@@ -118,7 +120,11 @@ function accelerationShape(pieces: readonly AccelerationPiece[]): Shape {
 const SHAPES: Readonly<Record<'linear' | 'cycloidal' | 'poly345' | 'harmonic' | 'modified_trapezoid' | 'modified_sine', Shape>> = {
   linear: (x) => [x, 1, 0],
   cycloidal: (x) => [x - Math.sin(2 * Math.PI * x) / (2 * Math.PI), 1 - Math.cos(2 * Math.PI * x), 2 * Math.PI * Math.sin(2 * Math.PI * x)],
-  poly345: (x) => [10 * x ** 3 - 15 * x ** 4 + 6 * x ** 5, 30 * x ** 2 - 60 * x ** 3 + 30 * x ** 4, 60 * x - 180 * x ** 2 + 120 * x ** 3],
+  poly345: (x) => [
+    10 * powInt(x, 3) - 15 * powInt(x, 4) + 6 * powInt(x, 5),
+    30 * x ** 2 - 60 * powInt(x, 3) + 30 * powInt(x, 4),
+    60 * x - 180 * x ** 2 + 120 * powInt(x, 3),
+  ],
   harmonic: (x) => [(1 - Math.cos(Math.PI * x)) / 2, (Math.PI / 2) * Math.sin(Math.PI * x), (Math.PI ** 2 / 2) * Math.cos(Math.PI * x)],
   modified_trapezoid: accelerationShape([sineUp, plateau(2 / 8, 1), cosinePiece(2 / 8, K_RAMP), plateau(2 / 8, -1), cosineDown]),
   modified_sine: accelerationShape([sineUp, cosinePiece(6 / 8, (4 * Math.PI) / 3), cosineDown]),
@@ -149,7 +155,7 @@ function jerkPiece(origin: number, distance: number, phases: readonly JerkPhase[
     if (phase.start !== undefined) a = sign * phase.start;
     const jerk = sign * phase.jerk;
     rows.push({ t0: t, p, v, a, jerk, duration: phase.duration });
-    p += v * phase.duration + (a * phase.duration ** 2) / 2 + (jerk * phase.duration ** 3) / 6;
+    p += v * phase.duration + (a * phase.duration ** 2) / 2 + (jerk * powInt(phase.duration, 3)) / 6;
     v += a * phase.duration + (jerk * phase.duration ** 2) / 2;
     a += jerk * phase.duration;
     t += phase.duration;
@@ -161,7 +167,7 @@ function jerkPiece(origin: number, distance: number, phases: readonly JerkPhase[
       if (row === undefined) return [origin, 0, 0];
       const s = Math.min(Math.max(tau - row.t0, 0), row.duration);
       return [
-        row.p + row.v * s + (row.a * s * s) / 2 + (row.jerk * s ** 3) / 6,
+        row.p + row.v * s + (row.a * s * s) / 2 + (row.jerk * powInt(s, 3)) / 6,
         row.v + row.a * s + (row.jerk * s * s) / 2,
         row.a + row.jerk * s,
       ];
@@ -224,7 +230,7 @@ function reachableSpeed(d: number, vmax: number, a: number, jerk: number): numbe
   if (d >= vmax * accelerationTime(vmax, a, jerk)) return vmax;
   const withPlateau = (a * (-a / jerk + Math.sqrt((a / jerk) ** 2 + (4 * d) / a))) / 2;
   if (withPlateau * jerk >= a * a) return withPlateau;
-  return ((d * Math.sqrt(jerk)) / 2) ** (2 / 3);
+  return pow((d * Math.sqrt(jerk)) / 2, 2 / 3);
 }
 
 function sCurvePhases(speed: number, a: number, jerk: number, total: number): JerkPhase[] {

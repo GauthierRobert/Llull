@@ -1,6 +1,7 @@
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { E_STEEL, lateralTorsionalReduction, sectionResistance } from '../steelDesign/steelDesign';
 import type { Verdict } from './purlinModel';
+import { powInt } from '@lib/powInt';
 
 /** EN 1993-1-5 §4.4 plate reduction ρ for slenderness λp with the 0.055 (3 + ψ) term. */
 function plateReduction(slenderness: number, psiTerm: number): number {
@@ -40,7 +41,7 @@ export function effectiveModulusRatio(profile: SteelProfile, fy: number): { rati
   const flangeRho = plateReduction(flangeSlenderness, 0.22) * (flangeSlenderness > 0.673 ? 0.9 : 1);
   const webRho = plateReduction(webSlenderness, 0.11);
   const half = web / 2;
-  const vertical = (length: number, y: number): Segment => ({ area: t * length, y, inertia: (t * length ** 3) / 12 });
+  const vertical = (length: number, y: number): Segment => ({ area: t * length, y, inertia: (t * powInt(length, 3)) / 12 });
   const horizontal = (length: number, y: number): Segment => ({ area: t * length, y, inertia: 0 });
   const bottom = (): Segment[] => [horizontal(flange, -half), vertical(lip, -half + lip / 2)];
   const gross: Segment[] = [...bottom(), horizontal(flange, half), vertical(lip, half - lip / 2), vertical(web, 0)];
@@ -97,7 +98,7 @@ export function beamVerdicts(
   const momentResistance = (loads.reduction * bendingResistance(profile, fy)) / 1e6;
   const shearResistance = sectionResistance(profile, fy).shear / 1000;
   const inertia = sectionProperties(profile).inertia;
-  const deflection = (5 * Math.max(0, loads.serviceability) * span ** 4) / (384 * E_STEEL * inertia);
+  const deflection = (5 * Math.max(0, loads.serviceability) * powInt(span, 4)) / (384 * E_STEEL * inertia);
   const limit = span / loads.deflectionRatio;
   return [
     {

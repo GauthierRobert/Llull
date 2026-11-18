@@ -9,6 +9,7 @@ import type { FieldBuilder } from '@core/geometry/field/build';
 import type { Vec3 } from '@core/model/types';
 import type { Frame } from './frame';
 import type { Law, ScalarNode } from './model';
+import { pow } from '@lib/pow';
 
 export interface ScalarPart {
   readonly reg: number;
@@ -135,8 +136,8 @@ export function compileScalar(host: ScalarHost, node: ScalarNode, frame: Frame):
       let sum = b.constant(0);
       let amplitudes = 0;
       for (let octave = 0; octave < node.octaves; octave += 1) {
-        const amplitude = 0.5 ** octave;
-        sum = b.add(sum, b.scale(valueNoise(b, node.seed + octave, frame, node.frequency * 2 ** octave), amplitude));
+        const amplitude = pow(0.5, octave);
+        sum = b.add(sum, b.scale(valueNoise(b, node.seed + octave, frame, node.frequency * pow(2, octave)), amplitude));
         amplitudes += amplitude;
       }
       return { reg: b.scale(sum, 1 / amplitudes), lo: 0, hi: 1 };

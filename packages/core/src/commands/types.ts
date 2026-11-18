@@ -112,6 +112,11 @@ export interface CommandAnnotations {
    */
   readonly session?: boolean;
   /**
+   * Human-gated act that records its time: the host fills the declared `at` from its own clock (a caller-supplied time is never trusted) and a
+   * missing `by` (`@protocol/hostParams`). Every command of the plm toolset is stamped without it. Not emitted in tool schemas.
+   */
+  readonly hostStamped?: boolean;
+  /**
    * Needs `ExecutionContext.kernel`: `execute` no-ops it with a "kernel not ready" summary when none is available and `replayHistory`
    * refuses to regenerate a history containing it. Not emitted in tool schemas.
    */

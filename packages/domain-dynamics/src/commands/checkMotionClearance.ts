@@ -17,7 +17,7 @@ import { candidateIds, collectParts } from '@core/geometry/assemblyParts';
 import { assemblyLinks } from '@core/geometry/assemblyGraph';
 import { dynamicsOf } from './bodies';
 import { simulateMotion } from './simulate';
-import { MAX_CLASSIFIED_TOTAL, MAX_EVALUATIONS, planMotion, runMotion, withPrefetch } from './motionClearanceRun';
+import { MAX_CLASSIFIED_TOTAL, MAX_EVALUATIONS, type MotionOutcome, planMotion, runMotion, withPrefetch } from './motionClearanceRun';
 
 const MAX_PARTS = 500;
 const MAX_PAIRS = 2000;
@@ -109,6 +109,56 @@ export const checkMotionClearance = defineCommand({
   run: (doc, params, ctx): CommandResult => motionClearanceCheck(doc, params, ctx, null),
 });
 
+type ClosestPair = MotionOutcome['pairs'][number];
+
+const closestPair = (pairs: MotionOutcome['pairs']): ClosestPair | null =>
+  pairs.reduce<ClosestPair | null>(
+    (top, pair) =>
+      pair.minClearanceMm !== null &&
+      (pair.status === 'clear' || pair.status === 'clearance_low') &&
+      (top === null || pair.minClearanceMm < (top.minClearanceMm ?? Infinity))
+        ? pair
+        : top,
+    null,
+  );
+
+const clearanceSummary = (
+  status: CheckResult['status'],
+  pairCount: number,
+  sampleCount: number,
+  items: readonly CheckItem[],
+  closest: ClosestPair | null,
+): string => {
+  const count = (itemStatus: string): number => items.filter((entry) => entry.status === itemStatus).length;
+  const gap =
+    closest === null
+      ? 'no pair evaluated'
+      : `closest ${closest.a} / ${closest.b} ${(closest.minClearanceMm ?? 0).toPrecision(4)} mm at t = ${(closest.timeS ?? 0).toPrecision(4)} s` +
+        (closest.crankDeg === null ? '' : ` (${closest.crankDeg.toPrecision(4)} deg)`);
+  return (
+    `${NAME}: ${status} — ${pairCount} pair(s) over ${sampleCount} samples, ${count('fail')} interference/fail, ` +
+    `${count('warn')} warn, ${count('not_run')} not_run; ${gap}. ` +
+    (status === 'fail' ? 'Next: see data.pairs[].collisions for when it hits.' : 'Next: check_prototype.') +
+    ' Computed by llull, not approved — needs a qualified engineer.'
+  );
+};
+
+const simulateForClearance = (
+  doc: CadDocument,
+  params: z.infer<typeof clearanceParams>,
+  ctx: ExecutionContext | undefined,
+): CommandResult =>
+  simulateMotion.run(
+    doc,
+    {
+      duration: params.duration ?? DEFAULT_DURATION,
+      detail: 'poses',
+      ...(params.timestep !== undefined ? { timestep: params.timestep } : {}),
+      ...(params.sampleRate !== undefined ? { sampleRate: params.sampleRate } : {}),
+    },
+    ctx,
+  );
+
 /** The check on `shared` (a simulate_motion result with poses, from check_prototype) or, when null, on its own run. */
 export function motionClearanceCheck(
   doc: CadDocument,
@@ -130,18 +180,7 @@ export function motionClearanceCheck(
   if (crankAxis !== undefined && dynamics.joints[crankAxis]?.kind !== 'revolute')
     return refuse('FPR_UNKNOWN_ID', `crankAxis '${crankAxis}' is not a revolute joint of the mechanism`, [crankAxis]);
 
-  const run =
-    shared ??
-    simulateMotion.run(
-      doc,
-      {
-        duration: params.duration ?? DEFAULT_DURATION,
-        detail: 'poses',
-        ...(params.timestep !== undefined ? { timestep: params.timestep } : {}),
-        ...(params.sampleRate !== undefined ? { sampleRate: params.sampleRate } : {}),
-      },
-      ctx,
-    );
+  const run = shared ?? simulateForClearance(doc, params, ctx);
   const sim = run.data as SimulationData | undefined;
   if (sim === undefined || sim.poses === undefined) {
     const why = run.summary.replace(/^simulate_motion:\s*/, '');
@@ -211,15 +250,7 @@ export function motionClearanceCheck(
       remediation: 'No pair of parts has a moving member: give the moving parts to rigid bodies, or use pairs "all" / other ids.',
       unverified: true,
     });
-  const closest = outcome.pairs.reduce<(typeof outcome.pairs)[number] | null>(
-    (top, pair) =>
-      pair.minClearanceMm !== null &&
-      (pair.status === 'clear' || pair.status === 'clearance_low') &&
-      (top === null || pair.minClearanceMm < (top.minClearanceMm ?? Infinity))
-        ? pair
-        : top,
-    null,
-  );
+  const closest = closestPair(outcome.pairs);
   const resolutionS = plan.times.reduce((widest, time, i) => Math.max(widest, i === 0 ? 0 : time - (plan.times[i - 1] ?? time)), 0);
   const result: CheckResult = {
     check: 'motion_clearance',
@@ -262,16 +293,6 @@ export function motionClearanceCheck(
       evaluations: outcome.evaluations,
     },
   };
-  const count = (status: string): number => items.filter((entry) => entry.status === status).length;
-  const gap =
-    closest === null
-      ? 'no pair evaluated'
-      : `closest ${closest.a} / ${closest.b} ${(closest.minClearanceMm ?? 0).toPrecision(4)} mm at t = ${(closest.timeS ?? 0).toPrecision(4)} s` +
-        (closest.crankDeg === null ? '' : ` (${closest.crankDeg.toPrecision(4)} deg)`);
-  const summary =
-    `${NAME}: ${result.status} — ${outcome.pairs.length} pair(s) over ${plan.times.length} samples, ${count('fail')} interference/fail, ` +
-    `${count('warn')} warn, ${count('not_run')} not_run; ${gap}. ` +
-    (result.status === 'fail' ? 'Next: see data.pairs[].collisions for when it hits.' : 'Next: check_prototype.') +
-    ' Computed by llull, not approved — needs a qualified engineer.';
+  const summary = clearanceSummary(result.status, outcome.pairs.length, plan.times.length, items, closest);
   return report(doc, summary, roundDeep(data));
 }

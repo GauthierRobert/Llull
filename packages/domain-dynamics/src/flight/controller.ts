@@ -7,7 +7,7 @@
 import type { BodyKinematics } from '@core/dynamics/physicsEngine';
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { multiplyQuaternion } from '@lib/quaternion';
-import { add3, cross3, dot3, len3, normalize3OrZero, scale3, sub3 } from '@lib/vec3';
+import { add3, cross3, dot3, len3, normalize3OrZero, scale3, sub3, map3 } from '@lib/vec3';
 import type { FlightController, FlightSetpoint, PidGains } from './controlModel';
 import { allocate, type MixerRow } from './mixer';
 import { conjugate, quaternionFromBasis, rotate, rotateInverse } from './frames';
@@ -167,7 +167,7 @@ export function controllerUpdate(
     acceleration,
     period,
     integrate,
-    gains.velocity.i.map((ki) => (ki > 0 ? accelerationBound / ki : 0)) as unknown as Vec3,
+    map3(gains.velocity.i, (ki) => (ki > 0 ? accelerationBound / ki : 0)),
   );
   // thrust vector -> collective + attitude set-point
   const force = thrustVector(runtime, velocityLoop.output, up);

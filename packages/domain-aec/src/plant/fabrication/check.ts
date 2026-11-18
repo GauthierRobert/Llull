@@ -10,7 +10,7 @@ import type { CadDocument } from '@core/model/types';
 import { sheetDrawingArea } from '@core/geometry/sheetLayout';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 import type { Vec3 } from '@core/model/vectors';
-import { analyseLine, isAnalysis } from './analysis';
+import { analyseLine, isAnalysis, type LineAnalysis } from './analysis';
 import { bomRows } from './bom';
 import { isoIssue } from './codes';
 import { cutPieces } from './cutList';
@@ -57,6 +57,28 @@ function nearMisses(points: readonly Point[]): string[][] {
     }
   });
   return pairs;
+}
+
+type AddIssue = (code: string, severity: IsoIssue['severity'], message: string, ids: readonly string[], paths?: readonly string[]) => void;
+
+function addShortCutIssue(analysis: LineAnalysis, add: AddIssue): void {
+  const rules = analysis.fabrication.rules;
+  if (
+    rules?.weldGapMm !== undefined &&
+    !([...analysis.classes.values()].some((kind) => kind === 'field_fit') && rules.fieldFitAllowanceMm === undefined)
+  ) {
+    const limit = Math.max(0, rules.minCutPieceMm?.value ?? 0);
+    const short = cutPieces(analysis, rules.weldGapMm.value, rules.fieldFitAllowanceMm?.value ?? 0).filter(
+      (piece) => piece.cutLengthMm <= limit,
+    );
+    if (short.length > 0)
+      add(
+        'ISO_CUT_LENGTH_SHORT',
+        'error',
+        `${short.length} cut piece(s) are not longer than ${limit} mm: ${short.map((piece) => `${piece.piece} ${piece.cutLengthMm} mm`).join(', ')}`,
+        short.map((piece) => piece.componentId),
+      );
+  }
 }
 
 export function checkLine(doc: CadDocument, lineId: string, options: CheckOptions): CheckIssue[] {
@@ -141,22 +163,7 @@ export function checkLine(doc: CadDocument, lineId: string, options: CheckOption
   for (const spool of analysis.spools.spools)
     for (const violation of violationsOf(spool, rules?.maxSpool)) add(violation.code, 'error', violation.message, [spool.name]);
 
-  if (
-    rules?.weldGapMm !== undefined &&
-    !([...analysis.classes.values()].some((kind) => kind === 'field_fit') && rules.fieldFitAllowanceMm === undefined)
-  ) {
-    const limit = Math.max(0, rules.minCutPieceMm?.value ?? 0);
-    const short = cutPieces(analysis, rules.weldGapMm.value, rules.fieldFitAllowanceMm?.value ?? 0).filter(
-      (piece) => piece.cutLengthMm <= limit,
-    );
-    if (short.length > 0)
-      add(
-        'ISO_CUT_LENGTH_SHORT',
-        'error',
-        `${short.length} cut piece(s) are not longer than ${limit} mm: ${short.map((piece) => `${piece.piece} ${piece.cutLengthMm} mm`).join(', ')}`,
-        short.map((piece) => piece.componentId),
-      );
-  }
+  addShortCutIssue(analysis, add);
 
   const unclosed = runDimensions(graph).filter((dimension) => dimension.mismatches > 0);
   if (unclosed.length > 0)

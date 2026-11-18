@@ -1,3 +1,4 @@
+import { powInt } from '@lib/powInt';
 /**
  * Closed-form thermal-stress solutions (PHY-04 §5.5): the functions of docs/physics/04-thermo-mechanical/validation/
  * generate_thermomech_reference.py, same algebra and operation order. SI-consistent inputs (MPa, mm, 1/K, K).
@@ -49,8 +50,8 @@ export function bimetalEquilibrium({ t1, t2, E1, E2, alpha1, alpha2, dT }: Bimet
   const A2 = E2 * t2;
   const S1 = (E1 * t1 * t1) / 2;
   const S2 = (-E2 * t2 * t2) / 2;
-  const I1 = (E1 * t1 ** 3) / 3;
-  const I2 = (E2 * t2 ** 3) / 3;
+  const I1 = (E1 * powInt(t1, 3)) / 3;
+  const I2 = (E2 * powInt(t2, 3)) / 3;
   const a11 = A1 + A2;
   const a12 = S1 + S2;
   const b1 = (A1 * alpha1 + A2 * alpha2) * dT;

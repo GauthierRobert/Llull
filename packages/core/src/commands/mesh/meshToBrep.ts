@@ -1,6 +1,8 @@
 /** mesh_to_brep — turn a closed triangle mesh into an exact B-rep solid: one planar face per triangle, or one exact face per fitted region (07 MSH FR-MSH-21). */
 
-import type { Entity, ShapeRecipe } from '../../model/types';
+import type { CadDocument, Entity, ShapeRecipe } from '../../model/types';
+import type { PrimitiveFit } from '../../model/meshProvenance';
+import type { GeometryKernel } from '../../geometry/kernel';
 import type { MeshToBrepGroup, MeshToBrepRequest } from '../../geometry/kernelMeshBrep';
 import { PRIMITIVE_KINDS } from '../../geometry/mesh/primitiveFit';
 import { recipeOf } from '../../geometry/shapeRecipe';
@@ -30,6 +32,86 @@ const DEFAULT_MAX_FACES = 50_000;
 const MAX_FACES_LIMIT = 200_000;
 const TOLERANCE_FRACTION = 0.001;
 const DEFAULT_FEATURE_ANGLE_DEG = 30;
+
+type Reject = (code: string, message: string, path?: string) => CommandResult;
+
+interface PrismaticBuild {
+  readonly working: CadDocument;
+  readonly recipe: ShapeRecipe;
+  readonly facesBuilt: Record<string, number>;
+  readonly kernelReport: Record<string, unknown>;
+  readonly maxResidual: number;
+  readonly facetedGroups: Array<{ group: string; fit: string }>;
+  readonly groupsSummary: Array<{ id: string; faces: number; fit: string }>;
+  readonly provenance: Parameters<typeof withConventions>[2]['provenance'];
+}
+
+const groupRequest = (group: { fit: PrimitiveFit }): MeshToBrepGroup => {
+  const fit = group.fit;
+  switch (fit.type) {
+    case 'plane':
+      return { kind: 'plane', point: fit.point, normal: fit.normal };
+    case 'cylinder':
+      return { kind: 'cylinder', axisPoint: fit.axisPoint, axis: fit.axis, radius: fit.radius };
+    case 'cone':
+      return { kind: 'cone', apex: fit.apex, axis: fit.axis, halfAngleRad: fit.halfAngleRad };
+    case 'sphere':
+      return { kind: 'sphere', center: fit.center, radius: fit.radius };
+    case 'freeform':
+      return { kind: 'faceted' };
+  }
+};
+
+/** The prismatic build: segmentation, the kernel's sewn solid and the reports; a refusal result when any step fails. */
+function buildPrismatic(
+  doc: CadDocument,
+  ctx: Parameters<typeof runSegmentation>[1],
+  kernel: GeometryKernel,
+  id: string,
+  outward: ReturnType<typeof outwardMesh>,
+  tolerance: number,
+  featureAngleDeg: number,
+  reject: Reject,
+): CommandResult | PrismaticBuild {
+  const segmented = runSegmentation(doc, ctx, 'mesh_to_brep', id, outward, {
+    featureAngleDeg,
+    fitTolerance: tolerance,
+    kinds: [...PRIMITIVE_KINDS],
+  });
+  if ('document' in segmented) return segmented;
+  const provenance = segmented.provenance;
+  const { groups, faceGroup } = segmented.segmentation;
+  if (segmented.segmentation.unassignedFaces > 0)
+    return reject('MESH_DEGENERATE', 'the mesh has faces without area: repair_mesh mode=clean first');
+  const request: MeshToBrepRequest = {
+    positions: outward.positions,
+    indices: outward.indices,
+    faceGroup: Array.from(faceGroup),
+    tolerance,
+    groups: groups.map(groupRequest),
+  };
+  const built = kernel.meshToBrep?.(request) ?? null;
+  if (built === null || !built.ok || built.brep === undefined || built.report === undefined)
+    return reject('MESH_BREP_SEW_FAILED', `the kernel could not build the solid: ${built?.error ?? 'no answer'}`);
+  if (!built.report.valid || built.report.freeEdges > 0)
+    return reject(
+      'MESH_BREP_SEW_FAILED',
+      `the sewn solid is not valid (${built.report.freeEdges} free edge(s)): try mode=faceted, or a larger fitTolerance`,
+    );
+  const blob = makeBlob('model/x-occt-brep', built.brep);
+  kernel.loadBlob?.(blob.sha256, built.brep);
+  const names = new Map<number, string>(groups.map((group) => [group.index, group.fit.type]));
+  return {
+    working: withBlob(doc, blob),
+    recipe: { op: 'brep', blob: blob.sha256, format: 'occt-brep-v1' },
+    facesBuilt: { ...built.report.built, faceted: built.report.facetedFaces },
+    kernelReport: { ...built.report },
+    maxResidual: groups.reduce((max, group) => (group.fit.type === 'freeform' ? max : Math.max(max, group.fit.max)), 0),
+    facetedGroups: built.report.facetedGroups.map((group) => ({ group: `seg-${group}`, fit: names.get(group) ?? 'freeform' })),
+    groupsSummary: groups.map((group) => ({ id: `seg-${group.index}`, faces: group.faces.length, fit: group.fit.type })),
+    provenance,
+  };
+}
 
 /**
  * @affects rewrites the mesh `id` as a mesh entity with an exact `brep` (same id), or adds one with keepSource; prismatic also stores the B-rep text as a document blob
@@ -117,55 +199,9 @@ export const meshToBrep = defineCommand({
       const leaf = newEntity('mesh', id, { mesh: outward }, [0, 0, 0], source.color, { layerId: source.layerId });
       recipe = recipeOf(leaf);
     } else {
-      const segmented = runSegmentation(doc, ctx, 'mesh_to_brep', id, outward, {
-        featureAngleDeg: featureAngleDeg ?? DEFAULT_FEATURE_ANGLE_DEG,
-        fitTolerance: tolerance,
-        kinds: [...PRIMITIVE_KINDS],
-      });
-      if ('document' in segmented) return segmented;
-      provenance = segmented.provenance;
-      const { groups, faceGroup } = segmented.segmentation;
-      if (segmented.segmentation.unassignedFaces > 0)
-        return reject('MESH_DEGENERATE', 'the mesh has faces without area: repair_mesh mode=clean first');
-      const request: MeshToBrepRequest = {
-        positions: outward.positions,
-        indices: outward.indices,
-        faceGroup: Array.from(faceGroup),
-        tolerance,
-        groups: groups.map((group): MeshToBrepGroup => {
-          const fit = group.fit;
-          switch (fit.type) {
-            case 'plane':
-              return { kind: 'plane', point: fit.point, normal: fit.normal };
-            case 'cylinder':
-              return { kind: 'cylinder', axisPoint: fit.axisPoint, axis: fit.axis, radius: fit.radius };
-            case 'cone':
-              return { kind: 'cone', apex: fit.apex, axis: fit.axis, halfAngleRad: fit.halfAngleRad };
-            case 'sphere':
-              return { kind: 'sphere', center: fit.center, radius: fit.radius };
-            case 'freeform':
-              return { kind: 'faceted' };
-          }
-        }),
-      };
-      const built = kernel.meshToBrep?.(request) ?? null;
-      if (built === null || !built.ok || built.brep === undefined || built.report === undefined)
-        return reject('MESH_BREP_SEW_FAILED', `the kernel could not build the solid: ${built?.error ?? 'no answer'}`);
-      if (!built.report.valid || built.report.freeEdges > 0)
-        return reject(
-          'MESH_BREP_SEW_FAILED',
-          `the sewn solid is not valid (${built.report.freeEdges} free edge(s)): try mode=faceted, or a larger fitTolerance`,
-        );
-      const blob = makeBlob('model/x-occt-brep', built.brep);
-      kernel.loadBlob?.(blob.sha256, built.brep);
-      working = withBlob(doc, blob);
-      recipe = { op: 'brep', blob: blob.sha256, format: 'occt-brep-v1' };
-      facesBuilt = { ...built.report.built, faceted: built.report.facetedFaces };
-      kernelReport = { ...built.report };
-      const names = new Map<number, string>(groups.map((group) => [group.index, group.fit.type]));
-      facetedGroups = built.report.facetedGroups.map((group) => ({ group: `seg-${group}`, fit: names.get(group) ?? 'freeform' }));
-      groupsSummary = groups.map((group) => ({ id: `seg-${group.index}`, faces: group.faces.length, fit: group.fit.type }));
-      maxResidual = groups.reduce((max, group) => (group.fit.type === 'freeform' ? max : Math.max(max, group.fit.max)), 0);
+      const prismatic = buildPrismatic(doc, ctx, kernel, id, outward, tolerance, featureAngleDeg ?? DEFAULT_FEATURE_ANGLE_DEG, reject);
+      if ('document' in prismatic) return prismatic;
+      ({ working, recipe, facesBuilt, kernelReport, maxResidual, facetedGroups, groupsSummary, provenance } = prismatic);
     }
     const result = evaluateRecipe(kernel, recipe);
     if (typeof result === 'string')

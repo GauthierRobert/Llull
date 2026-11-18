@@ -84,6 +84,33 @@ function pinchedVertex(faces: ReadonlyArray<ReadonlyArray<number>>, count: numbe
   return null;
 }
 
+/** The first problem of the crease, semi-sharp edge and sharp vertex lists of `cage` (`directed` = its directed edges), or null. */
+function sharpnessProblem(cage: Cage, directed: ReadonlySet<string>, count: number): string | null {
+  const infinite = new Set<string>();
+  for (const [a, b] of cage.creases) {
+    if (!directed.has(`${a}>${b}`) && !directed.has(`${b}>${a}`)) return `crease ${a}-${b} is not an edge of the cage`;
+    if (infinite.has(edgeKey(a, b))) return `crease ${a}-${b} is listed twice`;
+    infinite.add(edgeKey(a, b));
+  }
+  const semi = new Set<string>();
+  for (const { a, b, s } of cage.edgeSharpness ?? []) {
+    if (!directed.has(`${a}>${b}`) && !directed.has(`${b}>${a}`)) return `sharp edge ${a}-${b} is not an edge of the cage`;
+    if (!(s > 0 && s < SHARP_MAX))
+      return `edge ${a}-${b} sharpness must be in (0, ${SHARP_MAX}) (got ${s}); infinite sharpness belongs in creases`;
+    if (infinite.has(edgeKey(a, b))) return `edge ${a}-${b} is in both creases and edgeSharpness`;
+    if (semi.has(edgeKey(a, b))) return `edge ${a}-${b} is listed twice in edgeSharpness`;
+    semi.add(edgeKey(a, b));
+  }
+  const corners = new Set<number>();
+  for (const { v, s } of cage.vertexSharpness ?? []) {
+    if (!Number.isInteger(v) || v < 0 || v >= count) return `sharp vertex ${v} is outside 0..${count - 1}`;
+    if (!(s > 0 && s <= SHARP_MAX)) return `vertex ${v} sharpness must be in (0, ${SHARP_MAX}] (got ${s})`;
+    if (corners.has(v)) return `vertex ${v} is listed twice in vertexSharpness`;
+    corners.add(v);
+  }
+  return null;
+}
+
 /**
  * Why `cage` is not a consistently wound 2-manifold (null when it is): every directed edge must appear once and, unless the cage is open
  * (`boundary` set), its reverse once; faces need 3+ distinct in-range vertices, and every crease must be a cage edge.
@@ -114,29 +141,7 @@ export function cageProblem(cage: Cage): string | null {
   for (let v = 0; v < count; v++) if (!used.has(v)) return `vertex ${v} is not used by any face`;
   const pinched = pinchedVertex(cage.faces, count);
   if (pinched !== null) return `vertex ${pinched} joins separate fans of faces (a pinch); give each sheet its own vertex`;
-  const infinite = new Set<string>();
-  for (const [a, b] of cage.creases) {
-    if (!directed.has(`${a}>${b}`) && !directed.has(`${b}>${a}`)) return `crease ${a}-${b} is not an edge of the cage`;
-    if (infinite.has(edgeKey(a, b))) return `crease ${a}-${b} is listed twice`;
-    infinite.add(edgeKey(a, b));
-  }
-  const semi = new Set<string>();
-  for (const { a, b, s } of cage.edgeSharpness ?? []) {
-    if (!directed.has(`${a}>${b}`) && !directed.has(`${b}>${a}`)) return `sharp edge ${a}-${b} is not an edge of the cage`;
-    if (!(s > 0 && s < SHARP_MAX))
-      return `edge ${a}-${b} sharpness must be in (0, ${SHARP_MAX}) (got ${s}); infinite sharpness belongs in creases`;
-    if (infinite.has(edgeKey(a, b))) return `edge ${a}-${b} is in both creases and edgeSharpness`;
-    if (semi.has(edgeKey(a, b))) return `edge ${a}-${b} is listed twice in edgeSharpness`;
-    semi.add(edgeKey(a, b));
-  }
-  const corners = new Set<number>();
-  for (const { v, s } of cage.vertexSharpness ?? []) {
-    if (!Number.isInteger(v) || v < 0 || v >= count) return `sharp vertex ${v} is outside 0..${count - 1}`;
-    if (!(s > 0 && s <= SHARP_MAX)) return `vertex ${v} sharpness must be in (0, ${SHARP_MAX}] (got ${s})`;
-    if (corners.has(v)) return `vertex ${v} is listed twice in vertexSharpness`;
-    corners.add(v);
-  }
-  return null;
+  return sharpnessProblem(cage, directed, count);
 }
 
 interface EdgeInfo {

@@ -1,13 +1,15 @@
 /** Closed-form heat-transfer solutions in SI scalars (PHY-03 TR-THM-40): the formulas of docs/physics/03-thermal-analysis/validation/generate_thermal_reference.py. */
 
 import { erf } from '@lib/specialFunctions';
+import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 const H_PLANCK = 6.62607015e-34;
 const K_BOLTZMANN = 1.380649e-23;
 const C_LIGHT = 299792458;
 
 /** Stefan-Boltzmann constant in W/(m^2 K^4) from the exact 2019 SI defining constants. */
-export const STEFAN_BOLTZMANN: number = (2 * Math.PI ** 5 * K_BOLTZMANN ** 4) / (15 * H_PLANCK ** 3 * C_LIGHT ** 2);
+export const STEFAN_BOLTZMANN: number = (2 * powInt(Math.PI, 5) * powInt(K_BOLTZMANN, 4)) / (15 * powInt(H_PLANCK, 3) * C_LIGHT ** 2);
 
 export interface WallResult {
   readonly flux: number;
@@ -119,7 +121,7 @@ export function straightFin(h: number, k: number, perimeter: number, area: numbe
 
 /** Infinite grey parallel plates: q = sigma (T1^4 - T2^4) / (1/e1 + 1/e2 - 1), absolute temperatures. */
 export const parallelPlates = (t1: number, t2: number, e1: number, e2: number): number =>
-  (STEFAN_BOLTZMANN * (t1 ** 4 - t2 ** 4)) / (1 / e1 + 1 / e2 - 1);
+  (STEFAN_BOLTZMANN * (powInt(t1, 4) - powInt(t2, 4))) / (1 / e1 + 1 / e2 - 1);
 
 /** Two slabs in series with an interface conductance hc: q = dT / (L1/k1 + 1/hc + L2/k2). */
 export function interfaceSlabs(
@@ -177,8 +179,8 @@ export function viewFactorPerpendicular(l: number, w: number, h: number): number
   const r = Math.sqrt(bigH * bigH + bigW * bigW);
   const a = bigW * Math.atan(1 / bigW) + bigH * Math.atan(1 / bigH) - r * Math.atan(1 / r);
   const g1 = ((1 + bigW * bigW) * (1 + bigH * bigH)) / (1 + bigW * bigW + bigH * bigH);
-  const g2 = ((bigW * bigW * (1 + bigW * bigW + bigH * bigH)) / ((1 + bigW * bigW) * (bigW * bigW + bigH * bigH))) ** (bigW * bigW);
-  const g3 = ((bigH * bigH * (1 + bigH * bigH + bigW * bigW)) / ((1 + bigH * bigH) * (bigH * bigH + bigW * bigW))) ** (bigH * bigH);
+  const g2 = pow((bigW * bigW * (1 + bigW * bigW + bigH * bigH)) / ((1 + bigW * bigW) * (bigW * bigW + bigH * bigH)), bigW * bigW);
+  const g3 = pow((bigH * bigH * (1 + bigH * bigH + bigW * bigW)) / ((1 + bigH * bigH) * (bigH * bigH + bigW * bigW)), bigH * bigH);
   return (a + 0.25 * Math.log(g1 * g2 * g3)) / (Math.PI * bigW);
 }
 

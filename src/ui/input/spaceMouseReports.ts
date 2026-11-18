@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 // 3Dconnexion SpaceMouse HID input reports -> raw axis values. Pure: bytes in, numbers out.
 //
 // WebHID hands over each report WITHOUT its report-id byte. Report layouts (little-endian int16, ~-350..350 nominal travel):
@@ -40,7 +41,7 @@ export function parseSpaceMouseReport(reportId: number, bytes: Uint8Array): Spac
       return bytes.byteLength >= 6 ? { type: 'rotation', values: readAxes(view, 0) } : null;
     case REPORT_BUTTONS: {
       let mask = 0;
-      for (let index = 0; index < Math.min(bytes.byteLength, 4); index += 1) mask += (bytes[index] ?? 0) * 2 ** (8 * index);
+      for (let index = 0; index < Math.min(bytes.byteLength, 4); index += 1) mask += (bytes[index] ?? 0) * pow(2, 8 * index);
       return { type: 'buttons', mask };
     }
     default:
