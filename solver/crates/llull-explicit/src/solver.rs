@@ -143,9 +143,10 @@ struct Settings {
     quadratic: f64,
 }
 
-/// The configuration of one step: positions at n and n+1, velocities at n+1/2, the step length.
+/// The configuration of one step: positions at n+1/2 (the mean of n and n+1, built once per cycle: an element reads only its own nodes)
+/// and at n+1, velocities at n+1/2, the step length.
 struct Motion<'a> {
-    x0: &'a [f64],
+    mid: &'a [f64],
     x1: &'a [f64],
     v: &'a [f64],
     dt: f64,
@@ -159,7 +160,7 @@ fn step_element(
     motion: &Motion<'_>,
     settings: &Settings,
 ) -> Result<ElementStep, String> {
-    let Motion { x0, x1, v, dt } = *motion;
+    let Motion { mid, x1, v, dt } = *motion;
     if state.failed {
         // Eroded (Johnson–Cook damage reached 1): the element is gone; its nodes keep their mass and move freely.
         return Ok(ElementStep {
@@ -171,8 +172,7 @@ fn step_element(
         });
     }
     let material = &model.materials[element.material];
-    let mid: Vec<f64> = x0.iter().zip(x1).map(|(a, b)| 0.5 * (a + b)).collect();
-    let (b_mid, volume_mid) = kinematics(&element.nodes, &mid);
+    let (b_mid, volume_mid) = kinematics(&element.nodes, mid);
     if !(volume_mid > 0.0) {
         return Err("an element inverted (non-positive volume)".to_string());
     }
@@ -437,7 +437,8 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
         }
         let x_new: Vec<f64> = (0..3 * nodes).map(|k| x[k] + dt * v_new[k]).collect();
         external_work += (0..3 * nodes).map(|k| external[k] * (x_new[k] - x[k])).sum::<f64>();
-        let motion = Motion { x0: &x, x1: &x_new, v: &v_new, dt };
+        let x_mid: Vec<f64> = x.iter().zip(&x_new).map(|(a, b)| 0.5 * (a + b)).collect();
+        let motion = Motion { mid: &x_mid, x1: &x_new, v: &v_new, dt };
         let steps: Vec<Result<ElementStep, String>> = elements
             .par_iter()
             .zip(states.par_iter())

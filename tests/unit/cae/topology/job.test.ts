@@ -176,6 +176,26 @@ describe('loads and supports on faces, edges and points', () => {
     expect(load?.values.filter((value) => value === -2)).toHaveLength(21);
   });
 
+  it('maps a point load onto a 190k-node domain (no argument spread over the node list)', () => {
+    const job = okJob(
+      analysisOn(model, {
+        constraints: [fixedLeft],
+        loads: [
+          {
+            kind: 'force',
+            loadCase: 'LC1',
+            category: 'limit',
+            target: { entityId: model.entityId, pointsNear: [[60, 20, 0]] },
+            vector: [0, -1, 0],
+          },
+        ],
+        study: { voxel: 0.08 },
+      }),
+    );
+    expect(job.grid.nx * job.grid.ny).toBeGreaterThan(180_000);
+    expect(job.loadCases[0]?.values).toEqual([-1]);
+  });
+
   it('sums loads of the same case, orders the cases by appearance and weights them', () => {
     const made = analysisOn(model, {
       constraints: [fixedLeft],
