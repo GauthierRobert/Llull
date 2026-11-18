@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /** Base-10 octave / third-octave band system of IEC 61260-1 (TR-VAC-11): G = 10^0.3, f_r = 1000 Hz, nominal label -> exact frequencies by table lookup. */
 
 export type Bandwidth = 'octave' | 'third_octave';
@@ -31,9 +32,9 @@ const firstX = (bandwidth: Bandwidth): number => (bandwidth === 'octave' ? OCTAV
 /** Exact geometry of band `x` (odd b): f_m = 1000 G^(x/b), f1,2 = f_m G^(-/+ 1/(2b)), G^t = 10^(0.3 t). */
 function geometryOf(bandwidth: Bandwidth, x: number, nominalHz: number): BandGeometry {
   const b = FRACTION[bandwidth];
-  const exactMidHz = 1000 * 10 ** ((3 * x) / (10 * b));
-  const lowerHz = exactMidHz * 10 ** (-3 / (20 * b));
-  const upperHz = exactMidHz * 10 ** (3 / (20 * b));
+  const exactMidHz = 1000 * pow(10, (3 * x) / (10 * b));
+  const lowerHz = exactMidHz * pow(10, -3 / (20 * b));
+  const upperHz = exactMidHz * pow(10, 3 / (20 * b));
   return { x, nominalHz, exactMidHz, lowerHz, upperHz, bandwidthHz: upperHz - lowerHz };
 }
 

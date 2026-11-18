@@ -10,6 +10,7 @@ import type { CloudBounds, CloudManifest } from '@core/model/pointCloud';
 import type { Vec3 } from '@core/model/vectors';
 import { LruCache } from '@lib/lruCache';
 import { isRecord } from '@lib/isRecord';
+import { pow } from '@lib/pow';
 
 const RECORD_BYTES = 48;
 const NO_CHILD = 0xffffffff;
@@ -136,7 +137,7 @@ export class AssetReader {
     const node = this.nodes[i];
     const { octree, quantum, offset } = this.manifest;
     if (node === undefined) return { min: [0, 0, 0], max: [0, 0, 0] };
-    const edge = 2 ** (octree.rootBits - node.level);
+    const edge = pow(2, octree.rootBits - node.level);
     const low = [0, 1, 2].map((a) => ((octree.rootMin[a] ?? 0) + (node.key[a] ?? 0) * edge) * (quantum[a] ?? 0) + (offset[a] ?? 0));
     const high = [0, 1, 2].map((a) => (low[a] ?? 0) + edge * (quantum[a] ?? 0));
     return { min: [low[0] ?? 0, low[1] ?? 0, low[2] ?? 0], max: [high[0] ?? 0, high[1] ?? 0, high[2] ?? 0] };
@@ -151,7 +152,7 @@ export class AssetReader {
 
   /** Spacing of node level `level` (metres). */
   spacing(level: number): number {
-    return this.manifest.octree.rootSpacing / 2 ** level;
+    return this.manifest.octree.rootSpacing / pow(2, level);
   }
 
   /** The intensity / rgb / classification columns of a block (after positions and indices, in manifest order). */
@@ -190,7 +191,7 @@ export class AssetReader {
     if (node.byteSize !== node.pointCount * (16 + stride)) return null;
     const view = new DataView(block.buffer, block.byteOffset, block.byteLength);
     const { octree, quantum, offset } = this.manifest;
-    const edge = 2 ** (octree.rootBits - node.level);
+    const edge = pow(2, octree.rootBits - node.level);
     const origin = [0, 1, 2].map((a) => (octree.rootMin[a] ?? 0) + (node.key[a] ?? 0) * edge);
     const n = node.pointCount;
     const positions = new Float64Array(3 * n);

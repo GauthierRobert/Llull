@@ -1,4 +1,5 @@
 import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 /** Closed forms of the electro-optical checks (PHY-15 §5.2), pure; the same expressions as validation/generate_eop_reference.py. */
 
 /** Exact SI constants (2019 redefinition): J/K, J s, m/s. */
@@ -14,7 +15,7 @@ export const bulkResistance = (resistivity: number, length: number, area: number
 
 /** Equilibrium temperature of a flat plate, K: alpha S cos(theta) = n eps sigma T^4 (n radiating faces; no conduction, albedo or planet IR). */
 export const equilibriumTemperature = (alpha: number, flux: number, incidenceRad: number, epsilon: number, faces: 1 | 2): number =>
-  ((alpha * flux * Math.cos(incidenceRad)) / (faces * epsilon * STEFAN_BOLTZMANN)) ** 0.25;
+  pow((alpha * flux * Math.cos(incidenceRad)) / (faces * epsilon * STEFAN_BOLTZMANN), 0.25);
 
 /** Vacuum permeability N/A^2, the classical 4 pi 1e-7 (the CODATA 2018 value differs by 5.5e-10 relative, far below the checks' tolerances). */
 export const MU_0 = 4 * Math.PI * 1e-7;

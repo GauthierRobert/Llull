@@ -1,4 +1,5 @@
 import { powInt } from '../../lib/powInt';
+import { pow } from '../../lib/pow';
 /**
  * Incompressible hyperelasticity in homogeneous modes (PHY-02 §5.6): nominal and Cauchy stresses for W(I1, I2) laws (Neo-Hooke,
  * Mooney-Rivlin, polynomial, reduced polynomial, Yeoh, Arruda-Boyce) and Ogden, strain energy, initial shear modulus, and the
@@ -37,12 +38,12 @@ export function polynomialDerivatives(
     let W12 = 0;
     let W22 = 0;
     for (const [i, j, c] of terms) {
-      W += c * x ** i * y ** j;
-      if (i > 0) W1 += c * i * x ** (i - 1) * y ** j;
-      if (j > 0) W2 += c * j * x ** i * y ** (j - 1);
-      if (i > 1) W11 += c * i * (i - 1) * x ** (i - 2) * y ** j;
-      if (j > 1) W22 += c * j * (j - 1) * x ** i * y ** (j - 2);
-      if (i > 0 && j > 0) W12 += c * i * j * x ** (i - 1) * y ** (j - 1);
+      W += c * pow(x, i) * pow(y, j);
+      if (i > 0) W1 += c * i * pow(x, i - 1) * pow(y, j);
+      if (j > 0) W2 += c * j * pow(x, i) * pow(y, j - 1);
+      if (i > 1) W11 += c * i * (i - 1) * pow(x, i - 2) * pow(y, j);
+      if (j > 1) W22 += c * j * (j - 1) * pow(x, i) * pow(y, j - 2);
+      if (i > 0 && j > 0) W12 += c * i * j * pow(x, i - 1) * pow(y, j - 1);
     }
     return { W, W1, W2, W11, W12, W22 };
   };
@@ -58,10 +59,10 @@ export function arrudaBoyceDerivatives(mu: number, lambdaM: number): (i1: number
     let W11 = 0;
     AB_COEFFICIENTS.forEach((c, k) => {
       const order = k + 1;
-      const scale = mu * c * lambdaM ** (-2 * k);
-      W += scale * (i1 ** order - 3 ** order);
-      W1 += scale * order * i1 ** (order - 1);
-      if (order > 1) W11 += scale * order * (order - 1) * i1 ** (order - 2);
+      const scale = mu * c * pow(lambdaM, -2 * k);
+      W += scale * (pow(i1, order) - pow(3, order));
+      W1 += scale * order * pow(i1, order - 1);
+      if (order > 1) W11 += scale * order * (order - 1) * pow(i1, order - 2);
     });
     return { W, W1, W2: 0, W11, W12: 0, W22: 0 };
   };
@@ -85,7 +86,7 @@ export function nominalStress(law: ResolvedHyper, mode: HyperMode, lambda: numbe
     const exponent = mode === 'UT' ? (a: number) => -a / 2 - 1 : mode === 'ET' ? (a: number) => -2 * a - 1 : (a: number) => -a - 1;
     return law.mu.reduce((sum, mu, k) => {
       const alpha = law.alpha[k] ?? 1;
-      return sum + ((2 * mu) / alpha) * (lambda ** (alpha - 1) - lambda ** exponent(alpha));
+      return sum + ((2 * mu) / alpha) * (pow(lambda, alpha - 1) - pow(lambda, exponent(alpha)));
     }, 0);
   }
   const { i1, i2 } = invariantsOf(modeStretches(mode, lambda));
@@ -100,7 +101,7 @@ export function cauchyStresses(law: ResolvedHyper, stretches: readonly [number, 
   const [a, b, c] = stretches;
   if (law.kind === 'ogden') {
     const diff = (x: number): number =>
-      law.mu.reduce((sum, mu, k) => sum + ((2 * mu) / (law.alpha[k] ?? 1)) * (x ** (law.alpha[k] ?? 1) - c ** (law.alpha[k] ?? 1)), 0);
+      law.mu.reduce((sum, mu, k) => sum + ((2 * mu) / (law.alpha[k] ?? 1)) * (pow(x, law.alpha[k] ?? 1) - pow(c, law.alpha[k] ?? 1)), 0);
     return [diff(a), diff(b), 0];
   }
   const { i1, i2 } = invariantsOf(stretches);
@@ -114,7 +115,7 @@ export function strainEnergy(law: ResolvedHyper, stretches: readonly [number, nu
   if (law.kind === 'ogden') {
     return law.mu.reduce((sum, mu, k) => {
       const alpha = law.alpha[k] ?? 1;
-      return sum + ((2 * mu) / (alpha * alpha)) * stretches.reduce((acc, s) => acc + s ** alpha, -3);
+      return sum + ((2 * mu) / (alpha * alpha)) * stretches.reduce((acc, s) => acc + pow(s, alpha), -3);
     }, 0);
   }
   const { i1, i2 } = invariantsOf(stretches);

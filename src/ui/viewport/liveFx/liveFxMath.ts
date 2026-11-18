@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { Entity, Vec3 } from '@core/model/types';
 import type { EntityTransition } from './planLiveFx';
 import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 /** 0 before `startMs`, 1 after `startMs + durationMs`. */
 export function progressAt(nowMs: number, startMs: number, durationMs: number): number {
@@ -29,7 +30,7 @@ export function easeOutCubic(t: number): number {
 /** Glow bell: ramps in over the first 12 %, decays to exactly 0 at t = 1. */
 export function glowAt(t: number): number {
   if (t <= 0 || t >= 1) return 0;
-  return t < 0.12 ? t / 0.12 : ((1 - t) / 0.88) ** 1.6;
+  return t < 0.12 ? t / 0.12 : pow((1 - t) / 0.88, 1.6);
 }
 
 /** Smallest scale written to a matrix (a zero scale would make raycasting invert a singular matrix). */

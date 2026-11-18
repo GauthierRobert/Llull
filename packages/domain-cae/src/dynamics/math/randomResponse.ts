@@ -12,6 +12,7 @@
  */
 
 import { asdAt, type AsdPoint } from './psd';
+import { pow } from '@lib/pow';
 
 /** Base log-spaced grid density and the refinement around each kept mode (§5.4). */
 const POINTS_PER_DECADE = 200;
@@ -50,7 +51,7 @@ export function integrationGrid(
   const breaks = new Set<number>([lo, hi]);
   const decades = Math.log10(hi / lo);
   const count = Math.max(1, Math.ceil(POINTS_PER_DECADE * decades));
-  for (let i = 1; i < count; i += 1) breaks.add(lo * (hi / lo) ** (i / count));
+  for (let i = 1; i < count; i += 1) breaks.add(lo * pow(hi / lo, i / count));
   for (const [f] of spectrum) if (f > lo && f < hi) breaks.add(f);
   for (const { fHz, zeta } of modes) {
     const from = fHz * (1 - MODE_WINDOW_HALF_WIDTH_ZETAS * zeta);

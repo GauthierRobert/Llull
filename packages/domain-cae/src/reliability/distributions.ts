@@ -4,6 +4,7 @@ import { z } from '@core/commands/schema';
 import type { Distribution } from '@cae/reliability/types';
 import { normalCdf } from '@lib/specialFunctions';
 import { gamma, normalInv } from './numerics';
+import { pow } from '@lib/pow';
 
 export const distributionSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -88,7 +89,7 @@ export function cdf(d: Distribution, x: number): number {
     case 'uniform':
       return Math.min(Math.max((x - d.min) / (d.max - d.min), 0), 1);
     case 'weibull':
-      return x <= 0 ? 0 : 1 - Math.exp(-Math.pow(x / d.scale, d.shape));
+      return x <= 0 ? 0 : 1 - Math.exp(-pow(x / d.scale, d.shape));
     case 'gumbel':
       return Math.exp(-Math.exp(-(x - d.location) / d.scale));
   }
@@ -106,7 +107,7 @@ export function invCdf(d: Distribution, p: number): number {
     case 'uniform':
       return d.min + p * (d.max - d.min);
     case 'weibull':
-      return d.scale * Math.pow(-Math.log(1 - p), 1 / d.shape);
+      return d.scale * pow(-Math.log(1 - p), 1 / d.shape);
     case 'gumbel':
       return d.location - d.scale * Math.log(-Math.log(p));
   }

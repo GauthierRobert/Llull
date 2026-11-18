@@ -12,6 +12,7 @@ import { MM_PER_UNIT } from '../../model/units';
 import { GVP_POLICY_SOURCES, worstBand } from './gvpBands';
 import type { ProductVerification } from './importVerify';
 import type { ProductPlacement } from './importTree';
+import { pow } from '../../lib/pow';
 
 export interface GvpWarning {
   readonly code: 'XCH_GVP_YELLOW' | 'XCH_GVP_RED' | 'XCH_GVP_NOT_CHECKABLE' | 'XCH_PMI_UNMAPPED';
@@ -64,7 +65,7 @@ const UNIT_NAMES: Readonly<Record<string, ImportProvenance['sourceUnit']>> = {
 };
 
 const scaleMm = (value: number | undefined, unit: DocumentUnit, power: number): number | undefined =>
-  value === undefined ? undefined : value / MM_PER_UNIT[unit] ** power;
+  value === undefined ? undefined : value / pow(MM_PER_UNIT[unit], power);
 
 /** PMI read in millimetres, expressed in the document unit (angles and the zone / face data are unchanged). */
 function pmiInUnit(pmi: ExchangePmi, unit: DocumentUnit): ExchangePmi {

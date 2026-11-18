@@ -8,6 +8,7 @@ import { compressKnots } from './knotVector';
 import type { NurbsCurveData } from './types';
 import { MAX_NURBS_DEGREE } from './types';
 import { evaluateCurve } from './evaluate';
+import { pow } from '../pow';
 
 type Parameterization = 'chord' | 'centripetal' | 'uniform';
 
@@ -32,7 +33,7 @@ function parameters(points: ReadonlyArray<Vec3>, parameterization: Parameterizat
   const steps = points.slice(1).map((point, index) => distance3(point, points[index] as Vec3));
   const length = steps.reduce((sum, step) => sum + step, 0);
   if (parameterization === 'uniform') return { t: points.map((_, index) => index / (points.length - 1)), length };
-  const weights = steps.map((step) => step ** exponent);
+  const weights = steps.map((step) => pow(step, exponent));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   const t = [0];
   weights.forEach((weight) => t.push((t[t.length - 1] as number) + weight / total));

@@ -5,6 +5,7 @@
 
 import { programFunction, programGradient, type Program } from './expressionProgram';
 import { normalCdf } from './specialFunctions';
+import { pow } from './pow';
 
 type StackDistribution = 'normal' | 'uniform';
 
@@ -55,7 +56,7 @@ export function uniformSumCdf(x: number, terms: readonly { readonly lo: number; 
       }
     });
     const r = x - offset;
-    if (r > 0) total += sign * Math.pow(r, widths.length);
+    if (r > 0) total += sign * pow(r, widths.length);
   }
   return Math.min(1, Math.max(0, total / (factorial * product)));
 }

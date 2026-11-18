@@ -18,6 +18,7 @@ import {
 import { singleZoneCurve } from './singleZone';
 import { sliderRate } from './slider';
 import { elementAt } from '@lib/elementAt';
+import { pow } from '@lib/pow';
 
 const RADIANS_PER_DEG = Math.PI / 180;
 
@@ -93,7 +94,7 @@ function wiebeGrids(
     if (Math.abs(psi - (-180 + nextNode * STEP_DEG)) < 1e-9) atNode.set(nextNode, g);
   }
   const gEnd = g;
-  const pEndMotored = pIn * (bdcVolume / endVolume) ** nc;
+  const pEndMotored = pIn * pow(bdcVolume / endVolume, nc);
   const motored = new Float64Array(cells + 1);
   const perJoule = new Float64Array(cells + 1);
   for (let i = 0; i < cells; i++) {
@@ -102,11 +103,11 @@ function wiebeGrids(
     const volume = volumeAt(geometry, psiDeg);
     if (psiDeg <= 180 + 1e-9) {
       if (psiDeg <= end + 1e-9) {
-        motored[index] = pIn * (bdcVolume / volume) ** nc;
+        motored[index] = pIn * pow(bdcVolume / volume, nc);
         perJoule[index] = psiDeg <= model.startDeg ? 0 : (atNode.get(i) ?? gEnd);
       } else {
-        motored[index] = pEndMotored * (endVolume / volume) ** ne;
-        perJoule[index] = gEnd * (endVolume / volume) ** ne;
+        motored[index] = pEndMotored * pow(endVolume / volume, ne);
+        perJoule[index] = gEnd * pow(endVolume / volume, ne);
       }
     } else {
       motored[index] = psiDeg <= 360 + 1e-9 ? ambient : pIn;

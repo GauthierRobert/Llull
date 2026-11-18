@@ -10,6 +10,7 @@
 import type { DeformLaw } from '../../model/deform';
 import type { Vec3 } from '../../model/vectors';
 import { map3 } from '../../lib/vec3';
+import { pow } from '../../lib/pow';
 
 export type LatticeLaw = Extract<DeformLaw, { kind: 'lattice' }>;
 
@@ -29,7 +30,7 @@ const binomial = (n: number, k: number): number => {
 /** B_i^n(t) for i = 0..n. */
 function bernsteinBasis(n: number, t: number): number[] {
   const out: number[] = [];
-  for (let i = 0; i <= n; i++) out.push(binomial(n, i) * t ** i * (1 - t) ** (n - i));
+  for (let i = 0; i <= n; i++) out.push(binomial(n, i) * pow(t, i) * pow(1 - t, n - i));
   return out;
 }
 

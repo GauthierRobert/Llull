@@ -7,6 +7,7 @@
 import { pchipEvaluate, pchipSlopes } from '../lib/pchip';
 import type { MotionProfile, ProfileQuantity, ProfileSegment } from '../model/drives';
 import { powInt } from '../lib/powInt';
+import { pow } from '../lib/pow';
 
 interface ProfileSample {
   readonly value: number;
@@ -229,7 +230,7 @@ function reachableSpeed(d: number, vmax: number, a: number, jerk: number): numbe
   if (d >= vmax * accelerationTime(vmax, a, jerk)) return vmax;
   const withPlateau = (a * (-a / jerk + Math.sqrt((a / jerk) ** 2 + (4 * d) / a))) / 2;
   if (withPlateau * jerk >= a * a) return withPlateau;
-  return ((d * Math.sqrt(jerk)) / 2) ** (2 / 3);
+  return pow((d * Math.sqrt(jerk)) / 2, 2 / 3);
 }
 
 function sCurvePhases(speed: number, a: number, jerk: number, total: number): JerkPhase[] {

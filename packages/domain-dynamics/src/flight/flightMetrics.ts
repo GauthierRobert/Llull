@@ -13,6 +13,7 @@ import { POWER } from './powerBlock';
 import { offsetAt, type FlightRun } from './flightRun';
 import { rotateInverse } from './frames';
 import { STATIC_ADVANCE_RATIO_LIMIT, validatedRange } from './rotorLaw';
+import { pow } from '@lib/pow';
 
 const DEG = 180 / Math.PI;
 
@@ -172,7 +173,7 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
     const power = final(rotorSlot(i, ROTOR.power));
     const j = final(rotorSlot(i, ROTOR.advanceRatio));
     const area = Math.PI * (rotor.rotor.diameter / 2) ** 2;
-    const ideal = thrust > 0 ? thrust ** 1.5 / Math.sqrt(2 * rotor.rotor.airDensity * area) : 0;
+    const ideal = thrust > 0 ? pow(thrust, 1.5) / Math.sqrt(2 * rotor.rotor.airDensity * area) : 0;
     const outside = final(rotorSlot(i, ROTOR.outsideSteps));
     const range = validatedRange(rotor);
     rotors[rotor.rotor.id] = {

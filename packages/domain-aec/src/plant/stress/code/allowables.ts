@@ -3,6 +3,7 @@
  */
 
 import { ruleRows, type RuleRow, type RuleSet } from './ruleSets';
+import { pow } from '@lib/pow';
 
 export interface AllowableInput {
   readonly ScMPa: number;
@@ -29,7 +30,7 @@ export interface Allowables {
 }
 
 /** Raw stress range reduction factor for N full-range cycles. */
-export const rawF = (set: RuleSet, cycles: number): number => (set.fForm === 'n-1/3' ? 20 * cycles ** (-1 / 3) : 6 * cycles ** -0.2);
+export const rawF = (set: RuleSet, cycles: number): number => (set.fForm === 'n-1/3' ? 20 * pow(cycles, -1 / 3) : 6 * pow(cycles, -0.2));
 
 /**
  * @invariant f = min(raw, cap) then max(floor); eq. (1b) governs only when S_L is given and S_h > S_L (liberal form); both equations are returned

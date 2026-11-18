@@ -15,6 +15,7 @@ import {
 } from './closedForm';
 import { isInputProblem, inputValue, inputValues, type InputProblem, type InputSpec } from './inputs';
 import { convertNortonA } from '@core/model/materialLaws/nortonUnits';
+import { pow } from '@lib/pow';
 
 export const CHECKS = [
   'norton_constant_stress',
@@ -263,12 +264,12 @@ function wlfShift(inputs: Inputs): Result {
   if (delta < 0)
     return fail('CRP_WLF_OUT_OF_RANGE', `T - Tr = ${delta} K is below the reference temperature: WLF is not valid there`, 'T_minus_Tr_K');
   const log = wlfLogShift(C1, C2, delta);
-  const values: Record<string, CheckValue> = { log10ShiftFactor: value(log, '-'), shiftFactor: value(10 ** log, '-') };
+  const values: Record<string, CheckValue> = { log10ShiftFactor: value(log, '-'), shiftFactor: value(pow(10, log), '-') };
   if (SHIFTED.some((key) => Object.hasOwn(inputs, key))) {
     const shifted = inputValues(inputs, [mpa('Einf_MPa'), mpa('E1_MPa'), seconds('tau_s'), seconds('t_s', 'nonNegative')]);
     if (isInputProblem(shifted)) return asFailure(shifted);
     const terms = [{ E: shifted.E1_MPa, tau: shifted.tau_s }];
-    values['shiftedModulusMPa'] = value(pronyModulus(shifted.Einf_MPa, terms, shifted.t_s / 10 ** log), 'MPa');
+    values['shiftedModulusMPa'] = value(pronyModulus(shifted.Einf_MPa, terms, shifted.t_s / pow(10, log)), 'MPa');
   }
   return { values, formula: 'log10 aT = -C1 (T - Tr)/(C2 + T - Tr); E(t, T) = E_ref(t/aT)', warnings: [] };
 }

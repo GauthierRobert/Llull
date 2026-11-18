@@ -7,6 +7,7 @@ import type { Motor, PropellerLoad, TorquePoint } from '@core/model/dynamics';
 import type { Vec3 } from '@core/model/vectors';
 import type { AppliedLoads, SimulationState } from '@core/dynamics/physicsEngine';
 import { propellerCoefficients } from './propellerTable';
+import { pow } from '@lib/pow';
 
 export const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
 
@@ -65,9 +66,9 @@ export function propellerOutput(propeller: PropellerLoad, omega: number): Propel
   const n = omega / (2 * Math.PI);
   const { airDensity: rho, diameter: d } = propeller;
   const coefficients = propellerCoefficients(propeller, omega);
-  const torque = (coefficients.powerCoefficient * rho * n * n * d ** 5) / (2 * Math.PI);
+  const torque = (coefficients.powerCoefficient * rho * n * n * pow(d, 5)) / (2 * Math.PI);
   return {
-    thrust: coefficients.thrustCoefficient * rho * n * n * d ** 4,
+    thrust: coefficients.thrustCoefficient * rho * n * n * pow(d, 4),
     torque,
     power: torque * Math.abs(omega),
     ...(coefficients.tabulated ? { advanceRatio: coefficients.advanceRatio, outsideTable: coefficients.outsideTable } : {}),

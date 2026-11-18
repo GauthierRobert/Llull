@@ -33,6 +33,7 @@ import {
 import { round, weightKnPerMetre } from '../../shared/numeric';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
 import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 export function checkBeam(
   beam: SteelMemberElement,
@@ -108,7 +109,7 @@ export function checkBeam(
   const effectiveWidth = Math.min(profile.b, rail.foot + rail.height + profile.tf);
   const flangeInertia = (effectiveWidth * powInt(profile.tf, 3)) / 12;
   const railFlangeInertia = RAIL_WEAR_INERTIA_FACTOR * rail.inertia + flangeInertia;
-  const loadedLength = 3.25 * (railFlangeInertia / profile.tw) ** (1 / 3);
+  const loadedLength = 3.25 * pow(railFlangeInertia / profile.tw, 1 / 3);
   const localStress = (GAMMA_CRANE * wheel) / (loadedLength * profile.tw);
   const localRange = (characteristic * FATIGUE_PHI) / (loadedLength * profile.tw);
   const localLambda = CLASSES[craneClass] * LOCAL_LAMBDA_FACTOR;

@@ -6,6 +6,7 @@ import { entityToTriangles } from '@core/geometry/entityTriangles';
 import type { Triangle } from '@core/geometry/triangles';
 import { is3D, type CadDocument, type Vec3 } from '@core/model/types';
 import { TOPOLOGY_VOXEL_CAP } from './defaults';
+import { pow } from '@lib/pow';
 
 /** World axes (x = 0, y = 1, z = 2) of grid directions i, j, k. A 2D study's k is the out-of-plane axis (one layer). */
 type GridAxes = readonly [number, number, number];
@@ -81,7 +82,7 @@ export function gridOver(
   const nz = plane === undefined ? cells(length(axes[2]), study.voxel) : 1;
   const count = nx * ny * nz;
   if (count > TOPOLOGY_VOXEL_CAP) {
-    const suggested = roundUp3(study.voxel * (count / TOPOLOGY_VOXEL_CAP) ** (1 / study.dimension));
+    const suggested = roundUp3(study.voxel * pow(count / TOPOLOGY_VOXEL_CAP, 1 / study.dimension));
     return {
       code: 'TOP_GRID_TOO_LARGE',
       message: `${nx} x ${ny}${plane === undefined ? ` x ${nz}` : ''} = ${count} voxels exceed the cap of ${TOPOLOGY_VOXEL_CAP}; use voxel >= ${suggested}`,

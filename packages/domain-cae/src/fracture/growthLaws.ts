@@ -3,6 +3,7 @@
 import type { CrackGrowthMaterialModel } from '@core/model/materialDurability';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 type Table = ReadonlyArray<{ readonly stressRatio: number; readonly points: ReadonlyArray<readonly [number, number]> }>;
 type Closure =
@@ -55,23 +56,23 @@ export function rateModelOf(law: CrackGrowthMaterialModel): RateModel | string {
         : { ...model, dKRange: [dKRange[0], dKRange[1]] as const };
   switch (law.kind) {
     case 'da_dn_paris':
-      return withRange({ kind: 'paris', C: (law.C * a) / k ** law.m, m: law.m, dKth: (law.dKth ?? 0) * k });
+      return withRange({ kind: 'paris', C: (law.C * a) / pow(k, law.m), m: law.m, dKth: (law.dKth ?? 0) * k });
     case 'da_dn_walker':
       return withRange({
         kind: 'walker',
-        C: (law.C * a) / k ** law.m,
+        C: (law.C * a) / pow(k, law.m),
         m: law.m,
         gamma: law.gamma,
         gammaNegativeR: law.gammaNegativeR ?? law.gamma,
       });
     case 'da_dn_forman':
-      return withRange({ kind: 'forman', C: law.C * a * k ** (1 - law.n), n: law.n, Kc: law.Kc * k });
+      return withRange({ kind: 'forman', C: law.C * a * pow(k, 1 - law.n), n: law.n, Kc: law.Kc * k });
     case 'da_dn_nasgro': {
       if (!('dKth' in law.threshold)) return 'NASGRO threshold by dK0/Cth is not supported; give threshold { dKth }';
       if (!('Kc' in law.toughness)) return 'NASGRO toughness by KIc/Ak/Bk is not supported; give toughness { Kc }';
       return withRange({
         kind: 'nasgro',
-        C: (law.C * a) / k ** law.n,
+        C: (law.C * a) / pow(k, law.n),
         n: law.n,
         p: law.p,
         q: law.q,
@@ -93,7 +94,7 @@ export function rateModelOf(law: CrackGrowthMaterialModel): RateModel | string {
 
 /** Newman crack-opening function f(R) (grade C form, OQ-FRC-02). */
 export function newmanClosure(R: number, alpha: number, smaxOverSigma0: number): number {
-  const a0 = (0.825 - 0.34 * alpha + 0.05 * alpha ** 2) * Math.cos((Math.PI * smaxOverSigma0) / 2) ** (1 / alpha);
+  const a0 = (0.825 - 0.34 * alpha + 0.05 * alpha ** 2) * pow(Math.cos((Math.PI * smaxOverSigma0) / 2), 1 / alpha);
   const a1 = (0.415 - 0.071 * alpha) * smaxOverSigma0;
   const a3 = 2 * a0 + a1 - 1;
   const a2 = 1 - a0 - a1 - a3;
@@ -120,7 +121,7 @@ export function nasgroRate(model: Extract<RateModel, { kind: 'nasgro' }>, dK: nu
   const kmax = dK / (1 - R);
   if (dK <= model.dKth) return 0;
   if (kmax >= model.Kc) return Number.POSITIVE_INFINITY;
-  return (model.C * (((1 - f) / (1 - R)) * dK) ** model.n * (1 - model.dKth / dK) ** model.p) / (1 - kmax / model.Kc) ** model.q;
+  return (model.C * pow(((1 - f) / (1 - R)) * dK, model.n) * pow(1 - model.dKth / dK, model.p)) / pow(1 - kmax / model.Kc, model.q);
 }
 
 function interpolateFamily(points: Table[number]['points'], dK: number): { readonly rate: number; readonly extrapolated: boolean } {
@@ -131,7 +132,7 @@ function interpolateFamily(points: Table[number]['points'], dK: number): { reado
   const [x0 = 1, y0 = 1] = sorted[i - 1] ?? [];
   const [x1 = 1, y1 = 1] = sorted[i] ?? [];
   const slope = (Math.log10(y1) - Math.log10(y0)) / (Math.log10(x1) - Math.log10(x0));
-  return { rate: 10 ** (Math.log10(y0) + slope * (Math.log10(dK) - Math.log10(x0))), extrapolated };
+  return { rate: pow(10, Math.log10(y0) + slope * (Math.log10(dK) - Math.log10(x0))), extrapolated };
 }
 
 function tableRate(families: Table, dK: number, R: number): { readonly rate: number; readonly extrapolated: boolean } {
@@ -163,14 +164,14 @@ export function growthRate(model: RateModel, dK: number, R: number): Rate {
   if (!(dK > 0)) return { rate: 0, extrapolated: false };
   switch (model.kind) {
     case 'paris':
-      return { rate: dK <= model.dKth ? 0 : model.C * dK ** model.m, extrapolated: outside };
+      return { rate: dK <= model.dKth ? 0 : model.C * pow(dK, model.m), extrapolated: outside };
     case 'walker': {
       const gamma = R < 0 ? model.gammaNegativeR : model.gamma;
-      return { rate: model.C * (dK / (1 - R) ** (1 - gamma)) ** model.m, extrapolated: outside };
+      return { rate: model.C * pow(dK / pow(1 - R, 1 - gamma), model.m), extrapolated: outside };
     }
     case 'forman': {
       const denominator = (1 - R) * model.Kc - dK;
-      return { rate: denominator <= 0 ? Number.POSITIVE_INFINITY : (model.C * dK ** model.n) / denominator, extrapolated: outside };
+      return { rate: denominator <= 0 ? Number.POSITIVE_INFINITY : (model.C * pow(dK, model.n)) / denominator, extrapolated: outside };
     }
     case 'nasgro':
       return { rate: nasgroRate(model, dK, R, closureValue(model.closure, R)), extrapolated: outside };

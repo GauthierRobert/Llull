@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /**
  * Steady-state heat loss of a pipe per metre (02 RTE §5.10): series thermal resistances of the inside film, the steel wall, the insulation and the
  * outside film (Incropera [R9]; ISO 12241 calculation rules [S34]). Pure.
@@ -56,7 +57,7 @@ interface HeatLossResult {
   readonly diametersMm: { readonly inside: number; readonly outside: number; readonly envelope: number };
 }
 
-const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
+const round = (value: number, digits: number): number => Math.round(value * pow(10, digits)) / pow(10, digits);
 
 /** Stefan-Boltzmann constant, W/(m2 K4) (CODATA 2018, exact since the 2019 SI). */
 export const STEFAN_BOLTZMANN = 5.670374419e-8;

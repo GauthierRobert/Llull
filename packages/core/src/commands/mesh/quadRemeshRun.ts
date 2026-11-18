@@ -44,6 +44,7 @@ import {
 } from './meshCommon';
 import { type PreparedMesh, prepareSolidMesh } from './preparedMesh';
 import { DEVIATION_BASIS, engineDeviation } from './runMeshOp';
+import { pow } from '../../lib/pow';
 
 /** A closed quad surface has at least six faces (a cube). */
 export const MIN_TARGET_QUADS = 6;
@@ -170,7 +171,7 @@ function planTarget(
       `targetEdgeLength ${targetEdgeLength} gives ${target} quads on ${before.area.toPrecision(6)} ${doc.units}^2; the range is ${MIN_TARGET_QUADS}..${MAX_TARGET_QUADS}`,
       'targetEdgeLength',
     );
-  if (output === 'subdivision' && target * 4 ** levels > MAX_REFINED_QUADS)
+  if (output === 'subdivision' && target * pow(4, levels) > MAX_REFINED_QUADS)
     return fail(
       'MESH_PARAM_INVALID',
       `${target} quads at ${levels} levels refine to over ${MAX_REFINED_QUADS} quads; lower levels`,

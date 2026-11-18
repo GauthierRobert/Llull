@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /**
  * Fickian moisture diffusion through a plane sheet (Crank, The Mathematics of Diffusion; Shen & Springer 1976, J. Compos. Mater. 10, 2-20).
  * Plate of thickness h, both faces held at the boundary content from t = 0, uniform start, constant D:
@@ -47,7 +48,7 @@ export function timeToFraction(fraction: number): number | null {
 
 /** Equilibrium moisture content M_inf = a RH^b (percent of dry mass) for relative humidity `relativeHumidityPercent` in [0, 100]. */
 export function equilibriumContent(a: number, b: number, relativeHumidityPercent: number): number {
-  return a * relativeHumidityPercent ** b;
+  return a * pow(relativeHumidityPercent, b);
 }
 
 /** Moisture content at fractional uptake `g`: M = Mi + g (Mb - Mi); for desorption Mb is the dry boundary value. */

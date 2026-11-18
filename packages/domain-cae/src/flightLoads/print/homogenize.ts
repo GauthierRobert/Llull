@@ -2,6 +2,7 @@
 
 import type { PrintIdealization } from '@core/model/printIdealization';
 import type { Vec3 } from '@core/model/vectors';
+import { pow } from '@lib/pow';
 
 type Triangle = readonly [Vec3, Vec3, Vec3];
 
@@ -76,7 +77,7 @@ export function isStable(part: HomogenisedPart): boolean {
  * plane, shear G12 = E_xy / (2 (1 + nu)) and G13 = G23 = E_z / (2 (1 + nu)) (not measured: flagged by the caller). Infill density 1 or skin fraction 1 gives the solid coupon moduli exactly.
  */
 export function homogenise(print: PrintIdealization, nu: number, skinFraction: number): HomogenisedPart {
-  const coreFactor = print.infill.density ** print.exponent.value;
+  const coreFactor = pow(print.infill.density, print.exponent.value);
   const factor = skinFraction + (1 - skinFraction) * coreFactor;
   const E_xy = print.coupon.E_xyMpa * factor;
   const E_z = print.coupon.E_zMpa * factor;

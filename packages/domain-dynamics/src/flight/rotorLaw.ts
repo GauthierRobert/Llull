@@ -9,6 +9,7 @@ import { pchipEvaluate, pchipSlopes } from '@lib/pchip';
 import { add3, cross3, dot3, normalize3OrZero, scale3, sub3 } from '@lib/vec3';
 import type { BodyDrag, Rotor } from './model';
 import { rotate, rotateInverse } from './frames';
+import { pow } from '@lib/pow';
 
 /** |J| above which a static (J = 0) coefficient pair is outside its validated range (FLT_OUTSIDE_VALIDATED_RANGE). */
 export const STATIC_ADVANCE_RATIO_LIMIT = 0.05;
@@ -116,8 +117,8 @@ export function rotorOutput(runtime: RotorRuntime, body: BodyKinematics, rpm: nu
   const advanceRatio = n > 0 ? axialVelocity / (n * rotor.diameter) : 0;
   const { ct, cp, outside } = coefficientsAt(runtime, advanceRatio);
   const rho = rotor.airDensity;
-  const thrust = ct * rho * n * n * rotor.diameter ** 4;
-  const torque = (cp * rho * n * n * rotor.diameter ** 5) / (2 * Math.PI);
+  const thrust = ct * rho * n * n * pow(rotor.diameter, 4);
+  const torque = (cp * rho * n * n * pow(rotor.diameter, 5)) / (2 * Math.PI);
   const force = scale3(axis, thrust);
   const momentum = scale3(axis, rotor.spinInertiaKgM2 * 2 * Math.PI * n * spin);
   const moment = sub3(add3(cross3(arm, force), scale3(axis, -spin * torque)), cross3(omega, momentum));

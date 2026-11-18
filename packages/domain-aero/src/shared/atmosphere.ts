@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /**
  * U.S. Standard Atmosphere 1976 (NOAA/NASA/USAF, NASA-TM-X-74335), geopotential layers 0..84.852 km (geometric 86 km), plus an ISA
  * temperature offset at constant pressure. Sutherland viscosity, speed of sound with γ 1.4.
@@ -53,7 +54,7 @@ function layerState(base: LayerBase, heightM: number): { temperatureK: number; p
   const dh = heightM - base.heightM;
   if (base.lapse === 0) return { temperatureK: base.temperatureK, pressurePa: base.pressurePa * Math.exp((-g0M * dh) / base.temperatureK) };
   const temperatureK = base.temperatureK + base.lapse * dh;
-  return { temperatureK, pressurePa: base.pressurePa * (base.temperatureK / temperatureK) ** (g0M / base.lapse) };
+  return { temperatureK, pressurePa: base.pressurePa * pow(base.temperatureK / temperatureK, g0M / base.lapse) };
 }
 
 /** Geopotential altitude H = r0 Z / (r0 + Z) (eq. 18). */
@@ -77,7 +78,7 @@ export interface AtmosphereState {
 
 /** Sutherland's law μ = β T^1.5 / (T + S) (eq. 51). */
 export const sutherlandViscosity = (temperatureK: number): number =>
-  (US1976.sutherlandBeta * temperatureK ** 1.5) / (temperatureK + US1976.sutherlandS);
+  (US1976.sutherlandBeta * pow(temperatureK, 1.5)) / (temperatureK + US1976.sutherlandS);
 
 /**
  * State at a geopotential altitude; `temperatureOffsetK` shifts T at the standard pressure (ISA+ΔT day).

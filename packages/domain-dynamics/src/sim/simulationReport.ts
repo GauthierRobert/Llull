@@ -19,6 +19,7 @@ import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
 import type { LedgerData } from './ledger';
 import { speedTrend, trendWarning } from './speedTrend';
 import { map3 } from '@lib/vec3';
+import { pow } from '@lib/pow';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
 
@@ -282,7 +283,7 @@ export function simulationData(
         warnings.push(
           `FPR_OUTSIDE_VALIDATED_RANGE: propeller '${p.id}' runs at J = ${(end.advanceRatio ?? 0).toFixed(3)}, beyond its table (last J ${Math.max(...(p.table?.points.map((point) => point[0]) ?? [0]))}): the coefficients are held at the last point`,
         );
-      const figureOfMerit = p.powerCoefficient > 0 ? p.thrustCoefficient ** 1.5 / (p.powerCoefficient * Math.sqrt(Math.PI / 2)) : null;
+      const figureOfMerit = p.powerCoefficient > 0 ? pow(p.thrustCoefficient, 1.5) / (p.powerCoefficient * Math.sqrt(Math.PI / 2)) : null;
       if (tipMach > MAX_TIP_MACH)
         warnings.push(
           `propeller '${p.id}' tips reach Mach ${tipMach.toFixed(2)}: compressibility (not modelled) makes real thrust lower and power higher`,

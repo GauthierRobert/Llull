@@ -5,6 +5,7 @@
 
 import { sliderTravel, type Slider } from './slider';
 import { elementAt } from '@lib/elementAt';
+import { pow } from '@lib/pow';
 
 /** Grid step of every curve, deg (named, TR-FPR-08). */
 export const STEP_DEG = 0.1;
@@ -94,9 +95,9 @@ export function burnFraction(
 ): { x: number; rate: number } {
   const s = (psiDeg - burn.startDeg) / burn.durationDeg;
   if (s <= 0) return { x: 0, rate: 0 };
-  const power = s ** (burn.m + 1);
+  const power = pow(s, burn.m + 1);
   const x = 1 - Math.exp(-burn.a * power);
-  return { x, rate: ((burn.a * (burn.m + 1) * s ** burn.m) / burn.durationDeg) * (1 - x) };
+  return { x, rate: ((burn.a * (burn.m + 1) * pow(s, burn.m)) / burn.durationDeg) * (1 - x) };
 }
 
 /** Index of cycle angle `phiDeg` on the grid (wrapped into the cycle). */

@@ -1,6 +1,7 @@
 // Spatial tiles of a cloud (document frame): the unit of streaming. The port answers boxes with a budget, so a tile is one box query.
 
 import type { Vec3 } from '@core/model/vectors';
+import { pow } from '@lib/pow';
 
 export interface CloudBox {
   readonly min: Vec3;
@@ -24,7 +25,7 @@ export function tileDivisions(box: CloudBox, maxTiles: number): readonly [number
   if (!(longest > 0) || maxTiles <= 1) return [1, 1, 1];
   // Axes thinner than a tenth of the longest one are not split (a slab stays a slab).
   const active = extent.filter((e) => e > longest * 0.1);
-  const cell = Math.pow(active.reduce((volume, e) => volume * e, 1) / maxTiles, 1 / active.length);
+  const cell = pow(active.reduce((volume, e) => volume * e, 1) / maxTiles, 1 / active.length);
   const counts = extent.map((e) => (e > longest * 0.1 ? Math.min(MAX_DIVISIONS_PER_AXIS, Math.max(1, Math.round(e / cell))) : 1));
   const total = (): number => counts.reduce((product, c) => product * c, 1);
   while (total() > maxTiles) {

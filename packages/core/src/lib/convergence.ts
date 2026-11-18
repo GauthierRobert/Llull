@@ -1,3 +1,4 @@
+import { pow } from './pow';
 /**
  * Grid-convergence arithmetic (Celik et al. 2008 procedure; Roache GCI): observed order, Richardson extrapolation, GCI, asymptotic
  * ratio, classification, required and representative spacing. Pure, IEEE double; samples are given finest-first (h1 < h2 < h3).
@@ -58,7 +59,7 @@ export function observedOrder(
   const s = Math.sign(ratio);
   let p = Math.abs(lnR) / Math.log(r21);
   for (let iteration = 1; iteration <= ORDER_MAX_ITERATIONS; iteration += 1) {
-    const q = Math.log((r21 ** p - s) / (r32 ** p - s));
+    const q = Math.log((pow(r21, p) - s) / (pow(r32, p) - s));
     const next = 0.5 * p + (0.5 * Math.abs(lnR + q)) / Math.log(r21);
     if (!Number.isFinite(next)) return { converged: false };
     if (Math.abs(next - p) < ORDER_STOP) return { converged: true, p: next, iterations: iteration };
@@ -79,7 +80,7 @@ interface Extrapolation {
 
 /** Richardson extrapolation and the fine/coarse GCI of the pair (f1 fine, f2 coarse) at order p and ratio r. */
 export function richardson(f1: number, f2: number, r: number, p: number, fs: number): Extrapolation {
-  const rp = r ** p;
+  const rp = pow(r, p);
   const extrapolated = (rp * f1 - f2) / (rp - 1);
   if (f1 === 0) return { extrapolated, gciAbs: (fs * Math.abs(f1 - f2)) / (rp - 1), relativeUndefined: true };
   const ea21 = Math.abs((f1 - f2) / f1);
@@ -109,9 +110,9 @@ export function gciTriplet(
   if (!order.converged) return { orderNotConverged: true, levels };
   const { p, iterations } = order;
   const pair = richardson(s1.value, s2.value, r21, p, fs);
-  const gci32Fine = s2.value === 0 ? undefined : (fs * Math.abs((s2.value - s3.value) / s2.value)) / (r32 ** p - 1);
+  const gci32Fine = s2.value === 0 ? undefined : (fs * Math.abs((s2.value - s3.value) / s2.value)) / (pow(r32, p) - 1);
   const asymptoticRatio =
-    pair.gci21Fine !== undefined && gci32Fine !== undefined && gci32Fine !== 0 ? (r21 ** p * pair.gci21Fine) / gci32Fine : undefined;
+    pair.gci21Fine !== undefined && gci32Fine !== undefined && gci32Fine !== 0 ? (pow(r21, p) * pair.gci21Fine) / gci32Fine : undefined;
   return {
     ...base,
     p,
@@ -124,12 +125,12 @@ export function gciTriplet(
 
 /** Spacing h* = h1 / (GCI21 / GCI*)^(1/p) that would reach the target GCI* (corrected NPARC form). */
 export function requiredSpacing(gciTarget: number, gci21: number, p: number, h1: number): number {
-  return h1 / (gci21 / gciTarget) ** (1 / p);
+  return h1 / pow(gci21 / gciTarget, 1 / p);
 }
 
 /** Representative spacing h = (measure / elements)^(1/dimension) of an unstructured mesh. */
 export function representativeSpacing(measure: number, elements: number, dimension: 1 | 2 | 3): number {
-  return (measure / elements) ** (1 / dimension);
+  return pow(measure / elements, 1 / dimension);
 }
 
 /** Search range of the fitted order: the lower bound excludes a vanishing order (a plateau), the upper one a numerically meaningless fit. */
@@ -175,7 +176,7 @@ function linearFit(h: readonly number[], f: readonly number[], w: readonly numbe
   let sf = 0;
   h.forEach((hi, i) => {
     sw += at(w, i);
-    sx += at(w, i) * hi ** p;
+    sx += at(w, i) * pow(hi, p);
     sf += at(w, i) * at(f, i);
   });
   const xMean = sx / sw;
@@ -183,7 +184,7 @@ function linearFit(h: readonly number[], f: readonly number[], w: readonly numbe
   let sxx = 0;
   let sxf = 0;
   h.forEach((hi, i) => {
-    const dx = hi ** p - xMean;
+    const dx = pow(hi, p) - xMean;
     sxx += at(w, i) * dx * dx;
     sxf += at(w, i) * dx * (at(f, i) - fMean);
   });
@@ -191,7 +192,7 @@ function linearFit(h: readonly number[], f: readonly number[], w: readonly numbe
   const f0 = fMean - alpha * xMean;
   let rss = 0;
   h.forEach((hi, i) => {
-    const r = at(f, i) - f0 - alpha * hi ** p;
+    const r = at(f, i) - f0 - alpha * pow(hi, p);
     rss += at(w, i) * r * r;
   });
   return { f0, alpha, rss };
@@ -246,7 +247,7 @@ function normalEquations(
   let rss = 0;
   h.forEach((hi, i) => {
     const wi = at(w, i);
-    const x = hi ** parameters.p;
+    const x = pow(hi, parameters.p);
     const r = at(f, i) - parameters.f0 - parameters.alpha * x;
     const j = [-1, -x, -parameters.alpha * x * Math.log(hi)];
     rss += wi * r * r;
@@ -356,7 +357,7 @@ export function leastSquaresOrder(samples: readonly ConvergenceSample[], weights
   const final = normalEquations(h, f, w, parameters);
   let plainSquares = 0;
   h.forEach((hi, i) => {
-    const r = at(f, i) - f0 - alpha * hi ** p;
+    const r = at(f, i) - f0 - alpha * pow(hi, p);
     plainSquares += r * r;
   });
   const degreesOfFreedom = n - 3;

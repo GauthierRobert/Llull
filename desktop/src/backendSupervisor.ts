@@ -8,6 +8,7 @@
  */
 import { errorMessage } from '@lib/errorMessage';
 import { startBackend, type ForkBackend, type RunningBackend } from './backend';
+import { pow } from '@lib/pow';
 
 export type BackendState =
   | { readonly state: 'running' }
@@ -35,7 +36,7 @@ interface SupervisorOptions {
 
 const DEFAULT_MAX_RESTARTS = 3;
 const DEFAULT_WINDOW_MS = 60_000;
-const defaultBackoff = (attempt: number): number => 500 * 2 ** (attempt - 1);
+const defaultBackoff = (attempt: number): number => 500 * pow(2, attempt - 1);
 
 export interface SupervisedBackend extends RunningBackend {
   /** Pid of the backend process that is current now. */

@@ -10,13 +10,14 @@
 
 import { skinFrictionCoefficient } from './skinFriction';
 import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 export type FormFactorModel = 'raymer' | 'torenbeek' | 'hoerner';
 
 const laminarCf = (reynolds: number): number => skinFrictionCoefficient('laminar_blasius', reynolds);
 
 const turbulentCf = (reynolds: number, mach: number): number =>
-  skinFrictionCoefficient('turbulent_prandtl_schlichting', reynolds) / Math.pow(1 + 0.144 * mach * mach, 0.65);
+  skinFrictionCoefficient('turbulent_prandtl_schlichting', reynolds) / pow(1 + 0.144 * mach * mach, 0.65);
 
 /** Skin friction with a laminar fraction k of the reference length (0 = fully turbulent). */
 export function skinFrictionMixed(reynolds: number, mach: number, laminarFraction: number): number {
@@ -37,12 +38,12 @@ export function liftingFormFactor(model: FormFactorModel, shape: LiftingShape, m
   const t = shape.thicknessRatio;
   if (model === 'torenbeek') return 1 + 2.7 * t + 100 * powInt(t, 4);
   if (model === 'hoerner') return 1 + 2 * t + 60 * powInt(t, 4);
-  return (1 + (0.6 / shape.maxThicknessX) * t + 100 * powInt(t, 4)) * (1.34 * Math.pow(mach, 0.18) * Math.pow(Math.cos(shape.sweep), 0.28));
+  return (1 + (0.6 / shape.maxThicknessX) * t + 100 * powInt(t, 4)) * (1.34 * pow(mach, 0.18) * pow(Math.cos(shape.sweep), 0.28));
 }
 
 export function bodyFormFactor(model: Exclude<FormFactorModel, 'raymer'>, finenessRatio: number): number {
   const f = finenessRatio;
-  return model === 'torenbeek' ? 1 + 2.2 / f ** 1.5 + 3.8 / powInt(f, 3) : 1 + 1.5 / f ** 1.5 + 7 / powInt(f, 3);
+  return model === 'torenbeek' ? 1 + 2.2 / pow(f, 1.5) + 3.8 / powInt(f, 3) : 1 + 1.5 / pow(f, 1.5) + 7 / powInt(f, 3);
 }
 
 export const FORMULAS: Readonly<Record<string, string>> = {

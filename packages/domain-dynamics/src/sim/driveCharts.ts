@@ -4,6 +4,7 @@
  */
 
 import { escapeXml } from '@lib/escapeXml';
+import { pow } from '@lib/pow';
 
 const FONT = 'font-family="Helvetica, Arial, sans-serif"';
 const PALETTE = ['#1f77b4', '#d62728', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b'] as const;
@@ -33,7 +34,7 @@ function ticks(low: number, high: number): number[] {
   const span = high - low;
   if (!(span > 0)) return [low];
   const raw = span / 5;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const magnitude = pow(10, Math.floor(Math.log10(raw)));
   const ratio = raw / magnitude;
   const step = (ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10) * magnitude;
   const first = Math.ceil(low / step - 1e-9);

@@ -3,6 +3,7 @@
  * rational-method runoff.
  */
 import { bisect } from '@lib/bisect';
+import { pow } from '@lib/pow';
 
 /** Depth ratio y/D at which a circular pipe carries its maximum discharge (about 1.076 Q full). */
 const MAX_DISCHARGE_DEPTH_RATIO = 0.938;
@@ -25,7 +26,7 @@ export function fullArea(diameter: number): number {
 export function manningFullFlow(diameter: number, slope: number, manningN: number): number {
   if (!(slope > 0) || !(diameter > 0) || !(manningN > 0)) return 0;
   const hydraulicRadius = diameter / 4;
-  return (fullArea(diameter) * hydraulicRadius ** (2 / 3) * Math.sqrt(slope)) / manningN;
+  return (fullArea(diameter) * pow(hydraulicRadius, 2 / 3) * Math.sqrt(slope)) / manningN;
 }
 
 function wettedArea(diameter: number, ratio: number): { area: number; theta: number } {
@@ -38,7 +39,7 @@ export function partialFlowDischarge(diameter: number, slope: number, manningN: 
   if (!(slope > 0) || !(ratio > 0)) return 0;
   const { area, theta } = wettedArea(diameter, ratio);
   const radius = area / ((diameter * theta) / 2);
-  return (area * radius ** (2 / 3) * Math.sqrt(slope)) / manningN;
+  return (area * pow(radius, 2 / 3) * Math.sqrt(slope)) / manningN;
 }
 
 /**

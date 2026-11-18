@@ -23,6 +23,7 @@ import {
 import { layupSchema, resolveCandidateProperty } from './layups';
 import type { ResolveOptions } from './properties';
 import { INDEX_CASES, type Excluded, type IndexCase, type PropertyUse } from './types';
+import { pow } from '@lib/pow';
 
 const COMMAND = 'material_chart_data';
 
@@ -192,7 +193,7 @@ export const materialChartData = defineCommand({
       const exponent = rule?.exponent ?? { num: 1, den: 1 };
       const n = rule === undefined ? 1 : exponentValue(rule);
       const scored = points
-        .map((point) => ({ material: point.material, index: Math.pow(point.y, n) / point.x }))
+        .map((point) => ({ material: point.material, index: pow(point.y, n) / point.x }))
         .sort((a, b) => b.index - a.index || a.material.localeCompare(b.material));
       const best = scored[0];
       const xs = points.map((point) => point.x);
@@ -203,7 +204,7 @@ export const materialChartData = defineCommand({
         exponent,
         constant: best?.index ?? null,
         through: best?.material ?? null,
-        line: best === undefined ? [] : [low, high].map((x): readonly [number, number] => [x, Math.pow(best.index * x, 1 / n)]),
+        line: best === undefined ? [] : [low, high].map((x): readonly [number, number] => [x, pow(best.index * x, 1 / n)]),
       };
     });
     const bases = basesOf(points.flatMap((point) => point.inputs));

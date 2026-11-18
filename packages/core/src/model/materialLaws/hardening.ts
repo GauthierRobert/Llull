@@ -3,6 +3,7 @@
 import type { IsotropicHardening } from '../materialModel';
 import { interp1Pairs } from '../../lib/interp1';
 import { failure, isLawFailure, resolveAll, resolveParameter, convertQuantity, type LawFailure, type ResolveEnv } from './resolve';
+import { pow } from '../../lib/pow';
 
 export interface ResolvedIsotropic {
   /** Yield stress at zero plastic strain (and zero rate). */
@@ -141,8 +142,8 @@ export function resolveIsotropic(
         `${path}.transitionTemperature`,
       );
       if (isLawFailure(transition)) return transition;
-      const thermal = 1 - homologousTemperature(temperatureK, transition, melt) ** law.m;
-      return { y0: A * thermal, stress: (ep) => (A + B * ep ** law.n) * thermal, linearSlope: null, lastTabulatedStrain: null };
+      const thermal = 1 - pow(homologousTemperature(temperatureK, transition, melt), law.m);
+      return { y0: A * thermal, stress: (ep) => (A + B * pow(ep, law.n)) * thermal, linearSlope: null, lastTabulatedStrain: null };
     }
   }
 }
@@ -152,7 +153,7 @@ export const johnsonCookRateFactor = (C: number, referenceRate: number, rate: nu
   rate > referenceRate ? 1 + C * Math.log(rate / referenceRate) : 1;
 
 /** Cowper-Symonds rate factor 1 + (ε̇/D)^(1/q). */
-export const cowperSymondsRateFactor = (D: number, q: number, rate: number): number => (rate > 0 ? 1 + (rate / D) ** (1 / q) : 1);
+export const cowperSymondsRateFactor = (D: number, q: number, rate: number): number => (rate > 0 ? 1 + pow(rate / D, 1 / q) : 1);
 
 /** Johnson-Cook flow stress (A + B εp^n)(1 + C ln(ε̇/ε̇0))(1 − T*^m) in the unit of A, B (VC-MATL-12). */
 export function johnsonCookFlowStress(
@@ -162,9 +163,9 @@ export function johnsonCookFlowStress(
   strainRate: number,
   temperature: number,
 ): number {
-  const thermal = 1 - homologousTemperature(temperature, hardening.transitionTemperature, hardening.meltTemperature) ** hardening.m;
+  const thermal = 1 - pow(homologousTemperature(temperature, hardening.transitionTemperature, hardening.meltTemperature), hardening.m);
   return (
-    (hardening.A + hardening.B * equivalentPlasticStrain ** hardening.n) *
+    (hardening.A + hardening.B * pow(equivalentPlasticStrain, hardening.n)) *
     johnsonCookRateFactor(rate.C, rate.referenceRate, strainRate) *
     thermal
   );

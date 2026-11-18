@@ -2,6 +2,7 @@
 
 import { erf } from '@lib/specialFunctions';
 import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 const H_PLANCK = 6.62607015e-34;
 const K_BOLTZMANN = 1.380649e-23;
@@ -178,8 +179,8 @@ export function viewFactorPerpendicular(l: number, w: number, h: number): number
   const r = Math.sqrt(bigH * bigH + bigW * bigW);
   const a = bigW * Math.atan(1 / bigW) + bigH * Math.atan(1 / bigH) - r * Math.atan(1 / r);
   const g1 = ((1 + bigW * bigW) * (1 + bigH * bigH)) / (1 + bigW * bigW + bigH * bigH);
-  const g2 = ((bigW * bigW * (1 + bigW * bigW + bigH * bigH)) / ((1 + bigW * bigW) * (bigW * bigW + bigH * bigH))) ** (bigW * bigW);
-  const g3 = ((bigH * bigH * (1 + bigH * bigH + bigW * bigW)) / ((1 + bigH * bigH) * (bigH * bigH + bigW * bigW))) ** (bigH * bigH);
+  const g2 = pow((bigW * bigW * (1 + bigW * bigW + bigH * bigH)) / ((1 + bigW * bigW) * (bigW * bigW + bigH * bigH)), bigW * bigW);
+  const g3 = pow((bigH * bigH * (1 + bigH * bigH + bigW * bigW)) / ((1 + bigH * bigH) * (bigH * bigH + bigW * bigW)), bigH * bigH);
   return (a + 0.25 * Math.log(g1 * g2 * g3)) / (Math.PI * bigW);
 }
 

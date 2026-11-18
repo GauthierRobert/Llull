@@ -15,6 +15,7 @@ import { isAdditiveSelect } from '../selectClick';
 import { isClippedAway } from './review/activeClipPlanes';
 import { useStableByKey } from '../useStableByKey';
 import { XRAY_OPACITY } from '../viewportPalette';
+import { pow } from '@lib/pow';
 
 /** Geometry of a batch from its first entity (the grouping key guarantees shared params). */
 export function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
@@ -75,7 +76,7 @@ interface InstanceBatchMeshProps {
 export function useBatchCapacity(count: number): number {
   const capacity = useRef(0);
   if (count > capacity.current || count * 4 < capacity.current)
-    capacity.current = Math.max(8, 2 ** Math.ceil(Math.log2(Math.max(count, 1))));
+    capacity.current = Math.max(8, pow(2, Math.ceil(Math.log2(Math.max(count, 1)))));
   return capacity.current;
 }
 

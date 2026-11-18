@@ -13,6 +13,7 @@ import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { formHash, refuseWith } from './propertyModels';
 import { withoutUndefined } from './propertyModelSchema';
+import { pow } from '../../lib/pow';
 
 const MAX_REL_RESIDUAL = 0.05;
 const MAX_CONDITION = 1e12;
@@ -29,7 +30,7 @@ function unscale(coefficients: readonly number[], alpha: number, beta: number): 
   coefficients.forEach((c, k) => {
     let binomial = 1;
     for (let j = 0; j <= k; j += 1) {
-      result[j] = (result[j] ?? 0) + c * binomial * alpha ** j * beta ** (k - j);
+      result[j] = (result[j] ?? 0) + c * binomial * pow(alpha, j) * pow(beta, k - j);
       binomial = (binomial * (k - j)) / (j + 1);
     }
   });
@@ -150,7 +151,7 @@ function fitLaw(
       ? xs.map((t) => [1, -1 / (GAS_CONSTANT * t)])
       : form === 'powerLaw'
         ? xs.map((x) => [1, Math.log(x)])
-        : abscissa.map((x) => Array.from({ length: degree + 1 }, (_, k) => (alpha * x + beta) ** k));
+        : abscissa.map((x) => Array.from({ length: degree + 1 }, (_, k) => pow(alpha * x + beta, k)));
   const target = ys.map((y, i) =>
     form === 'arrhenius' ? Math.log(y) - m * Math.log(xs[i] ?? 1) : form === 'powerLaw' ? Math.log(y) : logX ? Math.log10(y) : y,
   );

@@ -1,6 +1,7 @@
 /** Normal and oblique shock relations of a calorically perfect gas (NACA Report 1135 eqs. 93-99, 128-150). */
 
 import { bisect } from '@lib/bisect';
+import { pow } from '@lib/pow';
 
 export interface NormalShock {
   readonly mach1: number;
@@ -24,8 +25,8 @@ export function normalShock(mach1: number, gamma: number): NormalShock {
   const pressureRatio = 1 + ((2 * gamma) / (gamma + 1)) * (m2 - 1);
   const densityRatio = ((gamma + 1) * m2) / ((gamma - 1) * m2 + 2);
   const temperatureRatio = pressureRatio / densityRatio;
-  const totalPressureRatio = densityRatio ** (gamma / (gamma - 1)) * (1 / pressureRatio) ** (1 / (gamma - 1));
-  const pitotRatio = pressureRatio * (1 + ((gamma - 1) / 2) * mach2 * mach2) ** (gamma / (gamma - 1));
+  const totalPressureRatio = pow(densityRatio, gamma / (gamma - 1)) * pow(1 / pressureRatio, 1 / (gamma - 1));
+  const pitotRatio = pressureRatio * pow(1 + ((gamma - 1) / 2) * mach2 * mach2, gamma / (gamma - 1));
   return { mach1, mach2, pressureRatio, densityRatio, temperatureRatio, totalPressureRatio, pitotRatio };
 }
 

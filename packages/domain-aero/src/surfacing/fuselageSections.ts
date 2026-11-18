@@ -9,6 +9,7 @@ import type { Vec3 } from '@core/model/types';
 import { conicWeight } from '@lib/nurbs/conic';
 import { evaluateCurve } from '@lib/nurbs/evaluate';
 import type { NurbsCurveData } from '@lib/nurbs/types';
+import { pow } from '@lib/pow';
 
 /** Largest allowed superellipse exponent (the arcs flatten into a rectangle as it grows; rho -> 1). */
 const MAX_EXPONENT = 50;
@@ -59,8 +60,8 @@ function superellipseDeviation(curve: NurbsCurveData, bl: number, wl: number, a:
   for (let k = 0; k <= 160; k++) {
     const [, y, z] = evaluateCurve(curve, k / 160);
     const [dy, dz] = [y - bl, z - wl];
-    const implicit = Math.abs(dy / a) ** n + Math.abs(dz / b) ** n;
-    if (implicit > 0) worst = Math.max(worst, Math.abs(1 - implicit ** (-1 / n)) * Math.hypot(dy, dz));
+    const implicit = pow(Math.abs(dy / a), n) + pow(Math.abs(dz / b), n);
+    if (implicit > 0) worst = Math.max(worst, Math.abs(1 - pow(implicit, -1 / n)) * Math.hypot(dy, dz));
   }
   return worst;
 }
@@ -115,7 +116,7 @@ export function sectionCurve(fs: number, section: FuselageSection): SectionResul
         return bad('a superellipse station needs wl, halfBreadth > 0 and halfHeight > 0');
       if (!isNumber(exponent) || !(exponent > 1) || exponent > MAX_EXPONENT)
         return bad(`exponent must be within (1, ${MAX_EXPONENT}] (2 = ellipse)`);
-      const rho = 2 ** (1 - 1 / exponent) - 1;
+      const rho = pow(2, 1 - 1 / exponent) - 1;
       const curve = ring(fs, {
         bl,
         halfBreadth,

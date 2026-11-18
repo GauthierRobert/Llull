@@ -5,6 +5,7 @@ export const at = (values: ArrayLike<number>, i: number): number => values[i] as
 
 import { jacobiRotate } from '@lib/symmetricEigen';
 import { normalCdf } from '@lib/specialFunctions';
+import { pow } from '@lib/pow';
 
 const ACKLAM_A = [
   -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2, -3.066479806614716e1, 2.506628277459239,
@@ -55,7 +56,7 @@ export function gamma(z: number): number {
   let sum = LANCZOS[0] ?? 0;
   for (let i = 1; i < 9; i += 1) sum += (LANCZOS[i] ?? 0) / (x + i);
   const t = x + 7.5;
-  return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * sum;
+  return Math.sqrt(2 * Math.PI) * pow(t, x + 0.5) * Math.exp(-t) * sum;
 }
 
 /** Eigenvalues of a symmetric matrix (cyclic Jacobi rotations), ascending. */

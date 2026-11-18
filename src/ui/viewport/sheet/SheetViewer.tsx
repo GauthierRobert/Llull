@@ -10,6 +10,7 @@ import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
 import { runQuery } from '@ui/services/localQuery';
 import { useSheetViewStore } from './sheetViewStore';
 import { type PaperTransform, fitTransform, readSheetExport, screenToPaper, viewAtPaperPoint, zoomAt } from './sheetData';
+import { pow } from '@lib/pow';
 
 const WHEEL_ZOOM_PER_NOTCH = 1.0015;
 const DRAG_THRESHOLD_PX = 4;
@@ -61,7 +62,7 @@ export function SheetViewer(): React.ReactElement | null {
     const onWheel = (event: WheelEvent): void => {
       event.preventDefault();
       const rect = stage.getBoundingClientRect();
-      const factor = WHEEL_ZOOM_PER_NOTCH ** -event.deltaY;
+      const factor = pow(WHEEL_ZOOM_PER_NOTCH, -event.deltaY);
       setTransform((current) => zoomAt(current, factor, event.clientX - rect.left, event.clientY - rect.top));
     };
     stage.addEventListener('wheel', onWheel, { passive: false });

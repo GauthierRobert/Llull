@@ -22,6 +22,7 @@ import {
   withConventions,
 } from './meshCommon';
 import { faceGroupSelection, faceGroupsParam, meshOfFaces } from './faceGroupRegion';
+import { pow } from '../../lib/pow';
 
 const DEFAULT_ITERATIONS = 10;
 const MAX_ITERATIONS = 30;
@@ -34,7 +35,7 @@ const DEFAULT_LEVELS = 2;
 /** Pinned limit points must hit their vertices to this fraction of the cage size, or the result says so. */
 const PIN_TOLERANCE = 1e-9;
 
-const quadsAt = (cage: Cage, level: number): number => cage.faces.length * 4 ** level;
+const quadsAt = (cage: Cage, level: number): number => cage.faces.length * pow(4, level);
 
 const STOP_TEXT: Readonly<Record<FitStop, string>> = {
   met: 'maxDeviation reached',

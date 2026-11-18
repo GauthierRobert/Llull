@@ -20,6 +20,7 @@ import { creepCase, isRefusal } from './stepCommands';
 import { holdSets, selectIndices, MAX_HISTORY_POINTS } from './history';
 import { isPartIssue, partLaw } from './readiness';
 import type { CreepLaw } from './law';
+import { pow } from '@lib/pow';
 
 const sig = (value: number): string => significantNumber(value, 5);
 
@@ -59,7 +60,7 @@ function quickCheck(
   if (creep?.maxCeeq === undefined || creep.maxVonMisesEndMPa === undefined || spec === undefined || only === undefined) return null;
   const sigma = creep.maxVonMisesEndMPa.value;
   const effectiveTime = nortonEffectiveTime(only.m, spec.preloadPeriodS, spec.preloadPeriodS + spec.durationS);
-  const expected = only.A * sigma ** only.n * effectiveTime;
+  const expected = only.A * pow(sigma, only.n) * effectiveTime;
   return {
     check: 'norton_constant_stress',
     sigmaMPa: sigma,

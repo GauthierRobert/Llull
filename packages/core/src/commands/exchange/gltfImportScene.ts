@@ -10,6 +10,7 @@ import { GltfAccessors } from './gltfAccessors';
 import { GltfBuffers, SUPPORTED_EXTENSION, type GltfFile } from './gltfContainer';
 import { GltfError, type Json, indexOf, isRecord, listAt, numbersOf, recordAt } from './gltfJson';
 import { IDENTITY, type Mat4, decompose, determinant3, fromTrs, multiply, transformPoint } from './gltfMath';
+import { pow } from '../../lib/pow';
 
 /** Colour of a primitive without a material colour. */
 const DEFAULT_COLOR = '#9aa5b1';
@@ -55,7 +56,7 @@ interface Primitive {
   readonly indices: Uint32Array;
 }
 
-const linearToSrgb = (c: number): number => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+const linearToSrgb = (c: number): number => (c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1 / 2.4) - 0.055);
 const hex2 = (c: number): string =>
   Math.round(Math.max(0, Math.min(1, linearToSrgb(Math.max(0, c)))) * 255)
     .toString(16)

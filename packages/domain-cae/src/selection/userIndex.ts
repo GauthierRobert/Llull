@@ -7,6 +7,7 @@ import { resolveCandidateProperty, anisotropicWarning } from './layups';
 import { BASE_UNITS } from './indexRules';
 import type { ResolveOptions } from './properties';
 import type { Excluded, IndexResult, PropertyUse } from './types';
+import { pow } from '@lib/pow';
 
 export interface UserIndex {
   readonly exponents: Readonly<Record<string, number>>;
@@ -75,7 +76,7 @@ export function evaluateUserIndex(doc: CadDocument, material: string, index: Use
     .filter((use) => use.property !== 'density')
     .reduce((product, use) => {
       const exponent = index.exponents[use.property];
-      return exponent === undefined ? product : product * Math.pow(use.value, exponent);
+      return exponent === undefined ? product : product * pow(use.value, exponent);
     }, 1);
   const value = density === undefined ? Number.NaN : numerator / density.value;
   if (!Number.isFinite(value) || !(value > 0))

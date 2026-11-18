@@ -3,6 +3,7 @@
 import type { FatigueMaterialModel } from '@core/model/materialDurability';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import type { Quantity } from '@core/model/quantity';
+import { pow } from '@lib/pow';
 
 /** `quantity` in MPa, or null when its unit is not a stress. */
 export function toMpa(quantity: Quantity): number | null {
@@ -37,7 +38,7 @@ function tableLife(model: Extract<StressLifeModel, { kind: 'sn_table' }>, amplit
   const [n0 = 1, s0 = 1] = points[segment] ?? [];
   const [n1 = 1, s1 = 1] = points[segment + 1] ?? [];
   const slope = (log(n1) - log(n0)) / (log(s1) - log(s0));
-  const cycles = 10 ** (log(n0) + slope * (x - log(s0)));
+  const cycles = pow(10, log(n0) + slope * (x - log(s0)));
   const inside = amplitude <= (points[0]?.[1] ?? 0) && amplitude >= (points.at(-1)?.[1] ?? 0);
   return { cycles, extrapolated: !inside };
 }
@@ -93,7 +94,7 @@ export function equivalentAmplitude(sa: number, sm: number, inputs: MeanStressIn
   if (model === 'swt' || model === 'walker') {
     if (smax <= 0) return 0;
     const gamma = model === 'swt' ? 0.5 : (inputs.gamma ?? Number.NaN);
-    return Number.isFinite(gamma) ? smax ** (1 - gamma) * sa ** gamma : null;
+    return Number.isFinite(gamma) ? pow(smax, 1 - gamma) * pow(sa, gamma) : null;
   }
   const strength = model === 'soderberg' ? inputs.sy : model === 'morrow' ? inputs.sigmaF : inputs.su;
   if (strength === undefined || !(strength > 0)) return null;
@@ -110,15 +111,15 @@ interface Term {
 
 /** Reversals 2N with sum(term) = target, Newton on x = log10(2N) from x0 = 3 with a bisection fallback; null when not found. */
 function solveReversals(terms: readonly Term[], target: number): number | null {
-  const value = (x: number): number => terms.reduce((sum, term) => sum + term.coefficient * 10 ** (x * term.exponent), 0) - target;
+  const value = (x: number): number => terms.reduce((sum, term) => sum + term.coefficient * pow(10, x * term.exponent), 0) - target;
   const slope = (x: number): number =>
-    Math.LN10 * terms.reduce((sum, term) => sum + term.coefficient * term.exponent * 10 ** (x * term.exponent), 0);
+    Math.LN10 * terms.reduce((sum, term) => sum + term.coefficient * term.exponent * pow(10, x * term.exponent), 0);
   let x = 3;
   for (let i = 0; i < 200; i += 1) {
     const step = value(x) / slope(x);
     if (!Number.isFinite(step)) break;
     x -= step;
-    if (Math.abs(step) < 1e-14) return Math.abs(value(x)) <= 1e-12 * Math.max(target, 1e-300) ? 10 ** x : null;
+    if (Math.abs(step) < 1e-14) return Math.abs(value(x)) <= 1e-12 * Math.max(target, 1e-300) ? pow(10, x) : null;
   }
   let [low, high] = [-3, 14];
   if (value(low) * value(high) > 0) return null;
@@ -127,7 +128,7 @@ function solveReversals(terms: readonly Term[], target: number): number | null {
     if (value(mid) * value(low) > 0) low = mid;
     else high = mid;
   }
-  return 10 ** ((low + high) / 2);
+  return pow(10, (low + high) / 2);
 }
 
 type StrainLifeModel = Extract<FatigueMaterialModel, { kind: 'en_coffin_manson' }>;
@@ -172,7 +173,7 @@ export function swtLifeReversals(model: StrainLifeModel, sigmaMax: number, epsA:
 /** Transition reversals 2Nt where the elastic and plastic strain amplitudes are equal. */
 export function transitionReversals(model: StrainLifeModel): number | null {
   const k = constantsOf(model);
-  return k === null || model.b === model.c ? null : ((model.epsF * k.E) / k.sigmaF) ** (1 / (model.b - model.c));
+  return k === null || model.b === model.c ? null : pow((model.epsF * k.E) / k.sigmaF, 1 / (model.b - model.c));
 }
 
 export const notchFactor = (kt: number, q: number): number => 1 + q * (kt - 1);
@@ -192,7 +193,7 @@ export function cyclicCurveOf(model: CyclicModel): CyclicCurve | null {
 }
 
 /** Total strain on the cyclic Ramberg-Osgood curve at stress `sigma`. */
-export const cyclicStrain = (curve: CyclicCurve, sigma: number): number => sigma / curve.E + (sigma / curve.kPrime) ** (1 / curve.nPrime);
+export const cyclicStrain = (curve: CyclicCurve, sigma: number): number => sigma / curve.E + pow(sigma / curve.kPrime, 1 / curve.nPrime);
 
 /** Local stress of Neuber's rule sigma * eps(sigma) = (Kf S)^2 / E for the elastic notch stress `elasticLocal` = Kf S (bisection, 1e-12 relative). */
 export function neuberStress(curve: CyclicCurve, elasticLocal: number): number {
@@ -209,4 +210,4 @@ export function neuberStress(curve: CyclicCurve, elasticLocal: number): number {
 
 /** Masing hysteresis strain range for a stress range. */
 export const masingStrainRange = (curve: CyclicCurve, stressRange: number): number =>
-  stressRange / curve.E + 2 * (stressRange / (2 * curve.kPrime)) ** (1 / curve.nPrime);
+  stressRange / curve.E + 2 * pow(stressRange / (2 * curve.kPrime), 1 / curve.nPrime);

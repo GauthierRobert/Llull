@@ -9,6 +9,7 @@
 import type { StrutSet } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
 import { powInt } from '@lib/powInt';
+import { pow } from '@lib/pow';
 
 interface AffineStiffness {
   /** E / E_s along x, y, z (null when the normal block of the stiffness is singular). */
@@ -103,7 +104,7 @@ export function latticeMechanics(input: MechanicsInput): Record<string, unknown>
   const affine = strut === null ? null : affineStiffness(strut.set, strut.cell);
   const exponent = scaling?.exponent ?? (cellClass === 'stretch' ? 1 : cellClass === 'bending' ? 2 : null);
   const coefficient = scaling?.coefficient ?? null;
-  const ratio = exponent === null || coefficient === null ? null : coefficient * rho ** exponent;
+  const ratio = exponent === null || coefficient === null ? null : coefficient * pow(rho, exponent);
   const es = baseMaterial?.youngModulusMpa;
   const scale = strut === null ? 1 : rho / strut.rho1;
   return {

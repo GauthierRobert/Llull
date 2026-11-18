@@ -7,6 +7,7 @@
  */
 
 import { BUILTIN_CONSTANTS, BUILTIN_FUNCTIONS, MAX_NESTING, tokenize, type Token } from './expression';
+import { pow } from './pow';
 
 type ProgramOp =
   | { readonly op: 'const'; readonly value: number }
@@ -216,7 +217,7 @@ function dualCall(fn: string, args: readonly Dual[]): Dual {
     case 'log10':
       return { v, d: scaled(a.d, 1 / (a.v * Math.LN10)) };
     case 'pow':
-      return { v, d: combined(a.d, b.v * Math.pow(a.v, b.v - 1), b.d, b.d.some((x) => x !== 0) ? v * Math.log(a.v) : 0) };
+      return { v, d: combined(a.d, b.v * pow(a.v, b.v - 1), b.d, b.d.some((x) => x !== 0) ? v * Math.log(a.v) : 0) };
     case 'hypot':
       return { v, d: args.reduce<number[]>((sum, arg) => combined(sum, 1, arg.d, v === 0 ? 0 : arg.v / v), zero) };
     case 'mod':

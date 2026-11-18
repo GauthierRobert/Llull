@@ -8,9 +8,10 @@ small files, discovery by name/path over prose. Command skeleton + tags: `rules/
 - TS strict; `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` ON.
 - NO `any` (use `unknown` + narrowing). NO non-null `!` except in tests. (`any` is hook-blocked.)
 - Explicit return types on exported functions. Model facts as unions/literals, not comments.
-- Small integer powers go through `powInt(x, n)` (`@lib/powInt`, exact IEEE products), never `x ** 3` / `Math.pow(x, 4)`: the built-in power
-  is not bit-identical across V8 versions (Node 22 vs 24, Electron), which breaks state hashes and golden snapshots. `x ** 2` is exact and
-  stays. Lint rule `llull/no-integer-pow`; `packages/domain-dynamics` is exempt (its byte-identical simulate_motion baselines, FR-FPR-19).
+- Powers never use the built-in `x ** y` / `Math.pow`: its last bit differs between V8 versions (Node 22 vs 24, Electron), which breaks
+  state hashes and golden snapshots. Use `pow(x, y)` (`@lib/pow`: fdlibm, bit-identical on every engine and to Node 22's `Math.pow`) or
+  `powInt(x, n)` (`@lib/powInt`: exact products, for a small integer `n`). `x ** 2` and literal constants (`2 ** 32`) are exact and stay.
+  Lint rule `llull/no-builtin-pow`.
 
 ## C2 — Comments
 

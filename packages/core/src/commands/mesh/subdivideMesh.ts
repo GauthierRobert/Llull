@@ -4,6 +4,7 @@ import { MESH_TRIANGLE_LIMIT } from './meshCommon';
 import { defineCommand, z } from '../schema';
 import type { CommandResult } from '../types';
 import { runMeshOp } from './runMeshOp';
+import { pow } from '../../lib/pow';
 
 const MAX_LEVELS = 6;
 
@@ -55,7 +56,7 @@ export const subdivideMesh = defineCommand({
         const estimate =
           method === 'smooth' && maxEdgeLength !== undefined
             ? Math.max(before.faces, before.area / (0.4330127 * maxEdgeLength ** 2))
-            : before.faces * 4 ** passes;
+            : before.faces * pow(4, passes);
         return estimate > MESH_TRIANGLE_LIMIT
           ? {
               code: 'MESH_PARAM_INVALID',

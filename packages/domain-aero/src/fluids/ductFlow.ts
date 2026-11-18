@@ -1,3 +1,4 @@
+import { pow } from '@lib/pow';
 /** Constant-area duct flow of a perfect gas with friction (Fanno) or heat addition (Rayleigh): ratios to the sonic (*) state (NACA Report 1135). */
 
 export interface FannoState {
@@ -22,7 +23,7 @@ export function fannoState(mach: number, gamma: number): FannoState {
     pressureRatio: Math.sqrt(temperatureRatio) / mach,
     temperatureRatio,
     densityRatio: 1 / (mach * Math.sqrt(temperatureRatio)),
-    totalPressureRatio: (denominator / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1))) / mach,
+    totalPressureRatio: pow(denominator / (gamma + 1), (gamma + 1) / (2 * (gamma - 1))) / mach,
     velocityRatio: mach * Math.sqrt(temperatureRatio),
   };
 }
@@ -48,7 +49,7 @@ export function rayleighState(mach: number, gamma: number): RayleighState {
     temperatureRatio: (m2 * (1 + gamma) ** 2) / base ** 2,
     densityRatio: 1 / velocityRatio,
     totalTemperatureRatio: (2 * (gamma + 1) * m2 * (1 + ((gamma - 1) / 2) * m2)) / base ** 2,
-    totalPressureRatio: pressureRatio * ((2 + (gamma - 1) * m2) / (gamma + 1)) ** (gamma / (gamma - 1)),
+    totalPressureRatio: pressureRatio * pow((2 + (gamma - 1) * m2) / (gamma + 1), gamma / (gamma - 1)),
     velocityRatio,
   };
 }

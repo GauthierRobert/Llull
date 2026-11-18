@@ -2,6 +2,7 @@
 
 import { growthPerBlock, type GrowthSetup } from './setup';
 import { netYieldSize, sizeLimit, stressIntensityAt } from './kSolutions';
+import { pow } from '@lib/pow';
 
 type StopReason = 'fracture' | 'net_section_yield' | 'target' | 'geometry_limit' | 'runout' | 'arrest' | 'initial_critical';
 
@@ -118,7 +119,7 @@ export function growthLife(setup: GrowthSetup, aStart: number, samples: number):
   let previous = aStart;
   let extrapolated = growthPerBlock(setup, aStart, kAt(setup)).extrapolated;
   for (let i = 1; i <= count; i += 1) {
-    const next = i === count ? stop.a : aStart * ratio ** (i / count);
+    const next = i === count ? stop.a : aStart * pow(ratio, i / count);
     blocks += segmentBlocks(setup, previous, next);
     if (!Number.isFinite(blocks))
       return {

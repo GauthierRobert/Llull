@@ -27,6 +27,7 @@ import { accuracy, RIGID_BODY_WARNING, type Accuracy, type AccuracyBand } from '
 import { combustionOrigin } from './combustionOrigin';
 import { efficiencyBand, fmepAt, fmepBand, frictionOrigin, lossBands, ownsCylinder } from './engineLosses';
 import { elementAt } from '@lib/elementAt';
+import { pow } from '@lib/pow';
 
 /** Share of the connecting-rod mass counted as reciprocating (the usual lumped-mass rule, named). */
 const ROD_RECIPROCATING_SHARE = 1 / 3;
@@ -288,7 +289,7 @@ function plausibilityFindings(input: RealismInput, losses: LossReport | null): P
       ),
     );
     const burn = model.kind === 'wiebe' ? model : model.burn;
-    const ca50 = 'ca50Deg' in burn ? burn.ca50Deg : burn.startDeg + burn.durationDeg * (Math.LN2 / burn.a) ** (1 / (burn.m + 1));
+    const ca50 = 'ca50Deg' in burn ? burn.ca50Deg : burn.startDeg + burn.durationDeg * pow(Math.LN2 / burn.a, 1 / (burn.m + 1));
     found.push(
       ...outsideBand(
         'ca50',

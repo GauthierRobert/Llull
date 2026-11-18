@@ -7,6 +7,7 @@
  */
 
 import { type ByteView, FontError, parseError } from './reader';
+import { pow } from '../pow';
 
 const MAX_AXES = 64;
 const MAX_REGIONS = 4096;
@@ -325,7 +326,7 @@ function readIndexMap(view: ByteView, at: number): (index: number) => readonly [
     const entryAt = first + Math.min(index, count - 1) * size;
     let entry = 0;
     for (let b = 0; b < size; b++) entry = entry * 256 + view.u8(entryAt + b);
-    return [Math.floor(entry / 2 ** innerBits), entry % 2 ** innerBits];
+    return [Math.floor(entry / pow(2, innerBits)), entry % pow(2, innerBits)];
   };
 }
 

@@ -30,6 +30,7 @@ import { compilePower, type PowerRuntime } from './powerBlock';
 import { staticCoefficients, type RotorRuntime } from './rotorLaw';
 import { isCalm, windSource } from './wind';
 import { RESTING_MEMORY, controllerUpdate } from './controller';
+import { pow } from '@lib/pow';
 
 /** Largest number of physics steps of one run (a 60 s flight at 2 kHz is 120 000). */
 export const MAX_FLIGHT_STEPS = 600_000;
@@ -105,7 +106,7 @@ export function mixerRotors(rotors: readonly RotorRuntime[]): MixerRotor[] {
 /** Thrust per (rev/min)² at J = 0, N. */
 export function thrustPerRpmSquared(rotor: RotorRuntime): number {
   const { ct } = staticCoefficients(rotor);
-  return (ct * rotor.rotor.airDensity * rotor.rotor.diameter ** 4) / 3600;
+  return (ct * rotor.rotor.airDensity * pow(rotor.rotor.diameter, 4)) / 3600;
 }
 
 /** The powertrains of `flight` compiled against the run's rotors, or the one whose battery is missing. */

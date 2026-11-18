@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { isRecord } from '@lib/isRecord';
 import { trustDirectory } from './hostConfig';
+import { pow } from '@lib/pow';
 
 const MAX_FREE = 4;
 const BASE_LOCK_MS = 60_000;
@@ -48,7 +49,7 @@ export const lockedForMs = (keyId: string, now: number): number => Math.max(0, (
 export function recordFailure(keyId: string, now: number): number {
   const all = readAll();
   const failures = (all[keyId]?.failures ?? 0) + 1;
-  const lock = failures <= MAX_FREE ? 0 : Math.min(MAX_LOCK_MS, BASE_LOCK_MS * 2 ** (failures - MAX_FREE - 1));
+  const lock = failures <= MAX_FREE ? 0 : Math.min(MAX_LOCK_MS, BASE_LOCK_MS * pow(2, failures - MAX_FREE - 1));
   writeAll({ ...all, [keyId]: { failures, lockedUntil: now + lock } });
   return lock;
 }

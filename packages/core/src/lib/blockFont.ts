@@ -4,6 +4,7 @@
  */
 
 import { parseHexRgb } from './isHexColor';
+import { pow } from './pow';
 
 /** Seven rows of five bits (MSB = left column) per glyph. */
 const GLYPHS: Readonly<Record<string, readonly number[]>> = {
@@ -87,8 +88,8 @@ export function rasterizeText(
   const chars = [...text.toUpperCase()];
   const inkW = Math.max(1, chars.length * CELL_W + 1) * DOT;
   const inkH = CELL_H * DOT;
-  const width = 2 ** Math.ceil(Math.log2(inkW));
-  const height = 2 ** Math.ceil(Math.log2(inkH));
+  const width = pow(2, Math.ceil(Math.log2(inkW)));
+  const height = pow(2, Math.ceil(Math.log2(inkH)));
   const rgba = new Uint8Array(width * height * 4);
   const fill = hexRgba(color, 255);
   const back = hexRgba(background, background === undefined ? 0 : 255);
