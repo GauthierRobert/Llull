@@ -66,6 +66,18 @@ export function solveBus(pack: PackLaw, ocv: number, powerW: number): { readonly
   return { currentA, terminalV: ocv - r * currentA };
 }
 
+/**
+ * Whether the pack is cut off at a bus solution `solved` (null: it cannot deliver the power) leaving it at state of charge `socAfter`: no
+ * solution, a terminal voltage under the cut-off while it delivers current, or an empty pack (the ESC low-voltage cut-off latches on any of them).
+ */
+export function packCutOff(
+  pack: PackLaw,
+  solved: { readonly currentA: number; readonly terminalV: number } | null,
+  socAfter: number,
+): boolean {
+  return solved === null || (solved.currentA > 0 && solved.terminalV < pack.cutoffV) || socAfter <= 0;
+}
+
 /** The DC law of a datasheet motor, direct drive. */
 export interface MotorLaw {
   readonly kt: number;

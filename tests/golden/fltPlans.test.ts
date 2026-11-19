@@ -129,4 +129,18 @@ describe('13 FLT validation plans, golden', () => {
     expect(again.document).toEqual(plan.document);
     expect(JSON.stringify(dataOf(again.steps, 'export_flight_loads'))).toBe(JSON.stringify(dataOf(plan.steps, 'export_flight_loads')));
   }, 120_000);
+  it('sc-flt-06-glider-linear: the lattice glider linearised with the default (lumped tables) and with rateDamping tail_arm; replay is identical', () => {
+    const plan = run('sc-flt-06-glider-linear');
+    const [lumped, damped] = plan.steps.filter((step) => step.command === 'linearize_flight').map((step) => step.data) as {
+      rateDamping: { method: string };
+      modes: { label: string; periodS: number | null }[];
+    }[];
+    // the default is the Jacobian of what run_flight integrates: a change of the default shows up here as a diff
+    expect(lumped?.rateDamping.method).toBe('none');
+    expect(damped?.rateDamping.method).toBe('tail_arm');
+    expect(six(lumped)).toMatchSnapshot('linearize_flight default');
+    expect(six(damped)).toMatchSnapshot('linearize_flight tail_arm');
+    const again = run('sc-flt-06-glider-linear');
+    expect(JSON.stringify(again.steps.map((step) => step.data))).toBe(JSON.stringify(plan.steps.map((step) => step.data)));
+  }, 120_000);
 });

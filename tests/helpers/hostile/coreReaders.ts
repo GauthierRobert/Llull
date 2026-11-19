@@ -361,6 +361,22 @@ export const CORE_READERS: readonly HostileReader[] = [
         },
       },
       {
+        name: 'a body inertia that is not positive definite (all zero)',
+        input: () => {
+          const dynamics = JSON.parse(mechanismDynamics(3)) as { bodies: Record<string, Record<string, unknown>> };
+          for (const body of Object.values(dynamics.bodies)) body['inertiaKgM2'] = [0, 0, 0, 0, 0, 0];
+          return JSON.stringify(dynamics);
+        },
+      },
+      {
+        name: 'a body inertia that breaks the triangle inequality',
+        input: () => {
+          const dynamics = JSON.parse(mechanismDynamics(3)) as { bodies: Record<string, Record<string, unknown>> };
+          for (const body of Object.values(dynamics.bodies)) body['inertiaKgM2'] = [1, 1, 5, 0, 0, 0];
+          return JSON.stringify(dynamics);
+        },
+      },
+      {
         name: 'every transmission drives the same joint',
         input: () => mechanismDynamics(3, (record) => void ('driven' in record && (record['driven'] = 'b0'))),
       },

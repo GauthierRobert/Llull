@@ -1,0 +1,156 @@
+[
+  {
+    "command": "set_units",
+    "params": {
+      "units": "mm"
+    }
+  },
+  {
+    "command": "add_box",
+    "params": {
+      "size": [
+        100,
+        100,
+        100
+      ],
+      "position": [
+        0,
+        0,
+        0
+      ]
+    },
+    "as": "frame_geo"
+  },
+  {
+    "command": "add_rigid_body",
+    "params": {
+      "entityIds": [
+        "$frame_geo"
+      ],
+      "id": "frame",
+      "massKg": 50,
+      "inertiaKgM2": [
+        20,
+        70,
+        85,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "command": "set_gravity",
+    "params": {
+      "gravity": [
+        0,
+        0,
+        -9.80665
+      ]
+    }
+  },
+  {
+    "command": "generate_aero_table",
+    "params": {
+      "body": "frame",
+      "surfaces": [
+        {
+          "name": "wing",
+          "sections": [
+            {
+              "leadingEdge": [
+                100,
+                0,
+                0
+              ],
+              "chord": 1000
+            },
+            {
+              "leadingEdge": [
+                100,
+                3000,
+                0
+              ],
+              "chord": 1000
+            }
+          ],
+          "spanwisePanels": 12,
+          "chordwisePanels": 4
+        },
+        {
+          "name": "tail",
+          "pivots": true,
+          "sections": [
+            {
+              "leadingEdge": [
+                -2800,
+                0,
+                0
+              ],
+              "chord": 500
+            },
+            {
+              "leadingEdge": [
+                -2800,
+                1250,
+                0
+              ],
+              "chord": 500
+            }
+          ],
+          "spanwisePanels": 6,
+          "chordwisePanels": 3
+        }
+      ],
+      "momentCentre": [
+        0,
+        0,
+        0
+      ],
+      "id": "w",
+      "forward": "+x",
+      "pivotsDeg": [
+        -8,
+        0,
+        8
+      ],
+      "pivotPoint": [
+        -2675,
+        0,
+        0
+      ],
+      "servo": {
+        "rateDegS": 60
+      },
+      "profileDrag": {
+        "cd0": 0.01,
+        "source": "test polar"
+      }
+    }
+  },
+  {
+    "command": "define_flight_scenario",
+    "params": {
+      "body": "frame",
+      "id": "glide",
+      "durationS": 1
+    }
+  },
+  {
+    "command": "linearize_flight",
+    "params": {
+      "scenario": "glide",
+      "airspeedMps": 20,
+      "freeFlightPath": true
+    }
+  },
+  {
+    "command": "linearize_flight",
+    "params": {
+      "scenario": "glide",
+      "airspeedMps": 20,
+      "freeFlightPath": true,
+      "rateDamping": "tail_arm"
+    }
+  }
+]

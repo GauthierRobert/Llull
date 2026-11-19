@@ -1,16 +1,25 @@
 /**
- * Eigenvalues of a linearised flight and their mode labels (13 FLT M5). The labels are HEURISTICS on the decoupled longitudinal (u, w, q, pitch) and
- * lateral (v, p, r, roll) blocks of A; each eigenvalue of the full matrix takes the label of the nearest unused block eigenvalue and is `coupled`
- * when none lies within 10 % (the vehicle's longitudinal and lateral motions interact).
- *   fixed wing, longitudinal: the complex pair of lower |λ| is the phugoid, the one of higher |λ| the short period; real roots are `longitudinal_real`.
- *   fixed wing, lateral: a complex pair is the Dutch roll; of the real roots the largest |λ| is the roll subsidence, the smallest the spiral.
- *   hover (multirotor): the real longitudinal root nearest A[w][w] is `heave`, the real lateral root nearest A[r][r] is `yaw`, the rest of the
- *   longitudinal block `pitch_translation`, of the lateral block `roll_translation` (the velocity-attitude-rate chains).
+ * Eigenvalues of a linearised flight and their mode labels (13 FLT M5, M5b).
+ *   fixed wing: each eigenvalue of the full A is labelled from the PARTICIPATION of the states in its mode (modeVectors.ts; scale-free):
+ *     longitudinal (u, w, q, pitch share >= 80 %): an oscillatory mode dominated by speed and attitude (u + pitch) is the phugoid, by
+ *     incidence and rate (w + q) the short period; a real root (an overdamped mode split in two) is `phugoid_real` / `short_period_real` by
+ *     the same leading states.
+ *     lateral (share <= 20 %): an oscillatory mode dominated by sideslip and yaw rate (v + r) is the Dutch roll (else `lateral_oscillatory`);
+ *     a real root dominated by the roll rate p is the roll subsidence, by the roll angle the spiral (else `lateral_real`); a neutral real or
+ *     defective lateral root is `lateral_neutral` (the lateral modes of an aero vehicle whose tables carry no sideslip or rate dependence).
+ *     between the two: `coupled`. A defective root has no participation: its right eigenvector groups it; a repeated root (no unique eigenvector)
+ *     is grouped by the decoupled block(s) that have it (`coupled` when both do).
+ *   hover (multirotor; every root a defective zero of the integrator chains, so participation is undefined): HEURISTICS on the decoupled
+ *     longitudinal (u, w, q, pitch) and lateral (v, p, r, roll) blocks of A; each eigenvalue of the full matrix takes the label of the nearest
+ *     unused block eigenvalue and is `coupled` when none lies within 10 %: the real longitudinal root nearest A[w][w] is `heave`, the real
+ *     lateral root nearest A[r][r] is `yaw`, the rest of the longitudinal block `pitch_translation`, of the lateral block `roll_translation`.
  */
 
 import { elementAt } from '@lib/elementAt';
 import { eigenvalues, type ComplexValue } from './eigenvalues';
 import { maxOf } from '@lib/arrayExtrema';
+import { modeParticipation } from './modeVectors';
+import { STATE_NAMES } from './trimModel';
 
 export type ModeSet = 'fixed_wing' | 'hover';
 
@@ -31,6 +40,15 @@ interface FlightMode {
   /** ln 2 / re of a divergent mode (oscillatory: of the envelope), s. */
   readonly timeToDoubleS: number | null;
   readonly stability: 'stable' | 'neutral' | 'unstable';
+  /** Participation of each state (u, v, w, p, q, r, roll, pitch) in the mode, sums to 1; null for a defective mode. */
+  readonly participation: Readonly<Record<(typeof STATE_NAMES)[number], number>> | null;
+  /**
+   * Share of the longitudinal states (u, w, q, pitch) in the mode: participation, else right-eigenvector energy; for a repeated root (no unique
+   * eigenvector) 1 / 0 when only the longitudinal / lateral block has it, null when both do.
+   */
+  readonly longitudinalShare: number | null;
+  /** What the label was read from: the participation factors, the right eigenvector (defective), or the block heuristic (hover). */
+  readonly labelBasis: 'participation' | 'eigenvector' | 'block';
 }
 
 const LONGITUDINAL = [0, 2, 4, 7];
@@ -40,6 +58,8 @@ const NEUTRAL_RATE = 1e-3;
 /** A full eigenvalue matches a block eigenvalue when closer than this share of its magnitude (plus a floor). */
 const MATCH_SHARE = 0.1;
 const MATCH_FLOOR = 1e-3;
+/** Eigenvalues closer than this share of their magnitude (floor 1) are one repeated root. */
+const REPEATED = 1e-9;
 /** Imaginary parts below this share of the magnitude are round-off of a real (repeated) root. */
 const REAL_SNAP = 1e-6;
 
@@ -54,45 +74,56 @@ const tidy = (values: readonly ComplexValue[] | null): ComplexValue[] | null =>
 const block = (a: readonly (readonly number[])[], indices: readonly number[]): number[][] =>
   indices.map((i) => indices.map((j) => elementAt(elementAt(a, i), j)));
 
-/** Heuristic labels of the eigenvalues of one block (the same length, same order); `nearest` is the diagonal term the hover heave / yaw root is nearest to. */
-function labelBlock(values: readonly ComplexValue[], longitudinal: boolean, modeSet: ModeSet, nearest: number): string[] {
-  const labels = values.map(() => 'unclassified');
-  const pairs = values.flatMap((value, i) => (value.im > 0 ? [i] : []));
+/** Hover labels of the eigenvalues of one block (the same length, same order); `nearest` is the diagonal term the heave / yaw root is nearest to. */
+function labelHoverBlock(values: readonly ComplexValue[], longitudinal: boolean, nearest: number): string[] {
   const reals = values.flatMap((value, i) => (value.im === 0 ? [i] : []));
-  const byMagnitude = (first: number, second: number): number => magnitude(elementAt(values, first)) - magnitude(elementAt(values, second));
-  if (modeSet === 'hover') {
-    const gap = (i: number): number => Math.abs(elementAt(values, i).re - nearest);
-    const heave =
-      reals.length === 0
-        ? -1
-        : elementAt(
-            [...reals].sort((first, second) => gap(first) - gap(second)),
-            0,
-          );
-    values.forEach((_, i) => {
-      labels[i] = i === heave ? (longitudinal ? 'heave' : 'yaw') : longitudinal ? 'pitch_translation' : 'roll_translation';
-    });
-    return labels;
-  }
-  const sortedPairs = [...pairs].sort(byMagnitude);
-  const sortedReals = [...reals].sort(byMagnitude);
-  if (longitudinal) {
-    const firstReal = sortedReals[0];
-    sortedPairs.forEach((index, rank) => {
-      const slower = firstReal === undefined || magnitude(elementAt(values, index)) < magnitude(elementAt(values, firstReal));
-      labels[index] = sortedPairs.length === 1 ? (slower ? 'phugoid' : 'short_period') : rank === 0 ? 'phugoid' : 'short_period';
-    });
-    sortedReals.forEach((index) => (labels[index] = 'longitudinal_real'));
-  } else {
-    sortedPairs.forEach((index) => (labels[index] = 'dutch_roll'));
-    sortedReals.forEach((index, rank) => {
-      labels[index] = rank === sortedReals.length - 1 ? 'roll_subsidence' : rank === 0 ? 'spiral' : 'lateral_real';
-    });
-  }
-  return labels;
+  const gap = (i: number): number => Math.abs(elementAt(values, i).re - nearest);
+  const heave =
+    reals.length === 0
+      ? -1
+      : elementAt(
+          [...reals].sort((first, second) => gap(first) - gap(second)),
+          0,
+        );
+  return values.map((_, i) => (i === heave ? (longitudinal ? 'heave' : 'yaw') : longitudinal ? 'pitch_translation' : 'roll_translation'));
 }
 
-function modeOf(value: ComplexValue, label: string): FlightMode {
+/** Share of the longitudinal states at and above which a mode is longitudinal (lateral at and below 1 − it). */
+const GROUP_SHARE = 0.8;
+
+const shareOf = (weights: readonly number[], indices: readonly number[]): number =>
+  indices.reduce((sum, i) => sum + elementAt(weights, i), 0);
+
+/**
+ * Fixed-wing label of the mode of `value` from its state weights (u, v, w, p, q, r, roll, pitch) and longitudinal share (null: both groups);
+ * `defective` when it has no participation.
+ */
+function fixedWingLabel(value: ComplexValue, weights: readonly number[], longitudinal: number | null, defective: boolean): string {
+  if (longitudinal === null) return 'coupled';
+  const at = (i: number): number => elementAt(weights, i);
+  const [u, v, w, p, q, r, roll, pitch] = [at(0), at(1), at(2), at(3), at(4), at(5), at(6), at(7)];
+  if (longitudinal >= GROUP_SHARE) {
+    const speedAttitude = u + pitch >= w + q;
+    if (value.im === 0) return speedAttitude ? 'phugoid_real' : 'short_period_real';
+    return speedAttitude ? 'phugoid' : 'short_period';
+  }
+  if (longitudinal > 1 - GROUP_SHARE) return 'coupled';
+  const neutral = Math.abs(value.re) <= NEUTRAL_RATE;
+  if (neutral && (value.im === 0 || defective)) return 'lateral_neutral';
+  if (value.im !== 0) return v + r >= p + roll ? 'dutch_roll' : 'lateral_oscillatory';
+  const dominant = Math.max(v, p, r, roll);
+  return p === dominant ? 'roll_subsidence' : roll === dominant ? 'spiral' : 'lateral_real';
+}
+
+interface Labelled {
+  readonly label: string;
+  readonly participation: number[] | null;
+  readonly longitudinalShare: number | null;
+  readonly labelBasis: FlightMode['labelBasis'];
+}
+
+function modeOf(value: ComplexValue, labelled: Labelled): FlightMode {
+  const { label, participation } = labelled;
   const oscillatory = value.im > 0;
   const rate = value.re;
   return {
@@ -106,6 +137,12 @@ function modeOf(value: ComplexValue, label: string): FlightMode {
     timeConstantS: !oscillatory && rate < -NEUTRAL_RATE ? -1 / rate : null,
     timeToDoubleS: rate > NEUTRAL_RATE ? Math.LN2 / rate : null,
     stability: rate > NEUTRAL_RATE ? 'unstable' : rate < -NEUTRAL_RATE ? 'stable' : 'neutral',
+    participation:
+      participation === null
+        ? null
+        : (Object.fromEntries(STATE_NAMES.map((name, i) => [name, elementAt(participation, i)])) as FlightMode['participation']),
+    longitudinalShare: labelled.longitudinalShare,
+    labelBasis: labelled.labelBasis,
   };
 }
 
@@ -118,20 +155,21 @@ interface ModeAnalysis {
   readonly couplingRatio: number;
 }
 
-/** Eigenvalues of `a` (8 x 8) with their labelled modes, or null when the eigenvalue iteration fails. */
-export function analyseModes(a: readonly (readonly number[])[], modeSet: ModeSet): ModeAnalysis | null {
-  const all = tidy(eigenvalues(a));
-  const longitudinal = tidy(eigenvalues(block(a, LONGITUDINAL)));
-  const lateral = tidy(eigenvalues(block(a, LATERAL)));
-  if (all === null || longitudinal === null || lateral === null) return null;
-  const longitudinalLabels = labelBlock(longitudinal, true, modeSet, elementAt(elementAt(a, 2), 2));
-  const lateralLabels = labelBlock(lateral, false, modeSet, elementAt(elementAt(a, 5), 5));
+/** Hover labels of every eigenvalue of `all`: the nearest unused root of the decoupled blocks, `coupled` when none is within 10 %. */
+function hoverLabels(
+  a: readonly (readonly number[])[],
+  all: readonly ComplexValue[],
+  longitudinal: readonly ComplexValue[],
+  lateral: readonly ComplexValue[],
+): string[] {
+  const longitudinalLabels = labelHoverBlock(longitudinal, true, elementAt(elementAt(a, 2), 2));
+  const lateralLabels = labelHoverBlock(lateral, false, elementAt(elementAt(a, 5), 5));
   const candidates = [
     ...longitudinal.map((value, i) => ({ value, label: elementAt(longitudinalLabels, i) })),
     ...lateral.map((value, i) => ({ value, label: elementAt(lateralLabels, i) })),
   ];
   const used = new Set<number>();
-  const labelOf = (value: ComplexValue): string => {
+  return all.map((value) => {
     let best = -1;
     let distance = Infinity;
     candidates.forEach((candidate, i) => {
@@ -144,10 +182,27 @@ export function analyseModes(a: readonly (readonly number[])[], modeSet: ModeSet
     if (best < 0 || distance > MATCH_SHARE * magnitude(value) + MATCH_FLOOR) return 'coupled';
     used.add(best);
     return elementAt(candidates, best).label;
-  };
-  const modes = all.flatMap((value) => {
-    const label = labelOf(value);
-    return value.im >= 0 ? [modeOf(value, label)] : [];
+  });
+}
+
+/** Eigenvalues of `a` (8 x 8) with their labelled modes, or null when the eigenvalue iteration fails. */
+export function analyseModes(a: readonly (readonly number[])[], modeSet: ModeSet): ModeAnalysis | null {
+  const all = tidy(eigenvalues(a));
+  const longitudinal = tidy(eigenvalues(block(a, LONGITUDINAL)));
+  const lateral = tidy(eigenvalues(block(a, LATERAL)));
+  if (all === null || longitudinal === null || lateral === null) return null;
+  const hover = modeSet === 'hover' ? hoverLabels(a, all, longitudinal, lateral) : null;
+  const near = (value: ComplexValue, other: ComplexValue, share: number, floor: number): boolean =>
+    Math.hypot(other.re - value.re, other.im - value.im) <= share * magnitude(value) + floor;
+  const modes = all.flatMap((value, i) => {
+    if (value.im < 0) return [];
+    const repeated = all.some((other, j) => j !== i && near(value, other, REPEATED, REPEATED));
+    const { participation, weights, basis } = modeParticipation(a, value, repeated);
+    const inLongitudinal = longitudinal.some((other) => near(value, other, MATCH_SHARE, MATCH_FLOOR));
+    const inLateral = lateral.some((other) => near(value, other, MATCH_SHARE, MATCH_FLOOR));
+    const share = !repeated ? shareOf(weights, LONGITUDINAL) : inLongitudinal === inLateral ? null : inLongitudinal ? 1 : 0;
+    const label = hover === null ? fixedWingLabel(value, weights, share, participation === null) : elementAt(hover, i);
+    return [modeOf(value, { label, participation, longitudinalShare: share, labelBasis: hover === null ? basis : 'block' })];
   });
   const cross = (rows: readonly number[], columns: readonly number[]): number =>
     Math.max(0, maxOf(rows.flatMap((i) => columns.map((j) => Math.abs(elementAt(elementAt(a, i), j))))));
