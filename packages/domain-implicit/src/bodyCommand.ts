@@ -8,9 +8,9 @@ import type { MeshAssetPort } from '@core/geometry/mesh/assets';
 import type { CadDocument, MeshData, MeshSolidEntity } from '@core/model/types';
 import type { MeshAssetRef } from '@core/model/meshProvenance';
 import { nextId } from '@lib/id';
-import { meshMeasures } from '@lib/isosurface/measures';
 import { storeBodyMesh } from './bodyMesh';
 import { refuseImplicit } from './codes';
+import { bodyMeshMeasuresOf } from './meshFacts';
 import { type ImplicitBody, fieldOf, withBody } from './model';
 import { realiseField } from './realise';
 
@@ -147,7 +147,7 @@ export const createImplicitBody = defineCommand({
       if (original !== undefined) entities[source] = { ...original, layerId: HIDDEN_LAYER_ID };
     }
     next = withBody({ ...next, entities, order: [...next.order, id] }, body);
-    const measures = meshMeasures(realised.mesh);
+    const measures = bodyMeshMeasuresOf(realised.mesh);
     const { result } = realised;
     const errorEstimate = Number.isFinite(realised.minFeature)
       ? 0.6 * (p.voxel / realised.minFeature) ** 2 * Math.abs(measures.volume)

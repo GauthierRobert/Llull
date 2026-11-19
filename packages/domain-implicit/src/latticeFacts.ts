@@ -212,7 +212,7 @@ export function measuredSpecificSurface(
   const voxel = Math.min(...cell) / cells;
   const result = engine.mesh(nodalProgram, { min: [0, 0, 0], max: cell, voxel }, { mesher: 'tetra', maxTriangles: 2_000_000 });
   if (!result.ok) return null;
-  return meshMeasures(result.mesh).area / (cell[0] * cell[1] * cell[2]);
+  return (result.measures?.area ?? meshMeasures(result.mesh).area) / (cell[0] * cell[1] * cell[2]);
 }
 
 /** Program whose negative side is {F < 0} of the TPMS family of `node` on its rectangular cells (the nodal surface F = 0). */

@@ -246,10 +246,13 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
             const indices = new Array<number>(indexBytes.length / 4);
             for (let i = 0; i < indices.length; i += 1) indices[i] = indexBytes.readUInt32LE(i * 4);
             const mesh: MeshData = { positions: Array.from(positions), indices };
+            const [volume, area] = [report['volume'], report['area']];
             return {
               ok: true as const,
               mesh,
               closedManifold: report['closedManifold'] === true,
+              // absent from an older binary, null when not finite: the caller then measures the mesh itself
+              ...(typeof volume === 'number' && typeof area === 'number' ? { measures: { volume, area } } : {}),
               samples: num(report['samples']),
               evaluatedSamples: num(report['evaluatedSamples']),
               prunedFraction: num(report['prunedFraction']),

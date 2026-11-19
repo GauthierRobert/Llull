@@ -12,6 +12,8 @@
 //!   sphere, 5 per beam); `points.f64` (3 per point) for `evaluate`. `sampled<i>_values.f64` (+ `_points.f64`, `_tets.u32` for tetrahedra; program JSON `sampled: [{kind: grid, nodes, origin, voxel} | {kind: tets, points, tets}]`).
 //! - Out: `report.json` always (`{ refusal: { code, message, samples, limit } }` on a budget refusal, else the op's figures); `positions.f64` +
 //!   `indices.u32` for `mesh`; `values.f64` (+ `gradients.f64`) for `evaluate`. One `progress` event per 5 % of the cell layers while meshing.
+//!   The `mesh` report also carries what the caller would otherwise recompute from the returned triangles: `closedManifold`, `volume` and `area`
+//!   (`mesh_measures.rs`, bit-identical to the TypeScript `meshMeasures`; a non-finite figure is written as `null`).
 //!
 //! `tets` (FLL-M1, `field_to_tets`) stuffs {f < 0} into a tetrahedral FE mesh on a BCC lattice (contract in `tets_job.rs`).
 //!
@@ -26,6 +28,7 @@ mod interval;
 mod job;
 mod jsnum;
 mod measure;
+mod mesh_measures;
 mod meshsdf;
 mod sampled;
 mod sampling;

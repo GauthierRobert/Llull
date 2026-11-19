@@ -40,7 +40,13 @@ export interface MeshOptions {
 export interface FieldMeshResult {
   readonly ok: true;
   readonly mesh: MeshData;
+  /** `isClosedManifold(mesh)` (`lib/isosurface/measures`): callers take it instead of testing the mesh again. */
   readonly closedManifold: boolean;
+  /**
+   * Signed volume and area of `mesh`, when the engine computed them with it: bit-identical to `meshMeasures(mesh)` (same expressions, triangle
+   * order and `Math.hypot`), so a caller may take them instead of walking the triangles. Absent: the caller measures the mesh itself.
+   */
+  readonly measures?: { readonly volume: number; readonly area: number };
   /** Grid nodes (the budgeted quantity). */
   readonly samples: number;
   /** Nodes actually evaluated (the rest were proved empty / full by interval pruning). */
