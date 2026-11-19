@@ -33,7 +33,7 @@ import { BAR_PRINT, printedBar, recordCoupon } from '../unit/cae/printFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
-import { flatDocument } from '../unit/vibroacoustics/fixtures';
+import { vibroacousticsDocument } from '../unit/vibroacoustics/seed';
 import { missionDocument } from '../unit/environment/fixtures';
 import { corrosionDocument } from '../unit/corrosion/seed';
 import { electroOpticalDocument } from '../unit/electroOptical/seed';
@@ -365,8 +365,9 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     mutate: { name: 'set_service_environment', params: constant({ scheme: 'anodic_index', environment: 'harsh' }) },
   },
   'physics-vibroacoustics': {
-    roots: ['vibroacoustics'],
-    build: flatDocument,
+    // reviews listed again so the 36 sampled cases reach the signed review (the 27-band spectrum otherwise dominates the pool)
+    roots: ['vibroacoustics', 'vibroacoustics.reviews'],
+    build: vibroacousticsDocument,
     query: { name: 'acoustic_spectrum_report', params: constant({ spectrum: 'flat130' }) },
     mutate: { name: 'convert_acoustic_spectrum', params: constant({ spectrum: 'flat130', to: 'octave', name: 'fuzz_octave' }) },
   },

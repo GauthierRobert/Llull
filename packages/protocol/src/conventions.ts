@@ -488,6 +488,7 @@ acoustic FE, no structural response (VAC_OUT_OF_SCOPE). Nothing is a default: th
 2. \`define_acoustic_exposure\` binds a spectrum to faces by points (target.facesNear) with field diffuse | progressive (VAC_FIELD_UNSET without it); \`delete_acoustic_exposure\` frees the spectrum.
 3. \`check_acoustic_handoff\`, then \`llull export_acoustic_load exposure=NAME --save FILE\`: face areas come from the exact kernel only (KRN_NO_EXACT_KERNEL otherwise, never a guess; VAC_EXPOSURE_UNRESOLVED for a point off
    the solid or on an edge). The check is unknown, never pass, when the faces could not be checked. Every package is reviewRequired: report VAC_REVIEW_PENDING and VAC_SPECTRUM_UNVERIFIED to the user.
+   The review is a human act (\`dispose_acoustic_export\`, VAC_HUMAN_GATE for an agent: hand the package to the reviewer, who signs with the signing port; desktop signing for this act is not built yet; do not retry); it ends when the exposure, spectrum or solid changes (review.status stale).
 
 ## 21. Electrical bonding, coatings and optical balance (toolset analysis, PHY-15)
 

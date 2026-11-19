@@ -30,7 +30,7 @@ const errorsAfter = (...edits: [string, (current: unknown) => unknown][]): strin
 const set = (value: unknown) => (): unknown => value;
 
 describe('plugin physics-vibroacoustics (TR-VAC-01, VC-VAC-35)', () => {
-  it('is installed in the analysis toolset with the nine commands', () => {
+  it('is installed in the analysis toolset with the ten commands', () => {
     expect(plugin.name).toBe('physics-vibroacoustics');
     expect(plugin.toolset).toBe('analysis');
     expect(plugin.commands.map((command) => command.name).sort()).toEqual([
@@ -42,6 +42,7 @@ describe('plugin physics-vibroacoustics (TR-VAC-01, VC-VAC-35)', () => {
       'define_acoustic_spectrum',
       'delete_acoustic_exposure',
       'delete_acoustic_spectrum',
+      'dispose_acoustic_export',
       'export_acoustic_load',
     ]);
   });
