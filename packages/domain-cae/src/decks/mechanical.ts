@@ -185,7 +185,7 @@ export interface StepLoadOptions {
 }
 
 /** Loads of a case gathered before they are written: nodal forces, element pressures, the gravity field and the inertial terms. */
-interface LoadAccumulator {
+export interface LoadAccumulator {
   readonly forces: Map<string, readonly [node: number, dof: number, value: number]>;
   readonly pressures: Map<string, readonly [element: number, face: number, value: number]>;
   readonly gravity: number[];
@@ -316,20 +316,11 @@ function dloadLines(ctx: DeckContext, acc: LoadAccumulator, nonlinear: boolean):
 }
 
 /**
- * Mechanical `*BOUNDARY, OP=NEW` / `*CLOAD, OP=NEW` / `*DLOAD, OP=NEW` lines for one step.
- * Force: the vector is the TOTAL load, consistent with the face integration when the target has faces (a linear face gives each corner A / 3, a quadratic face its
- * mid-edge nodes A / 3) and split equally over the target nodes otherwise (edges, points), or applied at every node (`'per_node'`); moment: a statically equivalent nodal force
- * couple on the target nodes (`loadDistribution.momentForces`); contributions to one node and dof are summed. Pressure: `P<face>` per (element, face) of the target's face set,
- * positive into the material. Gravity: acceleration vector on every element (`GRAV`, magnitude and unit direction). All of them
- * are restated with `OP=NEW` in each step, so load cases do not accumulate.
- * @param loadCase only the loads of this load case; without it every load of the case is written (thermo_static uses a single step)
- * @param options nonlinear steps: every load scaled by its multiplier, zero values kept (they remove a load under OP=MOD), no `OP=NEW`
- * @failure constraint / load target without nodes or faces in the mesh -> FEA_TARGET_UNRESOLVED; rotational dof or non-axis symmetry plane
- *   -> FEA_CONSTRAINT_INVALID
+ * The loads of a case gathered exactly as the deck writes them: nodal forces by `node:dof`, element pressures, the uniform gravity field
+ * (gravity plus the linear part of an inertial load) and the rotation terms (also read by the 14 FLL post-solve reaction check).
+ * @failure as mechanicalStepLines (load targets without nodes or faces, a second inertial load in a case)
  */
-export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options?: StepLoadOptions): DeckSections {
-  const boundary = options?.boundary === false ? [] : boundaryData(ctx);
-  if (!Array.isArray(boundary)) return boundary;
+export function caseLoads(ctx: DeckContext, loadCase?: string, options?: StepLoadOptions): LoadAccumulator | DeckRefusal {
   const acc: LoadAccumulator = {
     forces: new Map(),
     pressures: new Map(),
@@ -346,6 +337,26 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
     const refused = accumulateLoad(ctx, acc, id, load, options === undefined ? 1 : options.scale(load));
     if (refused !== null) return refused;
   }
+  return acc;
+}
+
+/**
+ * Mechanical `*BOUNDARY, OP=NEW` / `*CLOAD, OP=NEW` / `*DLOAD, OP=NEW` lines for one step.
+ * Force: the vector is the TOTAL load, consistent with the face integration when the target has faces (a linear face gives each corner A / 3, a quadratic face its
+ * mid-edge nodes A / 3) and split equally over the target nodes otherwise (edges, points), or applied at every node (`'per_node'`); moment: a statically equivalent nodal force
+ * couple on the target nodes (`loadDistribution.momentForces`); contributions to one node and dof are summed. Pressure: `P<face>` per (element, face) of the target's face set,
+ * positive into the material. Gravity: acceleration vector on every element (`GRAV`, magnitude and unit direction). All of them
+ * are restated with `OP=NEW` in each step, so load cases do not accumulate.
+ * @param loadCase only the loads of this load case; without it every load of the case is written (thermo_static uses a single step)
+ * @param options nonlinear steps: every load scaled by its multiplier, zero values kept (they remove a load under OP=MOD), no `OP=NEW`
+ * @failure constraint / load target without nodes or faces in the mesh -> FEA_TARGET_UNRESOLVED; rotational dof or non-axis symmetry plane
+ *   -> FEA_CONSTRAINT_INVALID
+ */
+export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options?: StepLoadOptions): DeckSections {
+  const boundary = options?.boundary === false ? [] : boundaryData(ctx);
+  if (!Array.isArray(boundary)) return boundary;
+  const acc = caseLoads(ctx, loadCase, options);
+  if ('code' in acc) return acc;
   const lines: string[] = [];
   if (boundary.length > 0) {
     lines.push('*BOUNDARY, OP=NEW');
@@ -380,9 +391,19 @@ function probePrintLines(ctx: DeckContext): string[] {
   return lines;
 }
 
+/** Name of the `.dat` set whose summed RF the free-body support constraint `constraintId` prints (CalculiX upper-cases set names). */
+export const supportReactionSet = (ctx: DeckContext, constraintId: string): string => ctx.nset(`C_${constraintId}`).toUpperCase();
+
+/** `*NODE PRINT, TOTALS=ONLY` RF of each 3-2-1 support of a free-body case: read back by the 14 FLL post-solve reaction check. */
+function supportReactionPrintLines(ctx: DeckContext): string[] {
+  return ctx.analysis.constraintOrder
+    .filter((id) => ctx.analysis.constraints[id]?.freeBody === true && nodesOfSet(ctx, `C_${id}`).length > 0)
+    .flatMap((id) => [`*NODE PRINT, NSET=${ctx.nset(`C_${id}`)}, TOTALS=ONLY`, 'RF']);
+}
+
 /**
  * The static procedure, one `*STEP` per load case (`loadCasesOf` order): `*STATIC`, the mechanical lines of the case, `*NODE FILE U`,
- * `*EL FILE S, E` and `*NODE PRINT U` for displacement probes. Results of step n are load case n.
+ * `*EL FILE S, E`, `*NODE PRINT U` for displacement probes and `*NODE PRINT RF` (totals) of the free-body supports. Results of step n are load case n.
  * @failure as mechanicalStepLines
  */
 export function staticStep(ctx: DeckContext): DeckSections {
@@ -392,7 +413,7 @@ export function staticStep(ctx: DeckContext): DeckSections {
     if (isDeckRefusal(mechanical)) return mechanical;
     out.push(`** load case ${commentText(name)}`, '*STEP', '*STATIC');
     appendAll(out, textLines(mechanical.text));
-    appendAll(out, ['*NODE FILE', 'U', '*EL FILE', 'S, E', ...probePrintLines(ctx), '*END STEP']);
+    appendAll(out, ['*NODE FILE', 'U', '*EL FILE', 'S, E', ...probePrintLines(ctx), ...supportReactionPrintLines(ctx), '*END STEP']);
   }
   return { text: linesText(out) };
 }
