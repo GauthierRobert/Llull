@@ -51,7 +51,8 @@ export const checkMaterialCompatibility = defineCommand({
     'Scheme mil_std_889d reports COR_889_TABLE_MISSING (the matrix is not shipped). Every item has reviewRequired true: a human decides; stress-corrosion and hydrogen-embrittlement rules are not evaluated. ' +
     'Returns data { status: pass | pass_isolated | warn | unknown | fail (worst item without a CONFIRMED human acceptance: an acceptance counts only when its signature re-verifies through the signing port for this document, so without a port nothing is accepted), scheme, environment, items: [{ key, status, code, ruleId, ruleGrade, ids, inputs, warnings, remedies, unverified, reviewRequired, acceptance? }], counts, tolerance, contacts }. ' +
     'With a kernel that answers distance (ctx kernel), AABB-only `possible` pairs of non-box solids are resolved: kind contact or interference, source kernel ' +
-    '(approximate unless the exact occt kernel), a measured separation above the tolerance drops the pair; data.kernelContacts counts them. ' +
+    '(approximate unless the exact occt kernel); only the exact occt kernel drops a pair it measures separated (a mesh kernel keeps it possible); at most 2000 pairs go to the kernel; ' +
+    'data.kernelContacts { kernel, resolved, separated, unresolved, capped } counts them. ' +
     'data.orphans [{ kind: surface_system | isolation | galvanic_group | acceptance, id, code COR_REFERENCE_ORPHANED, missing, remedy }] lists entries that name a deleted solid or material (never changes the status). ' +
     'Malformed fastener stacks cannot be scope-filtered (their layers are unknown) and always yield an unknown item. report: true adds data.text (CSV, `--save corrosion.csv`). Next: declare_isolation, accept_corrosion_item (human only).',
   params: z.object({
@@ -132,7 +133,13 @@ export const checkMaterialCompatibility = defineCommand({
       counts,
       tolerance: contacts.tolerance,
       contacts: geometric.length,
-      kernelContacts: { kernel: exact.kernel, resolved: exact.resolved, separated: exact.separated, unresolved: exact.unresolved },
+      kernelContacts: {
+        kernel: exact.kernel,
+        resolved: exact.resolved,
+        separated: exact.separated,
+        unresolved: exact.unresolved,
+        capped: exact.capped,
+      },
       notes,
       orphans,
       ...(wantsReport === true ? { text: reportCsv(items), fileName: 'corrosion.csv' } : {}),

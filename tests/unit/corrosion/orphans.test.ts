@@ -2,11 +2,16 @@
 import { describe, expect, it } from 'vitest';
 import { type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
 import { corrosionReferenceGuard } from '@cae/corrosion/guard';
 import { orphanedEntries } from '@cae/corrosion/orphans';
 import { remediationOfCor } from '@cae/corrosion/codes';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { signingContext } from '../../helpers/signedPlantDoc';
+import { libraryFile, mmDocument, step } from '../materials/support';
 import { check, pair, run, withEnvironment } from './fixtures';
+
+const SOURCE = { citation: 'test' };
 
 interface Orphan {
   kind: string;
@@ -50,17 +55,53 @@ describe('corrosion reference guard (COR_REFERENCE_IN_USE)', () => {
     expect(execute(covered, 'move_entities', { ids: [plate], delta: [1, 0, 0] }).error).toBeUndefined();
   });
 
-  it('refuses a result that removes a material with a galvanic group entry; remove_galvanic_group first lets it go', () => {
-    const { doc } = pair(['aluminium_wrought_other', null]);
-    const { m_plate: _gone, ...materials } = doc.materials;
+  it('delete_material_library is refused while a record of it has a galvanic group; remove_galvanic_group first lets it go', () => {
+    const imported = step(mmDocument(), 'import_material_library', { library: libraryFile() });
+    const grouped = run(imported, 'set_galvanic_group', {
+      material: 'aa7075_t6',
+      galvanicGroup: 'aluminium_wrought_other',
+      source: SOURCE,
+    });
+    const refused = execute(grouped, 'delete_material_library', { libraryId: 'synthetic-lib' });
+    expect(refused.error).toMatchObject({ code: 'COR_REFERENCE_IN_USE', ids: ['aa7075_t6'] });
+    expect(refused.summary).toContain("remove_galvanic_group 'aa7075_t6'");
+    expect(refused.document).toBe(grouped);
+    const cleared = run(grouped, 'remove_galvanic_group', { material: 'aa7075_t6' });
+    expect(execute(cleared, 'delete_material_library', { libraryId: 'synthetic-lib' }).error).toBeUndefined();
+  });
+
+  it('load_document of a pre-guard file whose surface system names an entity it lacks is not refused (whole-document replacement)', () => {
+    const { doc, plate } = pair();
+    const covered = run(doc, 'assign_surface_system', { entityIds: [plate], layers: [{ class: 'anodize' }] });
+    const { [plate]: _gone, ...entities } = covered.entities;
     void _gone;
-    const refusal = corrosionReferenceGuard.check(doc, { ...doc, materials }, 'delete_material_library');
-    expect(refusal).toMatchObject({ error: { code: 'COR_REFERENCE_IN_USE', ids: ['m_plate'] } });
-    expect(typeof refusal === 'object' && refusal !== null ? refusal.reason : '').toContain("remove_galvanic_group 'm_plate'");
-    const cleared = run(doc, 'remove_galvanic_group', { material: 'm_plate' });
-    const { m_plate: _also, ...rest } = cleared.materials;
-    void _also;
-    expect(corrosionReferenceGuard.check(cleared, { ...cleared, materials: rest }, 'delete_material_library')).toBeNull();
+    const legacy: CadDocument = { ...covered, entities, order: covered.order.filter((id) => id !== plate) };
+    const loaded = execute(covered, 'load_document', { json: serializeDocument(legacy) });
+    expect(loaded.error).toBeUndefined();
+    expect(loaded.document.entities[plate]).toBeUndefined();
+    expect(orphansOf(withEnvironment(loaded.document, 'normal')).map((orphan) => orphan.kind)).toEqual(['surface_system']);
+  });
+
+  it('refuses only references the input document already had (a result that adds a dangling entry is not a deletion)', () => {
+    const { doc, plate } = pair();
+    const covered = run(doc, 'assign_surface_system', { entityIds: [plate], layers: [{ class: 'anodize' }] });
+    const { [plate]: _gone, ...entities } = covered.entities;
+    void _gone;
+    expect(corrosionReferenceGuard.check(doc, { ...covered, entities }, 'some_command')).toBeNull();
+    expect(corrosionReferenceGuard.check(covered, { ...covered, entities }, 'some_command')).not.toBeNull();
+    expect(corrosionReferenceGuard.check(covered, { ...covered, entities }, 'some_command', { replaying: true })).toBeNull();
+  });
+
+  it('replay_history of a history recorded before the guard (assign, then delete the covered solid) gives the saved model', () => {
+    const { doc, plate } = pair();
+    const covered = run(doc, 'assign_surface_system', { entityIds: [plate], layers: [{ class: 'anodize' }] });
+    const preGuard = execute(covered, 'delete_entities', { ids: [plate] }, { ...defaultContext(), replaying: true });
+    expect(preGuard.error).toBeUndefined();
+    expect(preGuard.document.featureHistory.at(-1)?.name).toBe('delete_entities');
+    const replayed = execute(preGuard.document, 'replay_history', {});
+    expect(replayed.error).toBeUndefined();
+    expect(replayed.document.entities[plate]).toBeUndefined();
+    expect(replayed.document.corrosion).toEqual(preGuard.document.corrosion);
   });
 });
 
@@ -184,7 +225,7 @@ describe('check_material_compatibility data.orphans (COR_REFERENCE_ORPHANED)', (
 });
 
 describe('orphanedEntries (direct)', () => {
-  it('groups the missing ids per entry, ignores non-galvanic keys and sorts by kind then id', () => {
+  it('groups the missing ids per entry, ignores skipped:<id> keys (a skipped item is never acceptable) and sorts by kind then id', () => {
     const { doc, plate } = pair(['aluminium_wrought_other', null]);
     const corrosion = doc.corrosion;
     if (corrosion === undefined) throw new Error('no slice');

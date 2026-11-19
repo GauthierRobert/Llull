@@ -15,11 +15,17 @@ export interface GuardRefusal {
   readonly error: CommandError;
 }
 
+/** What a guard may know about the call (additive; guards that ignore it keep working). */
+export interface GuardContext {
+  /** True while history replay re-runs recorded steps: a reference guard added after the steps were recorded must not refuse them (L8). */
+  readonly replaying: boolean;
+}
+
 export interface DerivationGuard {
   /** Short id of the definition domain, e.g. `building`. */
   readonly domain: string;
   /** Rejection summary tail when `next` edits geometry derived from the definition; else null. `commandName` is the command that produced `next`. */
-  check(previous: CadDocument, next: CadDocument, commandName: string): string | GuardRefusal | null;
+  check(previous: CadDocument, next: CadDocument, commandName: string, context?: GuardContext): string | GuardRefusal | null;
 }
 
 /** First guard violation for a command result: its summary and (for coded guards) its error, else null. */
@@ -28,10 +34,11 @@ export function derivationViolation(
   commandName: string,
   previous: CadDocument,
   next: CadDocument,
+  context: GuardContext = { replaying: false },
 ): { readonly summary: string; readonly error: CommandError | null } | null {
   if (next === previous) return null;
   for (const guard of guards) {
-    const refusal = guard.check(previous, next, commandName);
+    const refusal = guard.check(previous, next, commandName, context);
     if (refusal === null) continue;
     if (typeof refusal === 'string') return { summary: `${commandName} rejected: ${refusal}`, error: null };
     return { summary: `${commandName} rejected: ${refusal.reason}`, error: refusal.error };

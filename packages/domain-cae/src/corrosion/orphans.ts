@@ -23,7 +23,7 @@ const REMOVER: Readonly<Record<CorrosionEntry['kind'], string>> = {
 
 const order = (p: string, q: string): number => (p < q ? -1 : p > q ? 1 : 0);
 
-/** The ids an acceptance item key names (`galvanic:<a>|<b>`). */
+/** The ids an acceptance item key names (`galvanic:<a>|<b>`); a `skipped:<id>` key names nothing: accept_corrosion_item never accepts a skipped item, so such a key is not a real acceptance. */
 const idsOfKey = (key: string): string[] => (key.startsWith('galvanic:') ? key.slice('galvanic:'.length).split('|') : []);
 
 /**

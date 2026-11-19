@@ -1,6 +1,6 @@
 /** Derivation guard: a solid or material that a surface system, isolation or galvanic-group entry still names cannot disappear (the slice would dangle). */
 
-import type { DerivationGuard, GuardRefusal } from '@core/commands/derivation';
+import type { DerivationGuard, GuardContext, GuardRefusal } from '@core/commands/derivation';
 import { commandError } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
 import { remediationOfCor } from './codes';
@@ -54,18 +54,29 @@ export function corrosionReferences(doc: CadDocument): Reference[] {
   return found;
 }
 
+/** Commands that replace the whole document (a loaded file is checked on load, not against the document it replaces). */
+const EXEMPT = new Set(['load_document', 'clear_document', 'restore_revision_snapshot']);
+
+const referenceKey = (reference: Reference): string => `${reference.entry.kind}:${reference.entry.id}>${reference.kind}:${reference.id}`;
+
 /**
- * @invariant a command may not remove an entity or material that a surface system, declared isolation or galvanic-group entry still references; refusal COR_REFERENCE_IN_USE
+ * @invariant a command may not remove an entity or material that a surface system, declared isolation or galvanic-group entry of the INPUT
+ *   document still references (and the result keeps); refusal COR_REFERENCE_IN_USE
+ * @invariant never refuses a history replay (steps recorded before the guard re-run as recorded, L8) nor a whole-document replacement (EXEMPT)
  */
 export const corrosionReferenceGuard: DerivationGuard = {
   domain: 'corrosion',
-  check(previous: CadDocument, next: CadDocument): GuardRefusal | null {
-    for (const { kind, id, owner, remedy } of corrosionReferences(next))
-      if (Object.hasOwn(previous[kind], id) && !Object.hasOwn(next[kind], id))
+  check(previous: CadDocument, next: CadDocument, commandName: string, context?: GuardContext): GuardRefusal | null {
+    if (context?.replaying === true || EXEMPT.has(commandName)) return null;
+    const before = new Set(corrosionReferences(previous).map(referenceKey));
+    for (const reference of corrosionReferences(next)) {
+      const { kind, id, owner, remedy } = reference;
+      if (before.has(referenceKey(reference)) && Object.hasOwn(previous[kind], id) && !Object.hasOwn(next[kind], id))
         return {
           reason: `${kind === 'entities' ? 'entity' : 'material'} '${id}' is used by ${owner}; ${remedy} first`,
           error: commandError('COR_REFERENCE_IN_USE', remediationOfCor('COR_REFERENCE_IN_USE'), [id]),
         };
+    }
     return null;
   },
 };

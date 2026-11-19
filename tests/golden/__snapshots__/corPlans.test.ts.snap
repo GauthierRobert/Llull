@@ -102,6 +102,7 @@ exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > 
       },
     ],
     "kernelContacts": {
+      "capped": 0,
       "kernel": null,
       "resolved": 0,
       "separated": 0,
@@ -195,6 +196,7 @@ exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > 
       },
     ],
     "kernelContacts": {
+      "capped": 0,
       "kernel": null,
       "resolved": 0,
       "separated": 0,
@@ -318,6 +320,7 @@ exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > 
       },
     ],
     "kernelContacts": {
+      "capped": 0,
       "kernel": null,
       "resolved": 0,
       "separated": 0,

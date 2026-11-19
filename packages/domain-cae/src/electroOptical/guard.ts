@@ -1,6 +1,6 @@
 /** Derivation guard: a solid or material that a coating assignment or bond path still names cannot disappear (the slice would dangle). */
 
-import type { DerivationGuard } from '@core/commands/derivation';
+import type { DerivationGuard, GuardContext } from '@core/commands/derivation';
 import type { CadDocument } from '@core/model/types';
 
 interface Reference {
@@ -31,10 +31,12 @@ function references(doc: CadDocument): Reference[] {
 
 /**
  * @invariant a command may not remove an entity or material that a coating assignment, bond path or lightning zone label still references
+ * @invariant never refuses a history replay (steps recorded before the guard re-run as recorded, L8)
  */
 export const electroOpticalReferenceGuard: DerivationGuard = {
   domain: 'electro-optical',
-  check(previous: CadDocument, next: CadDocument): string | null {
+  check(previous: CadDocument, next: CadDocument, _commandName: string, context?: GuardContext): string | null {
+    if (context?.replaying === true) return null;
     for (const { kind, id, owner } of references(next))
       if (Object.hasOwn(previous[kind], id) && !Object.hasOwn(next[kind], id))
         return `${kind === 'entities' ? 'entity' : 'material'} '${id}' is used by ${owner}; delete it (remove_surface_coating / delete_bond_path / remove_lightning_zone) first`;
