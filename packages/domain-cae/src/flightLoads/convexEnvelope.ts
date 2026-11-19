@@ -66,7 +66,7 @@ function ringWith(ring: readonly Flat[], p: Flat): Flat[] {
 /**
  * Incremental 2D hull of points lying within eps of the plane through `origin` spanned by e1, e2 (farthest from the seed triangle first): a
  * point farther than `eps` from the current polygon is added, a nearer one skipped (it stays within eps: the polygon only grows); vertices left
- * within 1e-9 x `scale` of the polygon of the others (collinear ones) are dropped.
+ * within 1e-9 x `scale` of the polygon of the others (collinear ones) are dropped, each removal checked against every vertex removed before it.
  */
 function planarHull(
   points: readonly Vec3[],
@@ -85,9 +85,13 @@ function planarHull(
   const order = [...flat].sort((p, q) => Math.hypot(q.x - cx, q.y - cy) - Math.hypot(p.x - cx, p.y - cy) || p.index - q.index);
   for (const point of order) if (ringDistance(ring, point) > eps) ring = ringWith(ring, point);
   const floor = 1e-9 * scale;
+  const removed: Flat[] = [];
   for (const vertex of [...ring]) {
     const others = ring.filter((entry) => entry !== vertex);
-    if (others.length >= 3 && !(ringDistance(others, vertex) > floor)) ring = others;
+    if (others.length >= 3 && [vertex, ...removed].every((entry) => !(ringDistance(others, entry) > floor))) {
+      ring = others;
+      removed.push(vertex);
+    }
   }
   return ring.map((point) => point.index);
 }
@@ -132,26 +136,34 @@ function hullDistance(at: (index: number) => Vec3, faces: readonly Face[], p: Ve
 const farthest = (indices: readonly number[], score: (index: number) => number): number =>
   indices.reduce((best, index) => (score(index) > score(best) ? index : best), indices[0] ?? 0);
 
-/** A tetrahedron of `indices` thicker than eps, or the dimension (0, 1, 2) of the cloud with its spanning points. */
+/** Thresholds of `seedOf`: the largest point extent, off-line distance and signed off-plane spread a cloud may have and still count as flat. */
+interface FlatLimits {
+  readonly point: number;
+  readonly line: number;
+  readonly plane: number;
+}
+
+/** A tetrahedron of `indices` thicker than the limits, or the dimension (0, 1, 2) of the cloud with its spanning points. */
 function seedOf(
   at: (index: number) => Vec3,
   indices: readonly number[],
-  eps: number,
+  limits: FlatLimits,
 ):
   | { readonly seed: readonly [number, number, number, number] }
   | { readonly flat: readonly number[]; readonly u: Vec3; readonly normal: Vec3 } {
   const first = indices[0] ?? 0;
   const i0 = farthest(indices, (index) => norm(sub(at(index), at(first))));
   const i1 = farthest(indices, (index) => norm(sub(at(index), at(i0))));
-  if (!(norm(sub(at(i1), at(i0))) > eps)) return { flat: [i0], u: [0, 0, 0], normal: [0, 0, 0] };
+  if (!(norm(sub(at(i1), at(i0))) > limits.point)) return { flat: [i0], u: [0, 0, 0], normal: [0, 0, 0] };
   const u = unit(sub(at(i1), at(i0)));
   const offLine = (index: number): number => norm(cross(sub(at(index), at(i0)), u));
   const i2 = farthest(indices, offLine);
-  if (!(offLine(i2) > eps)) return { flat: [i0, i1], u, normal: [0, 0, 0] };
+  if (!(offLine(i2) > limits.line)) return { flat: [i0, i1], u, normal: [0, 0, 0] };
   const normal = unit(cross(u, sub(at(i2), at(i0))));
-  const offPlane = (index: number): number => Math.abs(dot(sub(at(index), at(i0)), normal));
-  const i3 = farthest(indices, offPlane);
-  if (!(offPlane(i3) > eps)) return { flat: [i0, i1, i2], u, normal };
+  const height = (index: number): number => dot(sub(at(index), at(i0)), normal);
+  const spread = maxOf(indices.map(height)) - minOf(indices.map(height));
+  if (!(spread > limits.plane)) return { flat: [i0, i1, i2], u, normal };
+  const i3 = farthest(indices, (index) => Math.abs(height(index)));
   return { seed: [i0, i1, i2, i3] };
 }
 
@@ -186,14 +198,26 @@ function spatialHull(
   return faces;
 }
 
-/** Vertices of a 3D hull without the ones within `floor` of the hull of the others (points on a face or an edge of the final hull). */
+/** Hull faces of `indices`, or null when they are flatter than `floor` (no 3D hull). */
+function facesOf(at: (index: number) => Vec3, indices: readonly number[], floor: number): Face[] | null {
+  const seed = seedOf(at, indices, { point: floor, line: floor, plane: floor });
+  return 'seed' in seed ? spatialHull(at, indices, seed.seed, floor) : null;
+}
+
+/**
+ * Vertices of a 3D hull without the ones within `floor` of the hull of the others (points on a face or an edge of the final hull). A removal
+ * is kept only if every vertex removed so far stays within `floor` of the new hull, so the floors do not accumulate.
+ */
 function pruned(at: (index: number) => Vec3, faces: readonly Face[], floor: number): number[] {
   let kept = [...new Set(faces.flatMap((face) => face.corners))].sort((p, q) => p - q);
+  const removed: number[] = [];
   for (const vertex of [...kept]) {
     const others = kept.filter((index) => index !== vertex);
-    const seed = seedOf(at, others, floor);
-    if (!('seed' in seed)) continue;
-    if (!(hullDistance(at, spatialHull(at, others, seed.seed, floor), at(vertex)) > floor)) kept = others;
+    const hull = facesOf(at, others, floor);
+    if (hull !== null && [vertex, ...removed].every((index) => !(hullDistance(at, hull, at(index)) > floor))) {
+      kept = others;
+      removed.push(vertex);
+    }
   }
   return kept;
 }
@@ -202,7 +226,9 @@ function pruned(at: (index: number) => Vec3, faces: readonly Face[], floor: numb
  * Indices (ascending) of the instants whose `points` are the vertices of their convex hull to within eps = tolerance x the bounding-box
  * diagonal: a point less than eps (Euclidean) from the current hull is not added; points on a face or an edge of the result are dropped. A
  * degenerate cloud gives its hull in its own dimension (one point, the two ends of a segment, a planar polygon).
- * @invariant every point lies within eps (plus 1e-9 of the diagonal) of the convex hull of the returned points, so max over returned u.p >= max over all u.p - eps for every unit u
+ * @invariant every point lies within eps (plus 1e-9 of the diagonal) of the convex hull of the returned points (Euclidean): in 3D by the
+ *   insertion test; a flat cloud (signed off-plane spread <= eps / sqrt 2) by sqrt((eps / sqrt 2)^2 + spread^2) <= eps; a line (off-line
+ *   distance <= eps / 2) by the disc of the offsets; so max over returned u.p >= max over all u.p - eps for every unit u
  */
 export function convexEnvelopeIndices(points: readonly Vec3[], tolerance: number): number[] {
   if (points.length === 0) return [];
@@ -211,10 +237,11 @@ export function convexEnvelopeIndices(points: readonly Vec3[], tolerance: number
   const diagonal = Math.hypot(axis(0), axis(1), axis(2));
   const eps = tolerance * diagonal;
   const all = points.map((_, index) => index);
-  // a flat cloud is hulled in its plane / on its line with eps / sqrt 2 there: with the off-plane offset (also below eps / sqrt 2) the
-  // Euclidean distance of a sample to the hull stays below eps
+  // a flat cloud is hulled in its plane with flatEps = eps / sqrt 2 when its signed off-plane spread is at most flatEps too: the nearest point
+  // of the projected hull lifts to a point of the 3D hull whose height differs from the sample's by at most the spread, so the distance is at
+  // most sqrt(flatEps^2 + spread^2) <= eps. On a line the perpendicular offsets lie in a disc of radius eps / 2 (their differences <= eps).
   const flatEps = eps / Math.SQRT2;
-  const seed = seedOf(at, all, flatEps);
+  const seed = seedOf(at, all, { point: flatEps, line: eps / 2, plane: flatEps });
   if ('seed' in seed) return pruned(at, spatialHull(at, all, seed.seed, eps), 1e-9 * diagonal);
   if (seed.flat.length === 1) return [...seed.flat];
   if (seed.flat.length === 2) {

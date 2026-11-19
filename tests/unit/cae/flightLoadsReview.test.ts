@@ -39,6 +39,80 @@ function supportGap(points: readonly Vec3[], chosen: readonly number[]): number 
   return gap;
 }
 
+const sub3 = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross3 = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
+
+/** Exact distance from p to the segment a b. */
+function segmentDistance(p: Vec3, a: Vec3, b: Vec3): number {
+  const e = sub3(b, a);
+  const length2 = dot(e, e);
+  const t = length2 > 0 ? Math.min(1, Math.max(0, dot(sub3(p, a), e) / length2)) : 0;
+  return norm3(sub3(p, [a[0] + t * e[0], a[1] + t * e[1], a[2] + t * e[2]]));
+}
+
+/** Exact distance from p to the triangle a b c (a degenerate one by its edges). */
+function triangleDistance(p: Vec3, a: Vec3, b: Vec3, c: Vec3): number {
+  const n = cross3(sub3(b, a), sub3(c, a));
+  const area2 = norm3(n);
+  const edges = Math.min(segmentDistance(p, a, b), segmentDistance(p, b, c), segmentDistance(p, c, a));
+  if (!(area2 > 1e-14)) return edges;
+  const unitN: Vec3 = [n[0] / area2, n[1] / area2, n[2] / area2];
+  const h = dot(sub3(p, a), unitN);
+  const q = sub3(p, [unitN[0] * h, unitN[1] * h, unitN[2] * h]);
+  const inside = [
+    [a, b],
+    [b, c],
+    [c, a],
+  ].every(([x, y]) => dot(cross3(sub3(y as Vec3, x as Vec3), sub3(q, x as Vec3)), unitN) >= 0);
+  return inside ? Math.abs(h) : edges;
+}
+
+/**
+ * An upper bound of the Euclidean distance from every sample to the hull of the chosen ones, exact for a sample outside it: the minimum over
+ * every triangle (and segment) of chosen vertices (the hull boundary is a union of such triangles).
+ */
+function largestHullDistance(points: readonly Vec3[], chosen: readonly number[]): number {
+  const vertices = chosen.map((index): Vec3 => points[index] ?? [0, 0, 0]);
+  let worst = 0;
+  for (const p of points) {
+    let best = vertices.reduce((d, v) => Math.min(d, norm3(sub3(p, v))), Infinity);
+    for (let i = 0; i < vertices.length; i++)
+      for (let j = i + 1; j < vertices.length; j++) {
+        const [a, b] = [vertices[i] as Vec3, vertices[j] as Vec3];
+        best = Math.min(best, segmentDistance(p, a, b));
+        for (let k = j + 1; k < vertices.length; k++) best = Math.min(best, triangleDistance(p, a, b, vertices[k] as Vec3));
+      }
+    worst = Math.max(worst, best);
+  }
+  return worst;
+}
+
+/** Exact largest distance from samples in the z = 0 plane to the 2D convex hull of the chosen ones (monotone chain of the chosen). */
+function largestPlanarDistance(points: readonly Vec3[], chosen: readonly number[]): number {
+  const sorted = chosen.map((index): Vec3 => points[index] ?? [0, 0, 0]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross2 = (o: Vec3, a: Vec3, b: Vec3): number => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const chain = (list: readonly Vec3[]): Vec3[] => {
+    const out: Vec3[] = [];
+    for (const p of list) {
+      while (out.length >= 2 && cross2(out[out.length - 2] as Vec3, out[out.length - 1] as Vec3, p) <= 0) out.pop();
+      out.push(p);
+    }
+    return out.slice(0, -1);
+  };
+  const ring = [...chain(sorted), ...chain([...sorted].reverse())];
+  let worst = 0;
+  for (const p of points) {
+    const outside = ring.some((a, k) => cross2(a, ring[(k + 1) % ring.length] as Vec3, p) < 0);
+    if (!outside) continue;
+    worst = Math.max(
+      worst,
+      ring.reduce((d, a, k) => Math.min(d, segmentDistance(p, a, ring[(k + 1) % ring.length] as Vec3)), Infinity),
+    );
+  }
+  return worst;
+}
+
 describe('convex envelope of a flat cloud (the planar branch)', () => {
   const arc = (count: number, sweep: number, wobble = 0): Vec3[] =>
     Array.from({ length: count }, (_, k) => {
@@ -82,8 +156,46 @@ describe('convex envelope of a flat cloud (the planar branch)', () => {
   it('a thin 3D cloud (off-plane wobble below the flat threshold) is hulled in its plane and still bounded in 3D', () => {
     const points = arc(401, Math.PI, 0.05);
     const chosen = convexEnvelopeIndices(points, 0.02);
-    expect(supportGap(points, chosen)).toBeLessThanOrEqual(0.02 * diagonal(points));
+    expect(largestHullDistance(points, chosen)).toBeLessThanOrEqual(0.02 * diagonal(points));
     expect(chosen.length).toBeLessThan(40);
+  });
+
+  it('a flat cloud whose samples straddle the plane (+h at the hull edge, -h beyond it) stays within eps in 3D (round 2 regression)', () => {
+    const cloud = (h: number, d: number): Vec3[] => [
+      [-10, 0, 0],
+      [10, 0, 0],
+      [0, 10, 0],
+      [5, -8, h],
+      [-5, -8, h],
+      [0, -8 - d, -h],
+    ];
+    let points = cloud(0, 0);
+    for (let k = 0; k < 5; k++) {
+      const step = (0.99 * 0.02 * diagonal(points)) / Math.SQRT2;
+      points = cloud(step, step);
+    }
+    const eps = 0.02 * diagonal(points);
+    const chosen = convexEnvelopeIndices(points, 0.02);
+    expect(largestHullDistance(points, chosen)).toBeLessThanOrEqual(eps * (1 + 1e-9));
+  });
+
+  it('collinear pruning does not drift: noisy samples on a line in the plane stay within eps plus the 1e-9 floor (seeded)', () => {
+    let worst = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      let state = seed;
+      const random = (): number => {
+        state = (state * 1664525 + 1013904223) % 4294967296;
+        return state / 4294967296;
+      };
+      const points: Vec3[] = Array.from({ length: 300 }, () => {
+        const x = 20 * random() - 10;
+        return [x, 0.5 * x + 1e-7 * (random() - 0.5), 0];
+      });
+      const chosen = convexEnvelopeIndices(points, 1e-12);
+      const allowed = (1e-12 + 1e-9) * diagonal(points);
+      worst = Math.max(worst, largestPlanarDistance(points, chosen) / allowed);
+    }
+    expect(worst).toBeLessThanOrEqual(1);
   });
 });
 
@@ -115,6 +227,25 @@ describe('bodyForceShares (consistent body force, integral of N_i det J)', () =>
     expect(total).toBeGreaterThan(volume * 1.01);
     // the moved node (mid of edge 2-3) takes more than V/5, the straight rule would be wrong
     expect(shares[5]).toBeGreaterThan(volume / 5 + 0.01);
+  });
+
+  it('refuses a folded C3D10 (det J changes sign between Gauss points) and a flat C3D4; a consistently inverted element keeps |det J|', () => {
+    const folded = straight.map((p, k): Vec3 => (k === 4 ? [p[0], p[1] - 1.6, p[2] + 1.6] : p));
+    expect(bodyForceShares('C3D10', folded)).toBeNull();
+    expect(
+      bodyForceShares('C3D4', [
+        [0, 0, 0],
+        [1, 0, 0],
+        [2, 0, 0],
+        [0, 0, 1],
+      ]),
+    ).toBeNull();
+    // swapping corners 2 and 3 (and the mid nodes that follow them) mirrors the order: det J < 0 everywhere, same shares
+    const order = [0, 2, 1, 3, 6, 5, 4, 7, 9, 8];
+    const mirrored = order.map((k) => straight[k] as Vec3);
+    const shares = bodyForceShares('C3D10', mirrored) ?? [];
+    const reference = bodyForceShares('C3D10', straight) ?? [];
+    order.forEach((k, position) => expect(shares[position]).toBeCloseTo(reference[k] ?? Number.NaN, 12));
   });
 });
 

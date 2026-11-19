@@ -68,16 +68,21 @@ function jacobian(nodes: readonly Vec3[], derivatives: readonly Vec3[]): number 
 /**
  * integral of N_i |det J| per node of a C3D4 (4 nodes) or C3D10 (10 nodes, CalculiX order), or null for another element type / node count.
  * @invariant the shares sum to the element volume (the exact one for C3D4 and a straight C3D10; the 4-point one of a curved C3D10)
+ * @invariant null when det J is zero at a Gauss point or changes sign between them (a degenerate or folded element: no share is guessed);
+ *   an element inverted throughout (consistent negative det J, a mirrored node order, which CalculiX itself refuses) keeps |det J|
  */
 export function bodyForceShares(type: string, nodes: readonly Vec3[]): number[] | null {
   if (type === 'C3D4' && nodes.length === 4) {
-    const volume = Math.abs(jacobian(nodes, DL)) / 6;
+    const det = jacobian(nodes, DL);
+    if (det === 0) return null;
+    const volume = Math.abs(det) / 6;
     return [volume / 4, volume / 4, volume / 4, volume / 4];
   }
   if (type !== 'C3D10' || nodes.length !== 10) return null;
   const rules = GAUSS.map((point) => {
     const { values, derivatives } = quadratic(point);
-    return { values, weight: Math.abs(jacobian(nodes, derivatives)) / 24 };
+    return { values, det: jacobian(nodes, derivatives) };
   });
-  return nodes.map((_, i) => rules.reduce((sum, { values, weight }) => sum + at(values, i) * weight, 0));
+  if (!(rules.every((rule) => rule.det > 0) || rules.every((rule) => rule.det < 0))) return null;
+  return nodes.map((_, i) => rules.reduce((sum, { values, det }) => sum + (at(values, i) * Math.abs(det)) / 24, 0));
 }
