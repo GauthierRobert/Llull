@@ -50,7 +50,7 @@ export function resistivityOf(
   const reasons = Array.isArray(data['unverifiedReasons'])
     ? data['unverifiedReasons'].filter((reason): reason is string => typeof reason === 'string')
     : [];
-  const kind = typeof data['method'] === 'string' ? (data['method'].split(' ')[0] ?? '').replace(/\(\d+\)$/, '') : '';
+  const kind = typeof data['form'] === 'string' ? data['form'] : 'unknown';
   return {
     rho: data['value'],
     temperatureModel: temperatureModelOf(kind, temperature),

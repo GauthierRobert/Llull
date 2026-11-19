@@ -295,15 +295,19 @@ shapes and are executed by `tests/unit/electroOptical/`.
 **Built**
 - Linear temperature coefficient (TR-EOP-11): core property form `linearCoefficient { variable, referenceValue, coefficient, reference }`, y = referenceValue (1 + coefficient (x - reference)),
   coefficient per unit of the variable (T in degC: alphaR in 1/K). Same path as every PHY-01 form (`propertyModel.ts` union, `propertyForms.ts` value + slope, zod `formSchema`, so define, library import and load all
-  validate it). Load / define refuse a non-finite field (`PROP_FORM_INVALID`) and, the form being monotonic, a value <= 0 at a validity bound of a positive property (`PROP_NONPOSITIVE_IN_RANGE`) or outside a
-  catalogue range (`EOP_PROPERTY_RANGE`), even when an edited file recomputes the hash. Never extrapolated (PHY-01 range guard). `electrical_resistance` and `check_bonding` straps read it through
-  `evaluate_property` and report `temperatureModel` (`none (constant model)`, `linear temperature coefficient ...`, `PHY-01 <kind> model`). The separate catalogue row
+  validate it). Load / define refuse a non-finite field (`PROP_FORM_INVALID`) and, the law being monotonic, a value <= 0 of a positive property (`PROP_NONPOSITIVE_IN_RANGE`) or outside a
+  catalogue range (`EOP_PROPERTY_RANGE`) at the ends of the equation range, even when an edited file recomputes the hash (`model/propertyLinearBounds.ts`). A linear law nested in a piecewise segment is
+  checked over that segment's sub-range; a product or a ratioOf ratio holding one is evaluated at the same ends (a product of two linear laws can dip between them: not checked). Never extrapolated (PHY-01 range guard). `electrical_resistance` and `check_bonding` straps read it through
+  `evaluate_property` (whose data now names the form kind, `form`) and report `temperatureModel` (`none (constant model)`, `linear temperature coefficient ...`, `PHY-01 <kind> model`). The separate catalogue row
   `temperatureCoefficientOfResistivity` of §3.1 is NOT added: alpha and T0 live in the form, so one model carries rho(T) and its reference temperature. Oracle VC-EOP-02.b (alphaR 0.00393 /K is a test input).
   Hostile corpus: four tampered linear forms in the `load_document` reader.
 - `set_lightning_zone` / `remove_lightning_zone`: slice `electroOptical.zones` (optional; files without it load), label `lz-<step>.<k>` `{ entityId, zone, source }`, one per solid (set again replaces, keeps the id),
   zone enum SAE ARP5414A `1A 1B 1C 2A 2B 3` (1C is in revision A), source REQUIRED (`EOP_ZONE_SOURCE_REQUIRED`). Per solid, not `facesNear`, as coatings (§13). The guard refuses deleting a labelled solid.
   `check_bonding` (no `pathIds`) returns `zones` rows `{ labelId, entityId, zone, source, bondPaths, composite, code }`; a composite solid (material record productForm / designation text, the CFRP strap heuristic)
-  in a zone that no path names (endpoint or joint interface) warns `EOP_LIGHTNING_ZONE_NO_PATH`; the status is unchanged. llull never derives a zone.
+  in a zone that no path names (endpoint or joint interface) warns `EOP_LIGHTNING_ZONE_NO_PATH`; the status is unchanged. llull never derives a zone. Composite = a tool face of a PHY-06
+  `composites.parts` entry, or the material record text (cfrp, carbon, laminate, ...; "carbon steel" excluded, also for straps).
+- String bounds (review): one table `EOP_LIMITS` in `model.ts` bounds both the command params (`sourceParams`, `quantityParams`, names, ids, rule ids without spaces, 256 elements, justification) and
+  the load schema, so whatever a command stores loads again (`tests/unit/contract/electroOpticalLimits.test.ts`). Entity / material references in the slice follow the document's own rules (spaces allowed).
 - `llull guide` section 21 (properties and conditions, the linear form, coatings, zones, bond rule entries, no default limit / flux / zone, the human gate).
 - Golden plan `validation/plans/eop_end_to_end.plan.json` (`tests/golden/eopPlans.test.ts`: document, every query at 9 digits, replay and save / load equality).
 

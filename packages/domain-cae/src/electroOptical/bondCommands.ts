@@ -7,19 +7,14 @@ import { convertValue, isUnitFailure } from '@lib/quantity';
 import { is3D, type CadDocument } from '@core/model/types';
 import { nextId } from '@lib/id';
 import { refuseEop } from './codes';
-import { electroOpticalOf, withElectroOptical } from './model';
+import { EOP_LIMITS, electroOpticalOf, quantityParams, sourceParams, withElectroOptical } from './model';
 import type { BondElement, BondLimit, BondPath } from './types';
 
 const DEFINE = 'define_bond_path';
 
-const quantity = (what: string): z.ZodObject<{ value: z.ZodNumber; unit: z.ZodString }> =>
-  z
-    .object({ value: z.number().describe(`${what}: positive, finite.`), unit: z.string().describe("Unit, e.g. 'mohm', 'mm', 'mm^2'.") })
-    .describe(`${what} as { value, unit }.`);
-const sourceSchema = z.object({
-  citation: z.string().describe('Report, datasheet or standard.'),
-  locator: z.string().optional().describe('Page / table.'),
-});
+const quantity = (what: string): ReturnType<typeof quantityParams> => quantityParams(what, "mohm', 'mm', 'mm^2");
+const sourceSchema = sourceParams('Report, datasheet or standard');
+const idParam = (description: string): z.ZodString => z.string().max(EOP_LIMITS.key).describe(description);
 
 const elementSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -27,7 +22,7 @@ const elementSchema = z.discriminatedUnion('kind', [
     resistance: quantity('Measured or specified joint resistance').describe('Resistance, e.g. { value: 0.5, unit: "mohm" }.'),
     source: sourceSchema.describe('REQUIRED: measurement report or rule the resistance comes from.'),
     interfaces: z
-      .tuple([z.string(), z.string()])
+      .tuple([idParam('First solid id.'), idParam('Second solid id.')])
       .optional()
       .describe(
         'The two solids the joint connects: check_bonding confirms they touch (find_contacts) and reads their bonded-interface coatings.',
@@ -35,7 +30,7 @@ const elementSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('strap').describe("Element kind: 'strap'."),
-    material: z.string().describe('Material id with a PHY-01 electricalResistivity model (define_property_model, unit ohm*m).'),
+    material: idParam('Material id with a PHY-01 electricalResistivity model (define_property_model, unit ohm*m).'),
     length: quantity('Conductor length'),
     crossSection: quantity('Conductor cross-section area'),
   }),
@@ -77,15 +72,19 @@ export const defineBondPath = defineCommand({
     '(the 2.5 mohm figure is a programme rule the owner supplies with its citation); the limit is stored unverified. temperature: the temperature the resistivities are evaluated at. ' +
     'Returns the path id in affected[0]. Next: check_bonding.',
   params: z.object({
-    name: z.string().describe('Path name.'),
-    from: z.string().describe('Entity id of the first solid (e.g. the equipment box).'),
-    to: z.string().describe('Entity id of the last solid (e.g. the structure).'),
-    elements: z.array(elementSchema).describe('Series elements in order, at least one.'),
+    name: z.string().max(EOP_LIMITS.name).describe(`Path name (at most ${EOP_LIMITS.name} characters).`),
+    from: idParam('Entity id of the first solid (e.g. the equipment box).'),
+    to: idParam('Entity id of the last solid (e.g. the structure).'),
+    elements: z.array(elementSchema).max(EOP_LIMITS.elements).describe(`Series elements in order, 1 to ${EOP_LIMITS.elements}.`),
     limit: z
       .object({
         value: z.number().describe('Positive limit value.'),
-        unit: z.string().describe("Resistance unit, e.g. 'mohm'."),
-        ruleId: z.string().describe('Id of the programme rule the limit comes from.'),
+        unit: z.string().max(EOP_LIMITS.unit).describe("Resistance unit, e.g. 'mohm'."),
+        ruleId: z
+          .string()
+          .max(EOP_LIMITS.key)
+          .regex(/^\S*$/)
+          .describe('Id of the programme rule the limit comes from (no spaces, e.g. "bond_class_R").'),
         source: sourceSchema.describe('REQUIRED citation of the rule.'),
       })
       .optional()

@@ -4,6 +4,7 @@
  */
 
 import { convertValue, isUnitFailure, parseUnit, sameDimension } from '../lib/quantity';
+import { linearBoundsProblem } from './propertyLinearBounds';
 import { catalogEntry } from './propertyCatalog';
 import { formVariables, type PropertyForm, type PropertyModel } from './propertyModel';
 
@@ -206,39 +207,6 @@ export function modelProblem(model: PropertyModel, otherModelIds: ReadonlySet<st
   const coverage = coverageProblem(model);
   if (coverage !== null) return coverage;
   return linearBoundsProblem(model, entry);
-}
-
-/**
- * A top-level linearCoefficient form is monotonic, so its extremes are at the equation-range bounds: there it must stay > 0 for a positive
- * catalogue property (a negative rho(T) is not a resistivity) and inside the catalogue range.
- */
-function linearBoundsProblem(
-  model: PropertyModel,
-  entry: { readonly positive: boolean; readonly range?: { min: number; max: number } },
-): ModelProblem | null {
-  const form = model.form;
-  if (form.kind !== 'linearCoefficient') return null;
-  const range = model.validity.find((r) => r.variable === form.variable);
-  const unit = model.variables.find((v) => v.variable === form.variable)?.unit;
-  if (range === undefined || unit === undefined) return null;
-  for (const bound of range.equation ?? range.data) {
-    const converted = convertValue(bound, range.unit, unit);
-    const x = isUnitFailure(converted) ? bound : converted.value;
-    const value = form.referenceValue * (1 + form.coefficient * (x - form.reference));
-    if (entry.positive && !(value > 0))
-      return problem(
-        'PROP_NONPOSITIVE_IN_RANGE',
-        'model.form',
-        `${model.property} = ${value} at ${form.variable} = ${x} ${unit}: it must stay > 0 over the valid range`,
-      );
-    if (entry.range !== undefined && (value < entry.range.min || value > entry.range.max))
-      return problem(
-        'EOP_PROPERTY_RANGE',
-        'model.form',
-        `${model.property} = ${value} at ${form.variable} = ${x} ${unit} is outside [${entry.range.min}, ${entry.range.max}]`,
-      );
-  }
-  return null;
 }
 
 /** Forms that read T as an absolute temperature (logarithms, powers, exp(−Q/RT)). */

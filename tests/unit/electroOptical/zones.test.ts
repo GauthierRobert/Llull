@@ -177,4 +177,53 @@ describe('check_bonding zone rows (EOP_LIGHTNING_ZONE_NO_PATH)', () => {
       [bare, false, null, 0],
     ]);
   });
+
+  it('"carbon steel" is not a composite; a solid laid up by a PHY-06 composite part is, whatever its material', () => {
+    const { doc: start, panel, fitting } = panelAndFitting();
+    let doc = run(start, 'define_material_record', {
+      id: 'aisi1020',
+      designation: 'AISI 1020 carbon steel',
+      productForm: 'bar',
+      specs: [],
+      licence: 'company-proprietary',
+      exportMarking: { regime: 'none' },
+    });
+    doc = run(doc, 'assign_material', { materialName: 'aisi1020', entityIds: [panel] });
+    for (const entityId of [panel, fitting]) doc = run(doc, 'set_lightning_zone', { entityId, zone: '1A', source: ZONING });
+    const laidUp = {
+      ...doc,
+      composites: { parts: { 'cp-1': { id: 'cp-1', toolFaces: [{ entityId: fitting, faceNear: [0, 0, 16] }] } } },
+    } as unknown as CadDocument;
+    expect(zonesOf(doc).map((row) => [row.entityId, row.composite])).toEqual([
+      [panel, false],
+      [fitting, false],
+    ]);
+    expect(zonesOf(laidUp).map((row) => [row.entityId, row.composite, row.code])).toEqual([
+      [panel, false, null],
+      [fitting, true, 'EOP_LIGHTNING_ZONE_NO_PATH'],
+    ]);
+  });
+});
+
+describe('zone commands: purity and 2D refusals', () => {
+  it('remove_lightning_zone is pure', () => {
+    const { doc, panel } = panelAndFitting();
+    const labelled = run(doc, 'set_lightning_zone', { entityId: panel, zone: '3', source: ZONING });
+    const before = structuredClone(labelled);
+    execute(labelled, 'remove_lightning_zone', { entityId: panel });
+    expect(labelled).toEqual(before);
+  });
+
+  it('both zone commands refuse a 2D shape', () => {
+    const { doc } = panelAndFitting();
+    const drawn = execute(doc, 'draw_rectangle', { width: 10, height: 5 });
+    const shape = drawn.affected[0] ?? '';
+    expect(shape).not.toBe('');
+    const set = execute(drawn.document, 'set_lightning_zone', { entityId: shape, zone: '2A', source: ZONING });
+    expect(set.error?.code).toBe('EOP_ENTITY_NOT_FOUND');
+    expect(set.document).toBe(drawn.document);
+    const removed = execute(drawn.document, 'remove_lightning_zone', { entityId: shape });
+    expect(removed.error?.code).toBe('EOP_ZONE_NOT_FOUND');
+    expect(removed.document).toBe(drawn.document);
+  });
 });

@@ -31,31 +31,56 @@ export const dispositionOf = (doc: CadDocument, id: string): BondDisposition | u
 /** The zone labels (none in a file written before set_lightning_zone). */
 export const zonesOf = (doc: CadDocument): Readonly<Record<string, LightningZoneLabel>> => electroOpticalOf(doc).zones ?? {};
 
+/** Length bounds of the slice's strings: the command params and the load schema share them, so whatever a command stores loads again. */
+export const EOP_LIMITS = { citation: 500, locator: 2000, name: 256, key: 256, unit: 64, justification: 4000, elements: 256 } as const;
+
 const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
 const keySchema = z
   .string()
   .min(1)
-  .max(256)
+  .max(EOP_LIMITS.key)
   .regex(/^\S+$/)
   .refine((key) => !RESERVED.has(key), 'reserved key');
-const textSchema = z.string().max(2000);
-const sourceSchema = z.strictObject({ citation: z.string().min(1).max(500), locator: textSchema.optional() });
-const quantitySchema = z.strictObject({ value: z.number().finite(), unit: z.string().min(1).max(64) });
-const MAX_ELEMENTS = 256;
+/** A reference to a document entity or material: its own key rules (a material name may hold spaces), bounded and never a prototype name. */
+const refSchema = z
+  .string()
+  .min(1)
+  .max(EOP_LIMITS.key)
+  .refine((key) => !RESERVED.has(key), 'reserved key');
+
+const textSchema = z.string().max(EOP_LIMITS.locator);
+const sourceSchema = z.strictObject({ citation: z.string().min(1).max(EOP_LIMITS.citation), locator: textSchema.optional() });
+const quantitySchema = z.strictObject({ value: z.number().finite(), unit: z.string().min(1).max(EOP_LIMITS.unit) });
+
+/** The `source` parameter of every EOP command that stores one (bounded as on load; a blank citation is refused by the command with its own code). */
+export const sourceParams = (citation: string): z.ZodObject<{ citation: z.ZodString; locator: z.ZodOptional<z.ZodString> }> =>
+  z.object({
+    citation: z.string().max(EOP_LIMITS.citation).describe(`${citation} (at most ${EOP_LIMITS.citation} characters).`),
+    locator: z.string().max(EOP_LIMITS.locator).optional().describe(`Page / table / sheet (at most ${EOP_LIMITS.locator} characters).`),
+  });
+
+/** A stored `{ value, unit }` parameter (unit bounded as on load). */
+export const quantityParams = (what: string, example: string): z.ZodObject<{ value: z.ZodNumber; unit: z.ZodString }> =>
+  z
+    .object({
+      value: z.number().describe(`${what}: positive, finite.`),
+      unit: z.string().max(EOP_LIMITS.unit).describe(`Unit, e.g. '${example}'.`),
+    })
+    .describe(`${what} as { value, unit }.`);
 
 const elementSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('joint'),
     resistance: quantitySchema,
     source: sourceSchema,
-    interfaces: z.tuple([keySchema, keySchema]).optional(),
+    interfaces: z.tuple([refSchema, refSchema]).optional(),
   }),
-  z.strictObject({ kind: z.literal('strap'), material: keySchema, length: quantitySchema, crossSection: quantitySchema }),
+  z.strictObject({ kind: z.literal('strap'), material: refSchema, length: quantitySchema, crossSection: quantitySchema }),
 ]);
 
 const limitSchema = z.strictObject({
   value: z.number().finite().positive(),
-  unit: z.string().min(1).max(64),
+  unit: z.string().min(1).max(EOP_LIMITS.unit),
   ruleId: keySchema,
   source: sourceSchema,
   unverified: z.boolean(),
@@ -63,29 +88,29 @@ const limitSchema = z.strictObject({
 
 const pathSchema = z.strictObject({
   id: keySchema,
-  name: z.string().min(1).max(256),
-  from: keySchema,
-  to: keySchema,
-  elements: z.array(elementSchema).min(1).max(MAX_ELEMENTS),
+  name: z.string().min(1).max(EOP_LIMITS.name),
+  from: refSchema,
+  to: refSchema,
+  elements: z.array(elementSchema).min(1).max(EOP_LIMITS.elements),
   limit: limitSchema.optional(),
   temperature: quantitySchema.optional(),
 });
 
 const coatingSchema = z.strictObject({
   id: keySchema,
-  entityId: keySchema,
-  coating: keySchema,
+  entityId: refSchema,
+  coating: refSchema,
   location: z.enum(COATING_LOCATIONS),
   electrical: z.enum(ELECTRICAL_EFFECTS),
   source: sourceSchema.optional(),
 });
 
-const zoneSchema = z.strictObject({ id: keySchema, entityId: keySchema, zone: z.enum(LIGHTNING_ZONES), source: sourceSchema });
+const zoneSchema = z.strictObject({ id: keySchema, entityId: refSchema, zone: z.enum(LIGHTNING_ZONES), source: sourceSchema });
 
 const dispositionSchema = z.strictObject({
   pathId: keySchema,
   decision: z.enum(DISPOSITIONS),
-  justification: z.string().min(1).max(4000),
+  justification: z.string().min(1).max(EOP_LIMITS.justification),
   inputsHash: z.string().regex(/^[0-9a-f]{64}$/),
   signer: z.string().min(1).max(256),
   signatureId: z.string().min(1).max(256),

@@ -177,4 +177,52 @@ describe('linearCoefficient property form (TR-EOP-11)', () => {
     });
     expect(resistance(doc)['temperatureModel']).toBe('PHY-01 product model');
   });
+
+  it('checks a linear law nested in piecewise segments over each sub-range', () => {
+    const doc = withMaterial();
+    const piecewise = (coefficient: number): Record<string, unknown> => ({
+      kind: 'piecewise',
+      variable: 'T',
+      segments: [
+        { upTo: 0, form: { kind: 'linearCoefficient', variable: 'T', referenceValue: 1e-8, coefficient, reference: 0 } },
+        { upTo: 150, form: { kind: 'constant', value: 1e-8 } },
+      ],
+    });
+    const refused = define(doc, rhoModel(piecewise(0.05)));
+    expect(refused.error?.code).toBe('PROP_NONPOSITIVE_IN_RANGE');
+    expect(refused.summary).toContain('-55');
+    expect(define(doc, rhoModel(piecewise(0.005))).error).toBeUndefined();
+  });
+
+  it('checks a linear law inside a product and the ratio of a ratioOf', () => {
+    const doc = withMaterial();
+    const negative = { kind: 'linearCoefficient', variable: 'T', referenceValue: 1, coefficient: 0.05, reference: 0 };
+    expect(define(doc, rhoModel({ kind: 'product', factors: [{ kind: 'constant', value: 1e-8 }, negative] })).error?.code).toBe(
+      'PROP_NONPOSITIVE_IN_RANGE',
+    );
+    let withBase = run(doc, 'define_property_model', {
+      material: 'cu',
+      model: { ...rhoModel({ kind: 'constant', value: 1e-8 }), id: 'rho.base', variables: [], validity: [] },
+    });
+    const ratio = execute(withBase, 'define_property_model', {
+      material: 'cu',
+      model: rhoModel({ kind: 'ratioOf', baseModelId: 'rho.base', ratio: negative }),
+    });
+    expect(ratio.error?.code).toBe('PROP_NONPOSITIVE_IN_RANGE');
+    withBase = run(withBase, 'define_property_model', {
+      material: 'cu',
+      model: rhoModel({ kind: 'ratioOf', baseModelId: 'rho.base', ratio: { ...negative, coefficient: 0.001 } }),
+    });
+    expect(withBase.materials['cu']?.propertyModels?.length).toBe(2);
+  });
+
+  it('evaluate_property names the form kind in data.form', () => {
+    const doc = run(withMaterial(), 'define_property_model', { material: 'cu', model: rhoModel(LINEAR) });
+    const data = execute(doc, 'evaluate_property', {
+      material: 'cu',
+      property: 'electricalResistivity',
+      at: { T: { value: 75, unit: 'degC' } },
+    }).data as Record<string, unknown>;
+    expect(data['form']).toBe('linearCoefficient');
+  });
 });

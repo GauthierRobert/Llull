@@ -1,6 +1,7 @@
 /** Hostile-input table: core readers of user text (fonts, expressions, units, images, material libraries, saved documents) and PLM / protocol readers. */
 import { execute } from '@core/commands/registry';
 import { parseMaterialLibrary } from '@core/commands/materials/libraryFormat';
+import { formHash } from '@core/commands/document/propertyModels';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { dynamicsProblems } from '@core/commands/persistence/dynamicsValidation';
 import { createEmptyDocument } from '@core/model/types';
@@ -34,7 +35,7 @@ function implicitBodyDocument(mutate: (body: Record<string, unknown>) => void): 
   for (const body of Object.values(saved.document.implicit.bodies)) mutate(body);
   return JSON.stringify(saved);
 }
-/** A saved document with one material holding a PHY-15 linearCoefficient resistivity model, its stored form changed by `tamper`. */
+/** A saved document with one material holding a PHY-15 linearCoefficient resistivity model, its stored form changed by `tamper` and its hash recomputed (as an attacker would), so the load checks behind the hash are reached. */
 function linearModelDocument(tamper: (form: Record<string, unknown>) => void): string {
   let doc = execute(createEmptyDocument(), 'create_material', {
     name: 'cu',
@@ -56,9 +57,13 @@ function linearModelDocument(tamper: (form: Record<string, unknown>) => void): s
   };
   doc = execute(doc, 'define_property_model', { material: 'cu', model }).document;
   const saved = JSON.parse(serializeDocument(doc)) as {
-    document: { materials: Record<string, { propertyModels: { form: Record<string, unknown> }[] }> };
+    document: { materials: Record<string, { propertyModels: { form: Record<string, unknown>; coefficientsSha256: string }[] }> };
   };
-  for (const material of Object.values(saved.document.materials)) for (const stored of material.propertyModels ?? []) tamper(stored.form);
+  for (const material of Object.values(saved.document.materials))
+    for (const stored of material.propertyModels ?? []) {
+      tamper(stored.form);
+      stored.coefficientsSha256 = formHash(stored.form as never);
+    }
   return JSON.stringify(saved);
 }
 import { firaBytes } from '../../unit/wrap/fixtures';

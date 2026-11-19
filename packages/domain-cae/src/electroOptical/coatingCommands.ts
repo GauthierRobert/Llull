@@ -6,7 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { is3D } from '@core/model/types';
 import { nextId } from '@lib/id';
 import { refuseEop } from './codes';
-import { electroOpticalOf, withElectroOptical } from './model';
+import { EOP_LIMITS, electroOpticalOf, sourceParams, withElectroOptical } from './model';
 import { COATING_LOCATIONS, ELECTRICAL_EFFECTS, type CoatingAssignment } from './types';
 
 const ASSIGN = 'assign_surface_coating';
@@ -26,15 +26,14 @@ export const assignSurfaceCoating = defineCommand({
     "electrical states the coating's effect on a bond across it: 'conductive' or 'insulating' (each REQUIRES a source) or 'unknown' (default): an unknown or insulating coating on a bonded interface " +
     'never lets check_bonding pass. llull ships no coating data. One coating per entity and location. Returns the assignment id in affected[0].',
   params: z.object({
-    entityId: z.string().describe('Id of the solid.'),
-    coating: z.string().describe("Id of the coating material (record productForm 'coating')."),
+    entityId: z.string().max(EOP_LIMITS.key).describe('Id of the solid.'),
+    coating: z.string().max(EOP_LIMITS.key).describe("Id of the coating material (record productForm 'coating')."),
     location: z.enum(COATING_LOCATIONS).optional().describe("'exposed' (default) or 'bonded_interface'."),
     electrical: z
       .enum(ELECTRICAL_EFFECTS)
       .optional()
       .describe('Declared electrical effect: conductive | insulating | unknown (default). A declared value needs `source`.'),
-    source: z
-      .object({ citation: z.string().describe('Datasheet, report or standard.'), locator: z.string().optional().describe('Page / table.') })
+    source: sourceParams('Datasheet, report or standard')
       .optional()
       .describe('Where the electrical effect comes from (required for conductive / insulating).'),
   }),

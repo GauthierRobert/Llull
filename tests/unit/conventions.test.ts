@@ -306,7 +306,7 @@ describe('CONVENTIONS_GUIDE acoustics section (PHY-20 M2, AF-03)', () => {
 });
 
 describe('CONVENTIONS_GUIDE electro-optical section (PHY-15)', () => {
-  const section = CONVENTIONS_GUIDE.split('## 21. Electrical bonding')[1] ?? '';
+  const section = (CONVENTIONS_GUIDE.split(/## \d+\. Electrical bonding, coatings and optical balance/)[1] ?? '').split('\n## ')[0] ?? '';
   it('exists and names only registered commands, including every PHY-15 command', async () => {
     const { getCommand } = await import('@core/commands/registry');
     expect(section.length).toBeGreaterThan(0);

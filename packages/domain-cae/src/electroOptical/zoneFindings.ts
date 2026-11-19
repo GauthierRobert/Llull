@@ -1,7 +1,7 @@
-/** Lightning zone rows of check_bonding (PHY-15 V1, EOP_LIGHTNING_ZONE_NO_PATH): each labelled solid, the bond paths that name it, and whether it is composite. */
+/** Lightning zone rows of check_bonding (PHY-15 V1, EOP_LIGHTNING_ZONE_NO_PATH): each labelled solid, the bond paths that name it, and whether it is composite (a PHY-06 part's tool face, or its material record text). */
 
 import type { CadDocument } from '@core/model/types';
-import { COMPOSITE_TEXT } from './bondEval';
+import { isCompositeText } from './bondEval';
 import { electroOpticalOf, zonesOf } from './model';
 import type { BondPath } from './types';
 
@@ -22,19 +22,21 @@ const names = (path: BondPath, entityId: string): boolean =>
   path.to === entityId ||
   path.elements.some((element) => element.kind === 'joint' && (element.interfaces?.includes(entityId) ?? false));
 
-/** Composite when the solid's material record names a composite product form or designation (the same text heuristic as a CFRP strap). */
+/** Composite when a PHY-06 composite part lays up on the solid (a tool face of a `composites.parts` entry), or when its material record names a composite product form or designation. */
 function isComposite(doc: CadDocument, entityId: string): boolean {
+  const laidUp = Object.values(doc.composites?.parts ?? {}).some((part) => part.toolFaces.some((face) => face.entityId === entityId));
+  if (laidUp) return true;
   const materialId = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId]?.materialId : undefined;
   if (materialId === undefined || !Object.hasOwn(doc.materials, materialId)) return false;
   const record = doc.materials[materialId]?.record;
-  return COMPOSITE_TEXT.test(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
+  return isCompositeText(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
 }
 
-/** One row per zone label, in label id order. */
+/** One row per zone label, in label id order (numeric: lz-9.1 before lz-10.1). */
 export function zoneRows(doc: CadDocument): ZoneRow[] {
   const paths = Object.values(electroOpticalOf(doc).bondPaths);
   return Object.values(zonesOf(doc))
-    .sort((a, b) => a.id.localeCompare(b.id))
+    .sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }))
     .map((label) => {
       const bondPaths = paths.filter((path) => names(path, label.entityId)).map((path) => path.id);
       const composite = isComposite(doc, label.entityId);

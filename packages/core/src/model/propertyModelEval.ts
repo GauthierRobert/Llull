@@ -12,6 +12,7 @@ import {
   type Basis,
   type PropertyCondition,
   type PropertyDirection,
+  type PropertyForm,
   type PropertyModel,
   type PropertyUncertainty,
   type PropertyVariable,
@@ -43,6 +44,8 @@ interface PropertyEvaluationOk {
   readonly basis: Basis;
   readonly provenance: Provenance;
   readonly method: string;
+  /** Kind of the evaluated form (`constant`, `linearCoefficient`, `table1d`, …): read this, never parse `method`. */
+  readonly form: PropertyForm['kind'];
   readonly coefficientsSha256: string;
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
@@ -325,6 +328,7 @@ export function evaluatePropertyModel(
     basis: model.basis,
     provenance: model.provenance,
     method: methodOf(model),
+    form: model.form.kind,
     coefficientsSha256: model.coefficientsSha256,
     unverified: reasons.length > 0,
     unverifiedReasons: reasons,

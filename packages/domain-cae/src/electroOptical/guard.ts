@@ -30,7 +30,7 @@ function references(doc: CadDocument): Reference[] {
 }
 
 /**
- * @invariant a command may not remove an entity or material that a coating assignment or bond path still references
+ * @invariant a command may not remove an entity or material that a coating assignment, bond path or lightning zone label still references
  */
 export const electroOpticalReferenceGuard: DerivationGuard = {
   domain: 'electro-optical',

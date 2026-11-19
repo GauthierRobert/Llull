@@ -6,7 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { is3D } from '@core/model/types';
 import { nextId } from '@lib/id';
 import { refuseEop } from './codes';
-import { withElectroOptical, zonesOf } from './model';
+import { EOP_LIMITS, sourceParams, withElectroOptical, zonesOf } from './model';
 import { LIGHTNING_ZONES, type LightningZoneLabel } from './types';
 
 const SET = 'set_lightning_zone';
@@ -25,14 +25,9 @@ export const setLightningZone = defineCommand({
     'Setting again replaces the label of that solid (same id). check_bonding then warns EOP_LIGHTNING_ZONE_NO_PATH for a composite solid (material record productForm / designation) in a zone that no bond path names. ' +
     'Returns the label id in affected[0].',
   params: z.object({
-    entityId: z.string().describe('Id of the solid.'),
+    entityId: z.string().max(EOP_LIMITS.key).describe('Id of the solid.'),
     zone: z.enum(LIGHTNING_ZONES).describe('ARP5414A zone: 1A, 1B, 1C, 2A, 2B or 3.'),
-    source: z
-      .object({
-        citation: z.string().describe('Zoning drawing, report or certification document.'),
-        locator: z.string().optional().describe('Sheet / section.'),
-      })
-      .describe('REQUIRED: where the zone comes from.'),
+    source: sourceParams('Zoning drawing, report or certification document').describe('REQUIRED: where the zone comes from.'),
   }),
   run: (doc, { entityId, zone, source }): CommandResult => {
     const entity = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
