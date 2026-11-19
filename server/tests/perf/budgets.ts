@@ -30,6 +30,12 @@ export const BUDGETS = {
   'fea.query.describe_analysis': budget('instant', 100, 1318, 'describe_analysis, same process'),
   'fea.query.compute_margins': budget('responsive', 200, 2177, 'compute_margins over 68k nodes, same process'),
   'fea.query.check_analysis': budget('responsive', 300, 3782, 'check_analysis, same process'),
+  'fea.map.nodal68k': budget(
+    'job',
+    2500,
+    8860,
+    'mapNodalField (TypeScript, no llull-compute) of a 68k-node C3D10 field onto the same mesh',
+  ),
   'dynamics.simulate.servo_arms': budget('job', 6000, 10400, 'simulate_motion 10 s, 50 bodies / 40 joints / 40 speed motors'),
   'dynamics.simulate.closed_loops': budget(
     'job',
