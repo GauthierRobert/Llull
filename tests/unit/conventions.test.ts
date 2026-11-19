@@ -298,9 +298,10 @@ describe('CONVENTIONS_GUIDE acoustics section (PHY-20 M2, AF-03)', () => {
       'delete_acoustic_exposure',
       'check_acoustic_handoff',
       'export_acoustic_load',
+      'dispose_acoustic_export',
     ])
       expect(section).toContain(command);
-    for (const text of ['20 micropascal', 'VAC_OUT_OF_SCOPE', 'KRN_NO_EXACT_KERNEL', 'reviewRequired', 'VAC_FIELD_UNSET'])
+    for (const text of ['20 micropascal', 'VAC_OUT_OF_SCOPE', 'KRN_NO_EXACT_KERNEL', 'reviewRequired', 'VAC_FIELD_UNSET', 'VAC_HUMAN_GATE'])
       expect(section).toContain(text);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * The execution context every server / CLI `execute` call runs in: process defaults + the FE artifact port + the material library provider + the
- * signature port of this machine (trust store, 09 PLM) + the local vault's objects (`LLULL_VAULT`). Human-only acts are cleared by that port, never by a caller label.
+ * signature port of this machine (trust store, 09 PLM) + the local vault's objects (`LLULL_VAULT`) + the host version stamped into export provenance. Human-only acts are cleared by that port, never by a caller label.
  */
 
 import { defaultContext } from '@core/commands/context';
@@ -15,6 +15,7 @@ import { defaultMeshAssetStore } from '../meshAssets/store';
 import { cfdResultPort } from '../cfd/resultPort';
 import { currentScope } from '../native/deferredRun';
 import { exportFilePort } from '../exportFiles';
+import { hostVersion } from '../hostVersion';
 
 export function serverContext(
   onStep?: (event: PlanStepEvent) => void,
@@ -31,6 +32,7 @@ export function serverContext(
     pointClouds: defaultPointCloudPort(),
     meshAssets: defaultMeshAssetStore(),
     exportFiles: exportFilePort(),
+    hostVersion: hostVersion(),
     // inside `resolveDeferred`: the memo the runs of that resolve share (TECHNICAL_SPEC 13.9)
     resolveMemo: currentScope()?.memo ?? null,
   };

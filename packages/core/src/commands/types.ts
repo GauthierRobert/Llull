@@ -312,6 +312,8 @@ export interface ExecutionContext {
   readonly meshAssets?: MeshAssetPort | null;
   /** Files of this host for exports too large to return as a string (`export_3mf` toFile); null/absent = such exports stay in memory and refuse above their ceiling. */
   readonly exportFiles?: ExportFilePort | null;
+  /** The llull version of the host running the command (the server / CLI package version), stamped into export provenance; null/absent = not a llull host (exports write null). */
+  readonly hostVersion?: string | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */

@@ -5,7 +5,7 @@ import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import type { CadDocument } from '@core/model/types';
 import { bandByNominal } from './math/bands';
 import { LEVEL_DB_MAX, LEVEL_DB_MIN } from './math/levels';
-import type { AcousticExposure, AcousticSpectrum, VibroacousticsModel } from './types';
+import { REVIEW_DECISIONS, type AcousticExposure, type AcousticReview, type AcousticSpectrum, type VibroacousticsModel } from './types';
 
 const EMPTY: VibroacousticsModel = { spectra: {}, spectrumOrder: [], exposures: {}, exposureOrder: [] };
 
@@ -51,10 +51,30 @@ export const withExposure = (doc: CadDocument, exposure: AcousticExposure): CadD
   };
 };
 
+/** `doc` without the exposure `name` and its review (deleting an exposure ends its disposition). */
 export const withoutExposure = (doc: CadDocument, name: string): CadDocument => {
-  const model = vibroacousticsOf(doc);
+  const { reviews, ...model } = vibroacousticsOf(doc);
   const exposures = Object.fromEntries(Object.entries(model.exposures).filter(([key]) => key !== name));
-  return { ...doc, vibroacoustics: { ...model, exposures, exposureOrder: model.exposureOrder.filter((entry) => entry !== name) } };
+  const kept = Object.fromEntries(Object.entries(reviews ?? {}).filter(([key]) => key !== name));
+  return {
+    ...doc,
+    vibroacoustics: {
+      ...model,
+      exposures,
+      exposureOrder: model.exposureOrder.filter((entry) => entry !== name),
+      ...(Object.keys(kept).length === 0 ? {} : { reviews: kept }),
+    },
+  };
+};
+
+export const reviewOf = (doc: CadDocument, exposure: string): AcousticReview | undefined => {
+  const reviews = vibroacousticsOf(doc).reviews ?? {};
+  return Object.hasOwn(reviews, exposure) ? reviews[exposure] : undefined;
+};
+
+export const withReview = (doc: CadDocument, review: AcousticReview): CadDocument => {
+  const model = vibroacousticsOf(doc);
+  return { ...doc, vibroacoustics: { ...model, reviews: { ...model.reviews, [review.exposure]: review } } };
 };
 
 /** Name rule shared by the commands and the slice schema: a letter first (`__proto__`, `constructor`, `prototype` refused), then letters, digits, `_`, `.`, `-`. */
@@ -64,6 +84,8 @@ export const NAME_PATTERN = /^(?!(?:constructor|prototype)$)[A-Za-z][A-Za-z0-9_.
 export const MAX_BANDS = 30;
 export const MAX_FACES = 1000;
 const ENTITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+/** Longest reviewer justification (characters). */
+export const MAX_JUSTIFICATION = 2000;
 
 const nameSchema = z.string().regex(NAME_PATTERN);
 const levelSchema = z.number().min(LEVEL_DB_MIN).max(LEVEL_DB_MAX);
@@ -95,12 +117,25 @@ const exposureSchema = z.strictObject({
   notes: z.string().optional(),
 });
 
+const reviewSchema = z.strictObject({
+  exposure: nameSchema,
+  decision: z.enum(REVIEW_DECISIONS),
+  justification: z.string().min(1).max(MAX_JUSTIFICATION),
+  fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  signer: z.string().min(1).max(256),
+  signatureId: z.string().min(1).max(256),
+  signature: z.unknown(),
+  documentUid: z.string().min(1).max(256),
+});
+
 const sliceSchema = z
   .strictObject({
     spectra: z.record(z.string(), spectrumSchema),
     spectrumOrder: z.array(z.string()),
     exposures: z.record(z.string(), exposureSchema),
     exposureOrder: z.array(z.string()),
+    // no cross-check against exposures: a replay seeds the reviews before the steps re-create their exposures (an orphan never matches a fingerprint)
+    reviews: z.record(z.string(), reviewSchema).optional(),
   })
   .superRefine((slice, ctx) => {
     const bad = (path: (string | number)[], message: string): void => ctx.addIssue({ code: 'custom', path, message });
@@ -125,6 +160,8 @@ const sliceSchema = z
       if (exposure.name !== key) bad(['exposures', key, 'name'], `must equal its key '${key}'`);
       if (!Object.hasOwn(slice.spectra, exposure.spectrum)) bad(['exposures', key, 'spectrum'], `names no spectrum '${exposure.spectrum}'`);
     }
+    for (const [key, review] of Object.entries(slice.reviews ?? {}))
+      if (review.exposure !== key) bad(['reviews', key, 'exposure'], `must equal its key '${key}'`);
   });
 
 /** Value errors of the raw `vibroacoustics` slice (persistence rejects the file when non-empty). */

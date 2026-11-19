@@ -11,6 +11,7 @@ import { refuseVac } from './codes';
 import { facesNearPoints } from './faceResolve';
 import { acousticLoadPackage, type ExposedFace } from './exportPackage';
 import { exposureOf, spectrumOf } from './model';
+import { exposureFingerprint, packageReview } from './review';
 
 interface FaceRecord {
   readonly index: number;
@@ -33,7 +34,9 @@ const isFaceRecords = (value: unknown, count: number): value is readonly FaceRec
 
 /**
  * @affects nothing; read-only, data = the llull.acousticLoad/1 package { schema, exposure, field, spectrum, faces[{ entityId, faceIndex, areaMm2, centroidMm, rmsForceN }], totalAreaMm2,
- *   provenance, unverified, reviewRequired: true, reviewReason, items }
+ *   provenance { source, documentHash, llullVersion }, unverified, reviewRequired: true, reviewReason, review { status, fingerprint, signer? }, items }
+ * @invariant llullVersion comes only from the injected host port `ctx.hostVersion` (null without one): the command reads no file or environment
+ * @invariant a stored dispose_acoustic_export disposition counts only while its fingerprint equals the current one and its signature re-verifies through `ctx.humanSignature`
  * @invariant areas and centroids come from inspect_faces (exact kernel) in document units and are converted to mm / mm^2 and rounded to 1e-6 (stable across kernel builds), never estimated; deterministic for one document
  * @failure kind given -> VAC_OUT_OF_SCOPE; unknown exposure / spectrum -> VAC_EXPOSURE_UNKNOWN / VAC_SPECTRUM_UNKNOWN; no exact kernel -> KRN_NO_EXACT_KERNEL; inspect_faces refusals are forwarded with their code (ENTITY_NOT_FOUND, ENTITY_NOT_SOLID, KRN_NO_EXACT_KERNEL, KRN_SHAPE_UNAVAILABLE,
  *   KRN_FACE_INDEX, KRN_FACE_QUERY_FAILED); malformed face records -> KRN_FACE_QUERY_FAILED; target solid
@@ -46,8 +49,10 @@ export const exportAcousticLoad = defineCommand({
     'Export an acoustic exposure (define_acoustic_exposure) as the hand-off package "llull.acousticLoad/1" in data: the field type, the spectrum (per band nominal and exact mid frequency, level dB re 20 micropascal, ' +
     'band-averaged one-sided pressure PSD in Pa^2/Hz, overall level and rms pressure) and the exposed faces with their EXACT area (mm^2) and centroid (mm) from the exact kernel (inspect_faces; ' +
     'there is no mesh estimate: without the exact kernel the command is refused with KRN_NO_EXACT_KERNEL), plus for a diffuse field the rms force of the overall pressure on each face (N; uniform ' +
-    'pressure, correlation not modelled) and the total area. Provenance carries the source and the document hash. reviewRequired is always true (the package feeds a qualification analysis) ' +
-    'and an unverified spectrum adds VAC_SPECTRUM_UNVERIFIED. It is a hand-off: llull does not compute a response (no SEA, no acoustic FE); pass no `kind`. Does not modify the document; ' +
+    'pressure, correlation not modelled) and the total area. Provenance carries the source, the document hash and the llull version of the host (null outside a llull host). ' +
+    'reviewRequired is always true (the package feeds a qualification analysis); review { status: none | accepted | rejected | stale | unconfirmed, fingerprint } reports the signed reviewer ' +
+    'disposition (dispose_acoustic_export, human only): VAC_REVIEW_PENDING until a current accepted one re-verifies, VAC_REVIEW_REJECTED for a rejected one. ' +
+    'An unverified spectrum adds VAC_SPECTRUM_UNVERIFIED. It is a hand-off: llull does not compute a response (no SEA, no acoustic FE); pass no `kind`. Does not modify the document; ' +
     'save data to a file with the CLI --save.',
   params: z.object({
     confirmExportControlled,
@@ -102,10 +107,21 @@ export const exportAcousticLoad = defineCommand({
       areaMm2: face.area * areaFactor,
       centroidMm: [toMm(doc, face.centroid[0]), toMm(doc, face.centroid[1]), toMm(doc, face.centroid[2])],
     }));
-    const data = acousticLoadPackage(exposure, spectrum, faces, exportDocumentHash(doc));
+    const { review, item } = packageReview(
+      doc,
+      ctx?.humanSignature ?? null,
+      exposure.name,
+      exposureFingerprint(doc, exposure, spectrum, entity),
+    );
+    const data = acousticLoadPackage(exposure, spectrum, faces, {
+      review,
+      reviewItem: item,
+      documentHash: exportDocumentHash(doc),
+      llullVersion: ctx?.hostVersion ?? null,
+    });
     return report(
       doc,
-      `export_acoustic_load '${exposure.name}': ${exposure.field} field, spectrum '${spectrum.name}' (${spectrum.bands.length} ${spectrum.bandwidth} bands, OASPL ${data.spectrum.oasplDb.toPrecision(12)} dB re 20 uPa) on ${faces.length} face(s) of '${entityId}' [${faces.map((face) => face.faceIndex).join(', ')}], total ${data.totalAreaMm2.toPrecision(10)} mm^2 (exact kernel); reviewRequired${spectrum.unverified ? '; VAC_SPECTRUM_UNVERIFIED: not grade A' : ''}.`,
+      `export_acoustic_load '${exposure.name}': ${exposure.field} field, spectrum '${spectrum.name}' (${spectrum.bands.length} ${spectrum.bandwidth} bands, OASPL ${data.spectrum.oasplDb.toPrecision(12)} dB re 20 uPa) on ${faces.length} face(s) of '${entityId}' [${faces.map((face) => face.faceIndex).join(', ')}], total ${data.totalAreaMm2.toPrecision(10)} mm^2 (exact kernel); reviewRequired, review ${review.status}${item === null ? '' : ` (${item.code})`}${spectrum.unverified ? '; VAC_SPECTRUM_UNVERIFIED: not grade A' : ''}.`,
       data,
     );
   },
