@@ -6,6 +6,8 @@
  */
 
 import type { FeMeshArtifact } from '@core/model/analysis';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { hypotOf } from '@lib/hypotOf';
 import { barycentricAt, buildLocator, locateElement, type LocatorElement } from './elementLocator';
 
 export interface MappingReport {
@@ -70,8 +72,8 @@ function sourceElements(mesh: FeMeshArtifact): SourceElement[] | null {
       out.push({
         nodes,
         corners,
-        low: [0, 1, 2].map((axis) => Math.min(...all.map((p) => p[axis] ?? 0))) as unknown as Vec,
-        high: [0, 1, 2].map((axis) => Math.max(...all.map((p) => p[axis] ?? 0))) as unknown as Vec,
+        low: [0, 1, 2].map((axis) => minOf(all.map((p) => p[axis] ?? 0))) as unknown as Vec,
+        high: [0, 1, 2].map((axis) => maxOf(all.map((p) => p[axis] ?? 0))) as unknown as Vec,
       });
     }
   }
@@ -135,7 +137,7 @@ export function mappingReport(
       if (value < (low[axis] ?? 0)) low[axis] = value;
       if (value > (high[axis] ?? 0)) high[axis] = value;
     }
-  const size = Math.hypot(...high.map((h, axis) => h - (low[axis] ?? 0)));
+  const size = hypotOf(high.map((h, axis) => h - (low[axis] ?? 0)));
   const tolerance = 1e-9 * size;
   const exact = new Map<string, number>(source.nodes.map(([id, x, y, z]) => [`${x}|${y}|${z}`, id]));
   let maxDistance = 0;
