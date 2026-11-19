@@ -13,6 +13,7 @@ import { commentText, idLines, linesText, row, textLines } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { printedMaterialLines } from '../flightLoads/print/deck';
+import { inertialUnsupported } from '../flightLoads/inertialSupport';
 import { nonlinearSteps } from '../nonlinear/deck';
 import { imperfectNodes } from '../nonlinear/imperfectionDeck';
 import { creepSteps } from '../creep/deck';
@@ -294,7 +295,7 @@ function stepsOf(ctx: DeckContext, disciplines: DisciplineTable, heat: boolean):
  * @failure the document uses ITAR / EAR material records -> MAT_EXPORT_CONTROLLED (a deck leaves the machine; no confirmation path here)
  * @failure unknown analysis / -> FEA_ANALYSIS_NOT_FOUND; mesh of other inputs -> FEA_MESH_STALE;
  *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static / coupled / buckling without a
- *   constraint -> FEA_NO_CONSTRAINTS; plus every refusal of the mechanical and discipline functions
+ *   constraint -> FEA_NO_CONSTRAINTS; an inertial load in a non-static analysis -> FLL_INERTIAL_UNSUPPORTED; plus every refusal of the mechanical and discipline functions
  */
 export function buildInp(
   doc: CadDocument,
@@ -307,6 +308,8 @@ export function buildInp(
   if (ctx === null) return refuse('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
   const problem = precheck(doc, analysisId, mesh, ctx, STRUCTURAL_2D.has(ctx.analysis.type) ? INP_ELEMENTS : SOLID_TETS);
   if (problem !== null) return problem;
+  const inertial = inertialUnsupported(ctx.analysis);
+  if (inertial !== null) return inertial;
   const { analysis } = ctx;
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
   const geometry = analysis.type === 'nonlinear_static' ? imperfectNodes(ctx) : { nodes: mesh.nodes, comments: [] };

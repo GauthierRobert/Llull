@@ -33,6 +33,8 @@ export interface ReliefAssessment {
   readonly balances: readonly ReliefBalance[];
   /** Reasons the balance of some load could not be assessed (per-node forces, pressures, missing mass). */
   readonly unassessed: readonly string[];
+  /** Centre of mass of the analysed solids (analysis units), null when they have no mass. */
+  readonly centreOfMass: Vec3 | null;
 }
 
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -160,7 +162,7 @@ export function reliefAssessment(doc: CadDocument, analysis: AnalysisCase, ctx?:
   if (!Object.values(analysis.constraints).some((constraint) => constraint.freeBody === true)) return null;
   const length = toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem);
   const mass = bodyMass(doc, analysis, length, ctx ?? {});
-  if (typeof mass === 'string') return { balances: [], unassessed: [mass] };
+  if (typeof mass === 'string') return { balances: [], unassessed: [mass], centreOfMass: null };
   const unassessed: string[] = [];
   const balances: ReliefBalance[] = [];
   for (const loadCase of new Set(analysis.loadOrder.map((id) => analysis.loads[id]?.loadCase ?? ''))) {
@@ -181,7 +183,7 @@ export function reliefAssessment(doc: CadDocument, analysis: AnalysisCase, ctx?:
     const balanced = residualForce <= RELIEF_TOLERANCE * appliedForce + noise && residualMoment <= RELIEF_TOLERANCE * appliedMoment + noise;
     balances.push({ loadCase, residualForce, residualMoment, appliedForce, appliedMoment, balanced });
   }
-  return { balances, unassessed };
+  return { balances, unassessed, centreOfMass: mass.centerOfMass };
 }
 
 /** Centre of mass of the analysed solids in DOCUMENT units, or the reason it cannot be computed. */

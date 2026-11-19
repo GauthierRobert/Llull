@@ -177,7 +177,7 @@ export const checkAnalysis = defineCommand({
     'store (a differing one is FEA_SUMMARY_MISMATCH, state untrusted; no store or artifact is FEA_MESH_MISSING / FEA_RESULTS_MISSING, state ' +
     'missing). Run it before fea_mesh / fea_solve (readiness) and after the solve. ' +
     'Modal / buckling: supports, rigid-body modes, buckling-factor guards; any structural case: supports that remove all six rigid-body motions (FEA_UNDERCONSTRAINED) and through-thickness mesh adequacy (FEA_MESH_INADEQUATE error, FEA_MESH_MARGINAL warning); solved static / thermo_static cases with allowables: the margin rows (FEA_MS_NEGATIVE, FEA_MARGINAL_BAND_UNSET, FEA_DISPOSITION_PENDING, FEA_DISPOSITION_FOREIGN_DOCUMENT / FEA_DISPOSITION_UNBOUND for a recorded disposition signed for another document or recording no document uid). ' +
-    'Flight loads (14 FLL): FLL_RELIEF_RESIDUAL (a free-body case whose loads are not balanced: the 3-2-1 supports would take more than 1e-4 of the applied load), FLL_RUN_STALE (the design changed after export_flight_loads), FLL_INERTIAL_UNSUPPORTED. ' +
+    'Flight loads (14 FLL): FLL_RELIEF_RESIDUAL (a free-body case whose loads are not balanced: the 3-2-1 supports would take more than 1e-4 of the applied load), FLL_RUN_STALE (the design changed after export_flight_loads), FLL_INERTIAL_UNSUPPORTED, and after the solve FLL_RELIEF_REACTION (the solved 3-2-1 reactions above 1e-3 of the applied load). ' +
     'It is not a certification: reviewRequired is always true and a qualified person must review the model, mesh and results.',
   annotations: { readOnly: true },
   params: z.object({
@@ -215,7 +215,7 @@ export const checkAnalysis = defineCommand({
       ...setupItems(analysis),
       ...disciplines,
       ...structureItems(doc, analysis, trust),
-      ...flightLoadItems(doc, analysis, ctx),
+      ...flightLoadItems(doc, analysis, ctx, trust.state === 'solved' ? trust : null),
       ...(trust.state === 'solved' && (analysis.type === 'static' || analysis.type === 'thermo_static')
         ? marginItems(doc, analysisId, ctx, acceptInadequateMesh === true)
         : []),
