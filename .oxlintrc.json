@@ -139,6 +139,16 @@
     },
     {
       "files": [
+        "packages/*/src/**/*.ts",
+        "server/src/**/*.ts",
+        "src/app/**/*.ts"
+      ],
+      "rules": {
+        "llull/no-spread-call": "error"
+      }
+    },
+    {
+      "files": [
         "server/src/**/*.ts",
         "desktop/src/**/*.ts"
       ],

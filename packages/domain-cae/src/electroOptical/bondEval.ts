@@ -14,6 +14,7 @@ import { electroOpticalOf } from './model';
 import { bulkResistance } from './physics';
 import { resistivityOf } from './resistivity';
 import type { BondElement, BondPath } from './types';
+import { appendAll } from '@lib/appendAll';
 
 export type BondStatus = 'pass' | 'fail' | 'unknown';
 
@@ -179,7 +180,7 @@ const severity = (finding: Finding): number => {
 export function bondRow(doc: CadDocument, path: BondPath, context: BondContext, ctx: ExecutionContext | undefined): BondRow {
   const evaluated = path.elements.map((element, index) => evaluateElement(doc, element, index, path, ctx));
   const findings: Finding[] = evaluated.flatMap((item) => (item.finding === undefined ? [] : [item.finding]));
-  for (const element of path.elements) if (element.kind === 'joint') findings.push(...interfaceFindings(doc, element, context));
+  for (const element of path.elements) if (element.kind === 'joint') appendAll(findings, interfaceFindings(doc, element, context));
   const resolved = evaluated.every((item) => item.row.ohm !== null);
   const totalOhm = resolved ? evaluated.reduce((sum, item) => sum + (item.row.ohm === null ? 0 : item.row.ohm), 0) : null;
   const elements = evaluated.map(

@@ -13,6 +13,7 @@ import type { ContinuityJoint } from '../../geometry/surfaceAnalysis/types';
 import { currentContext } from '../context';
 import { refuseSrf } from './shared';
 import { commitSurface, isRefusal, sig, surfaceEntityOf, surfaceStyleFields } from './surfaceShared';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const sideField = z
   .enum(['u0', 'u1', 'v0', 'v1'])
@@ -102,7 +103,7 @@ export const blendSurfaces = defineCommand({
       max[1] - min[1],
       max[2] - min[2],
     ]);
-    const size = Math.max(...extent, 1e-9);
+    const size = Math.max(maxOf(extent), 1e-9);
     const tolerances = { g0: 1e-5 * size, g1AngleRad: 0.01, g2Rel: 0.1, g2Abs: 1e-9, g3Rel: 0.1, g3Abs: 1e-6 / size ** 2 };
     const engine = resolveSurfaceAnalysis((ctx ?? currentContext()).surfaceAnalysis);
     const jointA = engine.continuity(

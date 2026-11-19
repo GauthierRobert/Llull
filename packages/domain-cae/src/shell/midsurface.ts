@@ -13,6 +13,7 @@ import { boxPlateMidsurface } from './boxPlate';
 import { pairedMidsurface } from './facePairing';
 import { sheetMetalMidsurface, sheetMetalPartOf } from './sheetMetalMid';
 import type { MidFace, Midsurface, MidsurfaceOptions, MidsurfaceRefusal } from './types';
+import { minOf } from '@lib/arrayExtrema';
 
 /** Default largest angle between reversed normals of paired faces (degrees, 05 §4 `extract_midsurface`). */
 export const DEFAULT_ANGULAR_TOL_DEG = 1;
@@ -45,7 +46,7 @@ export function midsurfaceOf(
   if (sheet !== undefined) return sheetMetalMidsurface(doc, entityId, sheet, request.stripLength);
   const angularTolDeg = request.angularTolDeg ?? DEFAULT_ANGULAR_TOL_DEG;
   if (entity.kind === 'box') {
-    const thinnest = Math.min(...entity.size);
+    const thinnest = minOf(entity.size);
     return boxPlateMidsurface(entity, { maxThickness: request.maxThickness ?? thinnest, angularTolDeg });
   }
   if (request.maxThickness === undefined)

@@ -11,6 +11,7 @@ import { distance3, scale3, sub3 } from '../../lib/vec3';
 import { roundSignificant } from '../../lib/significant';
 import { curveEntityOf, refuseSrf } from './shared';
 import { inspectSurface } from './inspectSurface';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 const sigVec = (v: Vec3): Vec3 => [sig(v[0]), sig(v[1]), sig(v[2])];
@@ -143,15 +144,15 @@ export const analyzeCurveCurvature = defineCommand({
         ? undefined
         : live.filter((row, i) => i > 0 && Math.sign(row.signedCurvature ?? 0) * Math.sign(live[i - 1]?.signedCurvature ?? 0) < 0).length;
     const length = curveLength(curve, first, last);
-    const maxCurvature = curvatures.length === 0 ? 0 : Math.max(...curvatures);
+    const maxCurvature = curvatures.length === 0 ? 0 : maxOf(curvatures);
     const data = {
       id,
       planar: normal !== null,
       ...(normal === null ? {} : { planeNormal: sigVec(normal) }),
       samples: rows,
-      minCurvature: curvatures.length === 0 ? 0 : Math.min(...curvatures),
+      minCurvature: curvatures.length === 0 ? 0 : minOf(curvatures),
       maxCurvature,
-      maxAbsDCurvatureDs: live.length === 0 ? 0 : Math.max(...live.map((row) => Math.abs(row.dCurvatureDs))),
+      maxAbsDCurvatureDs: live.length === 0 ? 0 : maxOf(live.map((row) => Math.abs(row.dCurvatureDs))),
       ...(inflections === undefined ? {} : { inflections }),
       degenerateSamples: rows.length - live.length,
       length: sig(length),

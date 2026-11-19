@@ -15,6 +15,7 @@ import { resultColor } from '@lib/isoBands';
 import { encodePng } from '@lib/png';
 import type { FieldFace } from './fieldFaces';
 import { cross3, dot3, sub3 } from '@lib/vec3';
+import { appendAll } from '@lib/appendAll';
 
 interface PixelRect {
   readonly left: number;
@@ -147,15 +148,15 @@ export function prepareRaster(input: RasterInput): PreparedRaster {
   };
   for (const face of input.faces) {
     const [a, b, c] = face.corners;
-    if (input.ghost && !face.cap) ghostTriangles.push(...xy(a.u), ...xy(b.u), ...xy(c.u));
+    if (input.ghost && !face.cap) appendAll(ghostTriangles, [...xy(a.u), ...xy(b.u), ...xy(c.u)]);
     const normal = unitNormal(a.p, b.p, c.p);
     const facing = dot3(normal, toViewer);
     if (facing <= 0) continue;
     light.push(0.62 + 0.38 * facing);
-    normals.push(...normal);
+    appendAll(normals, normal);
     caps.push(face.cap ? 1 : 0);
     owners.push(ownerIds.get(face.entityId) ?? ownerIds.set(face.entityId, ownerIds.size).size - 1);
-    for (const corner of [a, b, c]) triangles.push(...xy(corner.p), dot3(corner.p, toViewer), corner.v);
+    for (const corner of [a, b, c]) appendAll(triangles, [...xy(corner.p), dot3(corner.p, toViewer), corner.v]);
   }
   const bands = Math.max(1, input.levels.length - 1);
   const [low, high] = [input.levels[0] ?? 0, input.levels.at(-1) ?? 1];

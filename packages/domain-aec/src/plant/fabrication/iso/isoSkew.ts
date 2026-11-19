@@ -56,7 +56,7 @@ export function skewFigures(graph: IsoGraph, layout: IsoLayout, northArrow: Nort
     const geometry = skewGeometry(d);
     if (geometry.legs.length < 2) continue;
     const projected = projectIso(d, northArrow);
-    const factor = Math.hypot(to[0] - from[0], to[1] - from[1]) / (Math.hypot(...projected) || 1);
+    const factor = Math.hypot(to[0] - from[0], to[1] - from[1]) / (Math.hypot(projected[0], projected[1]) || 1);
     const corners: Vec2[] = [from];
     for (const leg of geometry.legs) {
       const sign = Math.sign(d[leg.axis]);

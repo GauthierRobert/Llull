@@ -12,6 +12,7 @@ import { resolveMassProperties, type MassContext } from '../../geometry/resolveM
 import { entityBoundsInDoc } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import { exactOrMesh } from '../kernelShape';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 interface GvpItem {
   readonly id: string;
@@ -77,8 +78,8 @@ function combined(pieces: readonly Piece[]): Piece | null {
   const volume = pieces.reduce((sum, piece) => sum + piece.volume, 0);
   if (pieces.length === 0 || !(volume > 0)) return null;
   const axis = (k: 0 | 1 | 2): number => pieces.reduce((sum, piece) => sum + piece.volume * piece.centroid[k], 0) / volume;
-  const low = (k: 0 | 1 | 2): number => Math.min(...pieces.map((piece) => piece.min[k]));
-  const high = (k: 0 | 1 | 2): number => Math.max(...pieces.map((piece) => piece.max[k]));
+  const low = (k: 0 | 1 | 2): number => minOf(pieces.map((piece) => piece.min[k]));
+  const high = (k: 0 | 1 | 2): number => maxOf(pieces.map((piece) => piece.max[k]));
   return {
     volume,
     area: pieces.every((piece) => piece.area !== null) ? pieces.reduce((sum, piece) => sum + (piece.area ?? 0), 0) : null,

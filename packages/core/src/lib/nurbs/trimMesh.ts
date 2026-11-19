@@ -6,6 +6,8 @@
 
 import { regionTester } from './trimRegion';
 import type { UvTrimLoop } from './surfaceTypes';
+import { appendAll } from '../appendAll';
+import { minOf } from '../arrayExtrema';
 
 type Uv = readonly [number, number];
 type Triangle = readonly [Uv, Uv, Uv];
@@ -110,9 +112,9 @@ export function trimGrid(loops: ReadonlyArray<UvTrimLoop>, us: ReadonlyArray<num
       }
       const nearby: Segment[] = [];
       for (let di = -1; di <= 1; di++)
-        for (let dj = -1; dj <= 1; dj++) nearby.push(...(cellSegments.get((i + di) * vs.length + (j + dj)) ?? []));
+        for (let dj = -1; dj <= 1; dj++) appendAll(nearby, cellSegments.get((i + di) * vs.length + (j + dj)) ?? []);
       const value = (p: Uv): number => {
-        const distance = Math.min(...nearby.map((segment) => distanceToSegment(p, segment)));
+        const distance = minOf(nearby.map((segment) => distanceToSegment(p, segment)));
         return inside(p) ? distance : -distance;
       };
       const grid = Array.from({ length: SUBDIVISIONS + 1 }, (_, a) =>
@@ -124,8 +126,9 @@ export function trimGrid(loops: ReadonlyArray<UvTrimLoop>, us: ReadonlyArray<num
       for (let a = 0; a < SUBDIVISIONS; a++)
         for (let b = 0; b < SUBDIVISIONS; b++) {
           const cell = [grid[a]?.[b], grid[a + 1]?.[b], grid[a + 1]?.[b + 1], grid[a]?.[b + 1]] as Array<{ uv: Uv; f: number }>;
-          triangles.push(
-            ...fan(
+          appendAll(
+            triangles,
+            fan(
               insidePolygon(
                 cell.map((c) => c.uv),
                 cell.map((c) => c.f),

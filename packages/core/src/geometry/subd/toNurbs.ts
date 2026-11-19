@@ -21,6 +21,8 @@ import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
 import { settleLevels } from './settle';
 import { buildTopology } from './topology';
+import { hypotOf } from '../../lib/hypotOf';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface ToNurbsOptions {
   readonly packed: boolean;
@@ -247,13 +249,13 @@ function buildLevel(cage: Cage, levels: number, options: ToNurbsOptions, allowEx
   let chosen: 'exact' | 'fit' = exactHolds ? 'exact' : 'fit';
   let g1Choice: G1Choice | null = null;
   if (mode === 'auto' && exactHolds && fitted !== null && exact !== null) {
-    const diagonal = Math.hypot(
-      ...[0, 1, 2].map(
-        (axis) => Math.max(...refined.vertices.map((p) => p[axis] as number)) - Math.min(...refined.vertices.map((p) => p[axis] as number)),
+    const diagonal = hypotOf(
+      [0, 1, 2].map(
+        (axis) => maxOf(refined.vertices.map((p) => p[axis] as number)) - minOf(refined.vertices.map((p) => p[axis] as number)),
       ),
     );
     const measure = (patches: BezierPatch[]): { breakDeg: number; deviation: number } => ({
-      breakDeg: Math.max(0, ...evEdgeReports(refined, patches, valence).map((edge) => edge.g1Deg)),
+      breakDeg: Math.max(0, maxOf(evEdgeReports(refined, patches, valence).map((edge) => edge.g1Deg))),
       deviation: deviation(refined, patches, options.samples).max,
     });
     const [angleTolerance, deviationTolerance] = [options.tangentToleranceDeg ?? Infinity, options.deviationTolerance ?? 1e-3 * diagonal];
@@ -297,7 +299,7 @@ function buildLevel(cage: Cage, levels: number, options: ToNurbsOptions, allowEx
   };
 }
 
-const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((edge) => edge.g1Deg));
+const worstBreak = (build: Build): number => Math.max(0, maxOf(build.evEdges.map((edge) => edge.g1Deg)));
 
 /** The cage's patches as NURBS sheets with the conversion report. The cage may be open (boundary edges are creases) and may contain n-gons. */
 export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult {
@@ -330,7 +332,7 @@ export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult 
     deviationSamples: measured.count,
     skippedSamples: measured.skipped,
     evEdges,
-    maxEvG0: Math.max(0, ...evEdges.map((edge) => edge.g0)),
+    maxEvG0: Math.max(0, maxOf(evEdges.map((edge) => edge.g0))),
     maxEvG1Deg: worstBreak(build),
     refineLevels,
     g1ToleranceMet: tolerance === undefined ? null : worstBreak(build) <= tolerance,

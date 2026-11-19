@@ -15,6 +15,7 @@ import { tankMass } from './tankMass';
 import { TEST_WATER_KG_PER_M3 } from './vesselMass';
 import { centreOf, type CogPart, type VesselCog } from './vesselCog';
 import { powInt } from '@lib/powInt';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const NOZZLE_APPROXIMATION = 'each nozzle (neck + flange) is one lump at the middle between the wall point and the flange face';
 
@@ -158,7 +159,7 @@ export function pumpCog(template: PumpTemplate, weightKg: number, nozzleLumps: r
   const middle = (axis: 0 | 1 | 2): number => {
     const lows = machine.map((box) => box.center[axis] - box.size[axis] / 2);
     const highs = machine.map((box) => box.center[axis] + box.size[axis] / 2);
-    return (Math.min(...lows) + Math.max(...highs)) / 2;
+    return (minOf(lows) + maxOf(highs)) / 2;
   };
   const set: CogPart = { part: 'pump set', kg: weightKg, at: [middle(0), middle(1), middle(2)] };
   const state = centreOf([set, ...nozzleLumps]);

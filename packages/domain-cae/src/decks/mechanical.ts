@@ -8,10 +8,12 @@ import { elasticConstants, elasticTable, isElasticRefusal, propertyTemperatureK 
 import { resolveTemperatureField, thermomechOf } from '../thermomech/field';
 import { fromKelvin, kelvinOf } from '../thermomech/units';
 import { caseTemperatureRange } from '../thermal/material';
-import { appendAll, commentText, linesText, num, row, textLines } from './format';
+import { appendAll } from '@lib/appendAll';
+import { commentText, linesText, num, row, textLines } from './format';
 import { consistentWeights, momentForces } from './loadDistribution';
 import { targetKind } from '../shell/shellDeck';
 import { inertialContribution, inertialDloadLines, type InertialTerms } from './inertialBodyForce';
+import { hypotOf } from '@lib/hypotOf';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
 /** Shell nodes carry rotations (radians): CalculiX dofs 4-6. */
@@ -93,7 +95,7 @@ export function planeAxis(ctx: DeckContext, nodeIds: readonly number[]): number 
       hi[axis] = Math.max(hi[axis] ?? -Infinity, point[axis] ?? 0);
     }
   }
-  const size = Math.hypot(...meshHi.map((value, axis) => value - (meshLo[axis] ?? 0)));
+  const size = hypotOf(meshHi.map((value, axis) => value - (meshLo[axis] ?? 0)));
   const tolerance = 1e-6 * size;
   // An axis the whole mesh is flat in (a planar shell / plane-stress mesh) says nothing about the symmetry plane.
   const meshFlat = (axis: number): boolean => (meshHi[axis] ?? 0) - (meshLo[axis] ?? 0) <= tolerance;
@@ -390,7 +392,7 @@ export function staticStep(ctx: DeckContext): DeckSections {
     if (isDeckRefusal(mechanical)) return mechanical;
     out.push(`** load case ${commentText(name)}`, '*STEP', '*STATIC');
     appendAll(out, textLines(mechanical.text));
-    out.push('*NODE FILE', 'U', '*EL FILE', 'S, E', ...probePrintLines(ctx), '*END STEP');
+    appendAll(out, ['*NODE FILE', 'U', '*EL FILE', 'S, E', ...probePrintLines(ctx), '*END STEP']);
   }
   return { text: linesText(out) };
 }

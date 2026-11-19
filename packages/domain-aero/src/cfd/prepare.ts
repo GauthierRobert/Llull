@@ -17,6 +17,7 @@ import { prepareSurface, type SurfaceStage } from './surfaceStage';
 import { isMirrorSymmetric } from './symmetry';
 import { frontalArea, voxelise, type VoxelReport } from './voxel';
 import { MAX_REPORTED_POINTS } from './topology';
+import { appendAll } from '@lib/appendAll';
 
 export type CheckStatus = 'pass' | 'warn' | 'fail' | 'not_run';
 export type CheckRow = {
@@ -229,7 +230,7 @@ export function prepareCaseWithStage(
     checks.push(row('CFD_GEOMETRY_NOT_WATERTIGHT', 'fail', 'the bodies have no usable triangle'));
     return { report: emptyReport(cfdCase, checks, flow, warnings), stage: null };
   }
-  checks.push(...surfaceRows(stage));
+  appendAll(checks, surfaceRows(stage));
   if (stage.flipped) warnings.push('the surface was inward oriented (negative signed volume): winding reversed');
   if (stage.degenerate > 0) warnings.push(`${stage.degenerate} degenerate triangle(s) dropped`);
 
@@ -266,7 +267,7 @@ export function prepareCaseWithStage(
 
   const mach = flow?.machNumber ?? 0;
   const sizing = sizeDomain(cfdCase, stage.bounds, mach);
-  defaults.push(...sizing.defaults);
+  appendAll(defaults, sizing.defaults);
   const halved = cfdCase.domain.symmetryPlane === 'xz';
   if (halved && !isMirrorSymmetric(stage.surface, 1e-4 * stage.lengthM))
     checks.push(

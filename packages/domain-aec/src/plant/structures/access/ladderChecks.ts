@@ -7,6 +7,8 @@ import { ruleFlag, breach, ruleById, type AccessRule, type RulesetName } from '.
 import type { StaCode } from '../codes';
 import { OSHA_CAGE_RETROFIT_DATE, installedAfterRuleDate } from '../ladder/ladderDefaults';
 import { breachFinding, ruleFinding, type Finding } from './finding';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 interface LadderMeasures {
   readonly height: number;
@@ -20,7 +22,7 @@ interface LadderMeasures {
 
 const measuresOf = (doc: CadDocument, ladder: LadderElement, backClearance: number): LadderMeasures => {
   const heights = [0, ...ladder.landings, ladder.climbHeight];
-  const section = Math.max(...heights.slice(1).map((height, index) => height - (heights[index] as number)));
+  const section = maxOf(heights.slice(1).map((height, index) => height - (heights[index] as number)));
   return {
     height: toMm(doc, ladder.climbHeight),
     pitch: toMm(doc, ladder.rungPitch),
@@ -154,7 +156,7 @@ export function checkLadder(
     const finding = rulesets.includes(rule.ruleset) ? breachFinding(rule, check.code, ladder.id, check.measure(measures)) : null;
     return finding === null ? [] : [finding];
   });
-  found.push(...fallProtectionFindings(ladder, measures, rulesets), ...cageFindings(ladder, doc, rulesets));
+  appendAll(found, [...fallProtectionFindings(ladder, measures, rulesets), ...cageFindings(ladder, doc, rulesets)]);
   if (
     rulesets.includes('osha_1910') &&
     (ladder.fallProtection === 'cage' || ladder.fallProtection === 'ladder_safety_system' || ladder.fallProtection === 'pfas')

@@ -8,6 +8,7 @@ import { evaluateSurface, mapSurfacePoles } from '../lib/nurbs/surface';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import { trimGrid } from '../lib/nurbs/trimMesh';
+import { appendAll } from '../lib/appendAll';
 
 /** Largest number of samples per direction of a display grid. */
 const MAX_GRID = 96;
@@ -66,7 +67,7 @@ export function tessellateSheet(
   const uvs = us.flatMap((u) => vs.flatMap((v) => [u, v]));
   if (trims === undefined || trims.length === 0) return { ...tessellateSurface(surface, perSpan), uvs };
   const positions: number[] = [];
-  for (const u of us) for (const v of vs) positions.push(...evaluateSurface(surface, u, v));
+  for (const u of us) for (const v of vs) appendAll(positions, evaluateSurface(surface, u, v));
   const indices: number[] = [];
   const grid = trimGrid(trims, us, vs);
   for (const [i, j] of grid.full) {
@@ -78,7 +79,7 @@ export function tessellateSheet(
     for (const [u, v] of triangle) {
       indices.push(positions.length / 3);
       uvs.push(u, v);
-      positions.push(...evaluateSurface(surface, u, v));
+      appendAll(positions, evaluateSurface(surface, u, v));
     }
   return { positions, indices, uvs };
 }

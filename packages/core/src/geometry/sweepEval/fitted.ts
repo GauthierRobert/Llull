@@ -21,6 +21,8 @@ import type { RailIssue } from './rails';
 import { transformPoint, type SectionTransform } from './sectionTransform';
 import { constantEdges, ringEdges, type SectionEdge } from './sectionEdges';
 import { stationRingAt } from './sections';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Station counts tried in turn (shared out over the runs between curvature breaks); a run longer than CHUNK_CELLS is cut into faces of near-equal width (the pole count stays below MAX_SURFACE_POLES). */
 const CELL_LADDER = [64, 100, 200, 400, 800, 1600, 3200];
@@ -206,13 +208,10 @@ function fitOnce(
 }
 
 function modelSize(sweep: SweepShape): number {
-  const section =
-    sweep.section.shape === 'circle' ? sweep.section.radius : Math.max(...sweep.section.profile.map(([x, y]) => Math.hypot(x, y)));
+  const section = sweep.section.shape === 'circle' ? sweep.section.radius : maxOf(sweep.section.profile.map(([x, y]) => Math.hypot(x, y)));
   const poles = sweep.path.flatMap((segment) => segment.points);
-  const extent = [0, 1, 2].map(
-    (axis) => Math.max(...poles.map((p) => p[axis] as number)) - Math.min(...poles.map((p) => p[axis] as number)),
-  );
-  return Math.hypot(...extent) + 2 * section;
+  const extent = [0, 1, 2].map((axis) => maxOf(poles.map((p) => p[axis] as number)) - minOf(poles.map((p) => p[axis] as number)));
+  return hypotOf(extent) + 2 * section;
 }
 
 /** Named default fit tolerance: 1e-7 of the model size (path poles plus section), at least 1e-9 document units: the volume then holds ~1e-6. */

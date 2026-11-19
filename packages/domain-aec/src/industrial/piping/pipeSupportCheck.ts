@@ -28,6 +28,7 @@ import {
 import { riserRows, type RiserRow } from './pipeSupportRiser';
 import { orphanSupports } from './pipeCarrier';
 import { defaultedClause, defaultedInputs } from '../common/defaulted';
+import { appendAll } from '@lib/appendAll';
 
 export interface PipeSupportRow {
   readonly id: string;
@@ -132,7 +133,10 @@ function rowOf(
   if (limit.approximated) notes.push(`DN not tabulated: span of DN${limit.dn} used (next smaller size)`);
   if (run.lengthMm - length > 1) notes.push(`risers (${shown(run.lengthMm - length)} m) are not counted in the spans`);
   const risers = riserRows(run, stations, carriers, allowed * 1000, overhangRatio);
-  issues.push(...risers.flatMap((riser) => riser.issues));
+  appendAll(
+    issues,
+    risers.flatMap((riser) => riser.issues),
+  );
   if (basis === 'resting') notes.push('no supports: the beams the pipe rests on are used');
   return {
     id: element.id,

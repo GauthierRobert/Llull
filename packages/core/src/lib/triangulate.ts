@@ -5,6 +5,7 @@
 
 import { orient2 } from './vec2';
 import { pointInPolygon, polygonArea, segmentsIntersect, signedArea, type Point2 } from './polygon';
+import { maxOf } from './arrayExtrema';
 
 function pointInTriangle(p: Point2, a: Point2, b: Point2, c: Point2): boolean {
   return orient2(a, b, p) >= 0 && orient2(b, c, p) >= 0 && orient2(c, a, p) >= 0;
@@ -116,7 +117,7 @@ function triangulateWith(
   };
   let ring = toVertices(outer, true);
   const holeRings = holes.map((hole) => toVertices(hole, false));
-  const reach = (loop: ReadonlyArray<Vertex>): number => Math.max(...loop.map((vertex) => extremity(vertex.point)));
+  const reach = (loop: ReadonlyArray<Vertex>): number => maxOf(loop.map((vertex) => extremity(vertex.point)));
   const pending = [...holeRings].sort((a, b) => reach(b) - reach(a));
   for (const [index, hole] of pending.entries()) ring = bridge(ring, hole, pending.slice(index + 1), extremity);
   const triangles: Array<[number, number, number]> = [];

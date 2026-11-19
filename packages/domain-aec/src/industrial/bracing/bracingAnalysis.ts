@@ -25,6 +25,8 @@ import {
   groupPanels,
   panelRows,
 } from './bracingPanelRows';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Steel members of `levelId` with endpoints in mm. */
 export function locateMembers(doc: CadDocument, levelId: string): Located[] {
@@ -110,11 +112,11 @@ export function analyseBracing(
   if (rafters.length === 0) return { reason: `check_bracing failed: no rafters on level '${levelId}' (no gable).` };
   const rafterEnds = rafters.flatMap(({ start, end }) => [start, end]);
   const ys = rafterEnds.map((point) => point[1]);
-  const y0 = Math.min(...ys);
-  const yEnd = Math.max(...ys);
+  const y0 = minOf(ys);
+  const yEnd = maxOf(ys);
   const xs = rafterEnds.map((point) => point[0]);
-  const x0 = Math.min(...xs);
-  const x1 = Math.max(...xs);
+  const x0 = minOf(xs);
+  const x1 = maxOf(xs);
   const centre = (x0 + x1) / 2;
   const gableAreaMm2 = rafters
     .filter(({ start, end }) => near(start[1], y0) && near(end[1], y0))
@@ -147,7 +149,7 @@ export function analyseBracing(
   const sorted = [...panels.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   for (const [, panel] of sorted) panelRows(context, panel, rows, craneFoundation);
 
-  rows.push(...gablePostRows(members, rafterEnds, y0, yEnd, windPressure));
+  appendAll(rows, gablePostRows(members, rafterEnds, y0, yEnd, windPressure));
   return {
     rows,
     gableArea,

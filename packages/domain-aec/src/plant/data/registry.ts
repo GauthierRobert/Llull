@@ -9,6 +9,7 @@ import { resolvedOrNull } from './classes';
 import { ancestry, scopeKey } from './hierarchy';
 import { targetKey, type PlantDataModel, type PlantObject, type TagScope, own } from './model';
 import { normaliseTag } from './tagFormat';
+import { appendAll } from '@lib/appendAll';
 
 export interface ScopeInfo {
   readonly key: string;
@@ -101,7 +102,7 @@ export function collidingTags(data: PlantDataModel, registry: ObjectRegistry, sc
   for (const inner of registry.byScope.values()) {
     const first = inner.values().next().value?.[0];
     const other = first === undefined ? undefined : registry.scopeOf.get(first);
-    if (other !== undefined && scopesCollide(data, scope, other)) tags.push(...inner.keys());
+    if (other !== undefined && scopesCollide(data, scope, other)) appendAll(tags, inner.keys());
   }
   return tags;
 }

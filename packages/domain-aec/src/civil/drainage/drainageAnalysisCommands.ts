@@ -13,6 +13,7 @@ import { analyseNetwork } from './drainageNetwork';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
 import { DEFAULT_CRITERIA, DEFAULT_ENTRY_TIME_MIN, idfError, type DrainageCriteria, type Idf } from './drainageCriteria';
 import { sizeNetwork } from './drainageSizing';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export const COMMERCIAL_DIAMETERS_MM = [150, 225, 300, 375, 450, 525, 600, 750, 900, 1050, 1200];
 
@@ -209,7 +210,7 @@ export const checkDrainageNetwork = defineCommand({
     return report(
       doc,
       `Drainage check at ${rainfallText(criteria)}: ${pipes.length} pipes (${pipes.filter((r) => r.status === 'pass').length} pass), ` +
-        `${manholes.length} manholes; Tc ${Math.min(...tcs)}-${Math.max(...tcs)} min; HGL: ${surcharged} surcharged pipe(s), ${flooded} ` +
+        `${manholes.length} manholes; Tc ${minOf(tcs)}-${maxOf(tcs)} min; HGL: ${surcharged} surcharged pipe(s), ${flooded} ` +
         'flooding manhole(s). ' +
         (failures.length === 0 ? 'No failures.' : `${failures.length} failure(s): ${worst}`) +
         split +

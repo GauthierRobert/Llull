@@ -15,6 +15,7 @@ import { defaultMeshAssetStore } from '../meshAssets/store';
 import { feaFailure, INSTALL_HINT } from './feaCommon';
 import { partFaces } from './faceRefs';
 import { partGeometry } from './feaGeometry';
+import { appendAll } from '@lib/appendAll';
 
 export interface MesherResponse {
   readonly ok: boolean;
@@ -115,7 +116,10 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
     if (midsurface !== null && 'code' in midsurface)
       return feaFailure('fea_mesh', midsurface.code, midsurface.message, [analysisId, entityId]);
     if (midsurface !== null) {
-      warnings.push(...midsurface.warnings.map((warning) => `${entityId}: ${warning}`));
+      appendAll(
+        warnings,
+        midsurface.warnings.map((warning) => `${entityId}: ${warning}`),
+      );
       parts.push({ entityId, geometry: midsurface });
       kernelFaces.set(entityId, null);
       continue;

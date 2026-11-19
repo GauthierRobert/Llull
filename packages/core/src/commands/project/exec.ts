@@ -8,6 +8,7 @@ import { executeRecorded } from '../history/record';
 import { type StepReport } from './types';
 import type { ResolveMemo } from '../resolveMemo';
 import { resolveExprInParam, recordableParams, STEP_PARAM_COMMANDS } from './resolve';
+import { appendAll } from '../../lib/appendAll';
 
 export interface PlanRun {
   current: CadDocument;
@@ -135,6 +136,6 @@ export function execStep(
   run.onStep?.({ phase: 'end', ...event, ok, stepPosition: run.steps.length - 1 });
   if (!ok) return { ok, affected: [] };
   run.current = result.document;
-  run.allAffected.push(...result.affected);
+  appendAll(run.allAffected, result.affected);
   return { ok, affected: result.affected };
 }

@@ -38,7 +38,7 @@ export function minimumWallThickness(mesh: MeshData): WallThickness {
       point(mesh.indices[f * 3 + 2] as number),
     ];
     const normal = cross3(sub3(b, a), sub3(c, a));
-    if (Math.hypot(...normal) === 0) continue;
+    if (Math.hypot(normal[0], normal[1], normal[2]) === 0) continue;
     const centroid: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
     const inward = normalize3([-normal[0], -normal[1], -normal[2]]);
     samples++;

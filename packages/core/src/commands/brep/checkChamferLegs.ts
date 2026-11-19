@@ -14,6 +14,7 @@ import type { ShapeHandle } from '../../geometry/kernelTypes';
 import type { EdgeRadius, Entity, Vec3 } from '../../model/types';
 import { roundSignificant } from '../../lib/significant';
 import { REMEDIATION, type Finding } from './checkBlendFindings';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Relative deviation of a measured leg from its law above which the chamfer is off the law (named default, §13.24). */
 export const LEG_TOLERANCE = 1e-3;
@@ -78,7 +79,7 @@ function crossing(lines: readonly (readonly Vec3[])[], point: Vec3, tangent: Vec
   };
   for (const line of lines) {
     const offsets = line.map((p) => dot(sub(p, point), tangent));
-    const scale = Math.max(...line.map((p) => norm(sub(p, point))), 1e-12);
+    const scale = Math.max(maxOf(line.map((p) => norm(sub(p, point)))), 1e-12);
     const lastOffset = offsets[line.length - 1];
     if (lastOffset !== undefined && Math.abs(lastOffset) <= 1e-12 * scale) consider(norm(sub(line[line.length - 1] as Vec3, point)));
     for (let k = 0; k + 1 < line.length; k++) {

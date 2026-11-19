@@ -4,6 +4,7 @@
  */
 
 import type { FlightMetrics } from './flightMetrics';
+import { minOf } from '@lib/arrayExtrema';
 
 export interface FlightLimits {
   /** Least share of the maximum thrust left at hover. */
@@ -98,7 +99,7 @@ export function flightVerdict(
   checks.push(
     check(
       'battery_final_soc',
-      packs.length === 0 ? null : Math.min(...packs.map((pack) => pack.finalSoc)),
+      packs.length === 0 ? null : minOf(packs.map((pack) => pack.finalSoc)),
       limits.minFinalSoc,
       '>=',
       packs.length === 0 ? 'no powertrain: no battery is drawn' : 'lowest state of charge over the packs at the end of the run',

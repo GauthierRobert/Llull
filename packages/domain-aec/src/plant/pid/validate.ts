@@ -10,6 +10,7 @@ import { tagPatternErrors } from './patternSafety';
 import { fitsBox, shapeProblems, SYMBOL_LIMITS, symbolFamilyOf, targetBox } from './symbols/projectSymbol';
 import type { Shape } from './symbols/shapes';
 import { itemErrors } from './validateItems';
+import { appendAll } from '@lib/appendAll';
 
 const nonEmpty = (value: unknown): boolean => typeof value === 'string' && value !== '';
 const isOneOf = (list: readonly string[], value: unknown): boolean => typeof value === 'string' && list.includes(value);
@@ -26,7 +27,7 @@ function settingsErrors(raw: Record<string, unknown>): string[] {
     if (!isOneOf(PID_TAG_FORMAT_KINDS, kind)) errors.push(`${path}: the kind must be ${PID_TAG_FORMAT_KINDS.join(', ')}`);
     else if (!isRecord(format) || typeof format['pattern'] !== 'string' || typeof format['separator'] !== 'string')
       errors.push(`${path} must be { pattern: string, separator: string }`);
-    else errors.push(...tagPatternErrors(format['pattern'], `${path}.pattern`));
+    else appendAll(errors, tagPatternErrors(format['pattern'], `${path}.pattern`));
   }
   return errors;
 }
@@ -115,7 +116,7 @@ function symbolErrors(raw: Record<string, unknown>): string[] {
     if (!Array.isArray(conventions) || conventions.length === 0 || !conventions.every((entry) => isOneOf(PID_CONVENTIONS, entry)))
       errors.push(`${path}.conventions must list ${PID_CONVENTIONS.join(' and / or ')}`);
     const problems = shapeProblems(value['shapes'], `${path}.shapes`);
-    errors.push(...problems);
+    appendAll(errors, problems);
     if (problems.length === 0 && !fitsBox(value['shapes'] as Shape[], targetBox(key)))
       errors.push(`${path}.shapes lie outside the box of the built-in ${key} symbol`);
   }
@@ -168,7 +169,7 @@ function recordErrors(raw: Record<string, unknown>): string[] {
           errors.push(`${path}.census must map names to non-negative integers`);
       });
   }
-  errors.push(...linkErrors(raw));
+  appendAll(errors, linkErrors(raw));
   const counters = raw['counters'];
   if (!isRecord(counters) || !Object.values(counters).every((n) => Number.isInteger(n) && (n as number) >= 0))
     errors.push('plant.pid.counters must map names to non-negative integers');

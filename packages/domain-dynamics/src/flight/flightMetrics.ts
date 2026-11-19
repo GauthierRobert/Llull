@@ -14,6 +14,8 @@ import { offsetAt, type FlightRun } from './flightRun';
 import { rotateInverse } from './frames';
 import { STATIC_ADVANCE_RATIO_LIMIT, validatedRange } from './rotorLaw';
 import { pow } from '@lib/pow';
+import { appendAll } from '@lib/appendAll';
+import { maxOf } from '@lib/arrayExtrema';
 
 const DEG = 180 / Math.PI;
 
@@ -196,9 +198,9 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
   const battery = Object.fromEntries(
     loop.power.map((feed, index) => [feed.powertrain.id, batteryMetrics(feed, index, loop.rotors.length, final, duration, physicsSteps)]),
   );
-  for (const [id, entry] of Object.entries(battery)) warnings.push(...batteryWarnings(id, entry));
+  for (const [id, entry] of Object.entries(battery)) appendAll(warnings, batteryWarnings(id, entry));
   const aero = aeroMetrics(loop, final, physicsSteps, run.staleAero);
-  warnings.push(...aero.warnings);
+  appendAll(warnings, aero.warnings);
   const runtime = loop.control?.runtime ?? null;
   const maxThrustN =
     runtime === null
@@ -213,7 +215,7 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
   const recoveryTimeS =
     events.length === 0 || recoveries.some((value) => value === null)
       ? null
-      : Math.max(...recoveries.filter((value): value is number => value !== null));
+      : maxOf(recoveries.filter((value): value is number => value !== null));
   const yawSetpoint = setpointAt(scenario, duration).yawDeg;
   const attitudeFinal = eulerDeg(samples.orientation(lastK));
   const divergedTime = final(SLOT.divergedTime);

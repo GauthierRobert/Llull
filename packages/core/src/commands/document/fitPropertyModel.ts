@@ -14,6 +14,7 @@ import { report } from '../noop';
 import { formHash, refuseWith } from './propertyModels';
 import { withoutUndefined } from './propertyModelSchema';
 import { pow } from '../../lib/pow';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const MAX_REL_RESIDUAL = 0.05;
 const MAX_CONDITION = 1e12;
@@ -142,8 +143,8 @@ function fitLaw(
   const m = params.temperatureExponent ?? 0;
   const logX = form === 'log10Polynomial';
   const abscissa = xs.map((x) => (logX ? Math.log10(x) : x));
-  const lo = Math.min(...abscissa);
-  const hi = Math.max(...abscissa);
+  const lo = minOf(abscissa);
+  const hi = maxOf(abscissa);
   const alpha = 2 / (hi - lo);
   const beta = -(hi + lo) / (hi - lo);
   const design =
@@ -197,7 +198,7 @@ function residualStats(
   const ssTotal = ys.reduce((s, y) => s + (y - mean) ** 2, 0);
   const ssResidual = residuals.reduce((s, r) => s + r * r, 0);
   const relative = residuals.flatMap((r, i) => ((ys[i] ?? 0) !== 0 ? [Math.abs(r / (ys[i] ?? 1))] : []));
-  const maxRel = relative.length > 0 ? Math.max(...relative) : 0;
+  const maxRel = relative.length > 0 ? maxOf(relative) : 0;
   return { residuals, ssTotal, ssResidual, maxRel };
 }
 
@@ -252,7 +253,7 @@ export const fitPropertyModel = defineCommand({
       ...(params.dataSource !== undefined ? { dataProvenance: withoutUndefined<{ citation: string }>(params.dataSource) } : {}),
       residual: {
         rms: Math.sqrt(ssResidual / rows.length),
-        maxAbs: Math.max(...residuals.map(Math.abs)),
+        maxAbs: maxOf(residuals.map(Math.abs)),
         maxRel,
         unit: valueUnit,
         ...(ssTotal > 0 ? { rSquared: 1 - ssResidual / ssTotal } : {}),

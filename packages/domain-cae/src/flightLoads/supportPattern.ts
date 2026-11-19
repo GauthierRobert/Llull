@@ -1,6 +1,7 @@
 /** 3-2-1 statically determinate support (14 FLL): which global dofs to hold at three points so exactly the six rigid-body motions are removed. */
 
 import type { Vec3 } from '@core/model/vectors';
+import { maxOf } from '@lib/arrayExtrema';
 
 type SupportDof = 'ux' | 'uy' | 'uz';
 const AXES: readonly SupportDof[] = ['ux', 'uy', 'uz'];
@@ -67,7 +68,7 @@ function smallestPivot(matrix: readonly (readonly number[])[]): number {
  */
 export function bestSupportPattern(points: readonly [Vec3, Vec3, Vec3]): SupportPattern | null {
   const centre = [0, 1, 2].map((axis) => points.reduce((sum, point) => sum + at(point, axis), 0) / 3);
-  const spread = Math.max(...points.flatMap((p, i) => points.slice(i + 1).map((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]))));
+  const spread = maxOf(points.flatMap((p, i) => points.slice(i + 1).map((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]))));
   if (!(spread > 0)) return null;
   const relative = points.map(
     (p): Vec3 => [(p[0] - at(centre, 0)) / spread, (p[1] - at(centre, 1)) / spread, (p[2] - at(centre, 2)) / spread],

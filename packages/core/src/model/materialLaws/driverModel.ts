@@ -13,6 +13,7 @@ import { arrheniusLnShift, wlfLog10Shift } from './viscoelastic';
 import { convertQuantity, failure, isLawFailure, resolveAll, resolveParameter, type LawFailure, type ResolveEnv } from './resolve';
 import { resolveOrthotropicConstants } from './elasticResolve';
 import { pow } from '../../lib/pow';
+import { maxOf } from '../../lib/arrayExtrema';
 
 interface ElasticModel {
   readonly C: Matrix;
@@ -304,8 +305,6 @@ export function resolveSmallModel(slots: Slots, env: ResolveEnv, temperatureK: n
   if ((prony !== null || creep !== null) && elastic.iso === null)
     return failure('MATL_PATH_INVALID', 'set', 'viscoelastic and creep runs need elastic_isotropic', 'use an elastic_isotropic model');
   const referenceStress =
-    j2?.referenceYield ??
-    hill?.referenceYield ??
-    1e-3 * (elastic.iso?.E ?? Math.max(...elastic.C.map((row) => Math.max(...row.map(Math.abs)))));
+    j2?.referenceYield ?? hill?.referenceYield ?? 1e-3 * (elastic.iso?.E ?? maxOf(elastic.C.map((row) => maxOf(row.map(Math.abs)))));
   return { elastic, j2, hill, prony, creep, referenceStress };
 }

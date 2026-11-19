@@ -10,6 +10,7 @@ import type { CadDocument } from '@core/model/types';
 import { refusePlm } from '../refusal';
 import { withPlm } from '../revisions';
 import { NOT_MANAGED } from '../state';
+import { maxOf } from '@lib/arrayExtrema';
 
 type SourceKind = Characteristic['sourceRef']['kind'];
 
@@ -87,7 +88,7 @@ export const assignCharacteristicIds = defineCommand({
     const existing = plm.characteristics ?? {};
     const revision = plm.item.currentRevision;
     const next: Record<string, Characteristic> = { ...existing };
-    let counter = Math.max(0, ...Object.values(existing).map((c) => c.charNo));
+    let counter = Math.max(0, maxOf(Object.values(existing).map((c) => c.charNo)));
     const added: number[] = [];
     for (const id of pmi.order) {
       const item = pmi.items[id];

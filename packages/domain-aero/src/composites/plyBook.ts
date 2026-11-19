@@ -14,6 +14,7 @@ import { type FlatPieces, flatPiecesOf } from './flatPieces';
 import { piecesOf } from './geometry2d';
 import { isUnverified } from '@lib/laminate/provenance';
 import { compositesOf, findPart, pliesOf } from './state';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const SHEETS = { A4: [297, 210], A3: [420, 297], A2: [594, 420] } as const;
 const MARGIN = 10;
@@ -43,16 +44,16 @@ function sheetSvg(
     row.flat.ok ? row.flat.pieces.map((piece) => ({ row, piece, color: PALETTE[k % PALETTE.length] as string })) : [],
   );
   const all = flats.flatMap(({ piece }) => piece.polygon);
-  const [minX, maxX] = [Math.min(...all.map(([x]) => x)), Math.max(...all.map(([x]) => x))];
-  const [minY, maxY] = [Math.min(...all.map(([, y]) => y)), Math.max(...all.map(([, y]) => y))];
+  const [minX, maxX] = [minOf(all.map(([x]) => x)), maxOf(all.map(([x]) => x))];
+  const [minY, maxY] = [minOf(all.map(([, y]) => y)), maxOf(all.map(([, y]) => y))];
   const area = { x: MARGIN, y: MARGIN + 12, w: width - 2 * MARGIN - 100, h: height - 2 * MARGIN - 12 - 55 };
   const extent = all.length === 0 ? 1 : Math.max((maxX - minX) * scaleMm, (maxY - minY) * scaleMm, 1e-9);
   const fit = all.length === 0 ? 1 : Math.min(area.w / ((maxX - minX) * scaleMm || 1), area.h / ((maxY - minY) * scaleMm || 1), 1);
   const toSheet = ([x, y]: Vec2): Vec2 => [area.x + (x - minX) * scaleMm * fit, area.y + (maxY - y) * scaleMm * fit];
   const loc = { x: width - MARGIN - 90, y: MARGIN + 12, w: 90, h: 70 };
   const outline = part.outline;
-  const [oMinX, oMaxX] = [Math.min(...outline.map(([x]) => x)), Math.max(...outline.map(([x]) => x))];
-  const [oMinY, oMaxY] = [Math.min(...outline.map(([, y]) => y)), Math.max(...outline.map(([, y]) => y))];
+  const [oMinX, oMaxX] = [minOf(outline.map(([x]) => x)), maxOf(outline.map(([x]) => x))];
+  const [oMinY, oMaxY] = [minOf(outline.map(([, y]) => y)), maxOf(outline.map(([, y]) => y))];
   const locFit = Math.min(loc.w / (oMaxX - oMinX || 1), loc.h / (oMaxY - oMinY || 1));
   const toLocation = ([x, y]: Vec2): Vec2 => [loc.x + (x - oMinX) * locFit, loc.y + (oMaxY - y) * locFit];
   const out: string[] = [

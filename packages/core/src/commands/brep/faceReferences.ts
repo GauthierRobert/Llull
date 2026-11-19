@@ -11,6 +11,7 @@ import { hasNames, namesOf, referenceProblem, resolveNames } from '../../geometr
 import { meshDiagonal } from '../../geometry/meshExtent';
 import type { CommandError } from '../types';
 import { commandError } from '../noop';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface FaceRequest {
   readonly indices: readonly number[];
@@ -58,7 +59,7 @@ function facesByPoint(kernel: GeometryKernel, shape: ShapeHandle, near: readonly
 }
 
 function lowestContaining(kernel: GeometryKernel, shape: ShapeHandle, faceCount: number, point: Vec3): number | null {
-  const tolerance = 1e-6 * Math.max(1, ...point.map(Math.abs));
+  const tolerance = 1e-6 * Math.max(1, maxOf(point.map(Math.abs)));
   for (let face = 0; face < faceCount; face++) if (kernel.faceQuery?.faceContains(shape, face, point, tolerance) === true) return face;
   return null;
 }

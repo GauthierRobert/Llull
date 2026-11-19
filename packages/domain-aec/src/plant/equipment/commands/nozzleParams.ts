@@ -9,6 +9,7 @@ import { nozzleWarnings, type NozzleIssue } from '../geometry/nozzleChecks';
 import { equipmentPorts } from '../geometry/ports';
 import { PLANT_EQUIPMENT_SCHEMA, type NozzleFacing, type NozzleLocation, type NozzleRecord, type PlantEquipmentData } from '../plantData';
 import { fromNorthClockwise, toNorthClockwise, type AngleConvention } from './angles';
+import { appendAll } from '@lib/appendAll';
 
 export const nozzleLocationSchema = z
   .object({
@@ -132,7 +133,10 @@ export function nozzleRecord(doc: CadDocument, mark: string, spec: NozzleSpec, d
       `rating '${spec.rating}' is not CLnnn / PNnn, or DN${spec.dn} is not in the nominal-size table (15..600)`,
       'rating',
     );
-  defaulted.push(...hardware.defaulted.map((name) => `nozzle.${name}`));
+  appendAll(
+    defaulted,
+    hardware.defaulted.map((name) => `nozzle.${name}`),
+  );
   return {
     mark,
     ...(spec.service === undefined ? {} : { service: spec.service }),

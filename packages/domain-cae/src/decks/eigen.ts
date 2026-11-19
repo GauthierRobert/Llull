@@ -2,7 +2,8 @@
 
 import { boundaryData, mechanicalStepLines } from './mechanical';
 import { isDeckRefusal, loadCasesOf, type DeckContext, type DeckRefusal, type DeckSections } from './context';
-import { appendAll, commentText, linesText, num, textLines } from './format';
+import { appendAll } from '@lib/appendAll';
+import { commentText, linesText, num, textLines } from './format';
 
 /** Modes requested when the case gives none. */
 const DEFAULT_MODES = 6;

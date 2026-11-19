@@ -1,6 +1,7 @@
 /** Iso-band contouring of a linearly interpolated scalar on a triangle, and the blue → red result colour scale of FE post-processors. */
 
 import type { Vec3 } from '../model/vectors';
+import { maxOf, minOf } from './arrayExtrema';
 
 interface ValuedPoint {
   readonly point: Vec3;
@@ -54,8 +55,8 @@ export function triangleBands(
   if (low === undefined || high === undefined || levels.length < 2) return [];
   const clamp = (value: number): number => Math.min(high, Math.max(low, value));
   const triangle: ValuedPoint[] = points.map((point, index) => ({ point, value: clamp(values[index] ?? low) }));
-  const least = Math.min(...triangle.map((p) => p.value));
-  const most = Math.max(...triangle.map((p) => p.value));
+  const least = minOf(triangle.map((p) => p.value));
+  const most = maxOf(triangle.map((p) => p.value));
   const pieces: BandPiece[] = [];
   for (let band = 0; band < levels.length - 1; band += 1) {
     const from = levels[band] ?? low;

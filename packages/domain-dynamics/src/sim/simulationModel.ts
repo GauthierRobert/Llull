@@ -33,6 +33,7 @@ import type { CurveCode } from './pressureCurve';
 import { buildTopology, isRefusal, type Topology, type TopologyRefusal } from './topology';
 import { scale3 } from '@lib/vec3';
 import { compileFlight, withFlightLoads, type FlightRuntime } from '../flight/flightLoads';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 function unitAxis(axis: Vec3): Vec3 {
   const length = Math.hypot(axis[0], axis[1], axis[2]);
@@ -148,11 +149,11 @@ function loopHalfSpan(doc: CadDocument, bodies: readonly (RigidBody | undefined)
       return entity === undefined ? [] : [entityBoundsInDoc(doc, entity)];
     });
     if (boxes.length === 0) return [];
-    const min = [0, 1, 2].map((i) => Math.min(...boxes.map((box) => box.min[i] ?? 0)));
-    const max = [0, 1, 2].map((i) => Math.max(...boxes.map((box) => box.max[i] ?? 0)));
+    const min = [0, 1, 2].map((i) => minOf(boxes.map((box) => box.min[i] ?? 0)));
+    const max = [0, 1, 2].map((i) => maxOf(boxes.map((box) => box.max[i] ?? 0)));
     return [[0, 1, 2].reduce((sum, i) => sum + Math.abs(axis[i] ?? 0) * ((max[i] ?? 0) - (min[i] ?? 0)), 0) * metres];
   });
-  return Math.max(MIN_HALF_SPAN, extents.length === 0 ? 0 : Math.min(...extents) / 2);
+  return Math.max(MIN_HALF_SPAN, extents.length === 0 ? 0 : minOf(extents) / 2);
 }
 
 /** Simulation bodies (topology order) and their mass properties, or the first body that cannot be built. */

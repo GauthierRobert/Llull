@@ -46,7 +46,7 @@ export const addLoadSchedule = defineCommand({
       if (body === undefined) return fail(`body '${params.body}' not found`);
       if (body.fixed) return fail(`body '${params.body}' is fixed to the ground: a force on it does nothing`);
       if (params.kind !== 'force') return fail('a body takes a force (kind "force"); use `joint` for a torque');
-      if (params.direction === undefined || !(Math.hypot(...params.direction) > 0))
+      if (params.direction === undefined || !(Math.hypot(params.direction[0], params.direction[1], params.direction[2]) > 0))
         return fail('a body force needs a non-zero `direction`');
       direction = params.direction;
     } else {

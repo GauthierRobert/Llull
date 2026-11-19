@@ -7,6 +7,7 @@ import { bodyOf, type PlannedInline } from './inlineBody';
 import { ZERO } from './eccentric';
 import { comp, free, midpoint, otherEnd, refuse, take, type PlanState, type Step, type Walk } from './planState';
 import type { RouteRefusal } from './planTypes';
+import { appendAll } from '@lib/appendAll';
 
 /** Flange (entered by its welded end) - [gasket] - valve - gasket - flange: the valve inline and the far flange's welded end. */
 function valveSet(
@@ -123,7 +124,7 @@ function onwardStep(s: PlanState, w: Walk, component: NetworkComponent, exitPoin
   const through = valveSet(s, component, gasket, valve, farKey);
   if ('ok' in through) return through;
   w.inline.push({ ...through.valve, centre: sub3(through.valve.centre, w.shift) });
-  w.consumed.push(...through.consumed);
+  appendAll(w.consumed, through.consumed);
   w.end = through.out.xyz;
   w.key = nodeKey(through.out.xyz);
   return 'again';

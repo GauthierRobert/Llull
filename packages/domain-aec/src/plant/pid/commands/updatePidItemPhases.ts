@@ -5,6 +5,7 @@ import { moveEquipment, rerouteEnds } from '../authoring/move';
 import { type Draft, type Fail, checkTag, fail, isFail, segmentsOf } from '../authoring/refs';
 import type { toValues } from '../authoring/values';
 import type { PidItem, PidLine, PidModel } from '../model';
+import { appendAll } from '@lib/appendAll';
 
 type AttributeParam = Parameters<typeof toValues>[0];
 
@@ -83,7 +84,7 @@ export function placeItem(draft: Draft, current: PidItem, set: PidSet, affected:
   if ((set.at !== undefined || set.rotationDeg !== undefined) && next.kind === 'equipment') {
     draft.put(next);
     const moved = next;
-    affected.push(...moveEquipment(draft, moved, set.at ?? moved.at, set.rotationDeg ?? moved.rotationDeg).slice(1));
+    appendAll(affected, moveEquipment(draft, moved, set.at ?? moved.at, set.rotationDeg ?? moved.rotationDeg).slice(1));
   } else {
     if (set.at !== undefined) next = { ...next, at: set.at };
     if (set.rotationDeg !== undefined) next = { ...next, rotationDeg: set.rotationDeg };

@@ -10,6 +10,7 @@ import { bodyParams, outputParam, targetIds } from './schema';
 import type { DeformPlan } from './request';
 import { runDeform } from './run';
 import { type Refusal, resolveTargetFrame } from './target';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Layers next to a lattice face the body crosses that must not move (continuity with the undeformed part). */
 const DEFAULT_FIXED_LAYERS = 1;
@@ -172,7 +173,7 @@ export const deformLattice = defineCommand({
           {
             origin: frame?.origin ?? [0, 0, 0],
             axis,
-            reference: frame?.reference ?? (Math.abs(axis[0]) < 0.99 * Math.hypot(...axis) ? [1, 0, 0] : [0, 1, 0]),
+            reference: frame?.reference ?? (Math.abs(axis[0]) < 0.99 * Math.hypot(axis[0], axis[1], axis[2]) ? [1, 0, 0] : [0, 1, 0]),
           },
           'centre',
         );
@@ -181,7 +182,7 @@ export const deformLattice = defineCommand({
         // the body's extent along the box axes (the frame extent for a frame-aligned box)
         const bodyExtent: Box =
           axes === undefined || axes === null || local === null ? resolved.extent : extentAlong(target.mesh.positions, local, axes);
-        const margin = 1e-6 * Math.hypot(...AXES.map((a) => bodyExtent.max[a] - bodyExtent.min[a]));
+        const margin = 1e-6 * hypotOf(AXES.map((a) => bodyExtent.max[a] - bodyExtent.min[a]));
         const lattice: Box = (box === 'bounds' ? undefined : box) ?? {
           min: AXES.map((a) => bodyExtent.min[a] - margin) as unknown as Vec3,
           max: AXES.map((a) => bodyExtent.max[a] + margin) as unknown as Vec3,

@@ -10,6 +10,7 @@ import { buildTopology } from '../../geometry/subd/topology';
 import { dirRejection } from './codes';
 import { edgeRefField, isEntity, subdivisionOf } from './shared';
 import { finishedCage, isCommandResult, topologyResult } from './topologyResult';
+import { spliceAll } from '../../lib/spliceAll';
 
 const COMMAND = 'slide_cage_edges';
 
@@ -68,7 +69,7 @@ export const slideCageEdges = defineCommand({
     if (problem !== null) return reject('DIR_SLIDE_LOOP_INVALID', problem.message, ['params.edges']);
     if (entity.symmetry !== undefined) {
       const weights = entity.vertices.map((_, v) => (chain.some(([x, y]) => x === v || y === v) ? 1 : 0));
-      state.vertices.splice(0, state.vertices.length, ...symmetrize(entity.vertices, state.vertices, weights, entity.symmetry));
+      spliceAll(state.vertices, 0, state.vertices.length, symmetrize(entity.vertices, state.vertices, weights, entity.symmetry));
     }
     const updated = finishedCage(doc, COMMAND, entity, state);
     if (isCommandResult(updated)) return updated;

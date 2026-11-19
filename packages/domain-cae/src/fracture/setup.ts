@@ -11,6 +11,7 @@ import { strengthMpa } from '../fatigue/curves';
 import { crackOf, historyOf } from '../fatigue/store';
 import { growthRate, rateModelOf, type RateModel } from './growthLaws';
 import { solvedGeometry, type SolvedGeometry } from './kSolutions';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface Failure {
   readonly code: string;
@@ -177,7 +178,7 @@ export function resolveGrowth(doc: CadDocument, growthCase: CrackGrowthCase): Gr
       message: 'aDetectable / aTarget must be lengths > 0 and residualStrengthStress a stress > 0',
       ids: [growthCase.id],
     };
-  const sigmaPeak = Math.max(...block.map((cycle) => cycle.sMax));
+  const sigmaPeak = maxOf(block.map((cycle) => cycle.sMax));
   return {
     crack,
     geometry,

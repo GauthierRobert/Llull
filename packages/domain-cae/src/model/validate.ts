@@ -13,6 +13,7 @@ import { contactErrors } from '../contact/validate';
 import { creepErrors } from '../creep/validate';
 import { amErrors } from '../process/validate';
 import { pretensionErrors } from '../contact/pretensionValidate';
+import { appendAll } from '@lib/appendAll';
 
 const TYPES = [
   'static',
@@ -177,7 +178,7 @@ function checkNonlinear(scope: Scope, analysisCase: Record<string, unknown>, whe
   if (analysisCase['type'] !== 'nonlinear_static')
     return void scope.errors.push(`${where}: only nonlinear_static cases carry nonlinear settings`);
   if (!isRecord(nonlinear)) return void scope.errors.push(`${where}: expected a settings record`);
-  scope.errors.push(...nonlinearValueProblems(nonlinear, where));
+  appendAll(scope.errors, nonlinearValueProblems(nonlinear, where));
   checkBag(scope, `${where}.steps`, nonlinear['steps'], nonlinear['stepOrder'], (id, step) => {
     const control = step['control'];
     if (!isRecord(control) || !oneOf(['load', 'displacement', 'arc_length'], control['kind']))
@@ -210,9 +211,9 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
       if (!Object.hasOwn(scope.entities, entityId)) errors.push(`${where}: part '${entityId}' does not exist`);
       if (!isRecord(idealization) || !oneOf(IDEALIZATION_KINDS, idealization['kind']))
         errors.push(`${where}: part '${entityId}' has an invalid idealization`);
-      else errors.push(...idealizationErrors(idealization, `${where}: part '${entityId}'`));
+      else appendAll(errors, idealizationErrors(idealization, `${where}: part '${entityId}'`));
     }
-  errors.push(...defeatureErrors(analysisCase['defeature'], isRecord(parts) ? parts : {}, where));
+  appendAll(errors, defeatureErrors(analysisCase['defeature'], isRecord(parts) ? parts : {}, where));
   checkBag(scope, `${where}.constraints`, analysisCase['constraints'], analysisCase['constraintOrder'], (cid, constraint) => {
     if (!oneOf(CONSTRAINT_KINDS, constraint['kind'])) errors.push(`${where}: constraint '${cid}' has an unknown kind`);
     checkTarget(scope, constraint['target'], `${where}: constraint '${cid}'`);
@@ -254,15 +255,15 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     if (!isRecord(thermomech['referenceTemperature'])) errors.push(`${where}: thermomech.referenceTemperature is required`);
     if (coupled && thermomech['thermal'] === undefined) errors.push(`${where}: thermomech.thermal is required for coupled cases`);
     if (thermomech['thermal'] !== undefined) checkThermal(scope, thermomech['thermal'], `${where}.thermomech.thermal`);
-    scope.errors.push(...orientationErrors(thermomech['orientations'], scope.entities, `${where}.thermomech`));
+    appendAll(scope.errors, orientationErrors(thermomech['orientations'], scope.entities, `${where}.thermomech`));
   }
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
-  errors.push(...contactErrors(analysisCase, where, scope.entities));
-  errors.push(...creepErrors(analysisCase, where));
-  errors.push(...amErrors(analysisCase, where));
-  errors.push(...pretensionErrors(analysisCase, where, scope.entities));
-  errors.push(...settingsErrors(analysisCase, where));
-  errors.push(...studyErrors(analysisCase, id, where));
+  appendAll(errors, contactErrors(analysisCase, where, scope.entities));
+  appendAll(errors, creepErrors(analysisCase, where));
+  appendAll(errors, amErrors(analysisCase, where));
+  appendAll(errors, pretensionErrors(analysisCase, where, scope.entities));
+  appendAll(errors, settingsErrors(analysisCase, where));
+  appendAll(errors, studyErrors(analysisCase, id, where));
   checkStudyControls(scope, analysisCase, where);
   for (const summary of ['meshSummary', 'results'])
     if (
@@ -281,7 +282,10 @@ export function analysisErrors(raw: Record<string, unknown>): string[] {
   const scope: Scope = { entities: isRecord(raw['entities']) ? raw['entities'] : {}, errors: [] };
   const paths: string[] = [];
   nonFinitePaths(analysis, 'analysis', paths);
-  scope.errors.push(...paths.map((path) => `${path} is not a finite number`));
+  appendAll(
+    scope.errors,
+    paths.map((path) => `${path} is not a finite number`),
+  );
   const order = analysis['caseOrder'] as unknown[];
   checkBag(scope, 'analysis.cases', analysis['cases'], order, (id, analysisCase) => checkCase(scope, id, analysisCase));
   return [

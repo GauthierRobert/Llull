@@ -11,6 +11,7 @@ import { thinAirfoil } from './panelMethod';
 import { panelCount } from './vlmKernel';
 import { buildLattice, loftSections, type Lattice, type LatticeSection, type LatticeSurface } from './vlmLattice';
 import { alphaLoads, stability, stripLoading, trefftzBasis, type LatticeBasis, type LatticeReference, type TrefftzBasis } from './vlmLoads';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Largest lattice the TypeScript path solves (dense LU, measured ≈ 1.2 s at this size on the reference laptop; above: the native transport). */
 export const VLM_TS_PANEL_CAP = 1000;
@@ -97,7 +98,7 @@ interface ResolvedSurface {
 function onOrAcrossSymmetryPlane(sections: readonly LatticeSection[], spanLength: number): boolean {
   const tolerance = 1e-9 * spanLength;
   const ys = sections.map((s) => s.leadingEdge[1]);
-  return ys.every((y) => Math.abs(y) <= tolerance) || (Math.min(...ys) < -tolerance && Math.max(...ys) > tolerance);
+  return ys.every((y) => Math.abs(y) <= tolerance) || (minOf(ys) < -tolerance && maxOf(ys) > tolerance);
 }
 
 function surfaceOf(doc: CadDocument, surface: SurfaceParams, path: string): ResolvedSurface | VlmRefusal {

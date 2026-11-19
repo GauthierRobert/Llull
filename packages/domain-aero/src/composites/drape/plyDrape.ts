@@ -10,6 +10,7 @@ import { netFlattener } from './flatten';
 import { type DrapeNet, buildNet } from './net';
 import { type ShearLimits, type ShearSummary, summarizeShear } from './shear';
 import { type DrapeSurface, drapeSurfaceOf } from './surfaceQuery';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface PieceDrape {
   readonly index: number;
@@ -41,8 +42,8 @@ export type PlyDrapeResult =
 const MAX_NODES_ESTIMATE = 1_500_000;
 
 const bounds = (polygon: readonly Vec2[]): { min: Vec2; max: Vec2 } => ({
-  min: [Math.min(...polygon.map(([x]) => x)), Math.min(...polygon.map(([, y]) => y))],
-  max: [Math.max(...polygon.map(([x]) => x)), Math.max(...polygon.map(([, y]) => y))],
+  min: [minOf(polygon.map(([x]) => x)), minOf(polygon.map(([, y]) => y))],
+  max: [maxOf(polygon.map(([x]) => x)), maxOf(polygon.map(([, y]) => y))],
 });
 
 /**
@@ -122,7 +123,7 @@ function bisector(piece: readonly Vec2[], k: number): Vec2 {
 function pieceStart(part: CompositePart, ply: Ply, piece: readonly Vec2[]): { seedUv: Vec2; warp: Vec3 } {
   const wanted = ply.drape?.seed ?? defaultSeed(part);
   const seedUv = insideOrOn(wanted, piece, 1e-6) ? wanted : interiorPoint(piece);
-  const size = Math.max(...piece.map(([x]) => Math.abs(x)), ...piece.map(([, y]) => Math.abs(y)), 1);
+  const size = Math.max(maxOf(piece.map(([x]) => Math.abs(x))), maxOf(piece.map(([, y]) => Math.abs(y))), 1);
   const vertex = piece.findIndex((p) => Math.hypot(p[0] - seedUv[0], p[1] - seedUv[1]) <= 1e-6 * size);
   const rotated = (dir: Vec2): Vec2 => {
     const theta = (ply.orientation * Math.PI) / 180;
@@ -174,7 +175,9 @@ export function drapePly(part: CompositePart, ply: Ply, options: PlyDrapeOptions
       seedUv,
       net,
       coverage: pieceCoverage(net, piece),
-      summary: summarizeShear(net, options.limits, (node) => insideOrOn(node.hit.uv, piece, 1e-6 * (1 + Math.hypot(...node.hit.uv)))),
+      summary: summarizeShear(net, options.limits, (node) =>
+        insideOrOn(node.hit.uv, piece, 1e-6 * (1 + Math.hypot(node.hit.uv[0], node.hit.uv[1]))),
+      ),
     });
   }
   return { ok: true, stepLength: d, pieces };

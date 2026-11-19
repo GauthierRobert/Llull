@@ -12,6 +12,7 @@ import type { GeometryKernel, ShapeHandle, StepAssemblyPart, StepOccurrence } fr
 import { exactOrMesh, exactRecipe } from '../kernelShape';
 import type { AssemblyStepLabels, NestedOccurrence } from './stepAssemblyLabels';
 import { MAX_INSTANCE_DEPTH, type StepEntry, instanceSolids, stepLabels } from './stepTargets';
+import { appendAll } from '../../lib/appendAll';
 
 export interface StepAssemblyPlan {
   readonly occurrences: StepOccurrence[];
@@ -134,7 +135,7 @@ export function planStepAssembly(
     for (const use of uses) {
       const twins = uses.filter((other) => other.base === use.base && (other.shared === null) === (use.shared === null));
       const label = twins.length > 1 ? `${use.base} ${twins.indexOf(use) + 1}` : use.base;
-      if (use.shared === null) baked.push(...instanceSolids(doc, use.child, label, path.length));
+      if (use.shared === null) appendAll(baked, instanceSolids(doc, use.child, label, path.length));
       else {
         nested.push({ part: use.shared.part, position: scalePosition(use.child.position, factor), rotation: use.child.rotation });
         nestedLabels.push({ name: label, part: use.shared.index });

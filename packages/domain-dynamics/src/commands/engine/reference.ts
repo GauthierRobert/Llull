@@ -8,6 +8,7 @@ import { idOrNext, idTaken } from '@lib/explicitId';
 import { changed, failer } from '@core/commands/noop';
 import { idTakenInDynamicsOrFlight } from '../../flight/model';
 import { addSeriesReference, seriesSchema } from './referenceSeries';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const pointSchema = z.object({
   rpm: z.number().positive().optional().describe('Crank speed of the point, rpm (omit for a quantity that does not depend on speed).'),
@@ -186,7 +187,7 @@ export const addReferenceData = defineCommand({
       condition.altitudeM !== 0 ? ` Note: altitude ${condition.altitudeM} m is not modelled (sea-level ambient pressure).` : '';
     return changed(
       { ...doc, prototype: { ...prototype, references: { ...references, [referenceId]: record } } },
-      `add_reference_data: '${referenceId}' — ${quantity}, ${points.length} point(s)${speeds.length > 0 ? ` (${Math.min(...speeds)}..${Math.max(...speeds)} rpm)` : ''}, ` +
+      `add_reference_data: '${referenceId}' — ${quantity}, ${points.length} point(s)${speeds.length > 0 ? ` (${minOf(speeds)}..${maxOf(speeds)} rpm)` : ''}, ` +
         `grade ${record.grade}${record.digitised ? ', digitised' : ''}, band ±${bandRel * 100} %, ` +
         `${calibrationRpm.length > 0 ? `calibration at ${calibrationRpm.join(', ')} rpm (the others are hold-out)` : 'no calibration point (all hold-out)'}; source: ${source}.${warning}`,
       [referenceId],

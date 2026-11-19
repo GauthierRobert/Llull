@@ -19,6 +19,7 @@ import {
 } from '@aero/index';
 import { feaFailure } from '../fea/feaCommon';
 import { f64Bytes, f64Values, readOutput, withJobFolder, type ComputeRunner } from './computeJob';
+import { maxOf } from '@lib/arrayExtrema';
 
 const TOOL = 'vortex_lattice_solve';
 const DEFAULT_TIMEOUT_S = 600;
@@ -41,10 +42,10 @@ function verification(model: VortexLatticeModel, gamma: Float64Array): Record<st
   const reference = solveBasis(model.lattice.panels);
   if (reference === null) return { skipped: 'the TypeScript solve found the matrix singular' };
   const ts = [...reference.gammaX, ...reference.gammaZ];
-  const scale = Math.max(...ts.map(Math.abs));
+  const scale = maxOf(ts.map(Math.abs));
   return {
     referenceMs: Date.now() - started,
-    largestGammaDifference: Math.max(...ts.map((value, i) => Math.abs(value - (gamma[i] as number)))) / scale,
+    largestGammaDifference: maxOf(ts.map((value, i) => Math.abs(value - (gamma[i] as number)))) / scale,
   };
 }
 

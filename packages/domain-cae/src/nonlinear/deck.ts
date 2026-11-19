@@ -3,7 +3,8 @@
 import type { AnalysisStep, ConvergencePreset, NonlinearSettings } from '@core/model/analysis';
 import { findSet, setMembers } from '@core/model/materialLaws/combination';
 import { isDeckRefusal, safeName, type DeckContext, type DeckRefusal, type DeckSections } from '../decks/context';
-import { appendAll, commentText, linesText, num, row, textLines } from '../decks/format';
+import { appendAll } from '@lib/appendAll';
+import { commentText, linesText, num, row, textLines } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
 import { partSetId } from '../decks/constitutive';
 import { FIELD_KEYS, TIME_KEYS, nonlinearValueProblems } from './shape';
@@ -184,11 +185,11 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
     lines.push(`** step ${commentText(step.id)} ${commentText(step.name)}`);
     lines.push(`*STEP${nonlinear.nlgeom === true ? ', NLGEOM' : ''}, INC=${control.maxIncrements}`);
     lines.push('*STATIC', row(control.initialIncrement, 1, control.minIncrement, control.maxIncrement));
-    lines.push(...controlLines(nonlinear.convergence));
+    appendAll(lines, controlLines(nonlinear.convergence));
     const contactStep = contactStepLines(ctx, step.id, steps[index - 1]?.id ?? null, rate);
     const bolts = pretensionStepLines(ctx, index, step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : '', rate);
     if ('code' in bolts) return bolts;
-    lines.push(...contactStep.switches);
+    appendAll(lines, contactStep.switches);
     appendAll(lines, textLines(mechanical.text));
     appendAll(lines, bolts.loads);
     if (control.kind === 'displacement') {
@@ -196,7 +197,7 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
       lines.push(`*BOUNDARY${step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : ''}`);
       lines.push(row(ctx.nset(`S_${step.id}`), dof, dof, control.value * ctx.lengthToAnalysis));
     }
-    lines.push(
+    appendAll(lines, [
       `*NODE FILE${rate}`,
       'U, RF',
       `*EL FILE${rate}`,
@@ -205,7 +206,7 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
       ...contactStep.output,
       ...bolts.output,
       '*END STEP',
-    );
+    ]);
   }
   return { text: linesText(lines) };
 }

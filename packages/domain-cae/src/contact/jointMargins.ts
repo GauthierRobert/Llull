@@ -15,6 +15,7 @@ import { marginOfSafety, statusOf, type MarginStatus } from '../margins/marginMa
 import { NOT_APPROVED } from './codes';
 import { isSeries, jointSeriesOf, type Point } from './jointSeries';
 import { forceUnitName } from './pretensionRules';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const n = (value: number): string => significantNumber(value, 5);
 
@@ -158,7 +159,7 @@ export function jointMarginTable(
       'CNT_SEPARATED',
       `the clamp zone of '${bolt.id}' is already open at the first increment of step '${stepId}': the joint has no separation capacity in this step`,
     );
-  const capacity = Math.max(...closed.map((point) => point.load));
+  const capacity = maxOf(closed.map((point) => point.load));
   const force = forceUnitName(analysis.unitSystem);
   const resultsHash = analysis.results?.resultsHash ?? '';
   const inputHash = analysisInputHash(doc, analysis.id, 'full');
@@ -211,7 +212,7 @@ export function jointMarginTable(
     const bolted = forceAt(points, factored);
     if (bolted === null)
       warnings.push(
-        `no fastener_ultimate row: the factored load ${n(factored)} ${force} is outside the load range of step '${stepId}' (${n(Math.min(...points.map((p) => p.load)))} .. ${n(Math.max(...points.map((p) => p.load)))} ${force}); load the model to it`,
+        `no fastener_ultimate row: the factored load ${n(factored)} ${force} is outside the load range of step '${stepId}' (${n(minOf(points.map((p) => p.load)))} .. ${n(maxOf(points.map((p) => p.load)))} ${force}); load the model to it`,
       );
     else
       built.push(
@@ -242,7 +243,7 @@ export function jointMarginTable(
       criterion: 'joint',
       marginalBand: band ?? null,
       rows,
-      minMs: numeric.length === 0 ? null : Math.min(...numeric),
+      minMs: numeric.length === 0 ? null : minOf(numeric),
       factors: { separation: fsSeparation, ultimate: fsUltimate, fitting, source: factors.source },
       omitted: [
         'joint_slip: bolted_joint_check (NASA-STD-5020 A.10-4) and check_contact (CNT_SLIP); needs the shear load, not an FE criterion here',

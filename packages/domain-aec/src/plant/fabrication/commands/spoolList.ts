@@ -5,6 +5,7 @@ import { analyseLine, isAnalysis } from '../analysis';
 import { refuseIso } from '../codes';
 import { allLineIds } from '../lineNetwork';
 import { spoolRow } from './spoolOutput';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * @affects none (query: returns the same document)
@@ -33,7 +34,10 @@ export const spoolList = defineCommand({
     for (const lineId of lineIds) {
       const analysis = analyseLine(doc, 'spool_list', lineId);
       if (!isAnalysis(analysis)) return analysis;
-      spools.push(...analysis.spools.spools.map((spool) => spoolRow(spool, lineId, analysis.fabrication.rules?.maxSpool)));
+      appendAll(
+        spools,
+        analysis.spools.spools.map((spool) => spoolRow(spool, lineId, analysis.fabrication.rules?.maxSpool)),
+      );
     }
     const over = spools.filter((spool) => (spool['violations'] as unknown[]).length > 0).length;
     return report(

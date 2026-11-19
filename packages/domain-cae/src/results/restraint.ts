@@ -4,6 +4,7 @@ import type { FeaConstraint, FeMeshArtifact } from '@core/model/analysis';
 import type { DeckContext } from '../decks/context';
 import { planeAxis } from '../decks/mechanical';
 import { nodeCoordinates } from './fields';
+import { hypotOf } from '@lib/hypotOf';
 
 export interface RestraintGroup {
   /** Analysed parts that move together: parts sharing mesh nodes (conformal bonding) form one group, every other part is its own. */
@@ -88,7 +89,7 @@ export function partRestraints(ctx: DeckContext): RestraintGroup[] {
       const point = coordinates.get(node);
       if (box === undefined || point === undefined) continue;
       const centre = box.lo.map((low, axis) => (low + (box.hi[axis] ?? low)) / 2);
-      const size = Math.hypot(...box.lo.map((low, axis) => (box.hi[axis] ?? low) - low)) || 1;
+      const size = hypotOf(box.lo.map((low, axis) => (box.hi[axis] ?? low) - low)) || 1;
       const local: [number, number, number] = [
         (point[0] - (centre[0] ?? 0)) / size,
         (point[1] - (centre[1] ?? 0)) / size,
@@ -100,13 +101,13 @@ export function partRestraints(ctx: DeckContext): RestraintGroup[] {
         counts.set(group, (counts.get(group) ?? 0) + 1);
         if (taken.length >= 6) continue;
         const row = rigidRow(axis, local);
-        const norm = Math.hypot(...row);
+        const norm = hypotOf(row);
         let residual = row;
         for (const direction of taken) {
           const projection = residual.reduce((sum, value, index) => sum + value * (direction[index] ?? 0), 0);
           residual = residual.map((value, index) => value - projection * (direction[index] ?? 0));
         }
-        const left = Math.hypot(...residual);
+        const left = hypotOf(residual);
         if (left > INDEPENDENCE * norm) taken.push(residual.map((value) => value / left));
       }
     }

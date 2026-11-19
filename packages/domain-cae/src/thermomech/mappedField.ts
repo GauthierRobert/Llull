@@ -9,6 +9,7 @@ import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/mo
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { mappingReport, type MappedField } from './mapping';
+import { appendAll } from '@lib/appendAll';
 
 const MAPPED_FIELD_SOLVER = 'llull-compute post map';
 const FIELD_NAME = 'MAPPED';
@@ -74,7 +75,8 @@ export function mappingRequest(inputs: MappingInputs): MappingRequest {
 /** Wire buffers of `llull-compute post map` (little-endian f64): source nodes, element lists, source values, target nodes. */
 export function mappingJobBuffers(request: MappingRequest): Readonly<Record<string, Float64Array>> {
   const elements: number[] = [];
-  for (const block of request.source.blocks) for (const element of block.elements) elements.push(element.length - 1, ...element.slice(1));
+  for (const block of request.source.blocks)
+    for (const element of block.elements) appendAll(elements, [element.length - 1, ...element.slice(1)]);
   return {
     'source_nodes.f64': Float64Array.from(request.source.nodes.flat()),
     'source_elements.f64': Float64Array.from(elements),

@@ -10,6 +10,8 @@ import type { AnalysisCase, FeaConstraint, FeMeshArtifact } from '@core/model/an
 import type { ExplicitMotionTarget, ExplicitSpec } from '@core/model/explicit';
 import type { Vec3 } from '@core/model/vectors';
 import type { ExplicitMesh } from './mesh';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { hypotOf } from '@lib/hypotOf';
 
 export interface FixedDofs {
   /** One 0/1 per translational dof (3 per node); empty when nothing is held. */
@@ -56,9 +58,9 @@ export function locate(
   const part = mesh.nodePart.flatMap((entityId, node) => (entityId === target.entityId ? [node] : []));
   if (part.length === 0) return `part '${target.entityId}' has no nodes in the explicit mesh`;
   const at = (node: number, axis: number): number => mesh.nodes[3 * node + axis] ?? 0;
-  const low = [0, 1, 2].map((axis) => Math.min(...part.map((node) => at(node, axis))));
-  const high = [0, 1, 2].map((axis) => Math.max(...part.map((node) => at(node, axis))));
-  const tolerance = ON_PLANE * Math.max(...[0, 1, 2].map((axis) => (high[axis] ?? 0) - (low[axis] ?? 0)), 1e-300);
+  const low = [0, 1, 2].map((axis) => minOf(part.map((node) => at(node, axis))));
+  const high = [0, 1, 2].map((axis) => maxOf(part.map((node) => at(node, axis))));
+  const tolerance = ON_PLANE * Math.max(maxOf([0, 1, 2].map((axis) => (high[axis] ?? 0) - (low[axis] ?? 0))), 1e-300);
   const scaled = (point: Vec3): Vec3 => [point[0] * toCase, point[1] * toCase, point[2] * toCase];
   const selected = new Set<number>();
   const axes = new Set<number>();
@@ -69,7 +71,7 @@ export function locate(
         const outside = [0, 1, 2]
           .filter((other) => other !== axis)
           .map((other) => Math.max((low[other] ?? 0) - (point[other] ?? 0), (point[other] ?? 0) - (high[other] ?? 0), 0));
-        const distance = Math.hypot((point[axis] ?? 0) - plane, ...outside);
+        const distance = hypotOf([(point[axis] ?? 0) - plane, ...outside]);
         if (best === null || distance < best.distance) best = { axis, plane, distance };
       }
     if (best === null) continue;

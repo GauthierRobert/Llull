@@ -2,6 +2,8 @@
 
 import type { Vec3 } from '../../model/vectors';
 import { cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
+import { hypotOf } from '../../lib/hypotOf';
+import { minOf } from '../../lib/arrayExtrema';
 
 export type ReferenceKind = 'torus' | 'cylinder' | 'cone' | 'spheroid' | 'sphere' | 'plane' | 'ellipticCylinder' | 'helicoid';
 
@@ -130,9 +132,9 @@ function spheroidDistance(reference: ReferenceShape): DistanceOrMissing {
   return (p) => {
     const d = sub3(p, center);
     const f = d.reduce((sum, c, i) => sum + (c / (semiAxes[i] as number)) ** 2, 0) - 1;
-    const gradient = Math.hypot(...d.map((c, i) => (2 * c) / (semiAxes[i] as number) ** 2));
+    const gradient = hypotOf(d.map((c, i) => (2 * c) / (semiAxes[i] as number) ** 2));
     // the centre (zero gradient, f = -1): the nearest point of the surface is the end of the shortest semi-axis
-    return gradient === 0 ? Math.min(...semiAxes) : Math.abs(f) / gradient;
+    return gradient === 0 ? minOf(semiAxes) : Math.abs(f) / gradient;
   };
 }
 

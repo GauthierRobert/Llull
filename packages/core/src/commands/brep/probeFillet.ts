@@ -17,6 +17,7 @@ import type { CommandResult } from '../types';
 import { diagonalOf } from './shapeDiagonal';
 import { pickEdges } from './edgeReferences';
 import { validateSolidTarget } from './modifyTarget';
+import { minOf } from '../../lib/arrayExtrema';
 
 const DEFAULT_EVALUATIONS = 12;
 /** Probe edges per call: each costs up to `maxEvaluations` exact fillets. */
@@ -33,7 +34,7 @@ const refuse = tableRejection({
 function upperBoundOf(topology: ShapeTopology, faces: readonly number[], edge: number): number {
   const length = topology.edges[edge]?.length ?? 0;
   const widths = faces.map((face) => (topology.faces[face]?.area ?? 0) / length).filter((width) => Number.isFinite(width) && width > 0);
-  return widths.length === 0 ? length : Math.min(...widths);
+  return widths.length === 0 ? length : minOf(widths);
 }
 
 interface EdgeProbe {

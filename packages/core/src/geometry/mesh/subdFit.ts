@@ -250,7 +250,7 @@ function foldedTriangles(limit: MeshData, target: MeshData, targetIndex: Surface
       [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
     ] as [Vec3, Vec3];
     const n: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-    const length = Math.hypot(...n);
+    const length = Math.hypot(n[0], n[1], n[2]);
     return length > 0 ? [n[0] / length, n[1] / length, n[2] / length] : [0, 0, 0];
   };
   let [count, checked] = [0, 0];

@@ -9,6 +9,7 @@ import { compileField } from './compile';
 import { type BooleanNode, type FieldNode, fieldOf } from './model';
 import { isLawProblem, lawBounds } from './lawCheck';
 import { addNode } from './nodeResult';
+import { minOf } from '@lib/arrayExtrema';
 
 const MAX_OPERANDS = 256;
 
@@ -105,7 +106,7 @@ export const combineFields = defineCommand({
         metricsAt: 'the largest radius of the law',
       };
       const features = operands.map((id) => compileField(doc, id)).flatMap((c) => (c.ok ? [c.minFeature] : []));
-      const smallest = Math.min(...features);
+      const smallest = minOf(features);
       if (Number.isFinite(largest) && largest > smallest)
         warnings.push({
           code: 'IMP_BLEND_EXCEEDS_FEATURE',

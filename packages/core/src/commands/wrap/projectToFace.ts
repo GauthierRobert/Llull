@@ -24,6 +24,7 @@ import { namedDefault, wrapData } from './conventions';
 import { defaultFitTolerance, exactKernel } from './faceSession';
 import { faceRefField } from './schemas';
 import { isSketchFailure, sketchOutline, type SketchOutline } from './sketchProfiles';
+import { appendAll } from '../../lib/appendAll';
 
 const MAX_ENTITIES = 200;
 
@@ -179,7 +180,7 @@ export const projectToFace = defineCommand({
           names: ref.faceName === undefined ? undefined : [ref.faceName],
         });
         if ('problem' in pick) return fail('WRP_FACE_NOT_FOUND', `${pick.problem} on '${params.id}'`, [params.id], [`faces.${index}`]);
-        faces.push(...pick.faces);
+        appendAll(faces, pick.faces);
       }
     }
     if (faces.length === 0) return fail('WRP_FACE_NOT_FOUND', `'${params.id}' has no faces to project onto`, [params.id], ['faces']);
@@ -201,7 +202,7 @@ export const projectToFace = defineCommand({
     const first = doc.entities[params.entityIds[0] as string] as Entity;
     let direction: Vec3;
     if (params.direction !== undefined) {
-      if (!params.direction.every(Number.isFinite) || Math.hypot(...params.direction) === 0)
+      if (!params.direction.every(Number.isFinite) || Math.hypot(params.direction[0], params.direction[1], params.direction[2]) === 0)
         return fail('WRP_PARAM_INVALID', 'direction must be a non-zero [x, y, z]', [], ['direction']);
       direction = normalize3(params.direction);
     } else {

@@ -10,6 +10,7 @@ import type { Vec2, Vec3 } from '@core/model/vectors';
 import { applyMat3, matFromAxisAngle } from '@lib/axisRotation';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
 import type { MidFace, Midsurface, MidsurfaceRefusal } from './types';
+import { appendAll } from '@lib/appendAll';
 
 type FlatNode = Extract<SheetNode, { type: 'flat' }>;
 type BendNode = Extract<SheetNode, { type: 'bend' }>;
@@ -144,7 +145,7 @@ export function sheetMetalMidsurface(
         return { code: 'FEA_MIDSURFACE_FAILED', message: `bend ${node.id} of '${part.id}' does not join two flats` };
       const strips = bendFaces(node, from, to, zMid, thickness, stripLength);
       if (typeof strips === 'string') return { code: 'FEA_MIDSURFACE_FAILED', message: `sheet-metal part '${part.id}': ${strips}` };
-      faces.push(...strips);
+      appendAll(faces, strips);
     } else if (node?.type === 'form')
       warnings.push(`form ${node.id} (${node.form.kind}) is not on the midsurface: the flat is meshed without its lip / bead`);
   }

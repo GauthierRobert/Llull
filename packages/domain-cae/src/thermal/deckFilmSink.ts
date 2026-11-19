@@ -13,7 +13,8 @@ import type { ThermalBcRecord } from '@core/model/thermalBc';
 import type { Vec3 } from '@core/model/vectors';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
-import { appendAll, commentText, row } from '../decks/format';
+import { appendAll } from '@lib/appendAll';
+import { commentText, row } from '../decks/format';
 import { faceNodes, indexMesh, type MeshElement, type MeshIndex } from './meshGeometry';
 import { inScale } from './quantities';
 import { cross3, dot3, sub3 } from '@lib/vec3';
@@ -64,7 +65,7 @@ function wedgeCoordinates(index: MeshIndex, face: Corner): Vec3[] | null {
   if (p0 === null || p0 === undefined || p1 === null || p1 === undefined || p2 === null || p2 === undefined || opposite === null)
     return null;
   let normal = cross3(sub3(p1, p0), sub3(p2, p0));
-  const doubleArea = Math.hypot(...normal);
+  const doubleArea = Math.hypot(normal[0], normal[1], normal[2]);
   if (!(doubleArea > 0)) return null;
   const unit: Vec3 = [normal[0] / doubleArea, normal[1] / doubleArea, normal[2] / doubleArea];
   const outward = dot3(unit, sub3(mean([p0, p1, p2]), opposite)) > 0 ? 1 : -1;

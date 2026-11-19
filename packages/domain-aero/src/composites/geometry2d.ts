@@ -4,12 +4,13 @@ import type { CompositePart, Ply } from '@core/model/composites';
 import type { Vec2 } from '@core/model/types';
 import { pointInPolygon, projectOntoSegment } from '@lib/polygon';
 import { cutPieces } from './cutPieces';
+import { minOf } from '@lib/arrayExtrema';
 
 const BOUNDARY_EPS = 1e-6;
 
 /** Distance from `p` to the nearest edge of `polygon`. */
 export function boundaryDistance(p: Vec2, polygon: readonly Vec2[]): number {
-  return Math.min(...polygon.map((a, i) => projectOntoSegment(p, a, polygon[(i + 1) % polygon.length] as Vec2).distance));
+  return minOf(polygon.map((a, i) => projectOntoSegment(p, a, polygon[(i + 1) % polygon.length] as Vec2).distance));
 }
 
 /** True when `p` is inside `polygon` or within `eps` of its boundary. */

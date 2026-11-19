@@ -110,7 +110,7 @@ function hasCurvedFaces(mesh: MeshData): boolean {
     const corners = [0, 1, 2].map((c) => mesh.indices[3 * t + c] ?? 0);
     const [a, b, c] = corners.map(point) as [Vec, Vec, Vec];
     const normal = cross3(sub3(b, a), sub3(c, a));
-    const length = Math.hypot(...normal);
+    const length = Math.hypot(normal[0], normal[1], normal[2]);
     normals.push(length > 0 ? [normal[0] / length, normal[1] / length, normal[2] / length] : null);
     const ids = corners.map(weld);
     for (let c = 0; c < 3; c++) {

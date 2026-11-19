@@ -3,6 +3,7 @@
 import { isRecord } from '@lib/isRecord';
 import { historyProblem } from './libraryCommands';
 import { spectrumProblem } from './math/psd';
+import { appendAll } from '@lib/appendAll';
 
 const DAMPING_MODELS = ['modal', 'rayleigh', 'rayleigh_from_ratios', 'structural_material'];
 const isDynamic = (type: unknown): boolean => type === 'frequency_response' || type === 'random_response';
@@ -59,7 +60,7 @@ export function dynamicsErrors(raw: Record<string, unknown>): string[] {
   const library = analysis['vibration'];
   if (library === undefined) return errors;
   if (!isRecord(library)) return [...errors, 'analysis.vibration: expected a record'];
-  errors.push(
+  appendAll(errors, [
     ...bagErrors('analysis.vibration.spectra', library['spectra'], library['spectrumOrder'], (_name, spectrum) => {
       const points = spectrum['points'];
       if (!Array.isArray(points) || !points.every(numbers)) return 'has malformed points';
@@ -72,6 +73,6 @@ export function dynamicsErrors(raw: Record<string, unknown>): string[] {
         ? (historyProblem(history['timeS'], history['values'])?.message ?? null)
         : 'needs numeric timeS and values',
     ),
-  );
+  ]);
   return errors;
 }

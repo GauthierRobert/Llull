@@ -12,6 +12,7 @@ import { MAX_CANDIDATES } from './inputs';
 import { analysisOf } from '../shared/access';
 import { stateOf } from '../shared/state';
 import type { PropertyUse, SelIssue } from './types';
+import { appendAll } from '@lib/appendAll';
 
 const COMMAND = 'check_material_selection';
 
@@ -104,13 +105,13 @@ export const checkMaterialSelection = defineCommand({
       rows.push({ material, entityIds, inputs });
     }
     const bases = basesOf(rows.flatMap((row) => row.inputs));
-    items.push(
+    appendAll(items, [
       ...mixedBasesWarning(
         bases,
         rows.map((row) => row.material),
       ),
       ...staleAnalyses(doc, params.entityIds),
-    );
+    ]);
     const status = statusOf(items);
     const unverified = rows.some((row) => row.inputs.some((input) => input.unverified));
     return report(

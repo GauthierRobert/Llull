@@ -5,6 +5,7 @@
 
 import { isRecord } from '@lib/isRecord';
 import { imperfectionProblems } from './imperfectionShape';
+import { appendAll } from '@lib/appendAll';
 
 export const FIELD_KEYS = ['Rn', 'Cn', 'q0', 'qu', 'Rp', 'eps', 'Ceps', 'Rl'] as const;
 const THRESHOLD_KEYS = ['permanentDisplacement', 'permanentPeeq', 'smallRotation', 'strain'] as const;
@@ -118,7 +119,7 @@ export function nonlinearValueProblems(nonlinear: unknown, where: string): strin
   const problems: string[] = [];
   if (nonlinear['nlgeom'] !== undefined && typeof nonlinear['nlgeom'] !== 'boolean')
     problems.push(`${where}: nlgeom must be true or false`);
-  problems.push(...convergenceValueProblems(nonlinear['convergence'], `${where}.convergence`));
+  appendAll(problems, convergenceValueProblems(nonlinear['convergence'], `${where}.convergence`));
   const output = nonlinear['outputIncrements'];
   if (!(output === 'all' || output === 'last_per_step' || (isRecord(output) && wholeAtLeastOne(output['every']))))
     problems.push(`${where}: outputIncrements must be all, last_per_step or { every: integer >= 1 }`);
@@ -128,9 +129,9 @@ export function nonlinearValueProblems(nonlinear: unknown, where: string): strin
   ] as const) {
     const entries = nonlinear[bag];
     if (!isRecord(entries)) continue;
-    for (const [id, entry] of Object.entries(entries)) if (isRecord(entry)) problems.push(...check(id, entry, where));
+    for (const [id, entry] of Object.entries(entries)) if (isRecord(entry)) appendAll(problems, check(id, entry, where));
   }
-  problems.push(...thresholdProblems(nonlinear['thresholds'], `${where}.thresholds`));
-  problems.push(...imperfectionProblems(nonlinear, where));
+  appendAll(problems, thresholdProblems(nonlinear['thresholds'], `${where}.thresholds`));
+  appendAll(problems, imperfectionProblems(nonlinear, where));
   return problems;
 }

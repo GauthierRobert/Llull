@@ -6,7 +6,7 @@
 import type { Vec3 } from '@core/model/types';
 import type { Triangle } from '@core/geometry/triangles';
 import { tupleExtent } from '@lib/extent';
-import { cross3, dot3, sub3 } from '@lib/vec3';
+import { cross3, dot3, hypot3, sub3 } from '@lib/vec3';
 
 export interface ProjectedArea {
   readonly area: number;
@@ -25,7 +25,7 @@ export interface ProjectedArea {
 function planeBasis(direction: Vec3): readonly [Vec3, Vec3] {
   const helper: Vec3 = Math.abs(direction[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
   const u = cross3(helper, direction);
-  const lu = Math.hypot(...u);
+  const lu = Math.hypot(u[0], u[1], u[2]);
   const unit: Vec3 = [u[0] / lu, u[1] / lu, u[2] / lu];
   return [unit, cross3(direction, unit)];
 }
@@ -36,7 +36,7 @@ function planeBasis(direction: Vec3): readonly [Vec3, Vec3] {
  */
 export function projectedArea(triangles: readonly Triangle[], rawDirection: Vec3, resolution: number): ProjectedArea | null {
   if (triangles.length === 0) return null;
-  const norm = Math.hypot(...rawDirection);
+  const norm = Math.hypot(rawDirection[0], rawDirection[1], rawDirection[2]);
   const direction: Vec3 = [rawDirection[0] / norm, rawDirection[1] / norm, rawDirection[2] / norm];
   const [u, v] = planeBasis(direction);
   const flat = (point: Vec3): readonly [number, number] => [dot3(point, u), dot3(point, v)];
@@ -51,7 +51,7 @@ export function projectedArea(triangles: readonly Triangle[], rawDirection: Vec3
   );
   const [uMin, vMin] = box.min as [number, number];
   const [uMax, vMax] = box.max as [number, number];
-  const wettedArea = triangles.reduce((sum, [a, b, c]) => sum + Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / 2, 0);
+  const wettedArea = triangles.reduce((sum, [a, b, c]) => sum + hypot3(cross3(sub3(b, a), sub3(c, a))) / 2, 0);
   const span = Math.max(uMax - uMin, vMax - vMin);
   const extents = [uMax - uMin, vMax - vMin] as const;
   const length = (along.max[0] as number) - (along.min[0] as number);

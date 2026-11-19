@@ -9,6 +9,7 @@ import { refuseEop } from './codes';
 import { electroOpticalOf } from './model';
 import { type Missing, type Value, isMissing, propertyOf } from './opticalProperty';
 import { STEFAN_BOLTZMANN, equilibriumTemperature } from './physics';
+import { appendAll } from '@lib/appendAll';
 
 const COMMAND = 'optical_balance';
 const MAX_ITERATIONS = 200;
@@ -147,7 +148,10 @@ export const opticalBalance = defineCommand({
       if (params.state === undefined)
         reasons.push('EOP_DEFAULT_APPLIED: state was not given, BOL absorptivity was used (state a life state to clear this)');
       provenance.push(found.provenance);
-      reasons.push(...found.unverified.map((reason) => `alpha: ${reason}`));
+      appendAll(
+        reasons,
+        found.unverified.map((reason) => `alpha: ${reason}`),
+      );
     } else reasons.push('EOP_VALUE_UNSOURCED: alpha was supplied by the caller without a record');
     if (!(alpha >= 0 && alpha <= 1)) return fail('EOP_PROPERTY_RANGE', `absorptivity ${alpha} is outside [0, 1]`, [], 'alpha');
     let eps = params.eps;
@@ -160,7 +164,10 @@ export const opticalBalance = defineCommand({
       temperature = solved.temperature;
       iterations = solved.iterations;
       provenance.push(solved.eps.provenance);
-      reasons.push(...solved.eps.unverified.map((reason) => `eps: ${reason}`));
+      appendAll(
+        reasons,
+        solved.eps.unverified.map((reason) => `eps: ${reason}`),
+      );
     } else reasons.push('EOP_VALUE_UNSOURCED: eps was supplied by the caller without a record');
     if (!(eps > 0 && eps <= 1)) return fail('EOP_PROPERTY_RANGE', `emissivity ${eps} is outside (0, 1]`, [], 'eps');
     const kelvin = temperature ?? equilibriumTemperature(alpha, flux.value, angle.value, eps, params.radiatingFaces);

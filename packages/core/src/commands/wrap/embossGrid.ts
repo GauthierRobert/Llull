@@ -3,6 +3,8 @@ import { mapSegment2, sampleSegment, type PlaneSegment } from '../../geometry/pl
 import type { CommandResult } from '../types';
 import type { EmbossFail, EmbossGrid } from './embossRequest';
 import type { ChartRegion, SketchOutline } from './sketchProfiles';
+import { appendAll } from '../../lib/appendAll';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const MAX_INSTANCES = 2000;
 
@@ -20,8 +22,9 @@ function repeated(regions: readonly ChartRegion[], grid: EmbossGrid): ChartRegio
   for (let j = 0; j < grid.countY; j++)
     for (let i = 0; i < grid.countX; i++) {
       const [dx, dy] = [i * grid.pitchX, j * grid.pitchY];
-      out.push(
-        ...regions.map((region) => ({ outer: shifted(region.outer, dx, dy), holes: region.holes.map((hole) => shifted(hole, dx, dy)) })),
+      appendAll(
+        out,
+        regions.map((region) => ({ outer: shifted(region.outer, dx, dy), holes: region.holes.map((hole) => shifted(hole, dx, dy)) })),
       );
     }
   return out;
@@ -38,8 +41,8 @@ export function repeatOnGrid(
     return fail('WRP_PARAM_INVALID', `${grid.countX * grid.countY} instances exceed the limit of ${MAX_INSTANCES}`, ['grid']);
   const points = seedRegions.flatMap((region) => region.outer.flatMap((piece) => sampleSegment(piece, 9)));
   const extent: Vec2 = [
-    Math.max(...points.map((p) => p[0])) - Math.min(...points.map((p) => p[0])),
-    Math.max(...points.map((p) => p[1])) - Math.min(...points.map((p) => p[1])),
+    maxOf(points.map((p) => p[0])) - minOf(points.map((p) => p[0])),
+    maxOf(points.map((p) => p[1])) - minOf(points.map((p) => p[1])),
   ];
   if ((grid.countX > 1 && grid.pitchX < extent[0] * (1 - 1e-9)) || (grid.countY > 1 && grid.pitchY < extent[1] * (1 - 1e-9)))
     return fail(

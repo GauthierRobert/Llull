@@ -1,6 +1,7 @@
 /** STL readers: ASCII (several `solid` blocks = several bodies) and binary (80-byte header, u32 count, 50 bytes per facet). Normals are ignored. */
 
 import { type MeshParseFailure, type ParsedBody, type ParsedMeshFile, parseFailure } from './types';
+import { appendAll } from '../appendAll';
 
 const BINARY_HEADER = 84;
 const FACET_BYTES = 50;
@@ -56,7 +57,7 @@ export function parseAsciiStl(text: string): ParsedMeshFile | MeshParseFailure {
       if (values.length !== 3 || !values.every(Number.isFinite))
         return parseFailure('MESH_IMPORT_PARSE', `bad vertex at line ${index + 1}: "${line.slice(0, 60)}"`);
       current ??= { positions: [], triangles: [] };
-      current.positions.push(...values);
+      appendAll(current.positions, values);
       current.triangles.push(current.positions.length / 3 - 1);
       facetVertices++;
     } else if (token === 'facet') {

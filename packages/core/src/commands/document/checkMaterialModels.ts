@@ -23,6 +23,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { MATL_REMEDIATION } from './materialModelRefusal';
+import { appendAll } from '../../lib/appendAll';
 
 interface Item {
   readonly code: string;
@@ -161,7 +162,7 @@ export const checkMaterialModels = defineCommand({
         const report_ = stabilityOf(model);
         if (report_ !== null) stability[id] = report_;
       }
-      items.push(...roForms(name, models));
+      appendAll(items, roForms(name, models));
       for (const set of material.constitutiveSets ?? []) {
         const id = `${name}/${set.id}`;
         const problems = combinationIssues(set, models);

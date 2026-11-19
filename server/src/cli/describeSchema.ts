@@ -1,5 +1,6 @@
 /** `llull describe` text: the full nested parameter structure (objects, arrays, records, unions) as indented lines. */
 import type { ParamsSchema } from '@core/commands/types';
+import { appendAll } from '@lib/appendAll';
 
 /** Loose view of a published JSON-Schema node (records use `additionalProperties`, literals `const`). */
 interface SchemaNode {
@@ -75,16 +76,17 @@ function structureLines(node: SchemaNode, indent: string, depth: number): string
   if (!hasStructure(node)) return [];
   if (depth >= MAX_DEPTH) return [`${indent}…`];
   const lines: string[] = [];
-  if (node.properties !== undefined) lines.push(...propertyLines(node.properties, node.required ?? [], indent, depth));
-  if (node.items !== undefined) lines.push(...structureLines(node.items, indent, depth + 1));
+  if (node.properties !== undefined) appendAll(lines, propertyLines(node.properties, node.required ?? [], indent, depth));
+  if (node.items !== undefined) appendAll(lines, structureLines(node.items, indent, depth + 1));
   const value = recordValue(node);
-  if (value !== undefined && hasStructure(value)) lines.push(`${indent}each value:`, ...structureLines(value, `${indent}  `, depth + 1));
+  if (value !== undefined && hasStructure(value))
+    appendAll(lines, [`${indent}each value:`, ...structureLines(value, `${indent}  `, depth + 1)]);
   const branches = branchesOf(node);
   if (branches !== undefined && branches.some(hasStructure)) {
     lines.push(`${indent}one of:`);
     for (const branch of branches) {
       lines.push(`${indent}- ${branchLabel(branch)}${branch.description !== undefined ? `: ${branch.description}` : ''}`);
-      lines.push(...structureLines(branch, `${indent}  `, depth + 1));
+      appendAll(lines, structureLines(branch, `${indent}  `, depth + 1));
     }
   }
   return lines;

@@ -27,7 +27,7 @@ function planarSpan(face: NurbsSurfaceData, u0: number, u1: number): boolean {
     const [ab, ac, ad] = [sub(b, a), sub(c, a), sub(d, a)];
     const volume =
       ab[0] * (ac[1] * ad[2] - ac[2] * ad[1]) - ab[1] * (ac[0] * ad[2] - ac[2] * ad[0]) + ab[2] * (ac[0] * ad[1] - ac[1] * ad[0]);
-    const side = Math.max(Math.hypot(...ab), Math.hypot(...ac), Math.hypot(...ad), 1e-12);
+    const side = Math.max(Math.hypot(ab[0], ab[1], ab[2]), Math.hypot(ac[0], ac[1], ac[2]), Math.hypot(ad[0], ad[1], ad[2]), 1e-12);
     if (Math.abs(volume) > PLANAR_TOLERANCE * powInt(side, 3)) return false;
   }
   return true;

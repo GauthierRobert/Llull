@@ -34,7 +34,7 @@ export function boxOverlap(a: OrientedBox, b: OrientedBox): number {
   for (const u of a.axes)
     for (const v of b.axes) {
       const axis = cross3(u, v);
-      const length = Math.hypot(...axis);
+      const length = Math.hypot(axis[0], axis[1], axis[2]);
       if (length > 1e-9) axes.push([axis[0] / length, axis[1] / length, axis[2] / length]);
     }
   const delta = sub3(b.center, a.center);

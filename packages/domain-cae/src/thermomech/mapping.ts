@@ -6,8 +6,10 @@
  */
 
 import type { FeMeshArtifact } from '@core/model/analysis';
-import { cross3, dot3, sub3 } from '@lib/vec3';
+import { cross3, dot3, hypot3, sub3 } from '@lib/vec3';
 import { closestPointOnTriangle } from '@core/geometry/triangleQueries';
+import { hypotOf } from '@lib/hypotOf';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface MappingReport {
   /** Largest distance from a target node to the source element used (0 when all nodes are inside), in mesh length units. */
@@ -84,7 +86,7 @@ function closestOnTet(c: readonly [Vec, Vec, Vec, Vec], p: Vec): { readonly poin
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const [i, j, k] of FACES) {
     const point = closestPointOnTriangle(p, [c[i as 0], c[j as 0], c[k as 0]]);
-    const distance = Math.hypot(...sub3(p, point));
+    const distance = hypot3(sub3(p, point));
     if (distance < bestDistance) {
       best = point;
       bestDistance = distance;
@@ -113,7 +115,7 @@ function shape(l: readonly [number, number, number, number], nodes: number): num
 
 function boxDistance(low: Vec, high: Vec, p: Vec): number {
   const d = [0, 1, 2].map((axis) => Math.max((low[axis] ?? 0) - (p[axis] ?? 0), 0, (p[axis] ?? 0) - (high[axis] ?? 0)));
-  return Math.hypot(...d);
+  return hypotOf(d);
 }
 
 function build(elements: readonly SourceElement[], indices: readonly number[]): Tree {
@@ -178,8 +180,8 @@ function sourceElements(mesh: FeMeshArtifact): SourceElement[] | null {
       out.push({
         nodes,
         corners,
-        low: [0, 1, 2].map((axis) => Math.min(...all.map((p) => p[axis] ?? 0))) as unknown as Vec,
-        high: [0, 1, 2].map((axis) => Math.max(...all.map((p) => p[axis] ?? 0))) as unknown as Vec,
+        low: [0, 1, 2].map((axis) => minOf(all.map((p) => p[axis] ?? 0))) as unknown as Vec,
+        high: [0, 1, 2].map((axis) => maxOf(all.map((p) => p[axis] ?? 0))) as unknown as Vec,
       });
     }
   }
@@ -247,7 +249,7 @@ export function mappingReport(
       if (value < (low[axis] ?? 0)) low[axis] = value;
       if (value > (high[axis] ?? 0)) high[axis] = value;
     }
-  const size = Math.hypot(...high.map((h, axis) => h - (low[axis] ?? 0)));
+  const size = hypotOf(high.map((h, axis) => h - (low[axis] ?? 0)));
   const tolerance = 1e-9 * size;
   const exact = new Map<string, number>(source.nodes.map(([id, x, y, z]) => [`${x}|${y}|${z}`, id]));
   let maxDistance = 0;

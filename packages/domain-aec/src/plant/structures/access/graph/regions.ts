@@ -2,6 +2,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import { pointInPolygon, projectOntoSegment, segmentsIntersect } from '@lib/polygon';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export type Ring = ReadonlyArray<Vec2>;
 /** Axis-aligned box `[minX, minY, maxX, maxY]`. */
@@ -93,7 +94,7 @@ export function minimumWidth(ring: Ring): number {
     if (length === 0) continue;
     const normal: Vec2 = [-(b[1] - a[1]) / length, (b[0] - a[0]) / length];
     const projections = ring.map((point) => (point[0] - a[0]) * normal[0] + (point[1] - a[1]) * normal[1]);
-    least = Math.min(least, Math.max(...projections) - Math.min(...projections));
+    least = Math.min(least, maxOf(projections) - minOf(projections));
   }
   return least;
 }

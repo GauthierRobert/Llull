@@ -5,6 +5,7 @@ import { scale3 } from '@lib/vec3';
 import { isFailure, type DerivationFailure } from './deriveTypes';
 import { blindParts, capPart, flangeParts } from './routeEnds';
 import type { RunCtx } from './routeRunCtx';
+import { appendAll } from '@lib/appendAll';
 
 /** Flange set at the start port, then the start blind flange, then the start cap. */
 export function addStartParts(c: RunCtx): void {
@@ -13,7 +14,7 @@ export function addStartParts(c: RunCtx): void {
   const first = c.points[0] as Vec3;
   const dir = c.dirs[0] as Vec3;
   if (start.set !== null && start.port !== null && startIds !== null) {
-    c.parts.push(...flangeParts(runId, startIds, start.set, start.port, first, dir, od, true));
+    appendAll(c.parts, flangeParts(runId, startIds, start.set, start.port, first, dir, od, true));
     c.addJoint({
       kind: c.flangedKind,
       parts: [startIds.flange, start.portId as string],
@@ -24,7 +25,7 @@ export function addStartParts(c: RunCtx): void {
   }
   const startBlind = startIds === null || startBlindId === null ? null : blindParts(runId, startIds, startBlindId, start, first, dir, od);
   if (startBlind !== null && startIds !== null) {
-    c.parts.push(...startBlind.parts);
+    appendAll(c.parts, startBlind.parts);
     c.addJoint({
       kind: c.flangedKind,
       parts: [startIds.flange, startBlindId as string],
@@ -47,7 +48,7 @@ export function addEndParts(c: RunCtx): DerivationFailure | undefined {
     const endPipe = c.env.pipeAt(dnEnd);
     if (isFailure(endPipe)) return endPipe;
     const into = scale3(c.dirs[legCount - 1] as Vec3, -1);
-    c.parts.push(...flangeParts(runId, endIds, end.set, end.port, last, into, endPipe.od, false));
+    appendAll(c.parts, flangeParts(runId, endIds, end.set, end.port, last, into, endPipe.od, false));
     c.addJoint({
       kind: c.flangedKind,
       parts: [endIds.flange, end.portId as string],
@@ -61,7 +62,7 @@ export function addEndParts(c: RunCtx): DerivationFailure | undefined {
     if (isFailure(endPipe)) return endPipe;
     const blind = blindParts(runId, endIds, endBlindId, end, last, scale3(c.dirs[legCount - 1] as Vec3, -1), endPipe.od);
     if (blind !== null) {
-      c.parts.push(...blind.parts);
+      appendAll(c.parts, blind.parts);
       c.addJoint({
         kind: c.flangedKind,
         parts: [endIds.flange, endBlindId],

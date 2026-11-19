@@ -14,6 +14,7 @@ import { type StackEntry, locate, stackAt } from './sample';
 import { coreAt } from './sandwich';
 import { compositesOf, findPart } from './state';
 import { fibreDirection3d } from './surface';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** One sampled stack as agent-readable data (lengths in document units). */
 export function sampleData(
@@ -130,7 +131,7 @@ export const coreSample = defineCommand({
     const first = results[0] as { plyCount: number; thickness: number; laminate: string };
     return report(
       doc,
-      `core_sample: part "${part.name}": ${results.length === 1 ? `${first.plyCount} plies, thickness ${first.thickness} ${doc.units}, ${first.laminate}` : `${results.length} stations, ${Math.min(...results.map((r) => r['plyCount'] as number))}..${Math.max(...results.map((r) => r['plyCount'] as number))} plies`}.`,
+      `core_sample: part "${part.name}": ${results.length === 1 ? `${first.plyCount} plies, thickness ${first.thickness} ${doc.units}, ${first.laminate}` : `${results.length} stations, ${minOf(results.map((r) => r['plyCount'] as number))}..${maxOf(results.map((r) => r['plyCount'] as number))} plies`}.`,
       polyline === undefined ? { part: part.id, ...results[0] } : { part: part.id, stations: results },
     );
   },

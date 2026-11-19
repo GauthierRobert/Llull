@@ -17,6 +17,8 @@ import { flightDesignHash } from './designHash';
 import { chooseInstants, flightInstants, type ChosenInstant, type FlightInstant } from './flightInstants';
 import { analysedCentre } from './rigidBalance';
 import { map3 } from '@lib/vec3';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 const NEWTON_PER_LBF = 4.4482216152605;
 /** Sampling of the run the instants are read from, Hz (accelerations are central differences of the recorded velocity). */
@@ -72,10 +74,11 @@ function mountLoads(
   let force: Vec3 | undefined = mount.force;
   if (mount.rotorId !== undefined) {
     const direction = mount.direction;
-    if (direction === undefined || !(Math.hypot(...direction) > 0)) return `mount '${mount.name}': rotorId needs a non-zero direction`;
+    if (direction === undefined || !(Math.hypot(direction[0], direction[1], direction[2]) > 0))
+      return `mount '${mount.name}': rotorId needs a non-zero direction`;
     const thrust = instant?.thrustN[mount.rotorId];
     if (thrust === undefined) return `mount '${mount.name}': the run has no thrust of rotor '${mount.rotorId}'`;
-    const length = Math.hypot(...direction);
+    const length = Math.hypot(direction[0], direction[1], direction[2]);
     force = map3(direction, (component) => (thrust * component * forceUnit) / length);
   } else if (mount.direction !== undefined) return `mount '${mount.name}': direction needs a rotorId`;
   if (force === undefined && mount.moment === undefined) return `mount '${mount.name}': give a force, a rotorId + direction, or a moment`;
@@ -216,9 +219,9 @@ export const exportFlightLoads = defineCommand({
     } else {
       const instants = readRun(doc, { scenario: params.scenario ?? '', sampleRate: params.sampleRate }, ctx);
       if (typeof instants === 'string') return fail('FLL_RUN_FAILED', instants, [analysisId, params.scenario ?? '']);
-      const first = Math.min(...instants.map((instant) => instant.timeS));
+      const first = minOf(instants.map((instant) => instant.timeS));
       const at = params.at ?? 'peak_load';
-      const last = Math.max(...instants.map((instant) => instant.timeS));
+      const last = maxOf(instants.map((instant) => instant.timeS));
       if (typeof at === 'number' && at > last + 1e-9)
         return fail(
           'FLL_INSTANT_UNKNOWN',
@@ -288,10 +291,10 @@ export const exportFlightLoads = defineCommand({
           return fail(problem.code, `mount '${mount.name}': ${problem.message}`, [analysisId, mount.target.entityId], ['mounts']);
         const made = mountLoads(mount, instant, loadCase, category, forceUnit, source);
         if (typeof made === 'string') return fail('FLL_MOUNT_INVALID', made, [analysisId], ['mounts']);
-        loads.push(...made);
+        appendAll(loads, made);
       }
-      added.push(...loads);
-      const norm = (v: Vec3): number => Math.hypot(...v);
+      appendAll(added, loads);
+      const norm = (v: Vec3): number => Math.hypot(v[0], v[1], v[2]);
       summaries.push(
         `'${loadCase}'${fromRun ? ` at t = ${Number(instant.timeS.toPrecision(5))} s` : ''}: |a| ${Number(norm(instant.accelMps2).toPrecision(4))} m/s^2, |omega| ${Number(norm(instant.angularVelocity).toPrecision(4))} rad/s, |alpha| ${Number(norm(instant.angularAccel).toPrecision(4))} rad/s^2, ${loads.length} load(s)`,
       );

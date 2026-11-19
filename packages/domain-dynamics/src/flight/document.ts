@@ -192,7 +192,7 @@ function referenceErrors(
     const at = `flight.rotors.${key}`;
     if (entry.id !== key) errors.push(`${at}.id must equal its key`);
     if (dynamicsIds.has(key)) errors.push(`${at}: id '${key}' is also a doc.dynamics record (rotor ids share the dynamics id space)`);
-    if (Math.hypot(...entry.axis) < 1e-12) errors.push(`${at}.axis must be non-zero`);
+    if (Math.hypot(entry.axis[0], entry.axis[1], entry.axis[2]) < 1e-12) errors.push(`${at}.axis must be non-zero`);
     const points = entry.coefficients.kind === 'table' ? entry.coefficients.points : [];
     if (points.some((point, i) => i > 0 && point[0] <= (points[i - 1]?.[0] ?? Infinity)))
       errors.push(`${at}.coefficients.points: J must strictly increase`);

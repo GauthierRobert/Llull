@@ -16,6 +16,7 @@ import { sizeBoltGroups } from '../connections/frameBoltDesign';
 import { checkFrames } from './frameCheckFrames';
 import { frameMassKg, scoreRows, sizeFrames, withFixedBases } from './frameDesignLoop';
 import { designResult, finalUtilisationText, noChangeResult, utilisationStats } from '../reports/designReport';
+import { appendAll } from '@lib/appendAll';
 
 /** Fixed bases replace a passing sway-governed pinned design only when the frames weigh less than this fraction of it. */
 const FIXED_BASE_MASS_GAIN = 0.75;
@@ -114,12 +115,12 @@ export const designPortalFrames = defineCommand({
     const rows = sizing.settledRows ?? checkFrames(current, levelId, loads).rows;
     const bolts = sizeBoltGroups(current, getBuilding(current), rows, targetUtilisation, loads.boltClass ?? DEFAULT_BOLT_CLASS);
     let building = bolts.building;
-    changes.push(...bolts.changes);
+    appendAll(changes, bolts.changes);
     for (const id of bolts.changed) changed.add(id);
     if (bolts.limited) limited = true;
     const plates = designFixedPlates(current, building, levelId, loads, targetUtilisation);
     building = plates.building;
-    if (plates.changed.length > 0 || plates.unresolved > 0) changes.push(...plates.descriptions);
+    if (plates.changed.length > 0 || plates.unresolved > 0) appendAll(changes, plates.descriptions);
     for (const id of plates.changed) changed.add(id);
     if (plates.unresolved > 0) limited = true;
     if (changed.size === 0) {

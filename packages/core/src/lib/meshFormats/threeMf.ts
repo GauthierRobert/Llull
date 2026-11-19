@@ -2,6 +2,7 @@
 
 import { unzip } from '../zipRead';
 import { type MeshParseFailure, type ParseLimits, type ParsedBody, type ParsedMeshFile, parseFailure } from './types';
+import { appendAll } from '../appendAll';
 
 const UNIT_METRES: Readonly<Record<string, number>> = {
   micron: 1e-6,
@@ -105,8 +106,9 @@ function flatten(
     if (tally.bodies > limits.maxBodies || tally.triangles > limits.maxTriangles) return false;
     const positions: number[] = [];
     for (let i = 0; i + 2 < object.positions.length; i += 3) {
-      positions.push(
-        ...apply(transform, object.positions[i] as number, object.positions[i + 1] as number, object.positions[i + 2] as number),
+      appendAll(
+        positions,
+        apply(transform, object.positions[i] as number, object.positions[i + 1] as number, object.positions[i + 2] as number),
       );
     }
     into.push({ ...(object.name !== undefined ? { name: object.name } : {}), positions, triangles: object.triangles, groups: [] });

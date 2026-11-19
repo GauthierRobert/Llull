@@ -11,6 +11,8 @@ import { isTransientCase, problem, type Problem, type ThermalCase } from './acce
 import { interp1Pairs } from '@lib/interp1';
 import { amplitudeRange } from './amplitudeRange';
 import { inScale } from './quantities';
+import { appendAll } from '@lib/appendAll';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export type ThermalProperty = 'k' | 'cp' | 'density';
 const KIND: Readonly<Record<ThermalProperty, ThermalKind>> = { k: 'conductivity', cp: 'specificHeat', density: 'density' };
@@ -72,11 +74,11 @@ export function caseTemperatureRange(thermal: ThermalSetup): readonly [number, n
       const t = inScale(q, scale);
       return [t * fLow, t * fHigh];
     };
-    if (bc.kind === 'temperature') values.push(...scaled(bc.value));
-    if (bc.kind === 'film') values.push(...scaled(bc.sinkTemperature));
+    if (bc.kind === 'temperature') appendAll(values, scaled(bc.value));
+    if (bc.kind === 'film') appendAll(values, scaled(bc.sinkTemperature));
   }
   const finite = values.filter(Number.isFinite);
-  return finite.length === 0 ? null : [Math.min(...finite), Math.max(...finite)];
+  return finite.length === 0 ? null : [minOf(finite), maxOf(finite)];
 }
 
 export interface PropertyRequest {
@@ -144,10 +146,10 @@ function orthotropicTable(request: PropertyRequest): PropertyTable | Problem {
     origin: tables.map((table, i) => `direction ${ORTHO_DIRECTIONS[i] ?? ''}: ${table.origin}`).join('; '),
     modelId: tables.map((table) => table.modelId ?? '').join(','),
     coefficientsSha256: tables.map((table) => table.coefficientsSha256 ?? '').join(','),
-    maxRelError: Math.max(...tables.map((table) => table.maxRelError)),
+    maxRelError: maxOf(tables.map((table) => table.maxRelError)),
     constant: null,
     points: [],
-    range: ranges.length === 0 ? null : [Math.max(...ranges.map((r) => r[0])), Math.min(...ranges.map((r) => r[1]))],
+    range: ranges.length === 0 ? null : [maxOf(ranges.map((r) => r[0])), minOf(ranges.map((r) => r[1]))],
     unverifiedReasons: [...new Set(tables.flatMap((table) => table.unverifiedReasons))],
     orthotropic: [a, b, c],
   };

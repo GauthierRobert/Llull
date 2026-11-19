@@ -5,6 +5,7 @@
 
 import { busPower, motorPoint, openCircuitVolts, solveBus } from './powerChain';
 import type { MotorLoad, PowerRuntime } from './powerBlock';
+import { maxOf } from '@lib/arrayExtrema';
 
 type EnduranceLimit = 'cutoff_voltage' | 'empty' | 'pack_power' | 'motor_voltage' | 'no_load' | 'step_budget';
 
@@ -37,7 +38,7 @@ export function constantLoadEndurance(feed: PowerRuntime, loads: readonly MotorL
   const { pack, powertrain } = feed;
   const motors = loads.map((load) => motorPoint(feed.motor, load.torqueNm, (load.rpm * 2 * Math.PI) / 60));
   const power = busPower(powertrain, motors);
-  const maxMotorV = Math.max(0, ...motors.map((motor) => motor.voltageV));
+  const maxMotorV = Math.max(0, maxOf(motors.map((motor) => motor.voltageV)));
   const first = solveBus(pack, openCircuitVolts(pack, soc0), power);
   const initial = {
     busPowerW: power,

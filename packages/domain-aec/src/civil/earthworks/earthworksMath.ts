@@ -6,6 +6,7 @@ import type { Vec2 } from '@core/model/types';
 import { pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import { elevationAt, tinBounds, type Tin } from '../surface/tin';
 import { batterLevel } from './batter';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Default grid: the pad gets about this many cells. */
 export const TARGET_PAD_CELLS = 2500;
@@ -98,10 +99,10 @@ export function buildSamples(tin: Tin, boundary: ReadonlyArray<Vec2>, margin: nu
   if (!bounds || boundary.length < 3) return emptySamples();
   const xs = boundary.map((point) => point[0]);
   const ys = boundary.map((point) => point[1]);
-  const minX = Math.max(Math.min(...xs) - margin, bounds.min[0]);
-  const maxX = Math.min(Math.max(...xs) + margin, bounds.max[0]);
-  const minY = Math.max(Math.min(...ys) - margin, bounds.min[1]);
-  const maxY = Math.min(Math.max(...ys) + margin, bounds.max[1]);
+  const minX = Math.max(minOf(xs) - margin, bounds.min[0]);
+  const maxX = Math.min(maxOf(xs) + margin, bounds.max[0]);
+  const minY = Math.max(minOf(ys) - margin, bounds.min[1]);
+  const maxY = Math.min(maxOf(ys) + margin, bounds.max[1]);
   const width = maxX - minX;
   const height = maxY - minY;
   if (!(width > 0) || !(height > 0)) return emptySamples();

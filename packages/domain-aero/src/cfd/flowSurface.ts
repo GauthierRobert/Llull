@@ -10,6 +10,7 @@ import { buildMeshBvh, bvhIntersects, type MeshBvh } from '@core/geometry/meshBv
 import { recipeOf } from '@core/geometry/shapeRecipe';
 import { is3D, type CadDocument, type Entity, type ShapeRecipe, type Vec3 } from '@core/model/types';
 import type { CfdCase } from '@aero/cfd/types';
+import { appendAll } from '@lib/appendAll';
 
 /** One solid of the flow body: a plain 3D entity (instances are expanded), with the case entity it comes from. */
 export interface Leaf {
@@ -50,7 +51,7 @@ export function collectBodies(doc: CadDocument, cfdCase: CfdCase): CollectedBodi
     if (cfdCase.excludedEntityIds.includes(id) || !Object.hasOwn(doc.entities, id)) continue;
     const entity = doc.entities[id] as Entity;
     if (!is3D(entity)) skipped2D.push(id);
-    else leaves.push(...expandLeaves(doc, entity, id, 0));
+    else appendAll(leaves, expandLeaves(doc, entity, id, 0));
   }
   return { leaves, skipped2D, missing };
 }

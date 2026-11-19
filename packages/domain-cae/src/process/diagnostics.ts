@@ -4,6 +4,7 @@ import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ResultsSummary } 
 import { nearestNode } from '../results/probes';
 import { amLayerPlan } from './layers';
 import { amLoadCases } from './results';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface AmFinding {
   readonly code: string;
@@ -72,9 +73,9 @@ export function amResultFindings(
 ): AmFinding[] {
   const extent = ([1, 2, 3] as const).map((axis) => {
     const values = mesh.nodes.map((node) => node[axis]);
-    return Math.max(...values) - Math.min(...values);
+    return maxOf(values) - minOf(values);
   });
-  const size = Math.max(...extent);
+  const size = maxOf(extent);
   const worst = amLoadCases(analysis, mesh, results, lengthToAnalysis).reduce(
     (best, phase) => (phase.maxDisplacement.value > best.value ? { value: phase.maxDisplacement.value, name: phase.name } : best),
     { value: 0, name: '' },

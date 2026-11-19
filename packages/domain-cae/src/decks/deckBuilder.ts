@@ -8,7 +8,8 @@ import { analysisInputHash } from '../hash/inputHash';
 import { bindingMarker } from '../results/inputBinding';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import type { MaterialCardWriter } from './constitutive';
-import { appendAll, commentText, idLines, linesText, row, textLines } from './format';
+import { appendAll } from '@lib/appendAll';
+import { commentText, idLines, linesText, row, textLines } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { printedMaterialLines } from '../flightLoads/print/deck';
@@ -212,7 +213,7 @@ function materialBlocks(ctx: DeckContext, disciplines: DisciplineTable, heat: bo
         ];
     lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`);
     if (constitutive === null) lines.push(`*MATERIAL, NAME=${name}`);
-    else lines.push(...constitutive.comments, ...constitutive.lines);
+    else appendAll(lines, [...constitutive.comments, ...constitutive.lines]);
     for (const card of cards) {
       if (isDeckRefusal(card)) return card;
       appendAll(lines, textLines(card.text));
@@ -255,7 +256,10 @@ function sectionBlocks(ctx: DeckContext, orientations: ReadonlyMap<string, strin
   if (analysis.type === 'am_build_distortion') {
     const layers = amSections(ctx);
     if (isDeckRefusal(layers)) return layers;
-    lines.push(...layers.text.split('\n').filter((line) => line !== ''));
+    appendAll(
+      lines,
+      layers.text.split('\n').filter((line) => line !== ''),
+    );
   }
   return null;
 }

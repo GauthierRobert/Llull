@@ -117,7 +117,7 @@ export const windSchema = z.object({
   ),
   dragCoefficient: positive.describe('Drag (shape) coefficient Cf of the pipe cross-section, for example 0.7 to 1.2 for a round pipe.'),
   direction: vec3
-    .refine((v) => Math.hypot(...v) > 0, 'must not be the zero vector')
+    .refine((v) => Math.hypot(v[0], v[1], v[2]) > 0, 'must not be the zero vector')
     .describe('Direction the wind blows toward [x, y, z], global axes; normalised, normally horizontal.'),
 });
 

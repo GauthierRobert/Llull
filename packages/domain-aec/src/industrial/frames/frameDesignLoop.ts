@@ -19,6 +19,7 @@ import type { CheckRow } from './frameCheckSolve';
 import type { FrameLoads } from './frameModelTypes';
 import { reseatDependents } from './frameReseat';
 import { tryLongerHaunch } from './haunchDesign';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Haunch trials (one frame check each) per sizing run. */
 const MAX_HAUNCH_TRIALS = 3;
@@ -99,7 +100,7 @@ export function sizeFrames(doc: CadDocument, levelId: string, loads: FrameLoads,
     const swayFirst = swayRows.length > 0;
     if (swayFirst) {
       swayDriven = true;
-      const worst = Math.max(...swayRows.map((row) => row.utilisation));
+      const worst = maxOf(swayRows.map((row) => row.utilisation));
       if (previous && worst > (previous.utilisation / previous.factor) * SLOW_SWAY_PROGRESS) rafterAssist = true;
       const factor = Math.min(worst / target, MAX_STIFFNESS_STEP);
       previous = { utilisation: worst, factor };

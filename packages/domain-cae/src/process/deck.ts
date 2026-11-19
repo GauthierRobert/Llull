@@ -17,6 +17,7 @@ import { amLayerPlan, type AmLayerPlan } from './layers';
 import { activationStep, strainStep } from './plan';
 import { cross3, len3, sub3 } from '@lib/vec3';
 import { support321 } from './support321';
+import { appendAll } from '@lib/appendAll';
 
 const refuse = (code: string, message: string, ids: readonly string[] = []): DeckRefusal => ({ code, message, ids });
 
@@ -93,13 +94,13 @@ export function amSections(ctx: DeckContext): DeckSections {
       const set = setName(buildIndex, part);
       lines.push(`*ELSET, ELSET=${set}`);
       for (let i = 0; i < elements.length; i += ELEMENTS_PER_LINE) lines.push(elements.slice(i, i + ELEMENTS_PER_LINE).join(', '));
-      lines.push(
+      appendAll(lines, [
         `** layer ${buildIndex} (geometric layer ${layer.layer}) of '${commentText(partId)}': strain e(T) = eps clamp(T - ${buildIndex - 1}, 0, 1), alpha = e / T`,
         `*MATERIAL, NAME=MAM_${buildIndex}_${part + 1}`,
         ...material.text.split('\n').filter((line) => line !== ''),
         '*EXPANSION, TYPE=ORTHO, ZERO=0',
         row(0, 0, 0, buildIndex - 1),
-      );
+      ]);
       for (let t = buildIndex; t <= total; t++) lines.push(row(strain.exx / t, strain.eyy / t, strain.ezz / t, t));
       sections.push(`*SOLID SECTION, ELSET=${set}, MATERIAL=MAM_${buildIndex}_${part + 1}, ORIENTATION=${ORIENTATION}`);
     }
@@ -170,7 +171,7 @@ export function amSteps(ctx: DeckContext): DeckSections {
   ];
   for (const [position, layer] of plan.layers.entries()) {
     const buildIndex = position + 1;
-    lines.push(
+    appendAll(lines, [
       `** step ${activationStep(buildIndex)}: layer ${buildIndex} (geometric ${layer.layer}) added strain free`,
       '*STEP, NLGEOM',
       '*STATIC',
@@ -186,7 +187,7 @@ export function amSteps(ctx: DeckContext): DeckSections {
       `NALL, ${buildIndex}`,
       ...(buildIndex === total ? LAYER_OUTPUT : []),
       '*END STEP',
-    );
+    ]);
   }
   const removed = new Set<string>();
   for (const [index, release] of am.releaseSteps.entries()) {
@@ -227,7 +228,7 @@ export function amSteps(ctx: DeckContext): DeckSections {
     if (typeof dofs === 'string')
       return refuse('PRC_RELEASE_UNSUPPORTED', `${stepName}: ${dofs} (after snapping to mesh nodes)`, [ctx.analysisId]);
     const picked = [s1, s2, s3];
-    lines.push(
+    appendAll(lines, [
       `** step ${strainStep(total) + 1 + index}: ${stepName}: remove ${fresh.length === 0 ? 'nothing' : fresh.map((id) => ctx.elset(id)).join(', ')}; 3-2-1 on nodes ${picked.map((s) => `${s.node} (${num(s.distance / scale)} ${ctx.doc.units} from the point)`).join(', ')}`,
       '*STEP, NLGEOM',
       '*STATIC',
@@ -237,7 +238,7 @@ export function amSteps(ctx: DeckContext): DeckSections {
       ...picked.flatMap((s, i) => (dofs[i] ?? []).map((dof) => row(s.node, dof, dof))),
       ...LAYER_OUTPUT,
       '*END STEP',
-    );
+    ]);
   }
   return { text: linesText(lines) };
 }

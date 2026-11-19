@@ -6,6 +6,7 @@ import { polygonArea } from '@lib/polygon';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '@lib/vec3';
 import { chartMesh } from './chartMesh';
 import { fromFlat, isDoublyCurved, normalAt } from './surface';
+import { maxOf } from '@lib/arrayExtrema';
 
 const area3 = (a: Vec3, b: Vec3, c: Vec3): number => len3(cross3(sub3(b, a), sub3(c, a))) / 2;
 
@@ -101,7 +102,7 @@ export function plyPieceMesh(
 
 /** Welds coincident points (quantum 1e-9 of the extent): the welded positions and the welded index of each input point. */
 function weldPoints(points: readonly Vec3[]): { positions: number[]; remap: number[] } {
-  const tolerance = Math.max(1e-9, ...points.flatMap((p) => p.map(Math.abs))) * 1e-7;
+  const tolerance = Math.max(1e-9, maxOf(points.flatMap((p) => p.map(Math.abs)))) * 1e-7;
   const cell = (v: number): number => Math.floor(v / tolerance);
   const buckets = new Map<string, number[]>();
   const positions: number[] = [];

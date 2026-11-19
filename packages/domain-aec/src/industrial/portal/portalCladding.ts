@@ -4,6 +4,7 @@ import type { Vec2, Vec3 } from '@core/model/types';
 import { dot3 } from '@lib/vec3';
 import { panelFrame } from '../evaluate';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';
+import { appendAll } from '@lib/appendAll';
 
 type CladdingPanel = { readonly corners: Vec3[]; readonly role: 'roof' | 'wall'; readonly outward: Vec3 };
 
@@ -30,7 +31,10 @@ export function claddingPanels(geometry: HallGeometry, p: PortalProfiles): Cladd
     const left = index === 0 ? wallX0 : a;
     const right = index === spanBounds.length - 1 ? wallX1 : b;
     const breaks = monopitch ? [left, right] : [left, (a + b) / 2, right];
-    profileLine.push(...breaks.slice(0, -1).map((x): Vec2 => [x, roofZ(x)]));
+    appendAll(
+      profileLine,
+      breaks.slice(0, -1).map((x): Vec2 => [x, roofZ(x)]),
+    );
     if (index === spanBounds.length - 1) profileLine.push([right, roofZ(right)]);
     breaks.slice(1).forEach((to, panel) => {
       const from = breaks[panel] as number;

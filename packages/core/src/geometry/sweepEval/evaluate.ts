@@ -16,6 +16,7 @@ import { applyMiter } from './miter';
 import { hasSweepLaws, stationTransforms, sweepLawIssue, twistVariation } from './laws';
 import type { RailIssue } from './rails';
 import type { SectionTransform } from './sectionTransform';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** What a sweep's geometry depends on (a SweepEntity satisfies it). */
 export type SweepShape = Pick<SweepEntity, 'path' | 'section'> &
@@ -68,7 +69,7 @@ const OFF_CENTRE_REFINEMENT = 2;
 function offCentre(section: SweepShape['section']): boolean {
   if (section.shape !== 'profile') return false;
   const [cx, cy] = polygonCentroid(section.profile as Vec2[]);
-  return Math.hypot(cx, cy) > 1e-9 * Math.max(...section.profile.map(([x, y]) => Math.hypot(x, y)), 1e-12);
+  return Math.hypot(cx, cy) > 1e-9 * Math.max(maxOf(section.profile.map(([x, y]) => Math.hypot(x, y))), 1e-12);
 }
 
 function refinement(path: ReadonlyArray<CurveSegment<Vec3>>, shape: SweepShape, length: number): number {

@@ -8,6 +8,7 @@ import type { DynamicsModel } from '@core/model/dynamics';
 import { transmissionRatio, type Transmission } from '@core/model/transmissions';
 import { simulateMotion } from './simulate';
 import { runDataOf, type RunData } from '../sim/runData';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Smallest step simulate_motion accepts, s. */
 export const MIN_STEP = 5e-6;
@@ -34,7 +35,7 @@ export function profileWindow(dynamics: DynamicsModel, drive: MotorDrive): { rea
  */
 export function drivenTimestep(drives: Iterable<MotorDrive>): number | undefined {
   const rates = [...drives].flatMap((drive) => (drive.sampleHz === undefined ? [] : [drive.sampleHz]));
-  return rates.length === 0 ? undefined : Math.max(MIN_STEP * 2, Math.min(MAX_STEP, 1 / (2 * Math.max(...rates))));
+  return rates.length === 0 ? undefined : Math.max(MIN_STEP * 2, Math.min(MAX_STEP, 1 / (2 * maxOf(rates))));
 }
 
 export interface SizingRunOptions {

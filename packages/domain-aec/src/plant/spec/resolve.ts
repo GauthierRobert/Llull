@@ -19,6 +19,7 @@ import type {
 } from '../catalog/types';
 import { inRange, keyIn, querySize, sizeLabel } from './size';
 import { DEFAULT_PRIORITY, type BranchFitting, type PipeSpec, type SpecComponent } from './types';
+import { minOf } from '@lib/arrayExtrema';
 
 /** A component query: type and size (NPS or DN), optional branch size (reducing tee, olet, reducer small end) and filters. */
 export interface ComponentQuery {
@@ -277,7 +278,7 @@ export function resolveComponent(spec: PipeSpec, catalogs: readonly PipingCatalo
       ['type'],
     );
   }
-  const best = Math.min(...matching.map(priorityOf));
+  const best = minOf(matching.map(priorityOf));
   const winners = matching.filter((component) => priorityOf(component) === best);
   const first = winners[0] as SpecComponent;
   if (winners.length > 1)

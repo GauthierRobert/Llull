@@ -9,6 +9,7 @@ import type { NurbsCurveData } from './types';
 import { MAX_NURBS_DEGREE } from './types';
 import { evaluateCurve } from './evaluate';
 import { pow } from '../pow';
+import { maxOf, minOf } from '../arrayExtrema';
 
 type Parameterization = 'chord' | 'centripetal' | 'uniform';
 
@@ -80,9 +81,7 @@ export function interpolatePoints(
       code: 'SRF_POINTS_INSUFFICIENT',
       message: `degree ${degree} needs at least ${degree + 1 - tangentCount} points with ${tangentCount} end tangent(s) (got ${points.length})`,
     };
-  const extent = Math.max(
-    ...[0, 1, 2].map((axis) => Math.max(...points.map((p) => p[axis] as number)) - Math.min(...points.map((p) => p[axis] as number))),
-  );
+  const extent = maxOf([0, 1, 2].map((axis) => maxOf(points.map((p) => p[axis] as number)) - minOf(points.map((p) => p[axis] as number))));
   const coincident = points.findIndex(
     (point, index) => index > 0 && distance3(point, points[index - 1] as Vec3) <= 1e-9 * Math.max(extent, 1e-300),
   );
@@ -116,6 +115,6 @@ export function interpolatePoints(
     knots,
     multiplicities,
   };
-  const residual = Math.max(...points.map((point, k) => distance3(evaluateCurve(curve, t[k] as number), point)));
+  const residual = maxOf(points.map((point, k) => distance3(evaluateCurve(curve, t[k] as number), point)));
   return { curve, residual };
 }

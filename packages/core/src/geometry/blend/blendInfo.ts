@@ -182,7 +182,7 @@ function tangent(edge: ShapeTopology['edges'][number], atStart: boolean): Vec3 |
         : [edge.end, edge.mid];
   if (near === undefined || far === undefined) return null;
   const vector: Vec3 = [far[0] - near[0], far[1] - near[1], far[2] - near[2]];
-  const length = Math.hypot(...vector);
+  const length = Math.hypot(vector[0], vector[1], vector[2]);
   return length < 1e-12 ? null : [vector[0] / length, vector[1] / length, vector[2] / length];
 }
 

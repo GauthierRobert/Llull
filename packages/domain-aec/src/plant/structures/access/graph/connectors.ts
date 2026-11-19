@@ -9,11 +9,12 @@ import { directionOf, layoutSteelStair } from '../../stair/steelStairLayout';
 import { stairSizes } from '../../stair/steelStairMeasure';
 import { distanceToRegion, boxesNear } from './regions';
 import { CONNECT_REACH_MM, CONNECT_Z_MM, GRADE_ID, type AccessEdge, type DanglingConnector, type SurfaceNode } from './types';
+import { minOf } from '@lib/arrayExtrema';
 
 /** Distance in plan from `point` to a node: 0 on grade, else to its nearest region. */
 export function distanceToNode(point: Vec2, node: SurfaceNode): number {
   if (node.kind === 'grade') return 0;
-  return Math.min(Infinity, ...node.regions.map((region) => distanceToRegion(point, region)));
+  return Math.min(Infinity, minOf(node.regions.map((region) => distanceToRegion(point, region))));
 }
 
 /**

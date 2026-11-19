@@ -26,6 +26,7 @@ import { resolveVolumetric } from './hyperVolumetric';
 import { solveLinear } from './linalg';
 import { failure, isLawFailure } from './resolve';
 import { vonMises, zero6 } from './tensor';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface CompressibleRunInput {
   readonly model: MaterialModel;
@@ -106,7 +107,7 @@ function solveIncrement(
   if (current === null) return null;
   const tolerance = Math.max(RELATIVE_TOLERANCE * scale, 1e-13 * law.vol.bulkModulus);
   for (let iteration = 0; iteration < MAX_NEWTON; iteration += 1) {
-    if (Math.max(0, ...current.r.map(Math.abs)) <= tolerance) return { F: build(x), response: current.response };
+    if (Math.max(0, maxOf(current.r.map(Math.abs))) <= tolerance) return { F: build(x), response: current.response };
     const base: { response: FiniteResponse; r: number[] } = current;
     const jacobian: number[][] = unknown.map(() => new Array<number>(unknown.length).fill(0));
     for (let j = 0; j < x.length; j += 1) {
@@ -120,13 +121,13 @@ function solveIncrement(
       base.r.map((value) => -value),
     );
     if (step === null) return null;
-    const size = Math.max(0, ...base.r.map(Math.abs));
+    const size = Math.max(0, maxOf(base.r.map(Math.abs)));
     let damping = 1;
     let next: { response: FiniteResponse; r: number[] } | null = null;
     for (let attempt = 0; attempt < 16; attempt += 1) {
       const candidate = x.map((value, k) => value + damping * (step[k] ?? 0));
       const trial = evaluate(candidate);
-      if (trial !== null && Math.max(0, ...trial.r.map(Math.abs)) < size) {
+      if (trial !== null && Math.max(0, maxOf(trial.r.map(Math.abs))) < size) {
         x = candidate;
         next = trial;
         break;
@@ -136,7 +137,7 @@ function solveIncrement(
     if (next === null) return null;
     current = next;
   }
-  return Math.max(0, ...current.r.map(Math.abs)) <= tolerance * 10 ? { F: build(x), response: current.response } : null;
+  return Math.max(0, maxOf(current.r.map(Math.abs))) <= tolerance * 10 ? { F: build(x), response: current.response } : null;
 }
 
 const rowOf = (response: FiniteResponse, step: number, increment: number, time: number, T: number | null): DriverRow => ({
@@ -202,8 +203,8 @@ export function runCompressibleHyperelastic(input: CompressibleRunInput): Driver
       });
       const scale = Math.max(
         iso.shearModulus * 1e-3,
-        ...targets.filter((target) => target.kind === 'stress').map((target) => Math.abs(target.value)),
-        ...response.stress.map(Math.abs),
+        maxOf(targets.filter((target) => target.kind === 'stress').map((target) => Math.abs(target.value))),
+        maxOf(response.stress.map(Math.abs)),
       );
       const solved = solveIncrement(law, F, targets, scale);
       if (solved === null)

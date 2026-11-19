@@ -8,6 +8,7 @@ import type { DrawingFill, DrawingPrimitive } from '../model/drawing';
 import { clamp } from '../lib/clamp';
 import { readableAngle, toDegrees, wrapAngle } from '../lib/angle';
 import { escapeXml } from '../lib/escapeXml';
+import { appendAll } from '../lib/appendAll';
 
 /** SVG number text: two decimals, no trailing zeros, no negative zero. */
 export const n = (value: number): string => String(Math.round(value * 100) / 100 + 0);
@@ -133,7 +134,7 @@ export class DrawingPainter {
       case 'dimension': {
         // Model "right of a→b" becomes "left of a→b" once Y is flipped on paper.
         const gap = clamp(primitive.offset * this.perUnit, 6, 14);
-        this.parts.push(...paperDimension(this.map(primitive.a), this.map(primitive.b), -gap, primitive.label));
+        appendAll(this.parts, paperDimension(this.map(primitive.a), this.map(primitive.b), -gap, primitive.label));
         return;
       }
     }

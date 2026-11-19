@@ -3,6 +3,7 @@
 import type { PidEndpoint, PidLine, PidModel, PidSegment } from '../model';
 import { itemAt, text, type Norm, type Run } from './common';
 import { makeFinding3d, type Finding3d, type Skip3d } from './finding';
+import { appendAll } from '@lib/appendAll';
 
 interface End {
   readonly tag: string;
@@ -121,7 +122,7 @@ export function compareLine(pid: PidModel, line: PidLine, run: Run, norm: Norm):
       }),
     );
   const spec = compareSpec(line, run, segments, norm, label);
-  findings.push(...spec.findings);
+  appendAll(findings, spec.findings);
   const first = segments[0];
   const last = segments[segments.length - 1];
   const a = first === undefined ? undefined : pidEnd(pid, first.from, norm);

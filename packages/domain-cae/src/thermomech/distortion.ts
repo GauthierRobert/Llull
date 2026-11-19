@@ -15,6 +15,7 @@ import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord } from '../shared/trust';
 import { fitPlane } from './plane';
 import { refuseTmc } from './refusal';
+import { hypot3 } from '@lib/vec3';
 
 const faceSchema = z.object({
   name: z.string().min(1).describe('Name of the face in the report, e.g. "mounting face".'),
@@ -117,7 +118,7 @@ function faceNodeIds(mesh: FeMeshArtifact, face: FaceInput, factor: number): num
   }
   const plane = face.onPlane;
   if (plane === undefined) return `face '${face.name}' needs targetKey or onPlane`;
-  const length = Math.hypot(...plane.normal);
+  const length = Math.hypot(plane.normal[0], plane.normal[1], plane.normal[2]);
   if (!(length > 0) || !(plane.distance > 0)) return `face '${face.name}': normal must be non-zero and distance > 0`;
   const unit = plane.normal.map((c) => c / length);
   const entityNodes = new Set<number>();
@@ -195,10 +196,10 @@ function measure(
     }
     if (nodeId < 0) return fail('FEA_TARGET_UNRESOLVED', 'the mesh has no nodes');
     const u = shift(nodeId);
-    pointRows.push({ name, nodeId, distance: best, displacement: u, magnitude: Math.hypot(...u) });
+    pointRows.push({ name, nodeId, distance: best, displacement: u, magnitude: Math.hypot(u[0], u[1], u[2]) });
   }
   let maxDisplacement = 0;
-  for (const id of position.keys()) maxDisplacement = Math.max(maxDisplacement, Math.hypot(...shift(id)));
+  for (const id of position.keys()) maxDisplacement = Math.max(maxDisplacement, hypot3(shift(id)));
   const text = faceRows
     .map((row) => `${row.name} flatness ${row.flatnessBefore.toPrecision(6)} -> ${row.flatnessAfter.toPrecision(6)} ${unit}`)
     .concat(pointRows.map((row) => `${row.name} |u| ${row.magnitude.toPrecision(6)} ${unit}`))

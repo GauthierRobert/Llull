@@ -14,6 +14,7 @@ import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/ve
 import { curveDerivatives, curveDomain } from '../../lib/nurbs/evaluate';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { powInt } from '../../lib/powInt';
+import { appendAll } from '../../lib/appendAll';
 
 export type FlowLaw = Extract<DeformLaw, { kind: 'flowCurve' }>;
 
@@ -317,7 +318,7 @@ function tableFor(
   for (let k = 0; k < count; k++) {
     const t = tangents[k] as Vec3;
     const n = normals[k] as Vec3;
-    stations.push(...(points[k] as Vec3), ...t, ...n, ...cross3(t, n));
+    appendAll(stations, [...(points[k] as Vec3), ...t, ...n, ...cross3(t, n)]);
   }
   return { kind: 'flowCurve', z0: options.z0, ratio, step, stations };
 }

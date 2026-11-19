@@ -9,6 +9,8 @@ import { isLaminateRefusal, laminateOf } from './laminate';
 import { DEFAULT_ANGULAR_TOL_DEG, DEFAULT_MIN_COVERAGE, midFaceSpan, midsurfaceOf } from './midsurface';
 import { planeStressDomain } from './planeStressFace';
 import { isMidsurfaceRefusal, type MidsurfaceRefusal } from './types';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 export interface ShellRequest {
   readonly thickness?: number;
@@ -72,12 +74,12 @@ export function resolveShell(
     };
   const thickness = given ?? mid.thicknesses[0] ?? 0;
   const notes: string[] = [];
-  const span = Math.max(...mid.faces.map(midFaceSpan));
+  const span = maxOf(mid.faces.map(midFaceSpan));
   if (thickness > THICK_SHELL_RATIO * span) notes.push(`WARNING thick shell (t / span ${text(thickness / span)})`);
   const detected = mid.thicknesses[0];
   if (laminate !== null && detected !== undefined && Math.abs(laminate.thickness - detected) > LAMINATE_MISMATCH * detected)
     notes.push(`WARNING laminate thickness ${text(laminate.thickness)} differs from the wall ${text(detected)}`);
-  notes.push(...mid.warnings);
+  appendAll(notes, mid.warnings);
   const offset = request.offset ?? 'mid';
   const idealization: Idealization = {
     kind: 'shell',

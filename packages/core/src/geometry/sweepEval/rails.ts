@@ -12,6 +12,7 @@ import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { dot3, len3, sub3 } from '../../lib/vec3';
 import type { SweepFrame } from './frames';
 import type { Affine2, SectionTransform } from './sectionTransform';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** What the rails of a sweep depend on (a SweepEntity satisfies it). */
 export type RailShape = Pick<SweepEntity, 'section' | 'stations' | 'rails' | 'guideMode' | 'maintainHeight' | 'anchors'>;
@@ -84,7 +85,7 @@ function crossingParameters(
   label: string,
 ): number[] | RailIssue {
   const domain = curveDomain(rail);
-  const scale = Math.max(...rail.poles.map((p) => len3(sub3(p, rail.poles[0] as Vec3))), 1e-9);
+  const scale = Math.max(maxOf(rail.poles.map((p) => len3(sub3(p, rail.poles[0] as Vec3)))), 1e-9);
   const samples = Math.max(256, 48 * (rail.knots.length - 1));
   const found: number[] = [];
   for (let i = 0; i < frames.length; i++) {

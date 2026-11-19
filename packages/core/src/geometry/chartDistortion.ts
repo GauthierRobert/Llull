@@ -9,6 +9,7 @@ import type { Vec2 } from '../model/vectors';
 import type { FaceChart } from './chartFrame';
 import { sampleSegment, segmentLength, type PlaneSegment } from './planeSegments';
 import { integrateDu, loopOfPieces } from './uvIntegrals';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 export interface ChartDistortion {
   /** Largest |strain| over the samples. */
@@ -58,7 +59,7 @@ export function measureDistortion(
   const points = chains.flat().flatMap((segment) => sampleSegment(segment, 9));
   const xs = points.map((p) => p[0]);
   const ys = points.map((p) => p[1]);
-  const size = points.length === 0 ? 0 : Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const size = points.length === 0 ? 0 : Math.hypot(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys));
   const step = size / SIZE_DIVISOR;
   let worst: { chart: Vec2; strain: number } | null = null;
   let weighted = 0;

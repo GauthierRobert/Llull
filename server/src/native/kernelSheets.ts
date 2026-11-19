@@ -17,6 +17,8 @@ import { encodeSurface } from '@core/geometry/surfaceWire';
 import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
 import { extractSubSurface } from '@lib/nurbs/surfaceEdit';
 import { encodeChain, sectionPayload, type WireOptions } from './kernelLeaves';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { hypotOf } from '@lib/hypotOf';
 
 type LoftEntity = Extract<Entity, { kind: 'loft' }>;
 
@@ -96,10 +98,8 @@ function loftSheet(entity: LoftEntity, wire: WireOptions): Omit<SheetSolidRecipe
   if (wire.sheetSolid !== true || entity.faces === undefined || entity.faces.length === 0) return null;
   const faces = entity.faces.flatMap(spans);
   const poles = faces.flatMap((face) => face.poles.flat());
-  const extent = [0, 1, 2].map(
-    (axis) => Math.max(...poles.map((p) => p[axis] as number)) - Math.min(...poles.map((p) => p[axis] as number)),
-  );
-  return { faces: faces.map(encodeSurface), tolerance: Math.max(1e-7, 1e-6 * Math.hypot(...extent)), caps: entity.caps ?? 2 };
+  const extent = [0, 1, 2].map((axis) => maxOf(poles.map((p) => p[axis] as number)) - minOf(poles.map((p) => p[axis] as number)));
+  return { faces: faces.map(encodeSurface), tolerance: Math.max(1e-7, 1e-6 * hypotOf(extent)), caps: entity.caps ?? 2 };
 }
 
 /**

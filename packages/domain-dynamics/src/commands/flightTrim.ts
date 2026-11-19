@@ -182,7 +182,7 @@ function trimData(trim: Trimmed): Record<string, unknown> {
   const velocity = bodyVelocity(condition.airspeedMps, state.flightPath, state.roll, state.pitch);
   const wrench: Wrench = wrenchAt(vehicle, { velocity, rates: [0, 0, 0], roll: state.roll, pitch: state.pitch }, state.controls);
   const accelerations = trimAccelerations(vehicle, condition, state);
-  const weight = vehicle.massKg * Math.hypot(...vehicle.gravity);
+  const weight = vehicle.massKg * Math.hypot(vehicle.gravity[0], vehicle.gravity[1], vehicle.gravity[2]);
   const world = rotateInverse(orientationOf(state.roll, state.pitch), [0, 0, 1]);
   return {
     scenario: trim.scenarioId,

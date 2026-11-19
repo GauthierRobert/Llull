@@ -3,6 +3,7 @@
 import type { Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
 import { type DrapeNet, type DrapeNode, nodeKey } from './net';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface ShearLimits {
   readonly warning?: number | undefined;
@@ -58,7 +59,7 @@ function regionsOver(net: DrapeNet, lock: number, include: (node: DrapeNode) => 
     const sum = members.reduce<Vec3>((total, node) => add3(total, node.hit.point), [0, 0, 0]);
     regions.push({
       nodeCount: members.length,
-      maxShearDeg: Math.max(...members.map((node) => node.shear)),
+      maxShearDeg: maxOf(members.map((node) => node.shear)),
       centroid: scale3(sum, 1 / members.length),
     });
   }

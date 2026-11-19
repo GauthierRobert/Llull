@@ -10,6 +10,7 @@ import { getPiping } from '../../piping/model';
 import { pipeCentreline, type SourcePipe } from '../../common/pipeCentrelines';
 import { runComponents, type SourceBranch, type SourceComponent } from './components';
 import type { StressModel } from './schema';
+import { appendAll } from '@lib/appendAll';
 
 export type { SourcePipe };
 
@@ -43,8 +44,8 @@ export function resolveSources(doc: CadDocument, model: Pick<StressModel, 'scope
       pipes.push(found);
       if (found.kind === 'run') {
         const own = runComponents(doc, id);
-        components.push(...own.components);
-        branches.push(...own.branches);
+        appendAll(components, own.components);
+        appendAll(branches, own.branches);
       }
     }
   }

@@ -5,6 +5,7 @@ import type { Vec2, Vec3 } from '../model/types';
 import { elevateDegree } from '../lib/nurbs/edit';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import { constantEdges, type SectionEdge } from './sweepEval/sectionEdges';
+import { maxOf } from '../lib/arrayExtrema';
 
 const QUARTER_WEIGHT = Math.SQRT1_2;
 
@@ -53,7 +54,7 @@ const edgeCurve = ({ degree, poles, weights }: SectionEdge): NurbsCurveData => (
 export function chainCurve(segments: ReadonlyArray<CurveSegment<Vec2>>): NurbsCurveData | null {
   const edges = constantEdges({ shape: 'profile', profile: [], curves: segments });
   if (edges === null || edges.length === 0) return null;
-  const degree = Math.max(...edges.map((edge) => edge.degree));
+  const degree = maxOf(edges.map((edge) => edge.degree));
   const pieces: NurbsCurveData[] = [];
   for (const edge of edges) {
     const raised = edge.degree === degree ? edgeCurve(edge) : elevateDegree(edgeCurve(edge), degree - edge.degree);

@@ -109,7 +109,7 @@ export function pretensionCut(
   index: MeshIndex = indexMesh(mesh),
 ): PretensionCut | CutRefusal {
   const refuse = (message: string): CutRefusal => ({ code: 'CNT_PRETENSION_SECTION_INVALID', message });
-  const length = Math.hypot(...normal);
+  const length = Math.hypot(normal[0], normal[1], normal[2]);
   if (!(length > 0)) return refuse('the section normal is the zero vector');
   const unit = scale3(normal, 1 / length);
   const part = [...index.elements.values()].filter((element) => element.entityId === entityId);

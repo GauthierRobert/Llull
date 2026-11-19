@@ -1,6 +1,7 @@
 /** Hatch of a convex polygon: parallel lines along a direction, evenly spread across the polygon (06 STA plan symbol of a grating panel). Pure. */
 
 import type { Vec2 } from '@core/model/types';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /**
  * Lines parallel to the unit vector `direction` across `outline` (convex), about `spacing` apart and at most `maxLines`, none on the outline itself.
@@ -12,7 +13,7 @@ export function hatchLines(outline: ReadonlyArray<Vec2>, direction: Vec2, spacin
   const d: Vec2 = [direction[0] / length, direction[1] / length];
   const normal: Vec2 = [-d[1], d[0]];
   const across = outline.map((p) => p[0] * normal[0] + p[1] * normal[1]);
-  const [low, high] = [Math.min(...across), Math.max(...across)];
+  const [low, high] = [minOf(across), maxOf(across)];
   const count = Math.min(maxLines, Math.floor((high - low) / spacing));
   if (count < 1) return [];
   const step = (high - low) / (count + 1);

@@ -10,6 +10,7 @@ import type { Accuracy } from '../sim/accuracy';
 import { hashText } from '@lib/hash';
 import { canonicalJson } from '@lib/canonicalJson';
 import { isRecord } from '@lib/isRecord';
+import { maxOf } from '@lib/arrayExtrema';
 
 export type PrototypeCheckName = 'assembly' | 'mechanism' | 'motion_clearance' | 'dynamics';
 
@@ -129,7 +130,7 @@ function trustOf(checks: readonly PrototypeCheck[]): { count: number; largest: n
   const rels = all.flatMap((entry) => (entry.band !== null && 'rel' in entry.band ? [entry.band.rel] : []));
   return {
     count: all.length,
-    largest: rels.length === 0 ? null : Math.max(...rels),
+    largest: rels.length === 0 ? null : maxOf(rels),
     calibrated: all.some((entry) => entry.origin === 'calibrated'),
     unknown: all.some((entry) => entry.band === null),
   };

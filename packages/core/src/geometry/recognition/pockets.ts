@@ -11,6 +11,7 @@ import { roundTo } from '../../lib/compactNumber';
 import { dot3, sub3 } from '../../lib/vec3';
 import { type Group, type Model, edgesOf, outwardNormal } from './model';
 import type { RecognizedPocket } from './types';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const MIN_CLOSED_WALLS = 3;
 const MIN_OPEN_WALLS = 2;
@@ -65,7 +66,7 @@ function pocketAt(model: Model, floor: Group, taken: ReadonlySet<Group>): { pock
     .flatMap((group) => edgesOf(model, group))
     .flatMap((edge) => model.edgePoints(edge))
     .map((point) => dot3(sub3(point, floorPoint), normal));
-  const depth = Math.max(0, ...above);
+  const depth = Math.max(0, maxOf(above));
   if (!(depth > model.tolerance.length)) return null;
   const radius = (group: Group): number =>
     group.surface.type === 'cylinder' ? group.surface.radius : group.surface.type === 'torus' ? group.surface.minor : 0;
@@ -82,8 +83,8 @@ function pocketAt(model: Model, floor: Group, taken: ReadonlySet<Group>): { pock
       floorZ: r(dot3(floorPoint, normal)),
       normal: [r(normal[0]), r(normal[1]), r(normal[2])],
       depth: r(depth),
-      cornerRadius: corners.length === 0 ? 0 : r(Math.min(...corners)),
-      floorFillet: fillets.length === 0 ? 0 : r(Math.min(...fillets)),
+      cornerRadius: corners.length === 0 ? 0 : r(minOf(corners)),
+      floorFillet: fillets.length === 0 ? 0 : r(minOf(fillets)),
       open,
       faceIndices: [...new Set([floor, ...members].flatMap((group) => group.faces))].sort((a, b) => a - b),
     },

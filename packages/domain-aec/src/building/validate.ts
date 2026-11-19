@@ -11,6 +11,7 @@ import { isVec2 } from './model';
 import { EQUIPMENT_SHAPES } from '../industrial/equipment/equipmentShape';
 import { plantDataErrors } from '../plant/equipment/validatePlant';
 import { accessElementErrors } from '../plant/structures/validateAccess';
+import { appendAll } from '@lib/appendAll';
 
 /** Problems with the optional landing fields of a stair (landingAt, landingLength, shape, turn, flightGap). */
 function stairLandingErrors(key: string, stair: Record<string, unknown>): string[] {
@@ -200,7 +201,7 @@ function stairErrors(key: string, element: Elements): string[] {
   if (element['waistThickness'] !== undefined && !isPositiveNumber(element['waistThickness'])) {
     errors.push(`building element ${key}: waistThickness must be a number > 0`);
   }
-  errors.push(...stairLandingErrors(key, element));
+  appendAll(errors, stairLandingErrors(key, element));
   return errors;
 }
 
@@ -247,7 +248,7 @@ function equipmentErrors(key: string, element: Elements): string[] {
   if (shapeValue !== undefined && !(typeof shapeValue === 'string' && EQUIPMENT_SHAPES.includes(shapeValue))) {
     errors.push(`building element ${key}: shape must be one of ${EQUIPMENT_SHAPES.join(', ')}`);
   }
-  errors.push(...plantDataErrors(key, element['plant']));
+  appendAll(errors, plantDataErrors(key, element['plant']));
   return errors;
 }
 
@@ -409,6 +410,6 @@ export function buildingErrors(raw: unknown): string[] {
     const order = raw[field];
     if (!isStringArray(order) || !(order as string[]).every((id) => id in table)) errors.push(`building.${field} must list known ids`);
   }
-  for (const [key, element] of Object.entries(elements)) errors.push(...elementErrors(key, element, levels, elements));
+  for (const [key, element] of Object.entries(elements)) appendAll(errors, elementErrors(key, element, levels, elements));
   return errors;
 }

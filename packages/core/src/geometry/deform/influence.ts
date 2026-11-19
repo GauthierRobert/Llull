@@ -8,6 +8,7 @@ import { type DeformNode } from './laws';
 import { type LocalFrame, toLocal } from './frame';
 import { toBoxCoordinates } from './lattice';
 import { rbfFeatureSize } from './rbf';
+import { minOf } from '../../lib/arrayExtrema';
 
 type Segment = (p: Vec3, q: Vec3, margin?: number) => boolean;
 
@@ -21,7 +22,7 @@ function featureSize(node: Pick<DeformNode, 'law'>): number | null {
   if (law.kind === 'rbf') return rbfFeatureSize(law);
   if (law.kind !== 'lattice') return null;
   const cells = [0, 1, 2].map((a) => ((law.box.max[a] as number) - (law.box.min[a] as number)) / (law.degrees[a] as number));
-  return Math.min(...cells);
+  return minOf(cells);
 }
 
 /** Longest edge the mesh path keeps inside the influence zone of a local feature, or Infinity. */

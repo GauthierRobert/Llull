@@ -27,7 +27,7 @@ type TorusSurface = Extract<SurfaceParams, { type: 'torus' }>;
 /** East (+u) and north (+v) unit tangents at the point of the sphere in direction `a` (a unit outward normal). */
 function eastNorth(a: Vec3): { east: Vec3; north: Vec3 } {
   const raw = cross3([0, 0, 1], a);
-  const east: Vec3 = Math.hypot(...raw) < 1e-9 ? [1, 0, 0] : normalize3(raw);
+  const east: Vec3 = Math.hypot(raw[0], raw[1], raw[2]) < 1e-9 ? [1, 0, 0] : normalize3(raw);
   return { east, north: cross3(a, east) };
 }
 
@@ -118,7 +118,7 @@ function torusBase(surface: TorusSurface, placement: ChartPlacement, method: 'ge
   const rel = sub3(placement.anchorOn, center);
   const height = dot3(rel, axis);
   const planar = sub3(rel, scale3(axis, height));
-  const ringRadius = Math.hypot(...planar);
+  const ringRadius = Math.hypot(planar[0], planar[1], planar[2]);
   if (!(ringRadius > 1e-9)) return { error: 'the anchor is on the axis of the torus' };
   const x = scale3(planar, 1 / ringRadius);
   const y = cross3(axis, x);
@@ -155,7 +155,7 @@ function torusBase(surface: TorusSurface, placement: ChartPlacement, method: 'ge
       const at = sub3(point, center);
       const h = dot3(at, axis);
       const p = sub3(at, scale3(axis, h));
-      return [Math.atan2(dot3(p, y), dot3(p, x)), Math.atan2(h, Math.hypot(...p) - major)];
+      return [Math.atan2(dot3(p, y), dot3(p, x)), Math.atan2(h, Math.hypot(p[0], p[1], p[2]) - major)];
     },
     metricBound: () => major + minor,
     areaG: (v) => minor * (major * v + minor * Math.sin(v)),

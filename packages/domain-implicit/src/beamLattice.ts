@@ -17,6 +17,7 @@ import { type GraphNode, type StrutsNode, type VoronoiNode, bodyOf, fieldOf, typ
 import { voronoiGeometry } from './voronoi';
 import { bodyGrid } from './realise';
 import { strutGeometry } from './struts';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const MAX_BEAMS = 200_000;
 /** The clipping mesh is cut from the region at most this many cells along its longest side (a body voxel of 0.05 over 20 mm would be 400 and write megabytes of coplanar triangles). */
@@ -50,7 +51,7 @@ function strutBeams(node: StrutsNode, box: { min: Vec3; max: Vec3 }): Graph | st
   const range = [0, 1, 2].map((axis) => {
     const values = local.map((p) => p[axis] as number);
     const cell = node.cellSize[axis] as number;
-    return [Math.floor(Math.min(...values) / cell) - 1, Math.ceil(Math.max(...values) / cell) + 1] as const;
+    return [Math.floor(minOf(values) / cell) - 1, Math.ceil(maxOf(values) / cell) + 1] as const;
   });
   const cells = range.reduce((product, [lo, hi]) => product * (hi - lo + 1), 1);
   if (cells * set.beams.length > MAX_BEAMS)
@@ -126,7 +127,7 @@ export function latticeCut(
   const evaluated = engine.evaluate(region.program, Float64Array.from(built.nodes.flat()), false);
   if (evaluated.failure !== undefined) return evaluated.failure.message;
   const values = evaluated.values;
-  const eps = 1e-9 * Math.max(1, ...node.cellSize);
+  const eps = 1e-9 * Math.max(1, maxOf(node.cellSize));
   let dangling = 0;
   let inside = 0;
   let outside = 0;
@@ -192,8 +193,8 @@ export function beamLatticeOf(doc: CadDocument, entityId: string, ctx: Execution
     regionAnswer !== null
       ? regionAnswer.values
       : Float64Array.from(samples, (p) =>
-          Math.max(
-            ...[0, 1, 2].map((axis) =>
+          maxOf(
+            [0, 1, 2].map((axis) =>
               Math.max((clipBox.min[axis] as number) - (p[axis] as number), (p[axis] as number) - (clipBox.max[axis] as number)),
             ),
           ),
@@ -211,7 +212,7 @@ export function beamLatticeOf(doc: CadDocument, entityId: string, ctx: Execution
   const renumber = new Map(used.map((old, index) => [old, index]));
   let clip: MeshData | null;
   if (region !== null && region.ok) {
-    const longest = Math.max(...[0, 1, 2].map((axis) => (clipBox.max[axis] as number) - (clipBox.min[axis] as number)));
+    const longest = maxOf([0, 1, 2].map((axis) => (clipBox.max[axis] as number) - (clipBox.min[axis] as number)));
     const meshed = engine.mesh(region.program, bodyGrid(clipBox, Math.max(body.voxel, longest / CLIP_CELLS)), {
       mesher: 'dual_contouring',
       maxTriangles: engine.limits.maxTriangles,

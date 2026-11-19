@@ -12,6 +12,7 @@ import { pathBendAt } from './pathCurvature';
 import { orientedFrames, sweepFrames, type SweepFrame } from './frames';
 import { sectionLoops, stationLoopAt } from './sections';
 import { sweepClosingShift } from './symmetry';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Measurements at one arc-length fraction (entity-local frame); the curvature is exact (arc, Bézier and ellipse derivatives, the analytic helix). */
 export interface SweepSample {
@@ -113,7 +114,7 @@ export function sweepSamples(
       curvatureRadius = 1 / kappa;
       const toCentre = scale3(bend, 1 / kappa);
       const direction: Vec2 = [dot3(toCentre, normal), dot3(toCentre, binormal)];
-      sectionExtent = Math.max(...loopAtFraction(sweep, t).map((p) => dot2(transformPoint(p, transform), direction)));
+      sectionExtent = maxOf(loopAtFraction(sweep, t).map((p) => dot2(transformPoint(p, transform), direction)));
       margin = sectionExtent > 0 ? curvatureRadius / sectionExtent : null;
     }
     const point = mix3(a.point, b.point, u);

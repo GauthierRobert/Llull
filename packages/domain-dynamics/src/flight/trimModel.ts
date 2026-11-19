@@ -97,7 +97,7 @@ export function trimVehicle(prepared: PreparedVehicle): TrimVehicle | null {
       return index < 0 ? [] : [index];
     });
     const stiffness = own.reduce((sum, index) => sum + thrustPerRpmSquared(rotors[index] as RotorRuntime), 0);
-    const weight = prepared.massKg * Math.hypot(...prepared.gravity);
+    const weight = prepared.massKg * Math.hypot(prepared.gravity[0], prepared.gravity[1], prepared.gravity[2]);
     const guess = stiffness > 0 ? Math.sqrt(weight / stiffness) : 0.5 * (controller.minRpm + controller.maxRpm);
     for (const index of controller.maxRpm > controller.minRpm ? own : []) {
       controls.push({

@@ -10,6 +10,7 @@ import { dynamicsOf, withDynamics } from './bodies';
 import { buildDatasheetMotor, datasheetDescription, foreignField } from './motorBuild';
 import { inductionSheetSchema, pmsmSheetSchema, stepperSheetSchema } from './machineSchemas';
 import { datasheetSchema, gearheadSchema, sourceSchema, toSource } from './motorSchemas';
+import { maxOf } from '@lib/arrayExtrema';
 
 /**
  * @affects adds 1 motor to doc.dynamics (affected: [motorId])
@@ -134,7 +135,7 @@ export const addMotor = defineCommand({
           ? `holds ${motor.rpm} rpm (≤ ${motor.maxTorque} N·m${motor.source === undefined ? ', bound unsourced' : `, source ${motor.source.name} grade ${motor.source.grade}`})`
           : motor.kind === 'dc' || motor.kind === 'pmsm' || motor.kind === 'stepper' || motor.kind === 'induction'
             ? `${motor.kind === 'dc' ? 'DC' : motor.kind} motor ${motor.source.name}: ${verdict}; ${datasheetDescription(motor)}; commanded by set_motor_drive`
-            : `torque curve of ${motor.curve.length} point(s), peak ${Math.max(...motor.curve.map(([, t]) => t))} N·m, throttle ${motor.throttle}`;
+            : `torque curve of ${motor.curve.length} point(s), peak ${maxOf(motor.curve.map(([, t]) => t))} N·m, throttle ${motor.throttle}`;
     return changed(
       withDynamics(doc, { ...dynamics, motors: { ...dynamics.motors, [motorId]: motor } }),
       `add_motor: '${motorId}' on joint '${params.joint}' — ${what}.`,
@@ -200,7 +201,7 @@ export const addPropeller = defineCommand({
     if (joint === undefined) return fail(`joint '${params.joint}' not found (add_body_joint first)`);
     if (joint.kind !== 'revolute') return fail(`joint '${params.joint}' is prismatic; a propeller needs a revolute joint`);
     const thrustDirection = params.thrustDirection ?? joint.axis;
-    if (Math.hypot(...thrustDirection) < 1e-12) return fail('thrustDirection must be non-zero');
+    if (Math.hypot(thrustDirection[0], thrustDirection[1], thrustDirection[2]) < 1e-12) return fail('thrustDirection must be non-zero');
     const table = params.table;
     if (table !== undefined) {
       if (table.source.trim() === '') return fail('table needs a non-empty source');

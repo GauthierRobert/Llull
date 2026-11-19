@@ -8,6 +8,7 @@ import { toMm } from '@core/model/units';
 import { civilLine, civilMesh, civilPolyline, civilText } from '../entities';
 import { labelHeight, type CivilContext } from '../context';
 import { civilObject } from '../model';
+import { appendAll } from '@lib/appendAll';
 
 const MANHOLE_SIDES = 16;
 const PIPE_SIDES = 12;
@@ -27,7 +28,7 @@ function axisPrismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): 
       positions.push(centre[0] + u[0] * c + v[0] * s, centre[1] + u[1] * c + v[1] * s, centre[2] + u[2] * c + v[2] * s);
     }
   }
-  positions.push(...bottom, ...top);
+  appendAll(positions, [...bottom, ...top]);
   const bottomCentre = 2 * sides;
   const topCentre = 2 * sides + 1;
   const indices: number[] = [];

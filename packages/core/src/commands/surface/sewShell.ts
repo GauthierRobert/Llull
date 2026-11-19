@@ -10,6 +10,7 @@ import { sewParts, sheetShellMesh } from '../../lib/nurbs/shellMesh';
 import { placedSurface, surfacePoleExtent } from '../../geometry/nurbsSurface';
 import { refuseSrf } from './shared';
 import { isRefusal, sig, sigVec, surfaceEntityOf } from './surfaceShared';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /**
  * Sews the sheets `ids` into one closed solid mesh, or refuses with the free edges that remain.
@@ -31,7 +32,7 @@ export function sewIntoSolid(
   }
   const surfaces = sheets.map(placedSurface);
   const size = Math.max(
-    ...surfaces.map(surfacePoleExtent).flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]]),
+    maxOf(surfaces.map(surfacePoleExtent).flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]])),
     1e-9,
   );
   const tol = tolerance ?? 1e-6 * size;

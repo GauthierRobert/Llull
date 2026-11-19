@@ -13,6 +13,8 @@ import type { Vec3 } from '../../model/vectors';
 import { faceNormal } from './quadCage';
 import { type RimLoop, type SnapProblem, boundaryEdges, loopsOf, meanEdge, rimArc, rimLoop, rimPointAt } from './quadOpen';
 import { SurfaceIndex } from './surfaceIndex';
+import { appendAll } from '../../lib/appendAll';
+import { hypot3 } from '../../lib/vec3';
 
 const at = (positions: ReadonlyArray<number>, index: number): Vec3 => [
   positions[3 * index] as number,
@@ -131,7 +133,7 @@ export function realignBoundaryRow(
     if (corners.some((v) => engineLoopOfVertex.has(v))) {
       removed++;
       for (const v of corners) touching.set(v, [...(touching.get(v) ?? []), ...corners]);
-    } else innerQuads.push(...corners);
+    } else appendAll(innerQuads, corners);
   }
   if (innerQuads.length === 0) return problem('shape', 'no quad is left when the outermost layer is taken away');
   const innerLoops = loopsOf(boundaryEdges(innerQuads, 4));
@@ -227,7 +229,7 @@ export function realignBoundaryRow(
       link(b, a);
     }
   const sound = (coords: ReadonlyArray<number>): boolean => {
-    for (let f = 0; f < all.length / 4; f++) if (!(Math.hypot(...faceNormal(coords, all, f)) > 0)) return false;
+    for (let f = 0; f < all.length / 4; f++) if (!(hypot3(faceNormal(coords, all, f)) > 0)) return false;
     for (let f = 0; f < quadsOut.length / 4; f++)
       if (!(dot(faceNormal(base, quadsOut, f), faceNormal(coords, quadsOut, f)) > 0)) return false;
     // each strip quad faces the way the inner quad it shares its edge with does (a staircase makes the strip quads non-convex, so no corner test)
@@ -263,7 +265,7 @@ export function realignBoundaryRow(
       const start = out.length / 3;
       for (let i = 0; i < n; i++) {
         const corner = pinned.get(i);
-        out.push(...(corner !== undefined ? (rim.points[corner] as Vec3) : rimPointAt(rim, arc[i] as number)));
+        appendAll(out, corner !== undefined ? (rim.points[corner] as Vec3) : rimPointAt(rim, arc[i] as number));
         rimVertices.push(start + i);
       }
     }

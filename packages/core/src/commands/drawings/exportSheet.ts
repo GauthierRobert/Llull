@@ -11,6 +11,8 @@ import { DrawingPainter, n, paperDimension, svgLine, svgText } from '../../geome
 import { escapeXml } from '../../lib/escapeXml';
 import { scaleText } from './sheetOps';
 import { type PmiSkipReason, type SheetPmiReport, paintViewPmi, pmiReport, sheetShowsPmi } from './pmiPainter';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 export interface SheetViewInfo {
   readonly id: string;
@@ -83,7 +85,7 @@ function cuttingMarks(
     ];
     const along = corners.map((corner) => (corner[0] - line.point[0]) * line.along[0] + (corner[1] - line.point[1]) * line.along[1]);
     const reach = clearance / placed.perUnit;
-    const ends = [Math.min(...along) - reach, Math.max(...along) + reach].map(
+    const ends = [minOf(along) - reach, maxOf(along) + reach].map(
       (t): Vec2 => map([line.point[0] + line.along[0] * t, line.point[1] + line.along[1] * t]),
     );
     const sight: Vec2 = [line.sight[0], -line.sight[1]];
@@ -186,18 +188,19 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
       defs.push(`<clipPath id="clip-${viewKey}"><circle cx="${n(x)}" cy="${n(y)}" r="${r}"/></clipPath>`);
       body.push(`<g clip-path="url(#clip-${viewKey})">${parts.join('')}</g>`, `<circle cx="${n(x)}" cy="${n(y)}" r="${r}" class="thin"/>`);
     } else {
-      body.push(...parts);
+      appendAll(body, parts);
       const hosted = sheet.views.filter((other) => other.section?.parentViewId === view.id);
-      body.push(...cuttingMarks(entry, placed, map, hosted, options.showDimensions ? 14 : 6));
-      body.push(
-        ...detailMarks(
+      appendAll(body, cuttingMarks(entry, placed, map, hosted, options.showDimensions ? 14 : 6));
+      appendAll(
+        body,
+        detailMarks(
           placed,
           map,
           sheet.views.filter((other) => other.detail?.parentViewId === view.id),
         ),
       );
       if (options.showDimensions && view.kind === 'projection' && view.direction !== 'iso')
-        body.push(...overallDimensions(doc, entry, map));
+        appendAll(body, overallDimensions(doc, entry, map));
     }
     const labelY = y + placed.height / 2 + (options.showDimensions ? 22 : 8);
     body.push(svgText(x, labelY, 3.5, 'middle', caption), '</g>');

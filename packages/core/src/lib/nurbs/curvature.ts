@@ -6,6 +6,7 @@ import { curveDerivatives } from './evaluate';
 import { integrateCurve } from './integrate';
 import type { NurbsCurveData } from './types';
 import { powInt } from '../powInt';
+import { maxOf } from '../arrayExtrema';
 
 export interface CurvatureSample {
   readonly point: Vec3;
@@ -30,7 +31,7 @@ const EPSILON = 1e-12;
  */
 export function planeNormalOf(curve: NurbsCurveData): Vec3 | null {
   const origin = curve.poles[0] as Vec3;
-  const extent = Math.max(...curve.poles.map((pole) => distance3(pole, origin)));
+  const extent = maxOf(curve.poles.map((pole) => distance3(pole, origin)));
   if (extent === 0) return null;
   let normal: Vec3 = [0, 0, 0];
   let best = 0;

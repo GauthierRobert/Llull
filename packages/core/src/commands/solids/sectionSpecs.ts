@@ -12,6 +12,7 @@ import { resampleRing } from '../../geometry/sectionRing';
 import { untypedArray, z } from '../schema';
 import { MAX_PROFILE_POINTS } from '../limits';
 import { sketchLoop } from './sketchCurves';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Zod fields of one section spec (each described for agents). */
 export const sectionSpecFields = {
@@ -34,7 +35,7 @@ const ELLIPSE_POINTS = 96;
 
 /** The points without a point equal (within 1e-9 of the section size) to the one before it or, at the end, to the first (a closing repeat): the loop is closed implicitly. */
 function withoutRepeats(points: readonly Vec2[]): Vec2[] {
-  const tolerance = Math.max(...points.map(([x, y]) => Math.hypot(x, y)), 1e-12) * 1e-9;
+  const tolerance = Math.max(maxOf(points.map(([x, y]) => Math.hypot(x, y))), 1e-12) * 1e-9;
   const same = (a: Vec2, b: Vec2): boolean => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tolerance;
   const kept = points.filter((p, i) => i === 0 || !same(p, points[i - 1] as Vec2));
   const first = kept[0];
@@ -90,5 +91,5 @@ export function specPolygon(doc: CadDocument, spec: SectionSpec): Vec2[] | strin
 export function specRing(doc: CadDocument, spec: SectionSpec): { ring: Vec2[]; halfSize: number } | string {
   const polygon = specPolygon(doc, spec);
   if (typeof polygon === 'string') return polygon;
-  return { ring: resampleRing(polygon), halfSize: Math.max(...polygon.map(([x, y]) => Math.hypot(x, y))) };
+  return { ring: resampleRing(polygon), halfSize: maxOf(polygon.map(([x, y]) => Math.hypot(x, y))) };
 }

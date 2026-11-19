@@ -12,6 +12,8 @@ import { caseFrame, toCaseFrame, type CaseFrame } from './frame';
 import { findSelfIntersections, type IntersectionReport } from './selfIntersection';
 import { edgeReport, flipped, signedVolume, surfaceArea, surfaceBounds, type EdgeReport } from './topology';
 import { weldSurface, type IndexedSurface } from './weld';
+import { appendAll } from '@lib/appendAll';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Vertices closer than this fraction of the body length are one vertex. */
 export const WELD_TOLERANCE_PER_LENGTH = 1e-6;
@@ -48,7 +50,7 @@ function toFrameMetres(positions: readonly number[], frame: CaseFrame, scale: nu
   const out: number[] = [];
   for (let i = 0; i + 2 < positions.length; i += 3) {
     const point: Vec3 = [(positions[i] ?? 0) * scale, (positions[i + 1] ?? 0) * scale, (positions[i + 2] ?? 0) * scale];
-    out.push(...toCaseFrame(frame, point));
+    appendAll(out, toCaseFrame(frame, point));
   }
   return out;
 }
@@ -66,7 +68,7 @@ export function prepareSurface(doc: CadDocument, cfdCase: CfdCase, leaves: reado
   const metresPerUnit = toMetres(doc, 1);
   const raw = toFrameMetres(built.positions, frame, metresPerUnit);
   const rough = surfaceBounds({ vertices: raw, triangles: [] });
-  const roughLength = raw.length === 0 ? 0 : Math.max(...[0, 1, 2].map((axis) => (rough.max[axis] ?? 0) - (rough.min[axis] ?? 0)));
+  const roughLength = raw.length === 0 ? 0 : maxOf([0, 1, 2].map((axis) => (rough.max[axis] ?? 0) - (rough.min[axis] ?? 0)));
   const welded = weldSurface(raw, built.indices, WELD_TOLERANCE_PER_LENGTH * roughLength, DEGENERATE_AREA_PER_LENGTH_SQ * roughLength ** 2);
   const slack = (WELD_TOLERANCE_PER_LENGTH * roughLength + 1e-9) / metresPerUnit;
   const inOpening = (mid: Vec3): boolean => {
@@ -95,7 +97,7 @@ export function prepareSurface(doc: CadDocument, cfdCase: CfdCase, leaves: reado
     areaM2: surfaceArea(oriented),
     volumeM3: Math.abs(volume),
     bounds: welded.triangles.length === 0 ? { min: [0, 0, 0], max: [0, 0, 0] } : bounds,
-    lengthM: welded.triangles.length === 0 ? 0 : Math.max(...[0, 1, 2].map((axis) => (bounds.max[axis] ?? 0) - (bounds.min[axis] ?? 0))),
+    lengthM: welded.triangles.length === 0 ? 0 : maxOf([0, 1, 2].map((axis) => (bounds.max[axis] ?? 0) - (bounds.min[axis] ?? 0))),
     intersections: blocked ? null : findSelfIntersections(oriented),
     geometryHash: hashSurface(oriented),
   };

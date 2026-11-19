@@ -5,6 +5,7 @@ import { refuseIso } from '../codes';
 import type { WeldRecord } from '../model';
 import { getFabrication, withFabrication } from '../state';
 import type { WeldEntry } from '../welds';
+import { appendAll } from '@lib/appendAll';
 
 const row = (record: WeldRecord): Record<string, unknown> => ({
   weldId: record.id,
@@ -74,7 +75,10 @@ export const numberWelds = defineCommand({
         if (!previous.has(record.id)) affected.push(record.id);
       }
       for (const record of plan.dropped) dropped.push(row(record));
-      affected.push(...entries.filter((entry) => entry.status === 'assigned').map((entry) => entry.record.id));
+      appendAll(
+        affected,
+        entries.filter((entry) => entry.status === 'assigned').map((entry) => entry.record.id),
+      );
       if (analysis.read.staleWelds.length > 0) warnings.push({ code: 'ISO_FIELD_WELD_STALE', ids: analysis.read.staleWelds });
     }
     return {

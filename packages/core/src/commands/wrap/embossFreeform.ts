@@ -17,6 +17,7 @@ import { cross3, dot3, normalize3, scale3 } from '../../lib/vec3';
 import type { ShapeHandle } from '../../geometry/kernel';
 import type { FaceQueryPort } from '../../geometry/kernelPorts';
 import { newEntity } from '../entity/newEntity';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface FreeformFailure {
   readonly code: string;
@@ -112,14 +113,14 @@ export function buildFreeformRecipe(input: {
   const sampled = input.pieces.map((pieces) => coarseLoop(chart, pieces));
   // the box of the regions in (u, v): the surface can fold over the pull inside a loop whose boundary looks harmless
   const boxUvs = sampled.flatMap((loop) => loop.uvs);
-  const [uLow, uHigh] = [Math.min(...boxUvs.map((p) => p[0])), Math.max(...boxUvs.map((p) => p[0]))];
-  const [vLow, vHigh] = [Math.min(...boxUvs.map((p) => p[1])), Math.max(...boxUvs.map((p) => p[1]))];
+  const [uLow, uHigh] = [minOf(boxUvs.map((p) => p[0])), maxOf(boxUvs.map((p) => p[0]))];
+  const [vLow, vHigh] = [minOf(boxUvs.map((p) => p[1])), maxOf(boxUvs.map((p) => p[1]))];
   const boxGrid = Array.from(
     { length: 121 },
     (_, k): Vec2 => [uLow + ((uHigh - uLow) * (k % 11)) / 10, vLow + ((vHigh - vLow) * Math.floor(k / 11)) / 10],
   );
   const cosines = [...boxUvs, ...boxGrid].map((uv) => dot3(scale3(chart.normalAt(uv), input.orientation), e0));
-  const cosMin = Math.min(...cosines.map(Math.abs));
+  const cosMin = minOf(cosines.map(Math.abs));
   if (cosines.some((c) => c >= MIN_COSINE) && cosines.some((c) => c <= -MIN_COSINE))
     return {
       code: 'WRP_FACE_TOO_STEEP',
@@ -139,7 +140,7 @@ export function buildFreeformRecipe(input: {
   const heights = [...sampled.flatMap((loop) => loop.points), ...box].map((p) => dot3(p, e0));
   const margin = 1e-6 * input.diagonal;
   const extent = depth / cosMin;
-  const [low, high] = [Math.min(...heights) - extent - margin, Math.max(...heights) + extent + margin];
+  const [low, high] = [minOf(heights) - extent - margin, maxOf(heights) + extent + margin];
   const prismOf = (outline: Outline, tag: string): ShapeRecipe => ({
     op: 'place',
     source: {
@@ -188,10 +189,5 @@ export function buildFreeformRecipe(input: {
     mode === 'emboss'
       ? { op: 'boolean', boolean: 'union', a: input.source, b: combined }
       : { op: 'boolean', boolean: 'subtract', a: input.source, b: combined };
-  return {
-    recipe,
-    pull: e0,
-    footprintSegments: segmentCount,
-    footprintDeviation: Math.max(...footprints.map((outline) => outline.deviation)),
-  };
+  return { recipe, pull: e0, footprintSegments: segmentCount, footprintDeviation: maxOf(footprints.map((outline) => outline.deviation)) };
 }

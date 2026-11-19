@@ -17,6 +17,8 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import type { SurfaceUvMap } from './model';
+import { hypot3 } from '@lib/vec3';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Nodes of one grid at most (the grids and their sources travel in the program and its job folder). */
 const MAX_NODES = 600_000;
@@ -115,7 +117,7 @@ export function surfaceMapOf(doc: CadDocument, map: SurfaceUvMap): SurfaceMapRes
 
 /** Whether the first and last pole rows (u) or the first and last pole of every row (v) coincide: the patch closes on itself in that direction. */
 function closedDirections(poles: ReadonlyArray<ReadonlyArray<Vec3>>, tolerance: number): [boolean, boolean] {
-  const near = (a: Vec3, b: Vec3): boolean => Math.hypot(...sub(a, b)) <= tolerance;
+  const near = (a: Vec3, b: Vec3): boolean => hypot3(sub(a, b)) <= tolerance;
   const first = poles[0] ?? [];
   const last = poles[poles.length - 1] ?? [];
   const closedU = poles.length > 2 && first.every((p, j) => near(p, last[j] as Vec3));
@@ -182,7 +184,7 @@ function build(entity: Extract<CadDocument['entities'][string], { kind: 'nurbs_s
     const [ia, ib, ic] = [mesh.indices[t] as number, mesh.indices[t + 1] as number, mesh.indices[t + 2] as number];
     const [a, b, c] = [point(ia), point(ib), point(ic)];
     const raw = cross(sub(b, a), sub(c, a));
-    const area2 = Math.hypot(...raw);
+    const area2 = Math.hypot(raw[0], raw[1], raw[2]);
     const edge2 = Math.max(dot(sub(b, a), sub(b, a)), dot(sub(c, a), sub(c, a)), 1e-300);
     const [ua, ub, uc] = [scaled(ia), scaled(ib), scaled(ic)];
     const det = (ub[0] - ua[0]) * (uc[1] - ua[1]) - (uc[0] - ua[0]) * (ub[1] - ua[1]);
@@ -195,7 +197,7 @@ function build(entity: Extract<CadDocument['entities'][string], { kind: 'nurbs_s
     const [du1, dv1, du2, dv2] = [ub[0] - ua[0], ub[1] - ua[1], uc[0] - ua[0], uc[1] - ua[1]];
     const pu: Vec3 = [(e1[0] * dv2 - e2[0] * dv1) / det, (e1[1] * dv2 - e2[1] * dv1) / det, (e1[2] * dv2 - e2[2] * dv1) / det];
     const pv: Vec3 = [(e2[0] * du1 - e1[0] * du2) / det, (e2[1] * du1 - e1[1] * du2) / det, (e2[2] * du1 - e1[2] * du2) / det];
-    sizes.push([Math.hypot(...pu), Math.hypot(...pv)]);
+    sizes.push([Math.hypot(pu[0], pu[1], pu[2]), Math.hypot(pv[0], pv[1], pv[2])]);
   }
   if (triangles.length === 0 || degenerate > triangles.length)
     return singular(
@@ -205,8 +207,8 @@ function build(entity: Extract<CadDocument['entities'][string], { kind: 'nurbs_s
   const meanV = sizes.reduce((sum, s) => sum + s[1], 0) / sizes.length;
   if (!(meanU > 0 && meanV > 0 && Number.isFinite(meanU + meanV))) return singular(`the sheet '${map.sheetId}' collapses in (u, v)`);
   const aspects = sizes.map(([lu, lv]) => Math.max(lu, lv, map.depth) / Math.max(Math.min(lu, lv, map.depth), 1e-300));
-  const variation = Math.max(
-    ...sizes.flatMap(([lu, lv]) => [lu / meanU, meanU / Math.max(lu, 1e-300), lv / meanV, meanV / Math.max(lv, 1e-300)]),
+  const variation = maxOf(
+    sizes.flatMap(([lu, lv]) => [lu / meanU, meanU / Math.max(lu, 1e-300), lv / meanV, meanV / Math.max(lv, 1e-300)]),
   );
 
   const reach = map.depth * (map.layers + 1);
@@ -258,7 +260,7 @@ function build(entity: Extract<CadDocument['entities'][string], { kind: 'nurbs_s
             wa * tri.a[2] + wb * tri.b[2] + wc * tri.c[2],
           ];
           const offset = sub(p, q);
-          const distance = Math.hypot(...offset);
+          const distance = Math.hypot(offset[0], offset[1], offset[2]);
           const id = at(i, j, k);
           if (!(distance < (best[id] as number)) || distance > reach) continue;
           best[id] = distance;
@@ -302,7 +304,7 @@ function build(entity: Extract<CadDocument['entities'][string], { kind: 'nurbs_s
       w: grid(wGrid, 'w'),
       lateral: grid(lateral, 'lateral'),
       scales: [(2 * Math.PI) / meanU, (2 * Math.PI) / meanV, (2 * Math.PI) / map.depth],
-      stretch: { min: Math.min(...aspects), max: Math.max(...aspects) },
+      stretch: { min: minOf(aspects), max: maxOf(aspects) },
       variation,
       bounds: { min: [low[0] - grow, low[1] - grow, low[2] - grow], max: [high[0] + grow, high[1] + grow, high[2] + grow] },
     },

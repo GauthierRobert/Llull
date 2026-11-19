@@ -16,6 +16,7 @@ import type { SweepFrame } from './sweepEval/frames';
 import { transformPoint } from './sweepEval/sectionTransform';
 import { sectionLoops, stationLoopAt } from './sweepEval/sections';
 import { sweepClosingShift } from './sweepEval/symmetry';
+import { appendAll } from '../lib/appendAll';
 
 export { frameAtFraction, sweepFrames } from './sweepEval/frames';
 export { stationRingAt } from './sweepEval/sections';
@@ -73,9 +74,9 @@ function closedWalls(sweep: SweepShape, evaluation: SweepEvaluation, outerRings:
   for (let i = 0; i < count; i++) {
     const closing = i === count - 1;
     const upper = (rings: Vec3[][], shift: number): Vec3[] => (closing ? rotated(rings[0] as Vec3[], shift) : (rings[i + 1] as Vec3[]));
-    triangles.push(...walls(outerRings[i] as Vec3[], upper(outerRings, outerShift), false, alternate ? i : undefined));
+    appendAll(triangles, walls(outerRings[i] as Vec3[], upper(outerRings, outerShift), false, alternate ? i : undefined));
     if (innerRings !== null)
-      triangles.push(...walls(innerRings[i] as Vec3[], upper(innerRings, innerShift), true, alternate ? i : undefined));
+      appendAll(triangles, walls(innerRings[i] as Vec3[], upper(innerRings, innerShift), true, alternate ? i : undefined));
   }
   return triangles;
 }
@@ -108,9 +109,9 @@ function ringTriangles(sweep: SweepShape, origin: Vec3): Triangle[] {
   if (isClosedChain(path)) return closedWalls(sweep, evaluation, outerRings, innerRings);
   const triangles: Triangle[] = [];
   for (let i = 0; i + 1 < frames.length; i++) {
-    triangles.push(...walls(outerRings[i] as Vec3[], outerRings[i + 1] as Vec3[], false, alternate ? i : undefined));
+    appendAll(triangles, walls(outerRings[i] as Vec3[], outerRings[i + 1] as Vec3[], false, alternate ? i : undefined));
     if (innerRings !== null)
-      triangles.push(...walls(innerRings[i] as Vec3[], innerRings[i + 1] as Vec3[], true, alternate ? i : undefined));
+      appendAll(triangles, walls(innerRings[i] as Vec3[], innerRings[i + 1] as Vec3[], true, alternate ? i : undefined));
   }
   const [startOuter, endOuter] = [outerRings[0] as Vec3[], outerRings[frames.length - 1] as Vec3[]];
   if (innerRings !== null) {
@@ -118,8 +119,8 @@ function ringTriangles(sweep: SweepShape, origin: Vec3): Triangle[] {
     outer.forEach((_, j) => {
       const k = (j + 1) % outer.length;
       const at = (ring: Vec3[], index: number): Vec3 => ring[index] as Vec3;
-      triangles.push(...quad(at(endOuter, j), at(endOuter, k), at(endInner, k), at(endInner, j)));
-      triangles.push(...quad(at(startInner, j), at(startInner, k), at(startOuter, k), at(startOuter, j)));
+      appendAll(triangles, quad(at(endOuter, j), at(endOuter, k), at(endInner, k), at(endInner, j)));
+      appendAll(triangles, quad(at(startInner, j), at(startInner, k), at(startOuter, k), at(startOuter, j)));
     });
     return triangles;
   }

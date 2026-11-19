@@ -10,6 +10,7 @@ import { formingNote } from '../formNotes';
 import { FLANGED_HOLE_SOURCE, HEM_SOURCE } from '../provenance';
 import { REVIEW_NOTE, fixed, unverifiedNote } from '../result';
 import { isRefusal } from '../partLookup';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Outline vertices returned inline before `outlineTruncated` is set (AF-12). */
 const MAX_OUTLINE_POINTS = 200;
@@ -151,7 +152,7 @@ export const materializeFlatPattern = defineCommand({
     const foldedX = folded?.kind === 'mesh' ? folded.mesh.positions.filter((_, i) => i % 3 === 0) : [];
     const foldedY = folded?.kind === 'mesh' ? folded.mesh.positions.filter((_, i) => i % 3 === 1) : [];
     const gap = 0.1 * geometry.extents[0];
-    const target: Vec2 = origin ?? [foldedX.length > 0 ? Math.max(...foldedX) + gap : 0, foldedY.length > 0 ? Math.min(...foldedY) : 0];
+    const target: Vec2 = origin ?? [foldedX.length > 0 ? maxOf(foldedX) + gap : 0, foldedY.length > 0 ? minOf(foldedY) : 0];
     const position = [target[0] - geometry.min[0], target[1] - geometry.min[1], 0] as const;
     const created: string[] = [];
     const add = (layerName: string, color: string, shape: Shape): void => {

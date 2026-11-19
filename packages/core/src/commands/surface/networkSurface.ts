@@ -14,6 +14,7 @@ import { maxCurveDeviation, sizeOfCurves, worldCurves } from './curveInputs';
 import { refuseSrf } from './shared';
 import { commitSurface, isRefusal, sig, surfaceEntityOf, surfaceStyleFields } from './surfaceShared';
 import { refuseSwg } from './swgRefusal';
+import { maxOf } from '../../lib/arrayExtrema';
 
 type Boundary = PatchSide;
 
@@ -130,11 +131,11 @@ export const networkSurface = defineCommand({
         limits,
       );
       const interior = joint.samples.filter((sample) => sample.t >= 0.1 && sample.t <= 0.9);
-      const g1 = Math.max(0, ...interior.map((sample) => sample.g1AngleRad));
-      const g2 = Math.max(0, ...interior.map((sample) => sample.g2Gap));
+      const g1 = Math.max(0, maxOf(interior.map((sample) => sample.g1AngleRad)));
+      const g2 = Math.max(0, maxOf(interior.map((sample) => sample.g2Gap)));
       const edge = sideEdge(check.surface, check.side);
-      const curvature = Math.max(
-        ...[0.1, 0.5, 0.9].map((f) =>
+      const curvature = maxOf(
+        [0.1, 0.5, 0.9].map((f) =>
           Math.abs(crossFrameAt(check.surface, check.side, edge.interval[0] + (edge.interval[1] - edge.interval[0]) * f).curvature),
         ),
       );

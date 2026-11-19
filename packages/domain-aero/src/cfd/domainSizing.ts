@@ -6,6 +6,7 @@
 import type { Vec3 } from '@core/model/types';
 import type { CfdCase } from '@aero/cfd/types';
 import type { DefaultNote } from './caseParams';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Blockage (frontal area / domain cross-section) above which a case is refused. */
 export const MAX_BLOCKAGE = 0.03;
@@ -44,7 +45,7 @@ const margins = (bounds: Box, up: number, down: number, side: number, below: num
  */
 export function sizeDomain(cfdCase: Pick<CfdCase, 'domain' | 'ground'>, bounds: Box, machNumber: number): DomainSizing {
   const extent = [0, 1, 2].map((axis) => at(bounds.max, axis) - at(bounds.min, axis));
-  const length = Math.max(...extent);
+  const length = maxOf(extent);
   const symmetric = cfdCase.domain.symmetryPlane === 'xz';
   const finish = (box: Box, rule: DomainSizing['rule'], scale: number, basis: string, defaults: DefaultNote[]): DomainSizing => ({
     box: symmetric ? { min: [box.min[0], 0, box.min[2]], max: [box.max[0], Math.max(box.max[1], -box.min[1]), box.max[2]] } : box,

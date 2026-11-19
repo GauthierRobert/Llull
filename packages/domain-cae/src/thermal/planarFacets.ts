@@ -4,6 +4,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { makeFacet, type Facet } from './viewFactorContour';
 import { triangulatePolygon } from '@lib/triangulate';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface PlanarPolygon {
   readonly normal: Vec3;
@@ -73,7 +74,7 @@ export function planarFacets(
   const origin = loop[0] as Vec3;
   const axisU = normalizeFrom(sub3(loop[1] as Vec3, origin), normal);
   const axisV = cross3(normal, axisU);
-  const planarityError = Math.max(...loop.map((p) => Math.abs(dot3(sub3(p, origin), normal))));
+  const planarityError = maxOf(loop.map((p) => Math.abs(dot3(sub3(p, origin), normal))));
   const key = (x: number, y: number): string => `${x},${y}`;
   const byProjection = new Map<string, Vec3>();
   const projected = loop.map((p): [number, number] => {

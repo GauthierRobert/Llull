@@ -22,6 +22,7 @@ import { compareSeriesRun, referenceItems } from './engine/referenceSeries';
 import { drivenTimestep, MIN_STEP, profileWindow, SIZING_SAMPLE_RATE } from './sizingRun';
 import { simulateMotion } from './simulate';
 import { pow } from '@lib/pow';
+import { appendAll } from '@lib/appendAll';
 
 const NAME = 'check_motion_truth';
 const DEFAULT_DURATION = 2;
@@ -158,11 +159,11 @@ export const checkMotionTruth = defineCommand({
     let study: { level: string; steps: number[]; rows: StudyRow[] } | null = null;
     if (typeof base === 'string') {
       const why = `the simulation did not run: ${base}`;
-      items.push(
+      appendAll(items, [
         notRun('DRV_LEDGER_CLOSURE', why, 'Fix the model until simulate_motion runs.'),
         notRun('DRV_TIMESTEP_STUDY', why, 'Fix the model until simulate_motion runs.'),
         ...effortItems(Object.values(dynamics.motors), null),
-      );
+      ]);
     } else {
       const built = buildSimulationModel(doc, base.timestep, ctx.kernel ?? null);
       const topology = buildTopology(dynamics);
@@ -175,7 +176,7 @@ export const checkMotionTruth = defineCommand({
       const wanted = catalogue.filter((def) => params.outputs === undefined || params.outputs.includes(def.key));
       const rows = refined.stopped === null ? studyRows(wanted, refined.runs, refined.steps, energyScale(base)) : [];
       study = { level, steps: refined.steps, rows };
-      items.push(
+      appendAll(items, [
         ...ledgerItems(base, dynamics, inertiaOf),
         ...warningItems(base),
         ...(refined.stopped === null
@@ -185,20 +186,21 @@ export const checkMotionTruth = defineCommand({
         ...stopPenetrationItems(base, dynamics),
         ...(isRefusal(topology) ? [] : inertiaVariationItems(base, dynamics, topology)),
         ...effortItems(Object.values(dynamics.motors), base),
-      );
+      ]);
     }
     const provenance = provenanceOf(dynamics);
     items.push(provenanceItem(provenance));
     const references = Object.values(dynamics.referenceSeries ?? {});
     if (references.length > 0) {
       const span = references.reduce((largest, reference) => Math.max(largest, elementAt(reference.times, reference.times.length - 1)), 0);
-      if (typeof base !== 'string' && span <= duration + 1e-9) items.push(...referenceItems(references, base));
+      if (typeof base !== 'string' && span <= duration + 1e-9) appendAll(items, referenceItems(references, base));
       else {
         const compared = compareSeriesRun(doc, references, ctx);
-        items.push(
-          ...('error' in compared
+        appendAll(
+          items,
+          'error' in compared
             ? [notRun('DRV_REFERENCE_MISMATCH', compared.error, 'Make the model run, then compare again.')]
-            : compared.items),
+            : compared.items,
         );
       }
     }

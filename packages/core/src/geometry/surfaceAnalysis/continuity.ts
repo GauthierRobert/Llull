@@ -13,6 +13,7 @@ import { normalCurvature, surfaceSample, type SurfaceSample } from '../../lib/nu
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import type { ContinuityEdge, ContinuityJoint, ContinuityOrder, ContinuitySample, ContinuityTolerances, SurfaceSide } from './types';
+import { minOf } from '../../lib/arrayExtrema';
 
 const unit = (v: Vec3): Vec3 => scale3(v, 1 / (len3(v) || 1));
 
@@ -81,7 +82,7 @@ function crossCurvatureRate(surface: NurbsSurfaceData, base: SurfaceSample, w: V
     atStart ? (knots[1] as number) - (knots[0] as number) : (knots[knots.length - 1] as number) - (knots[knots.length - 2] as number);
   const [crossKnots, edgeKnots] = crossIsU ? [surface.knotsU, surface.knotsV] : [surface.knotsV, surface.knotsU];
   const hCross = RATE_STEP * spanWidth(crossKnots, interior === 1);
-  const hEdge = RATE_STEP * Math.min(...edgeKnots.slice(1).map((knot, k) => knot - (edgeKnots[k] as number)));
+  const hEdge = RATE_STEP * minOf(edgeKnots.slice(1).map((knot, k) => knot - (edgeKnots[k] as number)));
   const f0 = field(crossBase, edgeBase);
   const f1 = field(crossBase + interior * hCross, edgeBase);
   const f2 = field(crossBase + 2 * interior * hCross, edgeBase);

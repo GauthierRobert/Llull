@@ -18,6 +18,7 @@ import {
 import { noop, report } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluate/evaluateElements';
 import { openingFitIssues } from './walls';
+import { maxOf } from '@lib/arrayExtrema';
 
 /**
  * @affects none (levels are not entities); summary + data carry the new level id
@@ -37,7 +38,7 @@ export const addLevel = defineCommand({
   run: (doc, { name, elevation, height, makeActive = true }): CommandResult => {
     const building = getBuilding(doc);
     const tops = Object.values(building.levels).map((level) => level.elevation + level.height);
-    const resolvedElevation = elevation ?? (tops.length > 0 ? Math.max(...tops) : 0);
+    const resolvedElevation = elevation ?? (tops.length > 0 ? maxOf(tops) : 0);
     const resolvedHeight = height ?? fromMm(doc, 3000);
     if (resolvedHeight <= 0) return noop(doc, `add_level failed: height must be > 0 (got ${String(height)}).`);
     const id = nextLevelId(building);

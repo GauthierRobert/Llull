@@ -20,6 +20,7 @@ import { snapBackDetected, unloadingStep } from './curveRules';
 import { extractCurves } from './curves';
 import { unverifiedReasons } from './limitLoadQuery';
 import { isRefusal, nonlinearCase } from './settings';
+import { appendAll } from '@lib/appendAll';
 
 const item = (code: string, message: string, ids: readonly string[], severity: 'error' | 'warning' = 'warning'): NonlinearCheckItem => ({
   code,
@@ -138,7 +139,7 @@ export const checkNonlinear = defineCommand({
           resultItems.push(
             item('NLS_SNAP_BACK_DETECTED', `curve '${curve.name}' turns back on a displacement-controlled step`, [curve.probeId]),
           );
-      resultItems.push(...thresholdItems(doc, analysis, trust.meshArtifact, trust.resultsArtifact));
+      appendAll(resultItems, thresholdItems(doc, analysis, trust.meshArtifact, trust.resultsArtifact));
       notes.push('strain-beyond-hardening-curve, elongation and plastic-mesh-adequacy guardrails are not evaluated by this version');
     }
     const items = [...baseItems(doc, analysisId, ctx), ...setupWarnings(doc, analysis), ...resultItems];

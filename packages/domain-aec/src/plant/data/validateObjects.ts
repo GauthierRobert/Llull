@@ -5,6 +5,7 @@ import { resolveClass } from './classes';
 import type { PlantDataModel, PlantObject } from './model';
 import { coerceValue } from './properties';
 import { duplicateTags, objectRegistry } from './registry';
+import { appendAll } from '@lib/appendAll';
 
 export const isScalar = (value: unknown): boolean => value === null || ['string', 'number', 'boolean'].includes(typeof value);
 
@@ -79,7 +80,7 @@ export function objectErrors(raw: Record<string, unknown>, data: PlantDataModel)
     ...orderErrors(raw['objectOrder'], objects, 'plant.data.objectOrder'),
   ];
   if (errors.length > 0) return errors;
-  for (const [key, object] of Object.entries(data.objects)) errors.push(...semanticErrors(key, object, data));
+  for (const [key, object] of Object.entries(data.objects)) appendAll(errors, semanticErrors(key, object, data));
   if (errors.length > 0) return errors;
   for (const { tag, ids } of duplicateTags(data, objectRegistry(data)))
     errors.push(`plant.data: tag "${tag}" is held by ${ids.join(', ')} in colliding tag scopes`);

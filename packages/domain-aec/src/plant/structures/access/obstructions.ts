@@ -9,6 +9,7 @@ import { boxExtent, elementBoxes, type OrientedBox } from '../../../industrial/c
 import { externalBodies } from '../../../industrial/clash/clashSources';
 import { pipingClashBodies } from '../../piping/clashBodies';
 import { dot3 } from '@lib/vec3';
+import { appendAll } from '@lib/appendAll';
 
 export interface Candidate {
   readonly id: string;
@@ -52,7 +53,7 @@ export function allCandidates(doc: CadDocument, building: BuildingModel): Candid
 export function pipeBoxes(doc: CadDocument, building: BuildingModel): OrientedBox[] {
   const found: OrientedBox[] = [];
   for (const element of Object.values(building.elements))
-    if (element.category === 'pipe' || element.category === 'tray') found.push(...elementBoxes(doc, building, element));
+    if (element.category === 'pipe' || element.category === 'tray') appendAll(found, elementBoxes(doc, building, element));
   for (const body of pipingClashBodies(doc)) found.push(body.box);
   return found;
 }

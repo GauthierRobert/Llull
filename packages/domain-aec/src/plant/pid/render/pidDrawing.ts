@@ -10,6 +10,7 @@ import { equipmentSymbol } from '../symbols/equipment';
 import { BUBBLE_R, INLINE_HALF, actuatorSymbol, connectorSymbol, flowArrowSymbol, instrumentSymbol, pipingSymbol } from '../symbols/piping';
 import { withProjectSymbol } from '../symbols/projectSymbol';
 import { label, placeSymbol } from './placeSymbol';
+import { appendAll } from '@lib/appendAll';
 
 export const LAYERS = { equipment: 'PID-EQPT', pipe: 'PID-PIPE', instrument: 'PID-INST', signal: 'PID-SIGN', text: 'PID-TEXT' } as const;
 
@@ -55,8 +56,9 @@ function segmentGlyph(segment: PidSegment): PidGlyph {
   ];
   const leg = longestLeg(segment.route);
   if (leg !== undefined && segment.flow !== 'none' && leg.length >= 12)
-    primitives.push(
-      ...placeSymbol(flowArrowSymbol, { at: leg.mid, angleDeg: leg.angleDeg + (segment.flow === 'reverse' ? 180 : 0), layer: LAYERS.pipe }),
+    appendAll(
+      primitives,
+      placeSymbol(flowArrowSymbol, { at: leg.mid, angleDeg: leg.angleDeg + (segment.flow === 'reverse' ? 180 : 0), layer: LAYERS.pipe }),
     );
   return { id: segment.id, kind: 'segment', layer: LAYERS.pipe, primitives };
 }

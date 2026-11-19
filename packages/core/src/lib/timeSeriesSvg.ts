@@ -2,6 +2,7 @@
 
 import { escapeXml } from './escapeXml';
 import { pow } from './pow';
+import { maxOf, minOf } from './arrayExtrema';
 
 export interface PlotSeries {
   readonly label: string;
@@ -72,12 +73,12 @@ function panelSvg(panel: PlotPanel, layout: PlotLayout, top: number, bottomAxis:
   const [y0, y1] = [top + MARGIN.top, top + panelHeight - (bottomAxis ? MARGIN.bottom : 12)];
   const all = panel.series.flatMap((s) => s.values).filter(Number.isFinite);
   const includeZero = layout.includeZero !== false;
-  let [low, high] = includeZero ? [Math.min(0, ...all), Math.max(0, ...all)] : [Math.min(...all), Math.max(...all)];
+  let [low, high] = includeZero ? [Math.min(0, minOf(all)), Math.max(0, maxOf(all))] : [minOf(all), maxOf(all)];
   if (high - low < 1e-12) [low, high] = [low - 1, high + 1];
   const pad = (high - low) * 0.05;
   [low, high] = includeZero ? [low === 0 ? 0 : low - pad, high === 0 ? 0 : high + pad] : [low - pad, high + pad];
   const seen = layout.times ?? panel.series.flatMap((s) => (s.times ?? []).filter(Number.isFinite));
-  const [tMin, tMax] = layout.times !== undefined ? [seen[0] ?? 0, seen[seen.length - 1] ?? 1] : [Math.min(...seen), Math.max(...seen)];
+  const [tMin, tMax] = layout.times !== undefined ? [seen[0] ?? 0, seen[seen.length - 1] ?? 1] : [minOf(seen), maxOf(seen)];
   const sx = (t: number): number => x0 + ((t - tMin) / (tMax - tMin || 1)) * (x1 - x0);
   const sy = (v: number): number => y1 - ((v - low) / (high - low || 1)) * (y1 - y0);
   const parts: string[] = [`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="#ffffff" stroke="#888888"/>`];

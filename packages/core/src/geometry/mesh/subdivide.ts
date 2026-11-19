@@ -1,6 +1,7 @@
 /** Triangle subdivision: midpoint (linear, geometry unchanged) and Loop (approximating, boundary-aware). Each level quadruples the face count. */
 
 import type { Vec3 } from '../../model/vectors';
+import { appendAll } from '../../lib/appendAll';
 
 export interface SubdividedMesh {
   readonly positions: number[];
@@ -84,7 +85,7 @@ function loopLevel(mesh: Level): Level {
       const sum = ring.reduce<Vec3>((s, i) => [s[0] + at(i)[0], s[1] + at(i)[1], s[2] + at(i)[2]], [0, 0, 0]);
       next = [0, 1, 2].map((k) => (1 - n * beta) * (p[k] as number) + beta * (sum[k] as number)) as unknown as Vec3;
     }
-    positions.push(...next);
+    appendAll(positions, next);
   }
   for (const [key, edge] of edgeFaces) {
     const [pa, pb] = [at(edge.a), at(edge.b)];

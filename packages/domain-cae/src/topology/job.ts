@@ -20,6 +20,8 @@ import { densityOf, elasticOf } from './material';
 import { regionMasks, voxelsAroundNodes } from './regions';
 import { artifactGrid, domainTriangles, gridOver, insideMask, isGridRefusal, type TopologyGrid } from './voxel';
 import { powInt } from '@lib/powInt';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 interface TopologyLoadCase {
   readonly name: string;
@@ -98,7 +100,7 @@ function constrainedAxes(grid: TopologyGrid, constraint: FeaConstraint, mapped: 
   if (constraint.kind === 'symmetry') {
     const normal = mapped.normal;
     if (normal === undefined) return 'a symmetry constraint needs a facesNear point';
-    const world = normal.map(Math.abs).indexOf(Math.max(...normal.map(Math.abs)));
+    const world = normal.map(Math.abs).indexOf(maxOf(normal.map(Math.abs)));
     if (Math.abs(normal[world] ?? 0) < 0.999) return 'a symmetry face must be perpendicular to a coordinate axis';
     const axis = inPlane(world);
     return axis < dofComponents(grid) ? [axis] : [];
@@ -199,7 +201,7 @@ function supportsOf(
     if (isMappingFailure(mapped)) return refuse('TOP_TARGET_UNMAPPED', `constraint '${id}': ${mapped.error}`, [id]);
     const axes = constrainedAxes(grid, constraint, mapped);
     if (typeof axes === 'string') return refuse('TOP_SETUP_INVALID', `constraint '${id}': ${axes}`, [id]);
-    supportNodes.push(...mapped.nodes);
+    appendAll(supportNodes, mapped.nodes);
     for (const node of mapped.nodes) for (const axis of axes) fixed.add(dofComponents(grid) * node + axis);
   }
   return { supportNodes, fixed };
@@ -256,7 +258,7 @@ function loadsOf(
     if (typeof forces === 'string') return refuse('TOP_SETUP_INVALID', forces, [id]);
     forces.dofs.forEach((dof, i) => accumulated.dofs.set(dof, (accumulated.dofs.get(dof) ?? 0) + (forces.values[i] ?? 0)));
     byCase.set(load.loadCase, accumulated);
-    loadNodes.push(...mapped.nodes);
+    appendAll(loadNodes, mapped.nodes);
   }
   return { byCase, loadNodes };
 }

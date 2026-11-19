@@ -8,6 +8,7 @@ import { resolveVessel } from '../geometry/vesselFrame';
 import { asmeThickness } from './asme';
 import { COVERAGE_CODES, issuesOf, type ElementCheck, type Found } from './findings';
 import { nozzleFindings } from './nozzleFindings';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * @param element a vessel (`plant.template.kind === 'vessel'`)
@@ -54,6 +55,6 @@ export function checkVessel(element: EquipmentElement, mmPerUnit: number): Eleme
       severity: 'warning',
       finding: { code: 'EQP_TABLE_UNVERIFIED', message: 'a head standard row below grade A gives the head proportions', paths: ['heads'] },
     });
-  found.push(...nozzleFindings(plant.template, plant.nozzles));
+  appendAll(found, nozzleFindings(plant.template, plant.nozzles));
   return { issues: issuesOf(element, found), reviewRequired };
 }

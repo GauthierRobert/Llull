@@ -3,7 +3,8 @@
 import type { ThermalContact } from '@core/model/thermalBc';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
-import { appendAll, commentText, row } from '../decks/format';
+import { appendAll } from '@lib/appendAll';
+import { commentText, row } from '../decks/format';
 import { stressPerMpa } from '../decks/units';
 import type { Blocks } from './deckLoads';
 import { siOf } from './quantities';
@@ -50,13 +51,13 @@ export function contactBlocks(ctx: DeckContext, contact: ThermalContact): Blocks
           row(siToSystem('film', value, ctx.unitSystem), pressureMpa * stressPerMpa(ctx.unitSystem), temperature),
         )
       : [row(siToSystem('film', siOf('film', conductance), ctx.unitSystem), 0)];
-  lines.push(
+  appendAll(lines, [
     `*SURFACE INTERACTION, NAME=${names.interaction}`,
     '*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=TIED',
     '*GAP CONDUCTANCE',
     ...data,
     `*CONTACT PAIR, INTERACTION=${names.interaction}, TYPE=SURFACE TO SURFACE`,
     row(names.slave, names.master),
-  );
+  ]);
   return { lines };
 }

@@ -24,6 +24,8 @@ import type { IsoPrimitive } from './isoRender';
 import { revisionMarks, type RevisionDelta } from './isoRevision';
 import { isoSymbols } from './isoSymbols';
 import { isoTables, type IsoTable, type TableName } from './isoTables';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** The sheet of a split isometric: which components it prints and the continuation marks at its cuts. */
 export interface SheetScope {
@@ -104,7 +106,7 @@ export const rect = (x0: number, y0: number, x1: number, y1: number, layer: 'ISO
 /** Column widths (paper mm) of a table from its widest cell. */
 const columnWidths = (table: IsoTable): number[] =>
   table.columns.map(
-    (column, at) => Math.max(column.length, ...table.rows.slice(0, MAX_TABLE_ROWS).map((row) => (row[at] ?? '').length)) * CHAR + 2,
+    (column, at) => Math.max(column.length, maxOf(table.rows.slice(0, MAX_TABLE_ROWS).map((row) => (row[at] ?? '').length))) * CHAR + 2,
   );
 
 function tablePrimitives(tables: readonly IsoTable[], left: number, top: number): IsoPrimitive[] {
@@ -198,12 +200,12 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
     options.tables,
     options.sheet === undefined ? undefined : { indices: options.sheet.indices, partial: options.sheet.partial },
   );
-  warnings.push(...tableWarnings);
+  appendAll(warnings, tableWarnings);
   const [width, height] = PAPER_MM[options.paper];
   const area = sheetDrawingArea(width, height);
   const bottom = height - (area.y + area.height);
   const top = height - area.y;
-  const tableWidth = tables.length === 0 ? 0 : Math.max(...tables.map((table) => columnWidths(table).reduce((sum, w) => sum + w, 0))) + 6;
+  const tableWidth = tables.length === 0 ? 0 : maxOf(tables.map((table) => columnWidths(table).reduce((sum, w) => sum + w, 0))) + 6;
   const drawWidth = area.width - tableWidth;
   const layout = layoutIso(graph, options.northArrow, { width: drawWidth - 2 * PAD, height: area.height - 2 * PAD });
   const originX = area.x + PAD + (drawWidth - 2 * PAD - layout.bounds[2]) / 2;
@@ -243,19 +245,19 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
     ends: layout.ends.map(shift),
     nodes: new Map([...layout.nodes].map(([key, point]) => [key, shift(point)])),
   };
-  primitives.push(...isoSymbols({ network, graph, layout: shiftedLayout, joints: analysis.graph.joints, classes: analysis.classes }));
+  appendAll(primitives, isoSymbols({ network, graph, layout: shiftedLayout, joints: analysis.graph.joints, classes: analysis.classes }));
   const skew = skewFigures(graph, shiftedLayout, options.northArrow);
-  primitives.push(...skew.primitives);
+  appendAll(primitives, skew.primitives);
   const placedSupports = supportMarks(options.supports ?? [], graph, shiftedLayout);
-  for (const placed of placedSupports) primitives.push(...placed.primitives);
+  for (const placed of placedSupports) appendAll(primitives, placed.primitives);
   const revision =
     options.revision === undefined
       ? undefined
       : revisionMarks(graph, shiftedLayout.nodes, shiftedLayout.starts, shiftedLayout.ends, options.revision, (xyz) => nodeKey(xyz));
-  if (revision !== undefined) primitives.push(...revision.primitives);
+  if (revision !== undefined) appendAll(primitives, revision.primitives);
   const dimensions = runDimensions(graph);
   const dimensionLines = dimensionPrimitives(dimensions, layout, shift);
-  primitives.push(...dimensionLines);
+  appendAll(primitives, dimensionLines);
   const placer = new LabelPlacer([
     ...drawn,
     ...dimensionLines.flatMap((primitive): Array<readonly [Vec2, Vec2]> => (primitive.t === 'line' ? [[primitive.a, primitive.b]] : [])),
@@ -359,7 +361,7 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
   const centre: Vec2 = [area.x + area.width - tableWidth - 12, top - 14];
   const direction: Vec2 = [Math.cos((angles.northArrow * Math.PI) / 180), Math.sin((angles.northArrow * Math.PI) / 180)];
   const tipOfArrow: Vec2 = [centre[0] + direction[0] * 8, centre[1] + direction[1] * 8];
-  primitives.push(
+  appendAll(primitives, [
     { t: 'circle', layer: 'ISO-FRAME', c: centre, r: 9 },
     { t: 'line', layer: 'ISO-FRAME', a: centre, b: tipOfArrow },
     {
@@ -388,7 +390,7 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
         ]),
     ...tablePrimitives(tables, area.x + area.width - tableWidth + 3, top - 30),
     ...titleBlock(width, titleRows(analysis, options, layout.scale)),
-  );
+  ]);
   return {
     width,
     height,

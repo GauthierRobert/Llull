@@ -16,6 +16,7 @@ import { interpolatePolePaths, STATION_DEGREE, type PolePaths } from '../../lib/
 import type { Vec2 } from '../../model/types';
 import type { SweepShape } from './evaluate';
 import { placed, stationRuns, type FitRefusal, type Station } from './fitted';
+import { appendAll } from '../../lib/appendAll';
 
 /** Station counts tried in turn (a patch holds at most 400 poles in v: cells + 3). */
 const LADDER = [64, 100, 200, 390];
@@ -45,8 +46,8 @@ function mergeRuns(runs: ReadonlyArray<{ paths: PolePaths; from: number; to: num
     const own = expandKnots(paths.knots, paths.multiplicities).map((k) => from + k * (to - from));
     own.splice(0, r === 0 ? 0 : STATION_DEGREE + 1);
     if (r < runs.length - 1) own.pop();
-    full.push(...own);
-    paths.poles.forEach((row, i) => (poles[i] as Vec3[]).push(...(r === 0 ? row : row.slice(1))));
+    appendAll(full, own);
+    paths.poles.forEach((row, i) => appendAll(poles[i] as Vec3[], r === 0 ? row : row.slice(1)));
   });
   return { poles, ...compressKnots(full) };
 }

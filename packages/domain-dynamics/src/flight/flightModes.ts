@@ -10,6 +10,7 @@
 
 import { elementAt } from '@lib/elementAt';
 import { eigenvalues, type ComplexValue } from './eigenvalues';
+import { maxOf } from '@lib/arrayExtrema';
 
 export type ModeSet = 'fixed_wing' | 'hover';
 
@@ -149,7 +150,7 @@ export function analyseModes(a: readonly (readonly number[])[], modeSet: ModeSet
     return value.im >= 0 ? [modeOf(value, label)] : [];
   });
   const cross = (rows: readonly number[], columns: readonly number[]): number =>
-    Math.max(0, ...rows.flatMap((i) => columns.map((j) => Math.abs(elementAt(elementAt(a, i), j)))));
-  const total = Math.max(1e-300, ...a.flatMap((row) => row.map(Math.abs)));
+    Math.max(0, maxOf(rows.flatMap((i) => columns.map((j) => Math.abs(elementAt(elementAt(a, i), j))))));
+  const total = Math.max(1e-300, maxOf(a.flatMap((row) => row.map(Math.abs))));
   return { eigenvalues: all, modes, couplingRatio: Math.max(cross(LONGITUDINAL, LATERAL), cross(LATERAL, LONGITUDINAL)) / total };
 }

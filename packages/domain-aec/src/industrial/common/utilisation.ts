@@ -1,6 +1,7 @@
 /** Utilisation helpers shared by the check rows and summaries. A refused row is not a utilisation: every helper skips it. */
 
 /** Why a row's input was refused (grade, thickness, bolt class / size): the row was not computed. */
+import { maxOf } from '@lib/arrayExtrema';
 export interface RowRefusal {
   readonly code: string;
   readonly message: string;
@@ -38,7 +39,8 @@ export const highestUtilisation = <Item extends UtilisationRow>(items: readonly 
   );
 
 /** Highest computed utilisation of the items; 0 when there are none. */
-export const maxUtilisation = (items: readonly UtilisationRow[]): number => Math.max(0, ...computed(items).map((item) => item.utilisation));
+export const maxUtilisation = (items: readonly UtilisationRow[]): number =>
+  Math.max(0, maxOf(computed(items).map((item) => item.utilisation)));
 
 /** The computed items whose utilisation exceeds 1 (failing the check). */
 export const failingRows = <Item extends UtilisationRow>(items: readonly Item[]): Item[] =>

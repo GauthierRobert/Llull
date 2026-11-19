@@ -9,6 +9,7 @@ import type { FieldEngine, HomogenizeAnswer } from '@core/geometry/field/engineT
 import type { FieldProgram } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
 import { powInt } from '@lib/powInt';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Named cap: voxels of the finer cell (64^3). The solve costs about this many times a few hundred iterations of six load cases. */
 const MAX_HOMOGENIZATION_VOXELS = 64 * 64 * 64;
@@ -29,7 +30,7 @@ export interface HomogenizationOptions {
 
 /** Voxels per axis for `resolution` along the smallest edge (the voxel is cubic; the other axes are rounded to whole voxels). */
 export function cellVoxels(cell: Vec3, resolution: number): { dims: [number, number, number]; h: number } {
-  const h = Math.min(...cell) / resolution;
+  const h = minOf(cell) / resolution;
   return { dims: cell.map((edge) => Math.max(2, Math.round(edge / h))) as [number, number, number], h };
 }
 
@@ -68,7 +69,7 @@ function voxelise(engine: FieldEngine, program: FieldProgram, origin: Vec3, dims
 /** Inverse of a 6 x 6 matrix by Gauss-Jordan with partial pivoting, or null when it is singular. */
 function invert6(m: readonly number[]): number[] | null {
   const a = Array.from({ length: 6 }, (_, r) => [...m.slice(r * 6, r * 6 + 6), ...Array.from({ length: 6 }, (_, q) => (q === r ? 1 : 0))]);
-  const scale = Math.max(...m.map(Math.abs), 1e-300);
+  const scale = Math.max(maxOf(m.map(Math.abs)), 1e-300);
   for (let c = 0; c < 6; c += 1) {
     let pivot = c;
     for (let r = c + 1; r < 6; r += 1)
@@ -115,14 +116,14 @@ export function moduliOf(c: readonly number[], floor = 0): Moduli {
 /** Largest asymmetry |C - C^T| over the largest entry, and for a cubic cell the largest deviation from cubic symmetry over the largest entry. */
 export function symmetryOf(c: readonly number[], cubic: boolean): { asymmetry: number; cubicDeviation: number | null } {
   const at = (r: number, q: number): number => c[r * 6 + q] as number;
-  const top = Math.max(...c.map(Math.abs), 1e-300);
+  const top = Math.max(maxOf(c.map(Math.abs)), 1e-300);
   let asymmetry = 0;
   for (let r = 0; r < 6; r += 1) for (let q = 0; q < r; q += 1) asymmetry = Math.max(asymmetry, Math.abs(at(r, q) - at(q, r)));
   if (!cubic) return { asymmetry: asymmetry / top, cubicDeviation: null };
   const diagonal = [at(0, 0), at(1, 1), at(2, 2)];
   const coupling = [at(0, 1), at(1, 2), at(2, 0)];
   const shear = [at(3, 3), at(4, 4), at(5, 5)];
-  const spread = (values: number[]): number => Math.max(...values) - Math.min(...values);
+  const spread = (values: number[]): number => maxOf(values) - minOf(values);
   let off = 0;
   for (let r = 0; r < 6; r += 1) for (let q = 0; q < 6; q += 1) if (!(r < 3 && q < 3) && r !== q) off = Math.max(off, Math.abs(at(r, q)));
   return { asymmetry: asymmetry / top, cubicDeviation: Math.max(spread(diagonal), spread(coupling), spread(shear), off) / top };
@@ -212,7 +213,7 @@ export function homogenizeCell(
 export function relativeChange(fine: Moduli, coarse: Moduli): number | null {
   const pairs = [...fine.young, ...fine.shear].map((value, i) => [value, [...coarse.young, ...coarse.shear][i]] as const);
   if (pairs.some(([a, b]) => a === null || b === null || a === undefined || b === undefined)) return null;
-  return Math.max(...pairs.map(([a, b]) => Math.abs((a as number) - (b as number)) / Math.max(Math.abs(a as number), 1e-300)));
+  return maxOf(pairs.map(([a, b]) => Math.abs((a as number) - (b as number)) / Math.max(Math.abs(a as number), 1e-300)));
 }
 
 const SOURCE =
@@ -226,7 +227,7 @@ export function homogenizationBlock(
   baseMaterial: { youngModulusMpa: number; source: string } | undefined,
 ): Record<string, unknown> {
   const { fine, coarse } = result;
-  const cubic = Math.max(...cell) - Math.min(...cell) <= 1e-9 * Math.max(...cell);
+  const cubic = maxOf(cell) - minOf(cell) <= 1e-9 * maxOf(cell);
   const change = relativeChange(fine.moduli, coarse.moduli);
   const solverConverged = fine.converged && coarse.converged;
   const converged = solverConverged && change !== null && change <= CONVERGED_WITHIN;

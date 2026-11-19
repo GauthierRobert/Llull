@@ -6,6 +6,7 @@ import { findProfile, type SteelProfile } from '../../steel/profiles';
 import type { PortalProfiles } from './portalGeometry';
 import type { portalFrameParams } from './portalParams';
 import type { z } from '@core/commands/schema';
+import { maxOf } from '@lib/arrayExtrema';
 
 type PortalParams = z.output<typeof portalFrameParams>;
 
@@ -53,7 +54,7 @@ export function portalInputs(doc: CadDocument, params: PortalParams): PortalInpu
   const fail = (reason: string): { reason: string } => ({ reason: `add_portal_frame_building failed: ${reason}` });
   const mm = (value: number): number => fromMm(doc, value);
   const origin = params.origin ?? [0, 0];
-  const span = params.spans ? Math.max(...params.spans) : (params.span ?? mm(24000));
+  const span = params.spans ? maxOf(params.spans) : (params.span ?? mm(24000));
   const hallLength = params.length ?? mm(48000);
   const targetBay = params.baySpacing ?? mm(6000);
   const eave = params.eaveHeight ?? mm(7000);

@@ -15,6 +15,7 @@ import { autoStepLength } from './drape/plyDrape';
 import { stackRegions } from './plyRegions';
 import { coresOf, heightBelow } from './sandwich';
 import { compositesOf, findPart, findPly, pliesOf } from './state';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const MAX_SOLIDS = 400;
 const SOLID_COLOR = '#c8a46a';
@@ -33,7 +34,7 @@ function exactSlab(
   if (outline.some((uv) => Math.abs(heightAt(uv) - base) > 1e-9 * (1 + Math.abs(base)))) return null;
   const xs = region.outer.map(([x]) => x);
   const ys = region.outer.map(([, y]) => y);
-  const extent = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const extent = Math.hypot(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys));
   return plySlabRecipe(part, region, base, thickness, Math.min(1e-5 * Math.max(1, extent), thickness / 50));
 }
 

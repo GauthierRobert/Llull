@@ -12,6 +12,7 @@ import { GRAVITY, round } from '../../shared/numeric';
 import { findGratingType } from '../../plant/structures/grating/gratingTypes';
 import type { ModelUnits } from './steelMemberBars';
 import { depositArea, type BeamLoads } from './steelBeamLoads';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 interface AreaLoadParams {
   /** kN/m² on every floor slab (permanent). */
@@ -93,7 +94,7 @@ function beamsUnder(beams: ReadonlyArray<BeamLoads>, bottom: number, top: number
 /** Deposit `permanent` / `imposed` kN of the cell at `point` on its nearest beam(s). */
 function bear(point: Point2, beams: ReadonlyArray<BeamLoads>, permanent: number, imposed: number, floor: boolean): void {
   const found = beams.map((beam) => ({ beam, ...projectOntoSegment(point, beam.a, beam.b) }));
-  const nearest = Math.min(...found.map((entry) => entry.distance));
+  const nearest = minOf(found.map((entry) => entry.distance));
   const tied = found.filter((entry) => entry.distance <= nearest + TIE);
   for (const { beam, t } of tied) {
     depositArea(beam, t * beam.lengthM * 1000, permanent / tied.length, imposed / tied.length);
@@ -105,8 +106,8 @@ function bear(point: Point2, beams: ReadonlyArray<BeamLoads>, permanent: number,
 function rasterCells(surface: Surface): { centres: Point2[]; area: number } {
   const xs = surface.polygon.map((point) => point[0]);
   const ys = surface.polygon.map((point) => point[1]);
-  const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
-  const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+  const [minX, maxX] = [minOf(xs), maxOf(xs)];
+  const [minY, maxY] = [minOf(ys), maxOf(ys)];
   const cell = clamp(Math.sqrt(((maxX - minX) * (maxY - minY)) / 40000), 25, 200);
   const centres: Point2[] = [];
   for (let x = minX + cell / 2; x < maxX; x += cell) {

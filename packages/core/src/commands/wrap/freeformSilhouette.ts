@@ -18,6 +18,7 @@ import { evaluateSurface, surfaceDerivatives, surfaceDomain } from '../../lib/nu
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import type { SolidSession } from './faceSession';
 import type { SilhouetteCurve } from './silhouetteCurve';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Cells per side of the sampling grid over the parameter box of a freeform face (reported as data.silhouette.grid). */
 export const FREEFORM_GRID = 48;
@@ -202,7 +203,7 @@ export function freeformContours(
   if (values.every((g) => Math.abs(g) < EDGE_ON)) return { curves: [], onEdge: false, edgeOn: true };
   const positive = (g: number): boolean => g >= 0;
   if (values.every(positive) || values.every((g) => !positive(g))) {
-    return Math.min(...values.map(Math.abs)) < TANGENTIAL
+    return minOf(values.map(Math.abs)) < TANGENTIAL
       ? `the face is seen almost tangentially (|n . d| is under ${TANGENTIAL} without changing sign): the contour would be a double root that cannot be traced; turn the direction a little`
       : { curves: [], onEdge: false, edgeOn: false };
   }
@@ -304,7 +305,7 @@ export function freeformContours(
       const ds = surfaceDerivatives(surface, uv[0], uv[1], 1);
       return Math.hypot(len3((ds[1] as Vec3[])[0] as Vec3), len3((ds[0] as Vec3[])[1] as Vec3));
     });
-    const speed = Math.max(...speeds);
+    const speed = maxOf(speeds);
     if (!Number.isFinite(speed)) return lost;
     const parametric = fitSamples(
       (s) => {
@@ -377,7 +378,7 @@ export function freeformContours(
       const { fu, fv, length } = field([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]);
       gradients.push((Math.hypot(fu, fv) * cell) / length);
     }
-    if (Math.min(...gradients) < GRADIENT_FLOOR * Math.max(...gradients) || Math.min(...gradients) < GRADIENT_ABSOLUTE)
+    if (minOf(gradients) < GRADIENT_FLOOR * maxOf(gradients) || minOf(gradients) < GRADIENT_ABSOLUTE)
       return 'the contour has a cusp or is tangential to the view somewhere (the gradient of n . d vanishes along it): turn the direction a little';
     const ring = path.closed ? [...refined, refined[0] as Vec2] : refined;
     for (const run of insideRuns(ring, path.closed, inside, project)) {

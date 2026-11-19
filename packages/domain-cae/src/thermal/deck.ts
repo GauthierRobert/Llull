@@ -7,7 +7,8 @@
 import { siToSystem } from './thermalUnits';
 import { analysisInputHash } from '../hash/inputHash';
 import { ALL_NODES, type DeckContext, type DeckRefusal, type DeckSections } from '../decks/context';
-import { appendAll, linesText, num, row } from '../decks/format';
+import { appendAll } from '@lib/appendAll';
+import { linesText, num, row } from '../decks/format';
 import { absoluteZeroOf, inScale } from './quantities';
 import { temperatureConflictRefusal } from './bcConflicts';
 import { checkThermalItems } from './check';
@@ -73,10 +74,10 @@ export function thermalSections(ctx: DeckContext): DeckSections {
     lines.push(
       `*PHYSICAL CONSTANTS, ABSOLUTE ZERO=${num(absoluteZeroOf(scale))}, STEFAN BOLTZMANN=${num(siToSystem('stefanBoltzmann', stefanBoltzmannOf(thermal), ctx.unitSystem))}`,
     );
-  lines.push(...plan.timePoints);
+  appendAll(lines, plan.timePoints);
   if (thermal.initialTemperature !== undefined)
     lines.push('*INITIAL CONDITIONS, TYPE=TEMPERATURE', row(ALL_NODES, inScale(thermal.initialTemperature, scale)));
-  lines.push(...amplitudeLines(thermal));
+  appendAll(lines, amplitudeLines(thermal));
   for (const contact of Object.values(thermal.contacts)) {
     const block = contactBlocks(ctx, contact);
     if ('code' in block) return block;

@@ -2,6 +2,7 @@
 
 import type { Vec2 as Point } from '../model/vectors';
 import { pointsDiagonal } from './extent';
+import { maxOf, minOf } from './arrayExtrema';
 
 /**
  * Segments of lines at `angle` (radians), `spacing` apart, inside the region bounded by `loops` (outer boundary + holes, even-odd). Empty
@@ -21,7 +22,7 @@ export function hatchSegments(
   const toWorld = (u: number, v: number): [number, number] => [u * cos - v * sin, u * sin + v * cos];
   const local = loops.map((loop) => loop.map(toLocal));
   const vs = local.flatMap((loop) => loop.map(([, v]) => v));
-  const [low, high] = [Math.min(...vs), Math.max(...vs)];
+  const [low, high] = [minOf(vs), maxOf(vs)];
   const segments: Array<[[number, number], [number, number]]> = [];
   const epsilon = 1e-9 * (high - low) + 1e-12;
   const onEdge = (v: number): boolean =>

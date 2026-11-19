@@ -7,6 +7,8 @@ import { type FrameTable, baseFrameAt, buildBaseTable, frameCurvatures, projectO
 import { type LocalFrame, toLocal } from '../../geometry/deform/frame';
 import { dot3, len3, sub3 } from '../../lib/vec3';
 import type { Refusal } from './target';
+import { maxOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 /** A curve (world poles) in the local coordinates of `frame`; an affine map of the poles maps the NURBS (weights are kept). */
 export const curveToLocal = (curve: NurbsCurveData, frame: LocalFrame): NurbsCurveData => ({
@@ -17,7 +19,7 @@ export const curveToLocal = (curve: NurbsCurveData, frame: LocalFrame): NurbsCur
 /** Whether the curve is a straight line along the frame axis, running toward +z (the default base: the flow then ignores it). */
 function straightOnAxis(curve: NurbsCurveData): { readonly first: number; readonly last: number } | null {
   const poles = curve.poles as ReadonlyArray<Vec3>;
-  const scale = Math.max(...poles.map((pole) => len3(pole)), 1);
+  const scale = Math.max(maxOf(poles.map((pole) => len3(pole))), 1);
   const onAxis = poles.every((pole) => Math.abs(pole[0]) <= 1e-9 * scale && Math.abs(pole[1]) <= 1e-9 * scale);
   const rising = poles.every((pole, k) => k === 0 || pole[2] >= (poles[k - 1] as Vec3)[2]);
   const first = (poles[0] as Vec3)[2];
@@ -57,7 +59,7 @@ export function resolveBase(
 ): ResolvedBase | Refusal {
   const samples: number[] = [];
   for (let i = 0; i + 2 < positions.length; i += 3)
-    samples.push(...toLocal(frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]));
+    appendAll(samples, toLocal(frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]));
   const short = (what: string): Refusal => ({ code: 'DEF_BASE_CURVE_SHORT', message: what, paths: ['params.baseCurve'] });
   const slack = Math.max(options.tolerance, 1e-6);
   const straight = straightOnAxis(curve);

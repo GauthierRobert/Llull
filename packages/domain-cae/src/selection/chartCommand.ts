@@ -24,6 +24,7 @@ import { layupSchema, resolveCandidateProperty } from './layups';
 import type { ResolveOptions } from './properties';
 import { INDEX_CASES, type Excluded, type IndexCase, type PropertyUse } from './types';
 import { pow } from '@lib/pow';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const COMMAND = 'material_chart_data';
 
@@ -197,7 +198,7 @@ export const materialChartData = defineCommand({
         .sort((a, b) => b.index - a.index || a.material.localeCompare(b.material));
       const best = scored[0];
       const xs = points.map((point) => point.x);
-      const [low, high] = [Math.min(...xs), Math.max(...xs)];
+      const [low, high] = [minOf(xs), maxOf(xs)];
       return {
         case: guide,
         slope: exponent.den / exponent.num,

@@ -10,6 +10,7 @@ import type { Vec2 } from '@core/model/vectors';
 import { reverseChain, sampleProfile } from '@core/geometry/curveSegments';
 import type { HeadShape } from './heads';
 import type { VesselGeometry } from './vesselFrame';
+import { appendAll } from '@lib/appendAll';
 
 type Curves = CurveSegment<Vec2>[];
 
@@ -148,13 +149,13 @@ export function vesselBand(geometry: VesselGeometry, firstTangent: number): Prof
   const apexOuterSecond = atSecond(endOf(outerSecond));
   const apexInnerSecond = atSecond(endOf(innerSecond));
   const apexInnerFirst = atFirst(endOf(innerFirst));
-  curves.push(
+  appendAll(curves, [
     ...line(apexOuterSecond, apexInnerSecond),
     ...mapCurves(reverseChain(innerSecond), atSecond),
     ...line([radius, secondTangent], [radius, firstTangent]),
     ...mapCurves(innerFirst, atFirst),
     ...line(apexInnerFirst, apexOuterFirst),
-  );
+  ]);
   return { curves, profile: sampleProfile(curves).map(onAxis) };
 }
 

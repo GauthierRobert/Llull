@@ -14,6 +14,8 @@ import {
 } from '../../geometry/subd/symmetry';
 import { dirRejection } from './codes';
 import { isEntity, subdivisionOf } from './shared';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 const COMMAND = 'set_cage_symmetry';
 
@@ -21,9 +23,9 @@ const COMMAND = 'set_cage_symmetry';
 function cageSize(vertices: ReadonlyArray<Vec3>): number {
   const spans = [0, 1, 2].map((axis) => {
     const values = vertices.map((p) => p[axis] as number);
-    return Math.max(...values) - Math.min(...values);
+    return maxOf(values) - minOf(values);
   });
-  return Math.hypot(...spans);
+  return hypotOf(spans);
 }
 
 /** Positions with every mirror pair of `plane` made exact (mean of the pair), and on-plane vertices projected onto the plane. */

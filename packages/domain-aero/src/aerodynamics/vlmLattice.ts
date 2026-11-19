@@ -8,6 +8,7 @@
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { add3, cross3, lerp3, scale3, sub3 } from '@lib/vec3';
+import { appendAll } from '@lib/appendAll';
 
 export interface LatticeSection {
   readonly leadingEdge: Vec3;
@@ -135,7 +136,7 @@ export function buildLattice(surfaces: readonly LatticeSurface[]): Lattice {
         for (const side of sides) {
           const m = (p: Vec3): Vec3 => [p[0], side * p[1], p[2]];
           const [pa, pb] = side === 1 ? [a, b] : [m(b), m(a)];
-          values.push(...pa, ...pb, ...m(c), normal[0], side * normal[1], normal[2]);
+          appendAll(values, [...pa, ...pb, ...m(c), normal[0], side * normal[1], normal[2]]);
           surfaceOf.push(si);
           stripOf.push(side === 1 ? j : -1 - j);
           areaOf.push(panelArea);

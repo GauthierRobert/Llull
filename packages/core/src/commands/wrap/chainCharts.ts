@@ -20,6 +20,7 @@ import { wrapRejection } from './codes';
 import type { HalfPlane } from './clipRegions';
 import { isRejection, openFace, type FaceRefInput, type FaceSession, type ResolvedChart } from './faceSession';
 import { childChart, chartCoordinates, dist2, edgeScale, straightness, type Candidate } from './chainGeometry';
+import { minOf } from '../../lib/arrayExtrema';
 
 const SAMPLES = 17;
 const MAX_CHAIN_FACES = 16;
@@ -212,7 +213,7 @@ function crossingScore(env: JoinEnv, candidate: Placement): number | null {
   const probes = env.sketch.length > 0 ? env.sketch.flat() : [candidate.parent.chart.anchorChart];
   const mine = probes.filter((p) => keptByClips(candidate.parent.clips, p));
   const crossing = mine.some((p) => sideOfLine(first, last, p) > 0) && mine.some((p) => sideOfLine(first, last, p) < 0);
-  const near = Math.min(...probes.flatMap((p) => flat.map((c) => dist2(c, p))));
+  const near = minOf(probes.flatMap((p) => flat.map((c) => dist2(c, p))));
   return (crossing ? 0 : 1e9) + near;
 }
 
@@ -246,7 +247,7 @@ function edgeWindow(env: JoinEnv, join: Join, child: FaceSession): EdgeWindow | 
   };
   // the window is seeded where the sketch comes nearest the edge (its crossing), else nearest the chart anchor
   const targets = env.sketch.length > 0 ? env.sketch.flat() : [origin];
-  const nearTarget = (c: Vec2): number => Math.min(...targets.map((p) => dist2(c, p)));
+  const nearTarget = (c: Vec2): number => minOf(targets.map((p) => dist2(c, p)));
   let seed = -1;
   for (const [k, c] of coords.entries()) if (reached(k) && (seed < 0 || nearTarget(c as Vec2) < nearTarget(coords[seed] as Vec2))) seed = k;
   // a closed edge (a meridian) has its first sample on its last: the window runs round the ring, so a seed next to the wrap gets both sides

@@ -21,6 +21,8 @@ import { checkBeam } from './runwayBeamCheck';
 import { round } from '../../shared/numeric';
 import { checkTable, failureSummary, refusedEntries } from '../reports/checkReport';
 import { existingLevelIdParam } from '../../building/levelParams';
+import { minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * @affects none; data = { rows: RunwayCheckRow[], csv, maxUtilisation, failures, refused }
@@ -132,7 +134,7 @@ export const runwayCheck = defineCommand({
             Math.abs(mm(other.start[0] - beam.start[0])) > 1000,
         )
         .map((other) => Math.abs(mm(other.start[0] - beam.start[0])));
-      return distances.length > 0 ? Math.min(...distances) : DEFAULT_CRANE_SPAN;
+      return distances.length > 0 ? minOf(distances) : DEFAULT_CRANE_SPAN;
     };
     const capacities = new Set<number>();
     let beams = 0;
@@ -160,7 +162,7 @@ export const runwayCheck = defineCommand({
       if (beamRows.length === 0) continue;
       beams += 1;
       capacities.add(capacity);
-      rows.push(...beamRows);
+      appendAll(rows, beamRows);
     }
     const { csv, failures, refused, worst } = checkTable(
       rows,

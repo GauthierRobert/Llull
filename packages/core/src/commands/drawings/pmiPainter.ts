@@ -26,6 +26,7 @@ import { dot3 } from '../../lib/vec3';
 import { characteristicBalloon } from './characteristicBalloon';
 import { viewSolids } from './viewDrawing';
 import { primaryFeature } from '../pmi/refresh';
+import { appendAll } from '../../lib/appendAll';
 
 const TEXT = 3.5;
 const FRAME = 2 * TEXT;
@@ -147,21 +148,24 @@ function paintFcf(item: GeometricTolerancePmi, x: number, y: number): Painted {
   }));
   const total = FRAME + zoneWidth + datumLabels.reduce((sum, d) => sum + d.width, 0);
   parts.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(total)}" height="${n(FRAME)}" class="thin"/>`);
-  parts.push(...strokes(characteristicGlyph(item.characteristic), x + FRAME * 0.15, y + FRAME * 0.15, FRAME * 0.7));
+  appendAll(parts, strokes(characteristicGlyph(item.characteristic), x + FRAME * 0.15, y + FRAME * 0.15, FRAME * 0.7));
   let cursor = x + FRAME;
   parts.push(svgLine([cursor, y], [cursor, y + FRAME], 'thin'));
   let at = cursor + 0.5;
   for (const part of zone) {
     if (part.kind === 'text') parts.push(svgText(at, y + FRAME * 0.68, TEXT, 'start', part.text));
-    else if (part.kind === 'diameter') parts.push(...strokes(DIAMETER_GLYPH, at, y + FRAME * 0.2, FRAME * 0.6));
-    else parts.push(...ring(at, y + FRAME * 0.22, FRAME * 0.55, part.letter));
+    else if (part.kind === 'diameter') appendAll(parts, strokes(DIAMETER_GLYPH, at, y + FRAME * 0.2, FRAME * 0.6));
+    else appendAll(parts, ring(at, y + FRAME * 0.22, FRAME * 0.55, part.letter));
     at += partWidth(part);
   }
   cursor += zoneWidth;
   for (const { datum, width } of datumLabels) {
     parts.push(svgLine([cursor, y], [cursor, y + FRAME], 'thin'), svgText(cursor + 1, y + FRAME * 0.68, TEXT, 'start', datum.label));
     if (datum.boundary !== undefined)
-      parts.push(...ring(cursor + 1 + textWidth(datum.label) + 0.5, y + FRAME * 0.22, FRAME * 0.55, datum.boundary === 'MMB' ? 'M' : 'L'));
+      appendAll(
+        parts,
+        ring(cursor + 1 + textWidth(datum.label) + 0.5, y + FRAME * 0.22, FRAME * 0.55, datum.boundary === 'MMB' ? 'M' : 'L'),
+      );
     cursor += width;
   }
   return { parts, box: [x, y, total, FRAME], anchor: [x, y + FRAME / 2] };

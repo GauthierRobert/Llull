@@ -7,6 +7,7 @@ import type { StaCode } from '../codes';
 import { ruleById, type AccessRule, type RulesetName } from '../rules/ruleTable';
 import { stairGeometryMm } from '../stair/steelStairMeasure';
 import { breachFinding, type Finding } from './finding';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Stair quantities in mm / degrees. */
 interface StairMeasures {
@@ -37,7 +38,7 @@ export function stairMeasures(doc: CadDocument, stair: StairElement): StairMeasu
 function steelStairMeasures(doc: CadDocument, stair: SteelStairElement): StairMeasures {
   const geometry = stairGeometryMm(doc, stair);
   const cuts = [0, ...stair.landings.map((landing) => landing.afterRiser), stair.riserCount];
-  const longestFlight = Math.max(...cuts.slice(1).map((cut, index) => cut - (cuts[index] as number)));
+  const longestFlight = maxOf(cuts.slice(1).map((cut, index) => cut - (cuts[index] as number)));
   return {
     riser: geometry.riser,
     going: geometry.going,

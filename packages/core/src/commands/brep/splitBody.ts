@@ -66,7 +66,7 @@ function splitAlong(
   if ('summary' in validation) return validation;
   const { entity } = validation;
   if (!kernel) return noop(doc, kernelUnavailable('split_body'));
-  if (Math.hypot(...normal) === 0) return fail('plane.normal must be non-zero');
+  if (Math.hypot(normal[0], normal[1], normal[2]) === 0) return fail('plane.normal must be non-zero');
   const n = normalize3(normal);
   const source = operandRecipe(kernel, entity);
   const shape = kernel.evaluate(source);

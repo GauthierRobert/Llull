@@ -7,6 +7,7 @@
 import type { MeshData } from '../../model/types';
 import { tupleExtent } from '../../lib/extent';
 import { NumberIds, TripleSet } from './clusterTables';
+import { maxOf } from '../../lib/arrayExtrema';
 
 function cluster(mesh: MeshData, cell: number, origin: readonly number[], cells: readonly number[]): MeshData {
   const vertexCount = mesh.positions.length / 3;
@@ -51,7 +52,7 @@ export function lodMesh(mesh: MeshData, target: number): MeshData {
   if (mesh.indices.length / 3 <= target) return mesh;
   const { min, max } = tupleExtent(mesh.positions, 3);
   const extent = [0, 1, 2].map((a) => (max[a] as number) - (min[a] as number));
-  const longest = Math.max(...extent, 1e-300);
+  const longest = Math.max(maxOf(extent), 1e-300);
   let cell = longest / Math.sqrt(target);
   let accepted: { mesh: MeshData; gap: number } | null = null;
   let latest = mesh;

@@ -12,6 +12,7 @@ import { exportGate } from '../../model/exportGate';
 import { markingText } from './marking';
 import { materialsInUse } from '../../model/materialsInUse';
 import { preferredConflicts } from './propertyKey';
+import { appendAll } from '../../lib/appendAll';
 
 export interface MaterialCheckItem {
   readonly code: string;
@@ -93,7 +94,7 @@ export const checkMaterials = defineCommand({
       if (doc.entities[id] === undefined)
         items.push(item('MAT_ENTITY_NOT_FOUND', 'error', [id], `no entity '${id}'`, 'use describe_scene to list the entity ids'));
     for (const [name, entities] of [...users].sort(([a], [b]) => (a < b ? -1 : 1))) {
-      items.push(...valueItems(doc, name, entities));
+      appendAll(items, valueItems(doc, name, entities));
       const record = doc.materials[name]?.record;
       if (record?.superseded !== undefined)
         items.push(

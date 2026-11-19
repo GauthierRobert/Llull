@@ -5,6 +5,8 @@ import { fromMm, toMetres, toMm } from '@core/model/units';
 import { STEEL_DENSITY_KG_PER_M3, findProfile, type SteelProfile } from '../../../steel/profiles';
 import type { RailingElement } from '@aec/building/types';
 import { layoutRailing, type RailRun, type RailingLayout } from './railingLayout';
+import { hypotOf } from '@lib/hypotOf';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Toe plates are flat bars of this thickness, mm. */
 export const TOE_PLATE_THICKNESS_MM = 5;
@@ -60,7 +62,7 @@ export function railingQuantities(doc: CadDocument, railing: RailingElement): Ra
   const toeKg = toeM * toePlateProfile(toMm(doc, railing.toePlate)).massPerMetre;
   const spacings = layout.posts
     .slice(1)
-    .map((point, index) => Math.hypot(...point.map((value, axis) => value - (layout.posts[index]?.[axis] ?? 0))));
+    .map((point, index) => hypotOf(point.map((value, axis) => value - (layout.posts[index]?.[axis] ?? 0))));
   return {
     layout,
     lengthM: layout.length * metres,
@@ -74,6 +76,6 @@ export function railingQuantities(doc: CadDocument, railing: RailingElement): Ra
     toeKg,
     steelKg: postKg + railKg + toeKg,
     clearGapMm: toMm(doc, layout.clearGap),
-    postSpacingMm: toMm(doc, Math.max(0, ...spacings)),
+    postSpacingMm: toMm(doc, Math.max(0, maxOf(spacings))),
   };
 }

@@ -11,6 +11,8 @@ import { curveDomain } from '../../lib/nurbs/evaluate';
 import { surfaceSample } from '../../lib/nurbs/surfaceCurvature';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 export type SurfaceMapMode = 'gaussian' | 'mean' | 'zebra' | 'draft';
 
@@ -34,11 +36,9 @@ export function curveComb(curve: NurbsCurveData, count: number, scale: number | 
   const planeNormal = planeNormalOf(curve);
   const samples = Array.from({ length: count }, (_, k) => curvatureAt(curve, first + ((last - first) * k) / (count - 1), planeNormal));
   const live = samples.filter((sample) => !sample.degenerate);
-  const maxCurvature = Math.max(0, ...live.map((sample) => sample.curvature));
+  const maxCurvature = Math.max(0, maxOf(live.map((sample) => sample.curvature)));
   const extent = Math.max(
-    ...[0, 1, 2].map(
-      (axis) => Math.max(...curve.poles.map((p) => p[axis] as number)) - Math.min(...curve.poles.map((p) => p[axis] as number)),
-    ),
+    maxOf([0, 1, 2].map((axis) => maxOf(curve.poles.map((p) => p[axis] as number)) - minOf(curve.poles.map((p) => p[axis] as number)))),
     1e-12,
   );
   const length = scale ?? (maxCurvature > 0 ? (fraction * extent) / maxCurvature : 0);
@@ -46,8 +46,8 @@ export function curveComb(curve: NurbsCurveData, count: number, scale: number | 
   const envelope: number[] = [];
   for (const sample of live) {
     const tip = sub3(sample.point, scale3(sample.normal, sample.curvature * length));
-    teeth.push(...sample.point, ...tip);
-    envelope.push(...tip);
+    appendAll(teeth, [...sample.point, ...tip]);
+    appendAll(envelope, tip);
   }
   return { teeth, envelope, maxCurvature };
 }
@@ -98,7 +98,7 @@ export function surfaceMapColors(
   options: SurfaceMapOptions = {},
 ): number[] {
   const values = uv.map(([u, v]) => scalarAt(surface, u, v, mode, options));
-  const largest = Math.max(1e-300, ...values.map((value) => Math.abs(value ?? 0)));
+  const largest = Math.max(1e-300, maxOf(values.map((value) => Math.abs(value ?? 0))));
   const stripes = Math.max(1, options.stripes ?? 12);
   return values.flatMap((value): number[] => {
     if (value === null) return [0.6, 0.6, 0.6];

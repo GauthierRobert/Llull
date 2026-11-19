@@ -22,6 +22,7 @@ import { type PlantIfcRun, addPlantPsets, elementTag, equipmentProduct } from '.
 import { type PlantSpatial, containerOf } from './ifcPlantHierarchy';
 import { equipmentProperties, exportEquipmentPorts, parametricBody } from './ifcEquipmentExport';
 import { type PortState, exportPipeProducts } from './ifcPorts';
+import { appendAll } from '@lib/appendAll';
 
 export type LevelElement = Extract<BuildingElement, { levelId: string }>;
 
@@ -107,7 +108,7 @@ export function exportElement(
 export function appendTo(lists: Map<string, string[]>, key: string, refs: readonly string[]): void {
   const list = lists.get(key);
   if (list === undefined) lists.set(key, [...refs]);
-  else list.push(...refs);
+  else appendAll(list, refs);
 }
 
 /** Spatial element of the plant node an object sits in (IFC4X3_ADD2 with the hierarchy option), else no entry. */

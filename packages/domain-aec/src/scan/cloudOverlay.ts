@@ -13,6 +13,7 @@ import { classColour, grey, rgbColour, viridis } from './cloudColour';
 import { applyPoint } from './mat4';
 import { cloudsOf, scanOf, vecFromM } from './model';
 import type { CloudReference, CropBox } from './types';
+import { appendAll } from '@lib/appendAll';
 
 type Colour = 'elevation' | 'rgb' | 'intensity' | 'classification';
 
@@ -203,11 +204,11 @@ export const cloudOverlay: RenderOverlay = {
       drawn += marks;
       if (marks > 0) {
         drawnIds.push(set.cloud.id);
-        svg.push(
+        appendAll(svg, [
           `  <g class="cloud-overlay" data-cloud="${set.cloud.id}" fill="none" stroke-width="${size}" stroke-linecap="round" opacity="${view.dim === true ? 0.3 : 0.9}">`,
           ...[...buckets.keys()].sort().map((key) => `    <path stroke="${key}" d="${(buckets.get(key) ?? []).join('')}"/>`),
           '  </g>',
-        );
+        ]);
       }
       report.push({
         cloudId: set.cloud.id,

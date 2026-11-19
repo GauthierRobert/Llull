@@ -7,6 +7,8 @@ import { commentText } from '../decks/format';
 import { modeSet, modeSets } from '../results/modeSets';
 import { fetchArtifact } from '../shared/trust';
 import { imperfectionsOf } from './imperfectionShape';
+import { hypotOf } from '@lib/hypotOf';
+import { appendAll } from '@lib/appendAll';
 
 /** Element i of a numeric array; 0 for an index past the end (noUncheckedIndexedAccess identity, never an engineering default). */
 const at = (values: ArrayLike<number>, index: number): number => values[index] ?? 0;
@@ -29,7 +31,7 @@ function meshSize(mesh: FeMeshArtifact): number {
       lows[axis] = Math.min(lows[axis] ?? value, value);
       highs[axis] = Math.max(highs[axis] ?? value, value);
     }
-  return Math.hypot(...highs.map((high, axis) => high - (lows[axis] ?? high)));
+  return hypotOf(highs.map((high, axis) => high - (lows[axis] ?? high)));
 }
 
 /** Refusal when `source` is not node-for-node the mesh of the deck (same ids, coordinates within SAME_NODE_FRACTION of the mesh size). */
@@ -136,10 +138,10 @@ export function imperfectNodes(ctx: DeckContext): { readonly nodes: readonly Nod
     const peaks = addOffsets(ctx, imperfection, offsets);
     if (!Array.isArray(peaks)) return peaks;
     const modes = imperfection.modes.map(({ mode, amplitude }) => `mode ${mode} x ${amplitude}`).join(' + ');
-    comments.push(
+    appendAll(comments, [
       `** imperfection ${commentText(imperfection.id)}: ${modes} (document length units) from ${commentText(imperfection.fromAnalysisId)} results ${imperfection.sourceResultsHash.slice(0, 12)}; amplitude source ${commentText(imperfection.amplitudeSource, 120)}`,
       ...peaks.map((peak) => `** imperfection ${commentText(imperfection.id)} ${peak} (document length units, sign of the mode as solved)`),
-    );
+    ]);
   }
   const nodes = ctx.mesh.nodes.map((node): Node => {
     const offset = offsets.get(node[0]) ?? [0, 0, 0];

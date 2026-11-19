@@ -8,6 +8,8 @@ import { camFollower } from './camProfile';
 import { clampToLimit, jointValues, violatedLimit } from './jointValues';
 import { solveLoop } from './loopSolver';
 import { REST, compose, jointMotion, moveBy, unitAxis, type RigidMotion } from './rigidMotion';
+import { maxOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Joint ids ordered driver before driven; joints on a drive cycle are omitted. */
 function driveOrder(driveRelations: Record<string, DriveRelation>): string[] {
@@ -187,7 +189,7 @@ function closeLoops(
 ): { values: Record<string, number[]>; loop: LoopReport } {
   const points = [...plan.tree, ...plan.closing].flatMap((joint) => [frames.pivot(joint), frames.position(joint.b.instanceId)]);
   const first = points[0] ?? [0, 0, 0];
-  const extent = Math.max(0, ...points.map((p) => Math.hypot(p[0] - first[0], p[1] - first[1], p[2] - first[2])));
+  const extent = Math.max(0, maxOf(points.map((p) => Math.hypot(p[0] - first[0], p[1] - first[1], p[2] - first[2]))));
   const scale = extent > 0 ? extent : 1;
   const passive = [...plan.tree, ...plan.closing].filter((joint) => joint.passive === true && JOINT_DOF[joint.kind].length > 0);
   const assemble = (x: readonly number[]): Record<string, number[]> => {
@@ -208,7 +210,7 @@ function closeLoops(
   const closed = (x: number[]): Record<string, number[]> =>
     Object.fromEntries(passive.map((joint) => [joint.id, assemble(x)[joint.id] ?? []]));
   if (passive.length === 0) {
-    const residual = Math.hypot(...pose(plan, values, frames, scale).residual);
+    const residual = hypotOf(pose(plan, values, frames, scale).residual);
     const ok = residual <= 1e-9 * scale;
     const message = ok
       ? 'loop closes at the given joint values'

@@ -1,10 +1,11 @@
 /** Numeric inspector of an indexed triangle mesh (07 MSH FR-MSH-03): counts, topology, shells, loops, orientation, area, volume, quality, self-intersections. */
 
 import type { Vec3 } from '../../model/vectors';
-import { cross3, dot3, sub3 } from '../../lib/vec3';
+import { cross3, dot3, hypot3, sub3 } from '../../lib/vec3';
 import { findSelfIntersections } from './selfIntersection';
 import { buildTopology } from './topology';
 import { meshDiagonal } from './weld';
+import { maxOf } from '../../lib/arrayExtrema';
 
 interface LoopSummary {
   readonly edges: number;
@@ -70,11 +71,11 @@ interface FaceMetrics {
 function faceMetrics(corner: (i: number) => Vec3, a: number, b: number, c: number): FaceMetrics {
   const [pa, pb, pc] = [corner(a), corner(b), corner(c)];
   const normal = cross3(sub3(pb, pa), sub3(pc, pa));
-  const area = Math.hypot(...normal) / 2;
-  const edges: [number, number, number] = [Math.hypot(...sub3(pb, pa)), Math.hypot(...sub3(pc, pb)), Math.hypot(...sub3(pa, pc))];
+  const area = Math.hypot(normal[0], normal[1], normal[2]) / 2;
+  const edges: [number, number, number] = [hypot3(sub3(pb, pa)), hypot3(sub3(pc, pb)), hypot3(sub3(pa, pc))];
   const perimeter = edges[0] + edges[1] + edges[2];
   const inradius = perimeter > 0 ? (2 * area) / perimeter : 0;
-  const longest = Math.max(...edges);
+  const longest = maxOf(edges);
   const angle = (adjacent1: number, adjacent2: number, opposite: number): number =>
     adjacent1 * adjacent2 > 0
       ? Math.acos(Math.max(-1, Math.min(1, (adjacent1 ** 2 + adjacent2 ** 2 - opposite ** 2) / (2 * adjacent1 * adjacent2))))
@@ -184,7 +185,7 @@ export function analyzeIndexedMesh(
     boundaryLoopCount: topology.loops.length,
     boundaryLoops: topology.loops.slice(0, options.maxListed).map(({ vertices }) => {
       const points = vertices.map(corner);
-      const length = points.reduce((sum, p, k) => sum + Math.hypot(...sub3(points[(k + 1) % points.length] as Vec3, p)), 0);
+      const length = points.reduce((sum, p, k) => sum + hypot3(sub3(points[(k + 1) % points.length] as Vec3, p)), 0);
       const sum = points.reduce<Vec3>((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0]);
       return { edges: vertices.length, length, centroid: [sum[0] / points.length, sum[1] / points.length, sum[2] / points.length] };
     }),

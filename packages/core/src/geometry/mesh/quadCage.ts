@@ -6,6 +6,8 @@
 import type { MeshData } from '../../model/types';
 import { SurfaceIndex } from './surfaceIndex';
 import type { Vec3 } from '../../model/vectors';
+import { hypotOf } from '../../lib/hypotOf';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const at = (positions: ReadonlyArray<number>, index: number): Vec3 => [
   positions[3 * index] as number,
@@ -278,7 +280,7 @@ function boxOf(values: ReadonlyArray<number>): { low: number[]; high: number[]; 
     low[i % 3] = Math.min(low[i % 3] as number, v);
     high[i % 3] = Math.max(high[i % 3] as number, v);
   });
-  return { low, high, diagonal: values.length === 0 ? 0 : Math.hypot(...[0, 1, 2].map((k) => (high[k] as number) - (low[k] as number))) };
+  return { low, high, diagonal: values.length === 0 ? 0 : hypotOf([0, 1, 2].map((k) => (high[k] as number) - (low[k] as number))) };
 }
 
 /**
@@ -288,8 +290,8 @@ function boxOf(values: ReadonlyArray<number>): { low: number[]; high: number[]; 
  */
 export function resultBoxProblem(positions: ReadonlyArray<number>, source: MeshData): string | null {
   const [result, original] = [boxOf(positions), boxOf(source.positions)];
-  const growth = Math.max(
-    ...[0, 1, 2].flatMap((k) => [
+  const growth = maxOf(
+    [0, 1, 2].flatMap((k) => [
       (original.low[k] as number) - (result.low[k] as number),
       (result.high[k] as number) - (original.high[k] as number),
     ]),

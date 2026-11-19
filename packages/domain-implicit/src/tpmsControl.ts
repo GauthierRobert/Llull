@@ -10,6 +10,7 @@ import type { Vec3 } from '@core/model/types';
 import { worldFrame } from './frame';
 import type { TpmsControl, TpmsKind } from './model';
 import { TPMS_FACTS, rectangularCoordinates, tpmsRegisters } from './tpms';
+import { minOf } from '@lib/arrayExtrema';
 
 const CELL_SAMPLES = 2 ** 18;
 
@@ -28,7 +29,7 @@ export function controlInterval(request: ControlRequest): {
 } {
   const range = TPMS_FACTS[request.kind].range;
   if (request.form === 'network') return { low: -range, high: range, name: 'level' };
-  return { low: 0, high: request.normalize === 'gradient' ? Math.min(...request.cellSize) / 2 : range, name: 'thickness' };
+  return { low: 0, high: request.normalize === 'gradient' ? minOf(request.cellSize) / 2 : range, name: 'thickness' };
 }
 
 /** Resolved control of `target` (relative density of the solid in one cell), or the reason it is unreachable. */

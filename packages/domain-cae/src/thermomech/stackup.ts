@@ -13,6 +13,7 @@ import { toleranceBasis } from '@core/geometry/pmiText';
 import { type StackContributor, contributions, rssHalf, worstCaseHalf } from '@lib/stackup';
 import { remediationOf } from './refusal';
 import { temperatureIn } from './units';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const FORMULA = 'D_i(T) = D_i,spec (1 + a_sec,i (T - T_spec)); gap(T) = sum_i s_i D_i(T)';
 const MAX_CONTRIBUTORS = 50;
@@ -353,7 +354,7 @@ export const stackupAtTemperature = defineCommand({
     const gap = (value: number): string => value.toPrecision(6);
     const summary =
       `stackup_at_temperature: ${evaluated.length} contributor(s), ${rows.length} temperature(s); at spec the gap is ${gap(base.row.mean)} ${doc.units} (worst case ${gap(base.row.worstCase.min)} … ${gap(base.row.worstCase.max)}); ` +
-      `mean gap ${gap(Math.min(...rows.map((row) => row.mean)))} … ${gap(Math.max(...rows.map((row) => row.mean)))} ${doc.units} over the temperatures, worst case ${gap(Math.min(...rows.map((row) => row.worstCase.min)))} … ${gap(Math.max(...rows.map((row) => row.worstCase.max)))}; ` +
+      `mean gap ${gap(minOf(rows.map((row) => row.mean)))} … ${gap(maxOf(rows.map((row) => row.mean)))} ${doc.units} over the temperatures, worst case ${gap(minOf(rows.map((row) => row.worstCase.min)))} … ${gap(maxOf(rows.map((row) => row.worstCase.max)))}; ` +
       `${flagged.length === 0 ? (lowerSpecLimit === undefined && upperSpecLimit === undefined ? 'no spec limit given' : 'no row violates the spec limits') : `${flagged.length} row(s) flagged ${[...new Set(flagged.map((row) => row.code))].join(', ')} (pending human disposition)`}` +
       `${rows.some((row) => row.unverified) ? '; unverified inputs' : ''}; every row needs review by a qualified engineer.`;
     return report(doc, summary, {

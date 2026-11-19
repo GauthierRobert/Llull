@@ -19,6 +19,9 @@ import { type CellMap, type FieldNode, type StrutsNode, type TpmsNode, fieldOf }
 import { surfaceMapOf } from './surfaceMap';
 import { KNOWN_CLASS, strutGeometry } from './struts';
 import { TPMS_FACTS } from './tpms';
+import { appendAll } from '@lib/appendAll';
+import { hypotOf } from '@lib/hypotOf';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 type Box = { readonly min: Vec3; readonly max: Vec3 };
 
@@ -40,18 +43,18 @@ function regionRadii(
             (box.min[axis] as number) + ((([i, j, k][axis] as number) + 0.5) / n) * ((box.max[axis] as number) - (box.min[axis] as number)),
         ) as unknown as Vec3;
         spots.push(p);
-        points.push(...p);
+        appendAll(points, p);
       }
   const answer = region === null ? null : engine.evaluate(region, Float64Array.from(points), false);
   if (answer?.failure !== undefined) return null;
   const values = answer === null ? null : answer.values;
-  const length = map.kind === 'cylindrical' ? Math.hypot(...map.axis) : 1;
+  const length = map.kind === 'cylindrical' ? Math.hypot(map.axis[0], map.axis[1], map.axis[2]) : 1;
   return spots.flatMap((p, index) => {
     if (values !== null && (values[index] as number) > 0) return [];
     const d = [p[0] - map.origin[0], p[1] - map.origin[1], p[2] - map.origin[2]];
-    if (map.kind === 'spherical') return [Math.hypot(...d)];
+    if (map.kind === 'spherical') return [hypotOf(d)];
     const along = ((d[0] as number) * map.axis[0] + (d[1] as number) * map.axis[1] + (d[2] as number) * map.axis[2]) / length;
-    return [Math.sqrt(Math.max(Math.hypot(...d) ** 2 - along ** 2, 0))];
+    return [Math.sqrt(Math.max(hypotOf(d) ** 2 - along ** 2, 0))];
   });
 }
 
@@ -75,8 +78,8 @@ function mapStretch(
     map.kind === 'cylindrical'
       ? [(2 * Math.PI * rho) / map.cellsAround, node.cellSize[2], map.radialCellSize]
       : [(2 * Math.PI * rho) / map.cellsAround, (Math.PI * rho) / map.cellsPolar, map.radialCellSize];
-  const aspects = [Math.min(...radii), Math.max(...radii)].map((rho) => Math.max(...sizes(rho)) / Math.min(...sizes(rho)));
-  return { min: Math.min(...aspects), max: Math.max(...aspects) };
+  const aspects = [minOf(radii), maxOf(radii)].map((rho) => maxOf(sizes(rho)) / minOf(sizes(rho)));
+  return { min: minOf(aspects), max: maxOf(aspects) };
 }
 
 interface Lattice {
@@ -117,7 +120,7 @@ function describeLattice(
   const measured = table === null ? measuredSpecificSurface(engine, nodalSurfaceProgram(node), node.cellSize, 48) : null;
   const surface =
     table !== null
-      ? { perVolume: (table * Math.min(...node.cellSize) ** 2) / volume, source: `reference table, a = 1: ${table}` }
+      ? { perVolume: (table * minOf(node.cellSize) ** 2) / volume, source: `reference table, a = 1: ${table}` }
       : { perVolume: measured ?? NaN, source: 'measured: mesh area of the nodal surface of one cell at 48 voxels per edge' };
   const phases = cellProgram.ok ? cellPhaseMeasures(engine, cellProgram.program, node, resolution) : null;
   const facts = tpmsFacts(node, value, surface, phases);
@@ -208,7 +211,7 @@ export const latticeProperties = defineCommand({
       max: [node.origin[0] + node.cellSize[0], node.origin[1] + node.cellSize[1], node.origin[2] + node.cellSize[2]],
     };
     const samples = Math.min(128, Math.max(16, Math.round(resolution)));
-    const voxel = Math.min(...node.cellSize) / samples;
+    const voxel = minOf(node.cellSize) / samples;
     const measured = cellProgram.ok
       ? quadratureVolume(engine, cellProgram.program, null, cellBox, voxel)
       : { code: cellProgram.code, message: cellProgram.message };

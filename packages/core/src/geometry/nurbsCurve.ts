@@ -3,6 +3,7 @@
 import type { Vec3 } from '../model/vectors';
 import { curveDerivatives } from '../lib/nurbs/evaluate';
 import type { NurbsCurveData } from '../lib/nurbs/types';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 /** Most points a display polyline of one curve may hold. */
 const MAX_DISPLAY_POINTS = 2_000;
@@ -30,7 +31,7 @@ export function curveDisplayPoints(curve: NurbsCurveData): Vec3[] {
 export function poleExtent(curve: NurbsCurveData): { min: Vec3; max: Vec3 } {
   const axis = (index: 0 | 1 | 2): readonly [number, number] => {
     const values = curve.poles.map((pole) => pole[index]);
-    return [Math.min(...values), Math.max(...values)];
+    return [minOf(values), maxOf(values)];
   };
   const [x, y, z] = [axis(0), axis(1), axis(2)];
   return { min: [x[0], y[0], z[0]], max: [x[1], y[1], z[1]] };

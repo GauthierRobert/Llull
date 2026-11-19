@@ -19,6 +19,8 @@ import { DENSE_MAX_UNKNOWNS, type Sample, type SparseRow, gaussSolve, solveDense
 import { surfaceEvaluator } from './limit';
 import { edgeKey } from './edgeKey';
 import { buildTopology } from './topology';
+import { maxOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Pole indices (i * 4 + j) of side `k` of a patch: the boundary poles `b[m]` and the row next to them `r[m]`, m = 0..3 along the side (directed v_k -> v_k+1). */
 function sidePoles(k: number): { b: number[]; r: number[] } {
@@ -300,7 +302,7 @@ function solveAssembly(
         : solveSparse(sparse, targets, initial, options.sparseObjective === 'start' ? [] : samples, options.maxWork);
     options.onGroup?.({ rows: sparse, targets, start: initial, samples, x: solution.x, scale });
     const residual = Math.max(solution.residual, stuck) / scale;
-    const endMisfit = Math.max(0, ...faces.map((f) => assembly.endMisfit.get(f) ?? 0));
+    const endMisfit = Math.max(0, maxOf(faces.map((f) => assembly.endMisfit.get(f) ?? 0)));
     const consistent = !broken && solution.status === 'ok' && residual < CONSISTENT;
     const reason = consistent ? 'solved' : broken ? 'degenerate edge' : solution.status === 'budget' ? 'work budget' : 'contradiction';
     if (consistent)
@@ -346,7 +348,7 @@ export function solveExactG1(
     low = low.map((l, k) => Math.min(l, p[k] as number));
     high = high.map((h, k) => Math.max(h, p[k] as number));
   }
-  const scale = Math.max(Math.hypot(...high.map((h, k) => h - (low[k] as number))), 1e-300);
+  const scale = Math.max(hypotOf(high.map((h, k) => h - (low[k] as number))), 1e-300);
   const evaluate = surfaceEvaluator(refined);
   // the whole row of four poles next to every side on a crease edge between two quads stays where it is (its two end poles are the inner poles of the next edges): it is the cross derivative along the crease, so the crease keeps its angle along the whole edge (a boundary edge has no neighbour: nothing to keep)
   const creaseEdges = new Set(refined.creases.map(([a, b]) => edgeKey(a, b)));

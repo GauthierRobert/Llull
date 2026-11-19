@@ -9,6 +9,7 @@ import { type ReviewItem, reviewItem } from '@core/model/reviewEnvelope';
 import { elementAt } from '@lib/elementAt';
 import type { OutputDef } from './outputs';
 import type { RunData } from '../runData';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** GCI of the finest pair at or under which an output passes: 1 % of its value (TR-DRV-23). */
 const GCI_GATE = 0.01;
@@ -65,8 +66,8 @@ function valueRow(base: Base): StudyRow {
   const { values, steps } = base;
   const fine = [...values].reverse();
   const fineSteps = [...steps].reverse();
-  const scale = Math.max(...values.map(Math.abs));
-  if (Math.max(...values) - Math.min(...values) <= ROUND_OFF * Math.max(scale, Number.MIN_VALUE))
+  const scale = maxOf(values.map(Math.abs));
+  if (maxOf(values) - minOf(values) <= ROUND_OFF * Math.max(scale, Number.MIN_VALUE))
     return row(base, {
       order: null,
       orderAssumed: false,
@@ -139,7 +140,7 @@ function valueRow(base: Base): StudyRow {
  */
 function errorRow(base: Base, scale: number): StudyRow {
   const { values, steps } = base;
-  if (Math.max(...values) <= ERROR_FLOOR * scale)
+  if (maxOf(values) <= ERROR_FLOOR * scale)
     return row(base, {
       order: null,
       orderAssumed: false,

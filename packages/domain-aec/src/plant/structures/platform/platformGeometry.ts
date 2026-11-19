@@ -2,6 +2,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import { PERPENDICULAR_TOLERANCE_DEG, acrossExtent, clip } from '../grating/gratingSupports';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Default skew of a bracket from perpendicular to its panel bars: 1 deg inside the check_grating tolerance, which leaves room for the 10 mm end-cover tolerance of a wedge panel. */
 const DEFAULT_SKEW_DEG = PERPENDICULAR_TOLERANCE_DEG - 1;
@@ -27,7 +28,7 @@ export interface BeamLine {
  */
 export function framingBeams(region: ReadonlyArray<Vec2>, direction: Vec2, maxSpacingMm: number): BeamLine[] | string {
   const along = (p: Vec2): number => p[0] * direction[0] + p[1] * direction[1];
-  const [sMin, sMax] = [Math.min(...region.map(along)), Math.max(...region.map(along))];
+  const [sMin, sMax] = [minOf(region.map(along)), maxOf(region.map(along))];
   const bays = Math.max(1, Math.ceil((sMax - sMin) / maxSpacingMm - 1e-9));
   if (!(bays + 1 <= MAX_BEAMS)) return `maxSpacing gives ${bays + 1} beams (limit ${MAX_BEAMS}): check the unit and the spacing`;
   const stations = Array.from({ length: bays + 1 }, (_, index) => sMin + ((sMax - sMin) * index) / bays);

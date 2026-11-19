@@ -24,6 +24,7 @@ import { quantizedKey } from '@lib/quantize';
 import { release, withOwned } from '@core/geometry/nativeObject';
 import { toDegrees } from '@lib/angle';
 import { loadManifoldModule } from './manifoldModule';
+import { maxOf } from '@lib/arrayExtrema';
 
 // The subset of the Manifold WASM module we call (one cast at the boundary).
 interface ManifoldMesh {
@@ -235,7 +236,7 @@ const INSIDE_TOLERANCE = 1e-6;
 
 const contains = (outer: ManifoldShape, inner: ManifoldShape): boolean => {
   const [o, i] = [outer.boundingBox(), inner.boundingBox()];
-  const slack = 1e-9 * (1 + Math.max(...o.max.map(Math.abs), ...o.min.map(Math.abs)));
+  const slack = 1e-9 * (1 + Math.max(maxOf(o.max.map(Math.abs)), maxOf(o.min.map(Math.abs))));
   return [0, 1, 2].every((k) => (i.min[k] ?? 0) >= (o.min[k] ?? 0) - slack && (i.max[k] ?? 0) <= (o.max[k] ?? 0) + slack);
 };
 

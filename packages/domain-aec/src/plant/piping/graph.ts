@@ -16,6 +16,7 @@ import { isFailure, type DerivationFailure, type RunDerivation } from './deriveT
 import { getPiping } from './model';
 import { deriveRun } from './routeParts';
 import { connectedRuns } from './runLinks';
+import { appendAll } from '@lib/appendAll';
 
 export interface GraphRun {
   readonly runId: string;
@@ -160,7 +161,7 @@ export function buildGraph(doc: CadDocument, runs: readonly GraphRun[]): RunGrap
     const [x, y, z] = record.port.position.map(cellOf) as [number, number, number];
     const found: PortRecord[] = [];
     for (let dx = -1; dx <= 1; dx++)
-      for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) found.push(...(grid.get(`${x + dx}|${y + dy}|${z + dz}`) ?? []));
+      for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) appendAll(found, grid.get(`${x + dx}|${y + dy}|${z + dz}`) ?? []);
     return found.filter(
       (other) =>
         other !== record &&
@@ -203,7 +204,7 @@ export function buildGraph(doc: CadDocument, runs: readonly GraphRun[]): RunGrap
       connected.add(portKey(record));
       link(record.owner, other.owner, other.external ? 'attachment' : 'joint', record.port.position);
       if (other.external) attached.add(other.owner);
-      if (record.owner < other.owner || other.external) mismatches.push(...mismatchesOf(record, other));
+      if (record.owner < other.owner || other.external) appendAll(mismatches, mismatchesOf(record, other));
     }
   }
   const openEnds: OpenEnd[] = [];

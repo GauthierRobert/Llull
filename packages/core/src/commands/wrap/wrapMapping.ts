@@ -12,6 +12,7 @@ import type { FaceChart } from '../../geometry/chartFrame';
 import type { UvLoop, UvRegion } from '../../model/wrap';
 import type { ChartRegion, SketchOutline } from './sketchProfiles';
 import type { FaceSession } from './faceSession';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** One outline mapped onto the face. */
 export interface MappedCurve {
@@ -146,7 +147,7 @@ export function checkWrapAround(
 ): MappingFailure | null {
   if (chart.kind === 'plane' || chart.kind === 'freeform' || pieces.length === 0) return null;
   const boxes = pieces.map((chain) => extentOf(chain));
-  const extent = Math.max(...boxes.map((box) => box.max[0])) - Math.min(...boxes.map((box) => box.min[0]));
+  const extent = maxOf(boxes.map((box) => box.max[0])) - minOf(boxes.map((box) => box.min[0]));
   if (extent <= 2 * Math.PI * (1 + 1e-9)) return null;
   return {
     code: 'WRP_WRAP_OVERLAP',
