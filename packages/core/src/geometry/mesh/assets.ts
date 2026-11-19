@@ -29,6 +29,8 @@ export interface MeshAssetPort {
   writeMesh(mesh: MeshData): MeshAssetRef;
   /** Raw bytes of an imported file stored by its sha256 (`import_mesh_file fileKey`), or null when missing. */
   readFile(key: string): Uint8Array | null;
+  /** sha256 (lowercase hex) of `bytes` by the host's native hash: the digest of `@lib/sha256`, several times faster on a large file. */
+  sha256?(bytes: Uint8Array): string;
 }
 
 let installed: MeshAssetPort | null = null;
