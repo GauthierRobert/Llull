@@ -6,13 +6,16 @@ import { elementAt } from '@lib/elementAt';
 import { codedRejection, report } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
 import { aeroDesignHash } from '../flight/aeroTable';
-import { prepareVehicle, type FlightRefusal } from '../flight/flightRun';
+import { prepareVehicle, type FlightRefusal, type PreparedVehicle } from '../flight/flightRun';
 import { analyseModes, type ModeSet } from '../flight/flightModes';
 import { linearize } from '../flight/linearModel';
+import { rateDampingTerms, type RateDampingTerm } from '../flight/rateDamping';
+import { powerLimitText, trimPowertrains } from '../flight/trimPower';
 import { flightOf } from '../flight/model';
 import { rotateInverse } from '../flight/frames';
 import { bodyVelocity, solveTrim, trimAccelerations, TRIM_TOLERANCE, type TrimCondition, type TrimState } from '../flight/trimSolve';
 import {
+  controlSettings,
   orientationOf,
   STATE_NAMES,
   STATE_UNITS,
@@ -106,6 +109,28 @@ interface Trimmed {
   readonly warnings: readonly string[];
   readonly scenarioId: string;
   readonly bodyId: string;
+  readonly powertrains: ReturnType<typeof trimPowertrains>;
+}
+
+/** The powertrains at the trimmed rotor speeds and shaft torques (trimPower.ts). */
+function powerAtTrim(
+  prepared: PreparedVehicle,
+  vehicle: TrimVehicle,
+  condition: TrimCondition,
+  state: TrimState,
+): ReturnType<typeof trimPowertrains> {
+  if (prepared.power.length === 0) return [];
+  const velocity = bodyVelocity(condition.airspeedMps, state.flightPath, state.roll, state.pitch);
+  const wrench = wrenchAt(vehicle, { velocity, rates: [0, 0, 0], roll: state.roll, pitch: state.pitch }, state.controls);
+  const { rpm } = controlSettings(vehicle, state.controls);
+  const loads = new Map(
+    vehicle.rotors.map((rotor, i) => [rotor.rotor.id, { rpm: elementAt(rpm, i), torqueNm: elementAt(wrench.rotors, i).torque }] as const),
+  );
+  return trimPowertrains(
+    prepared.power,
+    prepared.rotors.map((rotor) => rotor.rotor.id),
+    loads,
+  );
 }
 
 /** Trim the scenario's vehicle at the condition, or the rejection that says why not. */
@@ -147,6 +172,17 @@ function trimmed(
       [scenario.id, scenario.bodyId],
       { residual: result.residual },
     );
+  const powertrains = powerAtTrim(prepared, vehicle, condition, result.state);
+  const limited = powertrains.filter((powertrain) => powertrain.limit !== null);
+  if (limited.length > 0)
+    return reject(
+      doc,
+      command,
+      'FLT_TRIM_SATURATED',
+      `scenario '${scenario.id}' at ${condition.airspeedMps} m/s balances, but its powertrain cannot hold the point: ${limited.map(powerLimitText).join('; ')}`,
+      [scenario.id, ...limited.map((powertrain) => powertrain.id)],
+      { powertrains },
+    );
   const calm =
     scenario.wind.steady.every((component) => component === 0) &&
     scenario.wind.gusts.length === 0 &&
@@ -167,12 +203,21 @@ function trimmed(
     defaulted,
     warnings: [
       ...(calm ? [] : [`scenario '${scenario.id}' has wind: ignored, the trim is in still air`]),
+      ...powertrains.flatMap((powertrain) =>
+        powertrain.motors
+          .filter((motor) => motor.overPeakCurrent)
+          .map(
+            (motor) =>
+              `powertrain '${powertrain.id}': the motor of '${motor.rotorId}' draws ${motor.currentA.toPrecision(4)} A, over its peak ${powertrain.peakCurrentA.toPrecision(4)} A (run_flight counts it, it does not limit it)`,
+          ),
+      ),
       ...(vehicle.controls.length === 0
         ? [`no controls: the scenario has no controller with rotors and no aero surface has a pivot servo, so only the attitude was solved`]
         : []),
     ],
     scenarioId: scenario.id,
     bodyId: scenario.bodyId,
+    powertrains,
   };
 }
 
@@ -240,6 +285,7 @@ function trimData(trim: Trimmed): Record<string, unknown> {
       relative: trim.residual,
       tolerance: TRIM_TOLERANCE,
     },
+    powertrains: trim.powertrains,
     weightN: weight,
     massKg: vehicle.massKg,
     defaulted: trim.defaulted,
@@ -263,7 +309,8 @@ const summaryOf = (trim: Trimmed): string => {
  * @invariant deterministic: same document and condition give bit-identical data; the force laws are those of run_flight (rotor law, body drag, aero tables, document loads)
  * @invariant kernel-optional: body mass properties are exact with a kernel, mesh integration otherwise (as run_flight)
  * @failure unknown scenario, non-free or multi-body vehicle, a mixer run_flight refuses, an aero surface not travelling along +x (FLT_TRIM_UNSUPPORTED),
- *          no balance within the control limits (FLT_TRIM_SATURATED), a stalled iteration (FLT_TRIM_NOT_CONVERGED) -> rejected with the code
+ *          no balance within the control limits or a powertrain that cannot hold the trimmed point (FLT_TRIM_SATURATED), a stalled iteration
+ *          (FLT_TRIM_NOT_CONVERGED) -> rejected with the code
  */
 export const trimFlightCommand = defineCommand({
   name: 'trim_flight',
@@ -274,10 +321,12 @@ export const trimFlightCommand = defineCommand({
     'roll and pitch, the flight-path angle with freeFlightPath, and the controls: the rotor speeds of the scenario controller within its minRpm..maxRpm and ' +
     'the pivot angle of every servo aero surface within its travel (an uncontrolled rotor keeps its own rpm). Damped Gauss-Newton with central-difference ' +
     'Jacobians; with more controls than the six equations the solution closest to the hover-speed start is taken (a symmetric vehicle keeps equal rotor speeds). ' +
-    'The vehicle travels along its body +x axis, heading 0, in still air (scenario set-points and wind are ignored; battery and motor limits are not applied). ' +
+    'The vehicle travels along its body +x axis, heading 0, in still air (scenario set-points and wind are ignored). Powertrains (add_flight_powertrain) are checked at ' +
+    'the trimmed point with the run_flight pack / ESC / motor laws at the battery initialSoc: a motor voltage above the pack terminal voltage, a power the pack cannot deliver ' +
+    'or a sag under the cut-off is FLT_TRIM_SATURATED (a check of the trimmed point, not a constrained solve); a motor current over its peak is a warning. ' +
     'Read-only, deterministic, no physics engine needed. data: attitude (roll / pitch deg), velocityBodyMps, angleOfAttackDeg, controls[] (value, unit rpm|deg, ' +
     'limits, limitMargin = share of the range to the nearest limit, atLimit), per rotor thrust N / shaft power W / advance ratio, per surface alpha / CL / CD / lift / drag, ' +
-    'the residual force N and moment N·m, iterations. Refusals: FLT_TRIM_SATURATED (a control would pass its limit: untrimmable there), FLT_TRIM_NOT_CONVERGED, ' +
+    'the residual force N and moment N·m, iterations, powertrains[] (bus power W, pack current A, terminal V, throttle, motor current / voltage, limit). Refusals: FLT_TRIM_SATURATED (a control would pass its limit: untrimmable there), FLT_TRIM_NOT_CONVERGED, ' +
     'FLT_TRIM_UNSUPPORTED, plus the run_flight vehicle refusals (unknown scenario, non-free body, mixer). Next: linearize_flight for A, B and the modes.',
   params: z.object(conditionSchema),
   run: (doc, params, ctx): CommandResult => {
@@ -287,17 +336,52 @@ export const trimFlightCommand = defineCommand({
   },
 });
 
+const rateDampingSchema = z
+  .enum(['tail_arm', 'none'])
+  .optional()
+  .describe(
+    'Longitudinal rate damping added to the linearisation: "tail_arm" (default) estimates Zq, Mq and Malpha-dot of every aero table with a pivoting (all-moving) tail from its pivot derivatives (tail arm = -chord Cm_delta / CL_delta; Nelson / Etkin & Reid tail-arm estimate, downwash slope 2 CL_alpha,wing / (pi A)); "none" linearises the lumped tables alone (no rate damping). Zero at the trim: it changes A, never the trim.',
+  );
+
+/** What the linearisation of an aero vehicle does not model (FLT-D30) and what its rate damping is. */
+function aeroWarnings(vehicle: TrimVehicle, damping: readonly RateDampingTerm[]): string[] {
+  if (vehicle.aero.length === 0) return [];
+  const lateral =
+    'the aero tables have no sideslip, roll-rate or yaw-rate dependence (FLT-D30): the lateral roots of an aero vehicle are neutral by construction (labelled lateral_neutral), not a stability result';
+  if (damping.length === 0)
+    return [
+      `${lateral}; longitudinal rate damping (Mq, Zq, Malpha-dot) is absent too (each surface is lumped at its moment centre and none has a pivoting tail to estimate it from, or rateDamping "none"), so the DAMPING of the phugoid and short period is not a stability result, their periods are`,
+    ];
+  return [
+    lateral,
+    `longitudinal rate damping (Zq, Mq, Malpha-dot) of ${damping.map((term) => `'${term.surfaceId}'`).join(', ')} is the tail-arm estimate (tail arm ${damping.map((term) => term.tailArmM.toPrecision(3)).join(', ')} m from the pivot derivatives; Nelson ch. 3): an estimate for an all-moving tail in attached, quasi-steady flow without the wing and fuselage rate terms, not a lattice result`,
+  ];
+}
+
+/** The tail-arm rate-damping terms at the trim (every surface's trim angle of attack, its pivot the control value or its neutral). */
+function dampingAtTrim(trim: Trimmed): RateDampingTerm[] {
+  const { vehicle, condition, state } = trim;
+  const velocity = bodyVelocity(condition.airspeedMps, state.flightPath, state.roll, state.pitch);
+  const wrench = wrenchAt(vehicle, { velocity, rates: [0, 0, 0], roll: state.roll, pitch: state.pitch }, state.controls);
+  return rateDampingTerms(
+    vehicle,
+    wrench.aero.map((output) => output.alphaDeg),
+    controlSettings(vehicle, state.controls).pivot,
+  );
+}
+
 const modesSchema = z
   .enum(['auto', 'fixed_wing', 'hover'])
   .optional()
   .describe(
-    'Mode labelling: "fixed_wing" (phugoid / short period / Dutch roll / roll subsidence / spiral), "hover" (heave, yaw, pitch_translation, roll_translation chains) or "auto" (default): fixed_wing when the vehicle has aero surfaces and flies faster than 1 m/s, else hover.',
+    'Mode labelling: "fixed_wing" (from participation factors: phugoid / short period / Dutch roll / roll subsidence / spiral / lateral_neutral), "hover" (heave, yaw, pitch_translation, roll_translation chains) or "auto" (default): fixed_wing when the vehicle has aero surfaces and flies faster than 1 m/s, else hover.',
   );
 
 /**
  * @affects nothing — read-only; data { trim, states[], inputs[], a, b, eigenvalues[], modes[], stable, couplingRatio, ... }
- * @invariant A, B are central-difference Jacobians of the same state derivative trim_flight balances (rotors, drag, aero, document loads) about the trim; the
- *            eigenvalues are of the full 8 x 8 A, each mode label is a heuristic on the longitudinal / lateral blocks (couplingRatio says how decoupled they are)
+ * @invariant A, B are central-difference Jacobians of the same state derivative trim_flight balances (rotors, drag, aero, document loads) about the trim, plus
+ *            the tail-arm rate damping of pivoting-tail tables unless rateDamping "none" (zero at the trim); the eigenvalues are of the full 8 x 8 A; fixed-wing
+ *            labels come from the participation factors of each mode, hover labels from the longitudinal / lateral blocks
  * @invariant deterministic; kernel-optional as trim_flight
  * @failure every trim_flight refusal; an eigenvalue iteration that fails (FLT_LINEARIZE_FAILED) -> rejected with the code
  */
@@ -310,19 +394,23 @@ export const linearizeFlightCommand = defineCommand({
     'roll, pitch (rad)] (heading and position do not enter a flat-earth, still-air flight, so they are neutral and left out); inputs = the trim controls in ' +
     'order, per rpm for a rotor and per degree for a pivot (the airframe alone: the flight controller is NOT in the loop, so a quad without its rate loop shows ' +
     'the open-loop integrators). data: states / inputs with units, a (8 x 8), b (8 x inputs), eigenvalues (re, im, 1/s), modes[] (one per mode: label, ' +
-    'dampingRatio, naturalFrequencyRadS, periodS, timeConstantS, timeToDoubleS, stability stable|neutral|unstable), stable (no unstable mode), couplingRatio, and the trim data. ' +
-    'Labels are heuristics on the decoupled longitudinal (u, w, q, pitch) and lateral (v, p, r, roll) blocks: fixed wing: phugoid (the lower-frequency longitudinal pair), ' +
-    'short_period, dutch_roll, roll_subsidence (largest real lateral root), spiral (smallest); hover: heave, yaw, pitch_translation, roll_translation; "coupled" when ' +
-    'the full-matrix root has no block root within 10 %. A repeated zero eigenvalue (integrator chain) is defective: its numerical roots spread by the cube root of the round-off, so read it as "about zero". ' +
+    'dampingRatio, naturalFrequencyRadS, periodS, timeConstantS, timeToDoubleS, stability stable|neutral|unstable, participation per state (sums to 1; null for a ' +
+    'defective root), longitudinalShare, labelBasis participation|eigenvector|block), stable (no unstable mode), couplingRatio, rateDamping { method, terms[] }, and the trim data. ' +
+    'Fixed-wing labels come from the participation factors of each mode (unit-free): longitudinal share >= 80 %: phugoid (led by u + pitch), short_period (w + q), ' +
+    'longitudinal_real; share <= 20 %: dutch_roll (v + r), lateral_oscillatory, roll_subsidence (real, led by p), spiral (real, led by roll), lateral_real, ' +
+    'lateral_neutral (a neutral real or defective lateral root: an aero table without sideslip / rate terms); between: coupled. Hover labels are heuristics on the ' +
+    'decoupled longitudinal (u, w, q, pitch) and lateral (v, p, r, roll) blocks: heave, yaw, pitch_translation, roll_translation, "coupled" when the full-matrix root ' +
+    'has no block root within 10 %. A repeated zero eigenvalue (integrator chain) is defective: its numerical roots spread by the cube root of the round-off, so read it as "about zero". ' +
     'Read-only, deterministic, same refusals as trim_flight.',
-  params: z.object({ ...conditionSchema, modes: modesSchema }),
+  params: z.object({ ...conditionSchema, modes: modesSchema, rateDamping: rateDampingSchema }),
   run: (doc, params, ctx): CommandResult => {
     const result = trimmed(doc, 'linearize_flight', params, ctx);
     if (!('vehicle' in result)) return result;
     const { vehicle, state, condition } = result;
     const velocity = bodyVelocity(condition.airspeedMps, state.flightPath, state.roll, state.pitch);
     const x0 = [...velocity, 0, 0, 0, state.roll, state.pitch];
-    const { a, b } = linearize(vehicle, x0, state.controls);
+    const damping = params.rateDamping === 'none' ? [] : dampingAtTrim(result);
+    const { a, b } = linearize(vehicle, x0, state.controls, damping);
     const wanted = params.modes ?? 'auto';
     const modeSet: ModeSet =
       wanted === 'auto' ? (vehicle.aero.length > 0 && condition.airspeedMps >= HOVER_SPEED_MPS ? 'fixed_wing' : 'hover') : wanted;
@@ -347,15 +435,9 @@ export const linearizeFlightCommand = defineCommand({
       `linearize_flight: ${summaryOf(result)}; ${modeSet} modes: ${modeText}; ${unstable.length === 0 ? 'no unstable mode' : `${unstable.length} unstable mode(s)`}.`,
       {
         trim: trimData(result),
-        warnings: [
-          ...result.warnings,
-          ...(vehicle.aero.length === 0
-            ? []
-            : [
-                'the aero tables have no sideslip, roll-rate or yaw-rate dependence (FLT-D30): the lateral modes (dutch_roll, roll_subsidence, spiral) of an aero vehicle are neutral by construction, not a stability result; longitudinal rate damping (Mq, Zq, Malpha-dot) is absent too (each surface is lumped at its moment centre), so the DAMPING of the phugoid and short period is not a stability result, their periods are',
-              ]),
-        ],
+        warnings: [...result.warnings, ...aeroWarnings(vehicle, damping)],
         modeSet,
+        rateDamping: { method: damping.length > 0 ? 'tail_arm' : 'none', terms: damping },
         states: STATE_NAMES.map((name, i) => ({ name, unit: STATE_UNITS[i] })),
         inputs: vehicle.controls.map((control) => ({
           id: control.id,

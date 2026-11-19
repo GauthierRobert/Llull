@@ -4,47 +4,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import type { CadDocument } from '@core/model/types';
 import { expectNoOp } from '../../helpers/expectNoOp';
-import { airframe, G, step } from './flightFixture';
+import { G, glider } from './flightFixture';
 
 const SPEED = 20;
 const MASS = 50;
-
-function glider(forward = '+x'): CadDocument {
-  const doc = airframe(MASS, [20, 70, 85], [0, 0, -G]);
-  const wing = {
-    name: 'wing',
-    sections: [
-      { leadingEdge: [100, 0, 0], chord: 1000 },
-      { leadingEdge: [100, 3000, 0], chord: 1000 },
-    ],
-    spanwisePanels: 12,
-    chordwisePanels: 4,
-  };
-  const tail = {
-    name: 'tail',
-    pivots: true,
-    sections: [
-      { leadingEdge: [-2800, 0, 0], chord: 500 },
-      { leadingEdge: [-2800, 1250, 0], chord: 500 },
-    ],
-    spanwisePanels: 6,
-    chordwisePanels: 3,
-  };
-  const table = step(doc, 'generate_aero_table', {
-    body: 'frame',
-    surfaces: [wing, tail],
-    momentCentre: [0, 0, 0],
-    id: 'w',
-    forward,
-    pivotsDeg: [-8, 0, 8],
-    pivotPoint: [-2675, 0, 0],
-    servo: { rateDegS: 60 },
-    profileDrag: { cd0: 0.01, source: 'test polar' },
-  }).doc;
-  return step(table, 'define_flight_scenario', { body: 'frame', id: 's', durationS: 1 }).doc;
-}
 
 interface Mode {
   label: string;
@@ -54,6 +20,9 @@ interface Mode {
   periodS: number | null;
   dampingRatio: number | null;
   stability: string;
+  participation: Record<string, number> | null;
+  longitudinalShare: number;
+  labelBasis: string;
 }
 interface Linear {
   a: number[][];
@@ -77,6 +46,7 @@ const lin = (doc: CadDocument, params: Record<string, unknown> = {}): Linear => 
 
 describe('glider trim and modes (FLT-M5)', () => {
   const linear = lin(glider());
+  const lumped = lin(glider(), { rateDamping: 'none' });
 
   it('trims a glide: weight balanced by lift and drag along the path, tail pivot inside its travel', () => {
     const flightPath = linear.trim.condition.flightPathDeg;
@@ -89,7 +59,7 @@ describe('glider trim and modes (FLT-M5)', () => {
   });
 
   it('reports the angle of attack with z up (= surface alpha = pitch - flight path); the path speed derivative is -2 D / (m V) within 1 %', () => {
-    const { trim, a } = linear;
+    const { trim, a } = lumped;
     const alpha = (trim.angleOfAttackDeg * Math.PI) / 180;
     expect(trim.angleOfAttackDeg).toBeCloseTo(trim.aero[0]?.alphaDeg ?? Number.NaN, 6);
     expect(trim.angleOfAttackDeg).toBeCloseTo(trim.attitude.pitchDeg - trim.condition.flightPathDeg, 3);
@@ -103,10 +73,10 @@ describe('glider trim and modes (FLT-M5)', () => {
     expect(Math.abs(pathXu / expected - 1)).toBeLessThan(0.01);
   });
 
-  it('the phugoid period is Lanchester sqrt(2) pi V / g within 10 % and the short period is much faster', () => {
+  it('the lumped tables alone (rateDamping none): the phugoid period is Lanchester sqrt(2) pi V / g within 10 % and the short period is much faster', () => {
     const lanchester = (Math.SQRT2 * Math.PI * SPEED) / G;
-    const phugoid = linear.modes.find((mode) => mode.label === 'phugoid');
-    const shortPeriod = linear.modes.find((mode) => mode.label === 'short_period');
+    const phugoid = lumped.modes.find((mode) => mode.label === 'phugoid');
+    const shortPeriod = lumped.modes.find((mode) => mode.label === 'short_period');
     expect(phugoid?.periodS).toBeGreaterThan(0.9 * lanchester);
     expect(phugoid?.periodS).toBeLessThan(1.1 * lanchester);
     // the phugoid damping (about 1 / (sqrt(2) L/D) in theory) is read to the accuracy of the table slope: only its smallness is asserted
@@ -116,12 +86,21 @@ describe('glider trim and modes (FLT-M5)', () => {
     expect(shortPeriod?.periodS ?? Infinity).toBeLessThan((phugoid?.periodS ?? 0) / 5);
   });
 
-  it('labels the lateral modes and says they are neutral by construction (no sideslip or rate derivatives in the aero tables)', () => {
+  it('labels the modes from their participation: the lateral roots are lateral_neutral (no sideslip or rate derivatives in the aero tables)', () => {
     expect(linear.modeSet).toBe('fixed_wing');
     const labels = linear.modes.map((mode) => mode.label);
-    expect(labels).toEqual(expect.arrayContaining(['phugoid', 'short_period', 'spiral', 'roll_subsidence']));
-    for (const mode of linear.modes.filter((entry) => ['spiral', 'roll_subsidence', 'lateral_real'].includes(entry.label)))
-      expect(mode.stability).toBe('neutral');
+    expect(labels.filter((label) => label === 'phugoid')).toHaveLength(1);
+    expect(labels.filter((label) => label === 'short_period')).toHaveLength(1);
+    const lateral = linear.modes.filter((mode) => mode.label === 'lateral_neutral');
+    expect(lateral.length).toBeGreaterThan(0);
+    expect(labels.every((label) => ['phugoid', 'short_period', 'lateral_neutral'].includes(label))).toBe(true);
+    for (const mode of lateral) expect(mode.stability).toBe('neutral');
+    // the participations that name them: speed + attitude for the phugoid, incidence + pitch rate for the short period
+    const share = (label: string, states: readonly string[]): number =>
+      states.reduce((sum, state) => sum + (linear.modes.find((mode) => mode.label === label)?.participation?.[state] ?? 0), 0);
+    expect(share('phugoid', ['u', 'pitch'])).toBeGreaterThan(0.8);
+    expect(share('short_period', ['w', 'q'])).toBeGreaterThan(0.9);
+    expect(lumped.modes.map((mode) => mode.label).sort()).toEqual(labels.sort());
     expect(linear.warnings.join(' ')).toContain('FLT-D30');
   });
 });
@@ -133,6 +112,19 @@ describe('glider refusals (FLT-M5)', () => {
     expect(result.rejected).toBe(true);
     expect(['FLT_TRIM_NOT_CONVERGED', 'FLT_TRIM_SATURATED']).toContain(result.error?.code);
     expectNoOp(result, doc);
+  });
+
+  it('a singular inertia from a loaded file (add_rigid_body refuses it, the file reader only checks 6 finite numbers) is FLT_MODEL_INVALID', () => {
+    const json = JSON.parse(serializeDocument(glider())) as { document: { dynamics: { bodies: { frame: { inertiaKgM2: number[] } } } } };
+    json.document.dynamics.bodies.frame.inertiaKgM2 = [0, 0, 0, 0, 0, 0];
+    const doc = deserializeDocument(JSON.stringify(json));
+    expect(doc.dynamics?.bodies['frame']?.inertiaKgM2).toEqual([0, 0, 0, 0, 0, 0]);
+    for (const command of ['trim_flight', 'linearize_flight']) {
+      const result = execute(doc, command, { scenario: 's', airspeedMps: SPEED, freeFlightPath: true });
+      expect(result.error?.code).toBe('FLT_MODEL_INVALID');
+      expect(result.summary).toContain('singular inertia');
+      expectNoOp(result, doc);
+    }
   });
 
   it('an aero surface that travels along another axis is FLT_TRIM_UNSUPPORTED', () => {
