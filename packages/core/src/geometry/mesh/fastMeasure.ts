@@ -65,7 +65,8 @@ const SHORT_ROW = 24;
 
 /**
  * Edge health without a global sort: every edge goes to the row of its lower vertex (counting sort), then each row (a handful of
- * entries: higher vertex x 2 + direction bit) is ordered on its own. Same counts as `edgeHealthBySort` for indices in 0..vertexCount-1.
+ * entries: higher vertex x 2 + direction bit) is ordered on its own. Same counts as `edgeHealthBySort` for indices in 0..vertexCount-1 while
+ * 2·vertexCount² ≤ 2^53 (vertexCount ≤ ~6.7e7): beyond that the Float64 key of the sort merges distinct edges and this count is the exact one.
  */
 function edgeHealthByVertex(indices: ReadonlyArray<number>, faces: number, vertexCount: number): EdgeHealth {
   const rowStart = new Uint32Array(vertexCount + 1);

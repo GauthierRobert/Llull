@@ -46,7 +46,7 @@ export const BUDGETS = {
   'document.export.svg20k': budget('responsive', 400, 2100, 'export_svg of 20 000 2D entities'),
   'document.export.dxf20k': budget('responsive', 600, 3600, 'export_dxf of 20 000 2D entities'),
   'mesh.import.stl1m': budget('job', 3000, 6300, 'import_mesh_file of a 1M-triangle binary STL through the mesh asset store (fileKey)'),
-  'mesh.import.obj1m': budget('job', 3000, 4900, 'import_mesh_file of a 1M-triangle OBJ through the mesh asset store (fileKey)'),
+  'mesh.import.obj1m': budget('job', 3000, 4400, 'import_mesh_file of a 1M-triangle OBJ through the mesh asset store (fileKey)'),
 } as const satisfies Record<string, Budget>;
 
 export type BudgetId = keyof typeof BUDGETS;
