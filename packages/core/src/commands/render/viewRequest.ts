@@ -88,7 +88,7 @@ export function prepareView(
   const port = ctx?.raster ?? null;
   if (port === null)
     return { code: 'NATIVE_TOOL_MISSING', message: 'no native raster (llull-compute) is installed in this host', paths: ['renderer'] };
-  const native = nativeRun(port, 'gpu');
+  const native = nativeRun(port, 'gpu', true);
   options.pixels = native.pixels;
   const finish: Finish = (d, summary, base) => {
     const outcome = native.result();

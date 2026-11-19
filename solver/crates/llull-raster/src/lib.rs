@@ -9,10 +9,12 @@
 pub mod cpu;
 #[cfg(feature = "gpu")]
 pub mod gpu;
+pub mod png;
 pub mod scene;
 pub mod scene_cpu;
 #[cfg(feature = "gpu")]
 pub mod scene_gpu;
+pub mod serve;
 
 use llull_protocol::{sha256_hex, Output};
 use serde::Deserialize;
@@ -150,6 +152,17 @@ pub enum Produced {
     Cpu,
     Gpu { adapter: String },
     CpuFallback { reason: String },
+}
+
+/// The warning a host reports for `produced` (code + message), or None for a plain CPU frame.
+pub fn produced_warning(produced: &Produced) -> Option<(&'static str, String)> {
+    match produced {
+        Produced::Cpu => None,
+        Produced::Gpu { adapter } => Some(("NATIVE_RASTER_GPU", format!("drawn on the GPU ({adapter}): a picture, not bit-identical"))),
+        Produced::CpuFallback { reason } => {
+            Some(("NATIVE_RASTER_CPU_FALLBACK", format!("GPU raster unavailable ({reason}); drawn by the CPU twin")))
+        }
+    }
 }
 
 fn render(prepared: &Prepared, engine: Engine) -> (Vec<u8>, Vec<f32>, Produced) {

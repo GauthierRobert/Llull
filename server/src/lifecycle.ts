@@ -4,7 +4,7 @@ import type { Server } from 'http';
 import type { Express } from 'express';
 import { installGeometryKernel } from './geometryKernel';
 import { installPhysicsEngine } from './physicsEngine';
-import { installRasterPort } from './native/rasterPort';
+import { closeRasterPort, installRasterPort } from './native/rasterPort';
 import { installMediaPort } from './native/mediaPort';
 import { installFontProvider } from './fontProvider';
 import { installPipingLibraryProvider } from './libraries/pipingLibraryStore';
@@ -55,6 +55,7 @@ const delay = (ms: number): Promise<void> => new Promise<void>((resolve) => setT
 async function shutdown(server: Server): Promise<void> {
   stopAutosave();
   killAllChildren();
+  closeRasterPort();
   const closed = new Promise<void>((resolve) => server.close(() => resolve()));
   closeAllSubscribers();
   server.closeIdleConnections();

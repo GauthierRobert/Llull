@@ -44,6 +44,8 @@ export interface RasterImage {
   readonly reason?: string;
   /** Binary version, e.g. "llull-compute 0.1.0". */
   readonly version: string;
+  /** Optional: the PNG of `rgba` byte for byte as `encodePng(width, height, rgba, true)` writes it (encoded natively, PERF1 §5 row 10). */
+  readonly png?: Uint8Array;
 }
 
 export type RasterOutcome =
@@ -52,6 +54,9 @@ export type RasterOutcome =
 
 /** A host's offscreen rasteriser. Synchronous: commands are synchronous (the host blocks on its job). */
 export interface RasterPort {
-  /** `gpu` (wgpu; falls back to the CPU twin with a reason) or `cpu` (the native CPU twin, bit-identical to the reference). */
-  render(scene: RasterScene, engine: 'gpu' | 'cpu'): RasterOutcome;
+  /**
+   * `gpu` (wgpu; falls back to the CPU twin with a reason) or `cpu` (the native CPU twin, bit-identical to the reference). `png`: the
+   * caller embeds the pixels as they are, so a port that can encode `RasterImage.png` should (a port may ignore it).
+   */
+  render(scene: RasterScene, engine: 'gpu' | 'cpu', options?: { readonly png?: boolean }): RasterOutcome;
 }
