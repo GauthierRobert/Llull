@@ -27,7 +27,7 @@ fn native_png_is_byte_identical_to_the_typescript_encoder() {
     let text = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/png.json")).unwrap();
     let cases: Value = serde_json::from_str(&text).unwrap();
     let cases = cases.as_array().unwrap();
-    assert_eq!(cases.len(), 6);
+    assert_eq!(cases.len(), 9);
     for case in cases {
         let (width, height) = (case["width"].as_u64().unwrap() as usize, case["height"].as_u64().unwrap() as usize);
         let rgba = base64(case["rgbaBase64"].as_str().unwrap());

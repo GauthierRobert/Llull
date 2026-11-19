@@ -219,6 +219,12 @@ mod tests {
 
     /// Inflate of a fixed-Huffman stream: enough of RFC 1951 to read back what `deflate_raw` writes.
     fn inflate_fixed(stream: &[u8]) -> Vec<u8> {
+        inflate_with_matches(stream).0
+    }
+
+    /// The inflated bytes and every (length, distance, output position) match of the stream.
+    fn inflate_with_matches(stream: &[u8]) -> (Vec<u8>, Vec<(usize, usize, usize)>) {
+        let mut matches = Vec::new();
         let mut bit = 0usize;
         let mut read = |count: u32| -> u32 {
             let mut value = 0;
@@ -246,7 +252,7 @@ mod tests {
             };
             match symbol {
                 0..=255 => out.push(symbol as u8),
-                256 => return out,
+                256 => return (out, matches),
                 _ => {
                     let index = (symbol - 257) as usize;
                     let length = (LENGTH_BASE[index] + read(LENGTH_EXTRA[index])) as usize;
@@ -255,6 +261,7 @@ mod tests {
                         d = (d << 1) | read(1);
                     }
                     let distance = (DIST_BASE[d as usize] + read(DIST_EXTRA[d as usize])) as usize;
+                    matches.push((length, distance, out.len()));
                     for _ in 0..length {
                         out.push(out[out.len() - distance]);
                     }
@@ -281,6 +288,40 @@ mod tests {
         for data in [vec![], vec![7], vec![1, 2], vec![0; 100_000], noise(70_000, 9), periodic] {
             assert_eq!(inflate_fixed(&deflate_raw(&data)), data);
         }
+    }
+
+    #[test]
+    fn matches_reach_the_window_edge_but_not_past_it() {
+        for (distance, reaches) in [(32768usize, true), (32769, false)] {
+            let mut data = noise(65536, 21);
+            data.copy_within(1000..1300, 1000 + distance);
+            let (out, matches) = inflate_with_matches(&deflate_raw(&data));
+            assert_eq!(out, data);
+            let far: Vec<_> = matches.iter().filter(|m| m.1 >= 32768).collect();
+            assert_eq!(far.first().map(|m| (m.0, m.1, m.2)), reaches.then_some((258, 32768, 1000 + 32768)), "distance {distance}");
+            assert!(matches.iter().all(|m| m.1 <= 32768));
+        }
+    }
+
+    #[test]
+    fn a_long_match_behind_more_than_24_newer_candidates_is_not_found() {
+        let mut data = noise(2400, 5);
+        let tail: Vec<u8> = (0..60u32).map(|k| ((k * 37 + 11) & 0xff) as u8).collect();
+        for k in 0..=30usize {
+            let at = 100 + k * 70;
+            data[at..at + 3].copy_from_slice(&[0xab, 0xcd, 0xef]);
+            if k == 0 || k == 30 {
+                data[at + 3..at + 63].copy_from_slice(&tail);
+            } else {
+                data[at + 3] = (k * 5) as u8;
+            }
+        }
+        let (out, matches) = inflate_with_matches(&deflate_raw(&data));
+        assert_eq!(out, data);
+        let last = 100 + 30 * 70;
+        assert!(matches.iter().filter(|m| m.2 == last).all(|m| m.0 < 10), "{matches:?}");
+        // with the cutoff lifted the oldest copy would match all 63 bytes: the cutoff is what the fixture pins
+        assert!(matches.iter().all(|m| m.2 != last || m.1 != 30 * 70));
     }
 
     #[test]

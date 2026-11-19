@@ -72,6 +72,8 @@ export const BUDGETS = {
   'document.export.svg20k': budget('responsive', 400, 2100, 'export_svg of 20 000 2D entities'),
   'document.export.dxf20k': budget('responsive', 600, 3600, 'export_dxf of 20 000 2D entities'),
   'mesh.import.stl1m': budget('job', 3000, 6300, 'import_mesh_file of a 1M-triangle binary STL through the mesh asset store (fileKey)'),
+  // provisional, reset from a quiet machine (measured at load 5-8 only). The first-frame budget sits above the 300 ms the per-frame job path
+  // took, so it guards no regression yet: it only bounds the process start.
   'render.view.native1280_first': budget(
     'responsive',
     500,

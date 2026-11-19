@@ -12,7 +12,7 @@
 
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import { errorMessage } from '@lib/errorMessage';
-import { createRasterReplyReader, type RasterReply } from './rasterFrames';
+import { createRasterReplyReader, NotRasterServeError, type RasterReply } from './rasterFrames';
 
 /** Relay: spawns the child, forwards request bytes to its stdin and every stdout chunk / the exit back, bumping the counter each time. */
 const RELAY = `
@@ -23,6 +23,7 @@ const signal = new Int32Array(signalBuffer);
 const send = (message) => { port.postMessage(message); Atomics.add(signal, 0, 1); Atomics.notify(signal, 0); };
 let gone = false;
 const exit = (reason) => { if (!gone) { gone = true; send({ exit: reason }); } };
+process.on('uncaughtException', (error) => { exit('relay failed: ' + (error && error.message)); process.exit(1); });
 try {
   const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'], env, windowsHide: true });
   child.on('error', (error) => exit('cannot run ' + command + ': ' + error.message));
@@ -54,11 +55,15 @@ export interface RasterProcessOptions {
   readonly env: NodeJS.ProcessEnv;
   /** Per frame, process start included. */
   readonly frameTimeoutMs: number;
+  /** A new process must report its pid (or its exit) within this; else it counts as dead (default 5 s). */
+  readonly startTimeoutMs?: number;
+  /** Tests only: replaces the relay worker source. */
+  readonly relaySource?: string;
 }
 
 export interface RasterProcess {
-  /** One frame: `request` bytes in, the reply out (restarting a dead process once). */
-  request(request: Uint8Array): RasterReply;
+  /** One frame: `request` bytes in, the reply out (restarting a dead process once); a reply may carry at most `maxReplyBytes`. */
+  request(request: Uint8Array, maxReplyBytes: number): RasterReply;
   /** Process id of the live process, or null when none runs. */
   pid(): number | null;
   /** How many processes were started so far. */
@@ -68,6 +73,8 @@ export interface RasterProcess {
 
 /** How long a process is given to exit after its input ended or it was killed. */
 const EXIT_GRACE_MS = 2_000;
+/** How long a new relay has to report its process (spawned or failed). */
+const START_TIMEOUT_MS = 5_000;
 
 const failure = (code: string, message: string): RasterReply => ({ ok: false, code, message });
 
@@ -78,7 +85,7 @@ export function createRasterProcess(options: RasterProcessOptions): RasterProces
   const launch = (): Live => {
     const signalBuffer = new SharedArrayBuffer(4);
     const { port1, port2 } = new MessageChannel();
-    const worker = new Worker(RELAY, {
+    const worker = new Worker(options.relaySource ?? RELAY, {
       eval: true,
       workerData: { command: options.command, args: [...options.args], env: options.env, signalBuffer, port: port2 },
       transferList: [port2],
@@ -131,9 +138,12 @@ export function createRasterProcess(options: RasterProcessOptions): RasterProces
   };
 
   /** One exchange with `target`: a reply, or why there is none (`died` = the process exited, worth one restart). */
-  const exchange = (target: Live, request: Uint8Array): RasterReply | { died: string } => {
-    const reader = createRasterReplyReader();
+  const exchange = (target: Live, request: Uint8Array, maxReplyBytes: number): RasterReply | { died: string } => {
+    const reader = createRasterReplyReader(maxReplyBytes);
     const deadline = Date.now() + options.frameTimeoutMs;
+    const startMs = options.startTimeoutMs ?? START_TIMEOUT_MS;
+    // a relay that never runs (or dies before spawning) says nothing: without a pid or exit by then the process counts as dead
+    const startDeadline = target.pid === null && target.exited === null ? Date.now() + startMs : Infinity;
     let seen = Atomics.load(target.signal, 0);
     target.port.postMessage({ write: request });
     for (;;) {
@@ -142,33 +152,36 @@ export function createRasterProcess(options: RasterProcessOptions): RasterProces
         if (reply !== undefined) return reply;
       }
       if (target.exited !== null) return { died: target.exited };
-      const left = deadline - Date.now();
+      const now = Date.now();
+      if (target.pid === null && now >= startDeadline) return { died: `did not start within ${startMs} ms` };
+      const left = deadline - now;
       if (left <= 0) return failure('NATIVE_TIMEOUT', `the raster process did not answer within ${options.frameTimeoutMs} ms`);
-      Atomics.wait(target.signal, 0, seen, left);
+      Atomics.wait(target.signal, 0, seen, target.pid === null ? Math.min(left, startDeadline - now) : left);
       seen = Atomics.load(target.signal, 0);
     }
   };
 
-  const attempt = (request: Uint8Array): RasterReply | { died: string } => {
+  const attempt = (request: Uint8Array, maxReplyBytes: number): RasterReply | { died: string } => {
     live ??= launch();
     const target = live;
     try {
-      const outcome = exchange(target, request);
+      const outcome = exchange(target, request, maxReplyBytes);
       // a dead process, a frame over its timeout and a broken stream end this process; a refused scene keeps it
       if ('died' in outcome || (!outcome.ok && (outcome.code === 'NATIVE_TIMEOUT' || outcome.code === 'NATIVE_PROTOCOL'))) stop(target);
       return outcome;
     } catch (error) {
       stop(target); // the framing is lost: the next frame starts a new process
+      if (error instanceof NotRasterServeError) return failure('NATIVE_NO_RASTER_SERVE', error.message);
       return failure('NATIVE_PROTOCOL', `raster process reply: ${errorMessage(error)}`);
     }
   };
 
   return {
-    request(request) {
-      const first = attempt(request);
+    request(request, maxReplyBytes) {
+      const first = attempt(request, maxReplyBytes);
       if (!('died' in first)) return first;
       console.warn(`[raster] the raster process ${first.died}; starting a new one for this frame`);
-      const second = attempt(request);
+      const second = attempt(request, maxReplyBytes);
       return 'died' in second ? failure('NATIVE_DIED', `the raster process ${second.died} twice in a row`) : second;
     },
     pid: () => (live !== null && live.exited === null ? live.pid : null),

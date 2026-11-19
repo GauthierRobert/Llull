@@ -38,6 +38,36 @@ const render = (raster: RasterPort): unknown =>
     .svg;
 
 describe('native PNG of a raster port', () => {
+  it('is asked for by render_view only', () => {
+    const asked: unknown[] = [];
+    const recording: RasterPort = {
+      render: (scene, engine, request) => {
+        asked.push(request);
+        return port(() => undefined).render(scene, engine);
+      },
+    };
+    render(recording);
+    expect(asked).toEqual([{ png: true }]);
+  });
+
+  it('is used once: a port handing back the same array without a PNG gets the TypeScript encoder', () => {
+    let shared: Uint8Array | null = null;
+    let calls = 0;
+    const marker = new Uint8Array([9, 9, 9]);
+    const reusing: RasterPort = {
+      render: (scene) => {
+        const pixels = rasterScenePixels(scene);
+        shared ??= new Uint8Array(pixels.length);
+        shared.set(pixels);
+        calls += 1;
+        const image = { rgba: shared, device: 'cpu', deterministic: true, engine: 'native-cpu', version: 'test' } as const;
+        return { ok: true, image: calls === 1 ? { ...image, png: marker } : image };
+      },
+    };
+    expect(pngOf(render(reusing))).toBe(Buffer.from(marker).toString('base64'));
+    expect(pngOf(render(reusing))).toBe(pngOf(render(port(() => undefined))));
+  });
+
   it('is embedded as is', () => {
     const marker = new Uint8Array([1, 2, 3, 4, 5]);
     expect(pngOf(render(port(() => marker)))).toBe(Buffer.from(marker).toString('base64'));

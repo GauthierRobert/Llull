@@ -28,14 +28,14 @@ export interface NativeRun {
   readonly result: () => NativeProvenance | { readonly code: string; readonly message: string };
 }
 
-/** A pixel stage drawing on `port` with `engine`. */
-export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu'): NativeRun {
+/** A pixel stage drawing on `port` with `engine`; `png` asks the port for the PNG too (render_view embeds it; framed renders blend first). */
+export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu', png = false): NativeRun {
   let failure: { code: string; message: string } | null = null;
   let provenance: NativeProvenance | null = null;
   const pixels = (scene: RasterScene): Uint8Array => {
     const blank = new Uint8Array(scene.width * scene.height * 4);
     if (failure !== null) return blank;
-    const outcome = port.render(scene, engine);
+    const outcome = port.render(scene, engine, { png });
     if (!outcome.ok) {
       failure = { code: outcome.code, message: outcome.message };
       return blank;
@@ -53,7 +53,7 @@ export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu'): NativeRun {
       version: image.version,
       ...(image.reason !== undefined ? { reason: image.reason } : {}),
     };
-    if (image.png !== undefined) rememberEncodedPng(image.rgba, image.png);
+    rememberEncodedPng(image.rgba, image.png);
     return image.rgba;
   };
   return {

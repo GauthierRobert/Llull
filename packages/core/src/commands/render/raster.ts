@@ -196,14 +196,20 @@ export function rasterScenePixels(scene: RasterScene): Uint8Array {
 /** PNGs a native raster already encoded, by the RGBA array it returned (the same bytes `encodePng(…, true)` writes for it). */
 const encodedByPort = new WeakMap<Uint8Array, Uint8Array>();
 
-/** Records that `png` is the compressed PNG of `rgba` (a port's `RasterImage.png`): `rasterImageSvg` then embeds it as is. */
-export function rememberEncodedPng(rgba: Uint8Array, png: Uint8Array): void {
-  encodedByPort.set(rgba, png);
+/**
+ * Records that `png` is the compressed PNG of `rgba` (a port's `RasterImage.png`): `rasterImageSvg` then embeds it as is, once. Without
+ * `png` a recorded one is forgotten (a port may hand the same array back with other pixels).
+ */
+export function rememberEncodedPng(rgba: Uint8Array, png: Uint8Array | undefined): void {
+  if (png === undefined) encodedByPort.delete(rgba);
+  else encodedByPort.set(rgba, png);
 }
 
 /** `<image>` element (PNG data URL) of a `width` × `height` RGBA image covering the canvas. */
 export function rasterImageSvg(width: number, height: number, rgba: Uint8Array): string {
-  const png = encodedByPort.get(rgba) ?? encodePng(width, height, rgba, true);
+  const encoded = encodedByPort.get(rgba);
+  encodedByPort.delete(rgba);
+  const png = encoded ?? encodePng(width, height, rgba, true);
   return `  <image x="0" y="0" width="${width}" height="${height}" href="data:image/png;base64,${uint8ArrayToBase64(png)}"/>`;
 }
 

@@ -20,6 +20,7 @@ import { createRasterProcess, type RasterProcess } from './rasterProcess';
 /** Named guard: one frame of at most 2000 × 2000 at 2× supersampling stays far below this, process start included. */
 const FRAME_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
+const MIB = 1024 * 1024;
 
 type Failure = Extract<RasterOutcome, { ok: false }>;
 const failure = (code: string, message: string): Failure => ({ ok: false, code, message });
@@ -106,11 +107,15 @@ export function createPersistentRasterPort(
     process: server,
     usesJobRunner: () => jobRunner !== null,
     close: () => server.close(),
-    render(scene, engine): RasterOutcome {
+    render(scene, engine, request): RasterOutcome {
       if (jobRunner !== null) return jobRunner.render(scene, engine);
-      const reply = server.request(encodeRasterRequest(scene, engine, true));
+      const rgbaBytes = scene.width * scene.height * 4;
+      // a compressed PNG of the image stays far below twice its raw rows (fixed Huffman: at most 9 bits per byte)
+      const maxReply = rgbaBytes + (request?.png === true ? 2 * rgbaBytes + MIB : 0);
+      const reply = server.request(encodeRasterRequest(scene, engine, request?.png === true), maxReply);
       if (!reply.ok) {
-        if (!served && (reply.code === 'NATIVE_PROTOCOL' || reply.code === 'NATIVE_DIED')) {
+        // only a binary that answered with a job event (no raster-serve) switches the host to one job per frame; a crash does not
+        if (!served && reply.code === 'NATIVE_NO_RASTER_SERVE') {
           console.warn(`[raster] ${binary} raster-serve did not answer (${reply.message}); drawing with one job per frame`);
           server.close();
           jobRunner = createNativeRasterPort(binary, env);
@@ -119,7 +124,7 @@ export function createPersistentRasterPort(
         return failure(reply.code, reply.message);
       }
       served = true;
-      if (reply.rgba.length !== scene.width * scene.height * 4)
+      if (reply.rgba.length !== rgbaBytes)
         return failure('NATIVE_PROTOCOL', `the raster process returned an image of the wrong size for ${scene.width} x ${scene.height}`);
       const png = reply.png.length > 0 ? { png: reply.png } : {};
       return { ok: true, image: { rgba: reply.rgba, ...provenance(reply.warnings, engine, version()), ...png } };

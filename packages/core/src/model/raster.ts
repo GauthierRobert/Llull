@@ -54,6 +54,9 @@ export type RasterOutcome =
 
 /** A host's offscreen rasteriser. Synchronous: commands are synchronous (the host blocks on its job). */
 export interface RasterPort {
-  /** `gpu` (wgpu; falls back to the CPU twin with a reason) or `cpu` (the native CPU twin, bit-identical to the reference). */
-  render(scene: RasterScene, engine: 'gpu' | 'cpu'): RasterOutcome;
+  /**
+   * `gpu` (wgpu; falls back to the CPU twin with a reason) or `cpu` (the native CPU twin, bit-identical to the reference). `png`: the
+   * caller embeds the pixels as they are, so a port that can encode `RasterImage.png` should (a port may ignore it).
+   */
+  render(scene: RasterScene, engine: 'gpu' | 'cpu', options?: { readonly png?: boolean }): RasterOutcome;
 }

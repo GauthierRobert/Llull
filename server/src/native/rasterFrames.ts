@@ -58,12 +58,21 @@ function replyOf(header: Record<string, unknown>, payload: Buffer): RasterReply 
   };
 }
 
+/** The reply of a `llull-compute` built before `raster-serve`: one NDJSON job event (`{"type":"error",…}`) instead of a framed reply. */
+export class NotRasterServeError extends Error {
+  constructor(line: string) {
+    super(`not a raster-serve reply (a llull-compute without raster-serve?): ${line.slice(0, 200)}`);
+    this.name = 'NotRasterServeError';
+  }
+}
+
 /** Incremental reader of replies from stdout chunks. `push` returns the replies completed so far; throws when the framing is lost. */
 export interface RasterReplyReader {
   push(chunk: Uint8Array): RasterReply[];
 }
 
-export function createRasterReplyReader(): RasterReplyReader {
+/** `maxBytes`: the largest payload a reply may announce (a larger header throws: the framing is not trusted). */
+export function createRasterReplyReader(maxBytes: number): RasterReplyReader {
   let pending: Buffer[] = [];
   let size = 0;
   let header: Record<string, unknown> | null = null;
@@ -89,8 +98,11 @@ export function createRasterReplyReader(): RasterReplyReader {
     }
     const line = take(end + 1).toString('utf8', 0, end);
     const parsed: unknown = JSON.parse(line);
+    if (isRecord(parsed) && typeof parsed['type'] === 'string' && parsed['bytes'] === undefined) throw new NotRasterServeError(line);
     if (!isRecord(parsed) || typeof parsed['bytes'] !== 'number' || !Number.isInteger(parsed['bytes']) || parsed['bytes'] < 0)
       throw new Error(`unreadable reply header: ${line.slice(0, 200)}`);
+    if ((parsed['bytes'] as number) > maxBytes)
+      throw new Error(`reply of ${String(parsed['bytes'])} bytes is over the ${maxBytes}-byte limit`);
     return parsed;
   };
 
