@@ -198,10 +198,45 @@ fn a_plane_splits_the_crossed_faces_and_tracks_where_they_came_from() {
 }
 
 #[test]
-fn a_plane_that_misses_the_shape_is_an_error() {
+fn a_plane_that_misses_the_shape_imprints_nothing() {
     let shape = Shape::read_step(&fixture("box_20x10x10.step"), 1.0).unwrap();
     assert!(shape.imprinted(&[50.0, 0.0, 0.0], &[1.0, 0.0, 0.0]).unwrap().is_none());
     assert!(shape.imprinted(&[0.0, 0.0, 0.0], &[1.0, 0.0, 0.0]).unwrap().is_none(), "a plane in a face of the shape cuts nothing");
     assert!(shape.imprinted(&[20.0, 0.0, 0.0], &[1.0, 0.0, 0.0]).unwrap().is_none(), "a plane touching the far face cuts nothing");
     assert!(shape.imprinted(&[1.0, 0.0, 0.0], &[0.0, 0.0, 0.0]).is_err());
+}
+
+#[test]
+fn an_edge_box_holds_the_whole_edge() {
+    let shape = Shape::read_step(&fixture("plate_hole.step"), 1.0).unwrap();
+    let whole = shape.bounds().unwrap();
+    for edge in 1..=shape.edge_count() as i32 {
+        let Some(b) = shape.edge_bounds(edge).unwrap() else { continue };
+        let samples = shape.sample_edge(edge, 0.1).unwrap();
+        assert!(!samples.is_empty());
+        let slack = 1e-6;
+        for p in samples {
+            assert!((0..3).all(|k| b[k] - slack <= p[k] && p[k] <= b[k + 3] + slack), "edge {edge}: {p:?} outside {b:?}");
+        }
+        assert!((0..3).all(|k| b[k] >= whole[k] - 1e-3 && b[k + 3] <= whole[k + 3] + 1e-3), "edge {edge} box inside the part's");
+    }
+    assert!(shape.edge_bounds(0).is_err());
+}
+
+/// The vertex at the origin is moved to (-2, -2, -2) e-3, 2.8e-3 off the three edge lines that end there (its tolerance covers the gap, the
+/// edges' own is 1.5e-3): edge_distance measures to the vertex, so the edge box must hold the vertex point; the curve's box alone does not.
+#[test]
+fn an_edge_box_holds_a_vertex_that_sits_off_the_curve() {
+    let shape = Shape::read_step(&fixture("box_offset_vertex.step"), 1.0).unwrap();
+    let vertex = [-0.002, -0.002, -0.002];
+    let mut checked = 0;
+    for edge in 1..=shape.edge_count() as i32 {
+        if shape.edge_distance(edge, &vertex).unwrap() > 1e-9 {
+            continue;
+        }
+        let b = shape.edge_bounds(edge).unwrap().unwrap();
+        assert!((0..3).all(|k| b[k] <= vertex[k] && vertex[k] <= b[k + 3]), "edge {edge}: {vertex:?} outside {b:?}");
+        checked += 1;
+    }
+    assert_eq!(checked, 3, "the three edges ending at the offset vertex measure 0 to it");
 }
