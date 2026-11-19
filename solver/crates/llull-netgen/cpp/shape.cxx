@@ -34,6 +34,7 @@
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <gp_Trsf.hxx>
 
 #include <algorithm>
@@ -195,6 +196,17 @@ rust::Vec<double> Shape::edge_bounds(int32_t edge) const {
   if (BRep_Tool::Degenerated(shape_edge)) return out;
   Bnd_Box box;
   BRepBndLib::Add(shape_edge, box, false);
+  // edge_distance also measures to the edge's vertices, which may sit up to their own tolerance off the curve ends: each vertex point
+  // joins the box grown by its tolerance (a box of its own, so the curve's box is not grown by the vertex tolerance)
+  TopoDS_Vertex first, last;
+  TopExp::Vertices(shape_edge, first, last);
+  for (const TopoDS_Vertex &vertex : {first, last}) {
+    if (vertex.IsNull()) continue;
+    Bnd_Box point;
+    point.Add(BRep_Tool::Pnt(vertex));
+    point.Enlarge(BRep_Tool::Tolerance(vertex));
+    box.Add(point);
+  }
   if (box.IsVoid()) return out;
   double values[6];
   box.Get(values[0], values[1], values[2], values[3], values[4], values[5]);

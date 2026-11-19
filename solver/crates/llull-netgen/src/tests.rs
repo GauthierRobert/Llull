@@ -222,3 +222,21 @@ fn an_edge_box_holds_the_whole_edge() {
     }
     assert!(shape.edge_bounds(0).is_err());
 }
+
+/// The vertex at the origin is moved to (-2, -2, -2) e-3, 2.8e-3 off the three edge lines that end there (its tolerance covers the gap, the
+/// edges' own is 1.5e-3): edge_distance measures to the vertex, so the edge box must hold the vertex point; the curve's box alone does not.
+#[test]
+fn an_edge_box_holds_a_vertex_that_sits_off_the_curve() {
+    let shape = Shape::read_step(&fixture("box_offset_vertex.step"), 1.0).unwrap();
+    let vertex = [-0.002, -0.002, -0.002];
+    let mut checked = 0;
+    for edge in 1..=shape.edge_count() as i32 {
+        if shape.edge_distance(edge, &vertex).unwrap() > 1e-9 {
+            continue;
+        }
+        let b = shape.edge_bounds(edge).unwrap().unwrap();
+        assert!((0..3).all(|k| b[k] <= vertex[k] && vertex[k] <= b[k + 3]), "edge {edge}: {vertex:?} outside {b:?}");
+        checked += 1;
+    }
+    assert_eq!(checked, 3, "the three edges ending at the offset vertex measure 0 to it");
+}

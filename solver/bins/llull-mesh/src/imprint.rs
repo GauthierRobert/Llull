@@ -322,16 +322,47 @@ mod tests {
         }
     }
 
+    fn fixture(name: &str) -> Shape {
+        Shape::read_step(&format!("{}/../../crates/llull-netgen/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR")), 1.0).unwrap()
+    }
+
+    /// The prefilter finds the edges of the unfiltered pass for every edge of `part` (and returns them), the part split by `plane`.
+    fn assert_identical(part: &Shape, point: Point, normal: Point, what: &str) -> BTreeSet<i32> {
+        let length = normal.iter().map(|c| c * c).sum::<f64>().sqrt();
+        let plane = Plane { point, normal: normal.map(|c| c / length) };
+        let split = imprint(part, &[plane], "part").unwrap_or_else(|e| panic!("{what}: {}", e.message));
+        let diag = diagonal(&part.bounds().unwrap());
+        let every: BTreeSet<i32> = (1..=part.edge_count() as i32).collect();
+        let start = Instant::now();
+        let reference = edges_from_unfiltered(&split, part, &every, diag);
+        let unfiltered = start.elapsed();
+        let start = Instant::now();
+        let filtered = split.edges_from(part, &every, diag).unwrap();
+        eprintln!("{what}, {} edges: unfiltered {unfiltered:?}, prefiltered {:?}", part.edge_count(), start.elapsed());
+        assert_eq!(filtered, reference, "{what}");
+        assert!(!filtered.is_empty(), "{what}");
+        filtered
+    }
+
     #[test]
-    fn the_prefilter_keeps_the_curved_edges_of_a_hole() {
-        let path = format!("{}/../../crates/llull-netgen/tests/fixtures/plate_hole.step", env!("CARGO_MANIFEST_DIR"));
-        let plate = Shape::read_step(&path, 1.0).unwrap();
-        let diag = diagonal(&plate.bounds().unwrap());
-        let split = imprint(&plate, &[Plane { point: [10.0, 0.0, 0.0], normal: [1.0, 0.0, 0.0] }], "plate").unwrap();
-        let every: BTreeSet<i32> = (1..=plate.edge_count() as i32).collect();
-        let filtered = split.edges_from(&plate, &every, diag).unwrap();
-        assert_eq!(filtered, edges_from_unfiltered(&split, &plate, &every, diag));
-        assert!(!filtered.is_empty());
+    fn the_prefilter_finds_the_unfiltered_edges_on_curved_oblique_in_plane_and_near_tangent_cuts() {
+        assert_identical(&fixture("plate_hole.step"), [10.0, 0.0, 0.0], [1.0, 0.0, 0.0], "circular hole edges");
+        let solid = fixture("box_20x10x10.step");
+        assert_identical(&solid, [10.0, 5.0, 5.0], [1.0, 0.5, 1.0], "oblique plane");
+        assert_identical(&solid, [0.0, 0.0, 0.0], [1.0, -1.0, 0.0], "an original edge in the plane");
+        assert_identical(&solid, [1e-3, 0.0, 0.0], [1.0, 0.0, 0.0], "near-tangent cut, 1e-3 from the x = 0 face");
+        // NIST CTC-01 (public domain, 07 validation data): 322 edges, 14 of them B-spline curves
+        let nist = format!(
+            "{}/../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/nist_ctc_01_asme1_ap242.stp",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let nist = Shape::read_step(&nist, 1.0).unwrap();
+        let b = nist.bounds().unwrap();
+        let centre = [0, 1, 2].map(|k| 0.5 * (b[k] + b[k + 3]));
+        assert_identical(&nist, centre, [1.0, 1.0, 1.0], "B-spline edges, oblique plane");
+        let offset = fixture("box_offset_vertex.step");
+        assert_identical(&offset, [10.0, 0.0, 0.0], [1.0, 0.0, 0.0], "a vertex off its curves");
+        assert_identical(&offset, [3e-3, 0.0, 0.0], [1.0, 0.0, 0.0], "near-tangent cut by the off-curve vertex");
     }
 
     #[test]

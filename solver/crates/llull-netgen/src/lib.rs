@@ -229,13 +229,14 @@ impl Shape {
         Ok(self.0.edge_distance(edge, point[0], point[1], point[2])?)
     }
 
-    /// `[min xyz, max xyz]` of a box holding the whole edge (never smaller than the edge); `None` for a degenerated edge.
+    /// `[min xyz, max xyz]` of a box holding everything [`Shape::edge_distance`] measures to: the curve grown by the edge tolerance and
+    /// each vertex point grown by its own tolerance (never smaller than the edge); `None` for a degenerated edge.
     pub fn edge_bounds(&self, edge: i32) -> Result<Option<[f64; 6]>> {
         let b = self.0.edge_bounds(edge)?;
         if b.is_empty() {
             return Ok(None);
         }
-        b.get(..6).and_then(|b| <[f64; 6]>::try_from(b).ok()).map(Some).ok_or_else(|| Error("edge bounds: 6 numbers expected".into()))
+        <[f64; 6]>::try_from(b.as_slice()).map(Some).map_err(|_| Error(format!("edge bounds: 6 numbers expected, got {}", b.len())))
     }
 
     /// Radius of a cylinder face, minor radius of a torus face, 0 otherwise.
