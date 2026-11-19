@@ -34,6 +34,33 @@ function implicitBodyDocument(mutate: (body: Record<string, unknown>) => void): 
   for (const body of Object.values(saved.document.implicit.bodies)) mutate(body);
   return JSON.stringify(saved);
 }
+/** A saved document with one material holding a PHY-15 linearCoefficient resistivity model, its stored form changed by `tamper`. */
+function linearModelDocument(tamper: (form: Record<string, unknown>) => void): string {
+  let doc = execute(createEmptyDocument(), 'create_material', {
+    name: 'cu',
+    density: 8960,
+    color: '#b87333',
+    metalness: 1,
+    roughness: 0.3,
+  }).document;
+  const form = { kind: 'linearCoefficient', variable: 'T', referenceValue: 1.7241e-8, coefficient: 0.00393, reference: 20 };
+  const model = {
+    id: 'rho.lin',
+    property: 'electricalResistivity',
+    unit: 'ohm*m',
+    variables: [{ variable: 'T', unit: 'degC' }],
+    form,
+    validity: [{ variable: 'T', unit: 'degC', data: [-55, 150] }],
+    basis: 'company',
+    source: { citation: 'hostile sample' },
+  };
+  doc = execute(doc, 'define_property_model', { material: 'cu', model }).document;
+  const saved = JSON.parse(serializeDocument(doc)) as {
+    document: { materials: Record<string, { propertyModels: { form: Record<string, unknown> }[] }> };
+  };
+  for (const material of Object.values(saved.document.materials)) for (const stored of material.propertyModels ?? []) tamper(stored.form);
+  return JSON.stringify(saved);
+}
 import { firaBytes } from '../../unit/wrap/fixtures';
 import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
 import { variableTrueTypeWithMetrics } from '../../unit/wrap/variableTrueType';
@@ -572,6 +599,19 @@ export const CORE_READERS: readonly HostileReader[] = [
       },
       { name: 'implicit body: material id __proto__', input: () => implicitBodyDocument((body) => (body['materialId'] = '__proto__')) },
       { name: 'implicit body: material id as an object', input: () => implicitBodyDocument((body) => (body['materialId'] = { petg: 1 })) },
+      {
+        name: 'linear resistivity model: coefficient as a string',
+        input: () => linearModelDocument((form) => (form['coefficient'] = 'fast')),
+      },
+      { name: 'linear resistivity model: reference 1e308', input: () => linearModelDocument((form) => (form['reference'] = 1e308)) },
+      {
+        name: 'linear resistivity model: variable __proto__',
+        input: () => linearModelDocument((form) => (form['variable'] = '__proto__')),
+      },
+      {
+        name: 'linear resistivity model: rho negative inside the range (hash recomputed by an attacker is still refused)',
+        input: () => linearModelDocument((form) => (form['coefficient'] = -1)),
+      },
     ],
   },
   {

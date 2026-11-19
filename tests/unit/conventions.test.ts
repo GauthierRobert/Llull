@@ -304,3 +304,19 @@ describe('CONVENTIONS_GUIDE acoustics section (PHY-20 M2, AF-03)', () => {
       expect(section).toContain(text);
   });
 });
+
+describe('CONVENTIONS_GUIDE electro-optical section (PHY-15)', () => {
+  const section = CONVENTIONS_GUIDE.split('## 21. Electrical bonding')[1] ?? '';
+  it('exists and names only registered commands, including every PHY-15 command', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(section.length).toBeGreaterThan(0);
+    const named = [...section.matchAll(/`([a-z_]+)`/g)].map((match) => match[1] ?? '');
+    for (const name of named) expect(getCommand(name), name).toBeDefined();
+    for (const name of ['set_lightning_zone', 'check_bonding', 'dispose_bond_check', 'optical_balance', 'electrical_resistance'])
+      expect(named).toContain(name);
+  });
+  it('states that no limit, flux or zone is a default and names the human gate', () => {
+    for (const text of [/NO bond limit/, /NO solar flux/, /NO lightning zone/, /EOP_HUMAN_GATE/, /linearCoefficient/])
+      expect(section).toMatch(text);
+  });
+});

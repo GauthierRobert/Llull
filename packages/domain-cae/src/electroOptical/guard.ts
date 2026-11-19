@@ -16,6 +16,8 @@ function references(doc: CadDocument): Reference[] {
     const owner = `coating assignment '${item.id}'`;
     found.push({ kind: 'entities', id: item.entityId, owner }, { kind: 'materials', id: item.coating, owner });
   }
+  for (const label of Object.values(doc.electroOptical?.zones ?? {}))
+    found.push({ kind: 'entities', id: label.entityId, owner: `lightning zone label '${label.id}'` });
   for (const path of Object.values(doc.electroOptical?.bondPaths ?? {})) {
     const owner = `bond path '${path.id}'`;
     found.push({ kind: 'entities', id: path.from, owner }, { kind: 'entities', id: path.to, owner });
@@ -35,7 +37,7 @@ export const electroOpticalReferenceGuard: DerivationGuard = {
   check(previous: CadDocument, next: CadDocument): string | null {
     for (const { kind, id, owner } of references(next))
       if (Object.hasOwn(previous[kind], id) && !Object.hasOwn(next[kind], id))
-        return `${kind === 'entities' ? 'entity' : 'material'} '${id}' is used by ${owner}; delete it (remove_surface_coating / delete_bond_path) first`;
+        return `${kind === 'entities' ? 'entity' : 'material'} '${id}' is used by ${owner}; delete it (remove_surface_coating / delete_bond_path / remove_lightning_zone) first`;
     return null;
   },
 };

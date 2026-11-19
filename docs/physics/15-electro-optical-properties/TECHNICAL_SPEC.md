@@ -288,4 +288,35 @@ shapes and are executed by `tests/unit/electroOptical/`.
 - `optical_balance` refuses a T-dependent emissivity that does not settle in 200 iterations (`EOP_BALANCE_NOT_CONVERGED`, last T and change named) and alpha = 0 with a T-dependent emissivity (`EOP_BALANCE_DEGENERATE`: T = 0 K is outside every model); a constant emissivity with alpha = 0 answers T = 0 K by the closed form. It reports `iterations`.
 - The signed-gate re-verification is shared (`packages/domain-cae/src/shared/signedGate.ts`) by corrosion and electro-optical.
 
-**Left**: anisotropic `direction` and CFRP resistivity by direction, `set_lightning_zone`, part-geometry paths (V1), faces (`facesNear`) instead of whole solids, PHY-03 link `emissivity: 'material'` (TR-EOP-32), the wavelength / frequency variables with refractiveIndex / relativePermeability rows, UI overlay, the `llull guide` section and a golden plan.
+**Left**: anisotropic `direction` and CFRP resistivity by direction, `set_lightning_zone`, part-geometry paths (V1), faces (`facesNear`) instead of whole solids, PHY-03 link `emissivity: 'material'` (TR-EOP-32), the wavelength / frequency variables with refractiveIndex / relativePermeability rows, UI overlay, the `llull guide` section and a golden plan. (EOP-b: see §14.)
+
+## 14. As built (EOP-b, 2026-11-19)
+
+**Built**
+- Linear temperature coefficient (TR-EOP-11): core property form `linearCoefficient { variable, referenceValue, coefficient, reference }`, y = referenceValue (1 + coefficient (x - reference)),
+  coefficient per unit of the variable (T in degC: alphaR in 1/K). Same path as every PHY-01 form (`propertyModel.ts` union, `propertyForms.ts` value + slope, zod `formSchema`, so define, library import and load all
+  validate it). Load / define refuse a non-finite field (`PROP_FORM_INVALID`) and, the form being monotonic, a value <= 0 at a validity bound of a positive property (`PROP_NONPOSITIVE_IN_RANGE`) or outside a
+  catalogue range (`EOP_PROPERTY_RANGE`), even when an edited file recomputes the hash. Never extrapolated (PHY-01 range guard). `electrical_resistance` and `check_bonding` straps read it through
+  `evaluate_property` and report `temperatureModel` (`none (constant model)`, `linear temperature coefficient ...`, `PHY-01 <kind> model`). The separate catalogue row
+  `temperatureCoefficientOfResistivity` of §3.1 is NOT added: alpha and T0 live in the form, so one model carries rho(T) and its reference temperature. Oracle VC-EOP-02.b (alphaR 0.00393 /K is a test input).
+  Hostile corpus: four tampered linear forms in the `load_document` reader.
+- `set_lightning_zone` / `remove_lightning_zone`: slice `electroOptical.zones` (optional; files without it load), label `lz-<step>.<k>` `{ entityId, zone, source }`, one per solid (set again replaces, keeps the id),
+  zone enum SAE ARP5414A `1A 1B 1C 2A 2B 3` (1C is in revision A), source REQUIRED (`EOP_ZONE_SOURCE_REQUIRED`). Per solid, not `facesNear`, as coatings (§13). The guard refuses deleting a labelled solid.
+  `check_bonding` (no `pathIds`) returns `zones` rows `{ labelId, entityId, zone, source, bondPaths, composite, code }`; a composite solid (material record productForm / designation text, the CFRP strap heuristic)
+  in a zone that no path names (endpoint or joint interface) warns `EOP_LIGHTNING_ZONE_NO_PATH`; the status is unchanged. llull never derives a zone.
+- `llull guide` section 21 (properties and conditions, the linear form, coatings, zones, bond rule entries, no default limit / flux / zone, the human gate).
+- Golden plan `validation/plans/eop_end_to_end.plan.json` (`tests/golden/eopPlans.test.ts`: document, every query at 9 digits, replay and save / load equality).
+
+**Not built**
+- `EOP_BACKLIT`: named only on the task board; neither this spec nor FUNCTIONAL_SPEC defines it (no code, condition or remediation). Needs a definition first.
+- Anisotropic direction (CFRP strap): a strap gains `direction?: PropertyDirection`; `resistivityOf` passes it to `evaluate_property` (models with `direction` exist in PHY-01), a composite strap without a
+  direction refuses (`EOP_DIRECTION_REQUIRED`) instead of warning; VC-EOP-07 (sigma_x 1e4 S/m, 0.25 ohm) becomes a unit oracle. Needs `percentIacs` / `electricalConductivity` input aliases to enter sigma as given.
+- Part-geometry bond paths (V1) and `facesNear`: element `{ kind: 'part', entityId, fromNear, toNear }` evaluated by §5.3 with `ctx.kernel` (`requiresKernel` branch: slab-clipped `massProperties`), flagged
+  approximate; coatings and zones then take optional `facesNear` resolved like 05 FEA targets. Blocked on a kernel slab-clip query, not on this pack.
+- PHY-03 `emissivity: 'material'` (TR-EOP-32): add a read-only EOP query (`surface_emissivity { entityId, temperature }`: exposed coating -> emissivityIr hemispherical_total at T -> value, provenance,
+  unverified; no coating -> the solid's own material; none -> `EOP_SURFACE_PROPERTY_MISSING`) and let the thermal radiation BC compose it through `execute` at deck time, as `check_bonding` composes
+  `list_surface_systems` (no plugin-to-plugin import). Touches the thermal BC schema and deck writer (another lane's files) and is per solid until `facesNear` exists; VC-EOP-11 is its oracle.
+- `refractiveIndex` / `relativePermeability` rows: need `wavelength` and `frequency` in `PROPERTY_VARIABLES` plus their unit dimensions in `lib/quantity` (owned by PHY-01 / core); then `normal_reflectance` and the
+  skin-depth path accept a material in place of `n2` / `mur`.
+- UI overlay (bond paths, coating and zone labels, disposition dialog): `src/ui`, Lane 2.
+

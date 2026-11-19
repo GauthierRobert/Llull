@@ -16,6 +16,7 @@ this pack ships no property data (sources.md "Data policy findings").
 | `radiator_balance.csv` | (b) | sun-facing plate equilibrium temperature vs α/ε (flux 1361 W/m² as a test input) |
 | `plans/eop_bonding_paths.plan.json` | draft plan | box + structure, two bond paths (pass / fail against a 2.5 mΩ test rule), `check_bonding` |
 | `plans/eop_radiator_coating.plan.json` | draft plan | coating record (α BOL 0.2, ε 0.9 test inputs) on a panel face, `optical_balance`, `check_surface_properties` |
+| `plans/eop_end_to_end.plan.json` | golden plan | every EOP command end to end: linearCoefficient copper strap at 75 °C (VC-EOP-02.b) failing a 2.5 mΩ test rule, coatings, ARP5414A zones (`EOP_LIGHTNING_ZONE_NO_PATH` on a CFRP skin), the conductor / optical queries; pinned by `tests/golden/eopPlans.test.ts` |
 
 Plans use existing commands, proposed 08 commands, PHY-01 `define_property_model` (constant models with the `lifeState` /
 `opticalKind` condition fields this pack requests from PHY-01, TECHNICAL §3.1) and the commands of TECHNICAL_SPEC §4.

@@ -8,6 +8,7 @@ import { bondContext } from './bondContext';
 import { type BondRow, type BondStatus, bondRow } from './bondEval';
 import { dispositionState } from './gate';
 import { dispositionOf, electroOpticalOf } from './model';
+import { zoneRows } from './zoneFindings';
 
 const COMMAND = 'check_bonding';
 const RANK: Readonly<Record<BondStatus, number>> = { pass: 0, unknown: 1, fail: 2 };
@@ -56,7 +57,7 @@ export function checkedRows(
 
 /**
  * @affects nothing; read-only, document returned unchanged, affected: []
- * @invariant data = { status, rows, counts, open, reviewRequired: true, notes }; row total = sum of its elements (joints as given, straps rho L / A with rho from evaluate_property at the path temperature); a path passes only when
+ * @invariant data = { status, rows, counts, open, zones, reviewRequired: true, notes }; zones (all labels, only without pathIds) never change the status; row total = sum of its elements (joints as given, straps rho L / A with rho from evaluate_property at the path temperature); a path passes only when
  *   every element resolves, a sourced limit exists, the total is <= the limit, no bonded-interface coating (or surface system, list_surface_systems) is insulating or undeclared, and joined solids touch (find_contacts or a fastener stack) and were tested; overall status = worst row without a CONFIRMED human
  *   disposition 'accepted' (re-verified through the signing port for this document and the path as it is); every limit is unverified
  * @failure unknown pathIds entry -> EOP_PATH_NOT_FOUND; a find_contacts refusal is returned as is (document unchanged)
@@ -70,7 +71,9 @@ export const checkBonding = defineCommand({
     '(EOP_BOND_RESISTANCE_EXCEEDED, or EOP_COATING_INSULATES when a bonded_interface coating on a joint solid is declared insulating); unknown (never pass): no limit (EOP_BOND_LIMIT_MISSING), an unresolved strap resistivity ' +
     '(EOP_RESISTIVITY_UNAVAILABLE), a coating whose electrical effect is undeclared or a surface system without a declared one (EOP_COATING_UNKNOWN), joined solids that do not touch (EOP_JOINT_NO_CONTACT). ' +
     'Every row has reviewRequired true: a qualified engineer decides; a failed or unknown path is disposed only by a human (dispose_bond_check, disposition pending_human until then). ' +
-    'A joint also counts as touching when its two solids are consecutive layers of a placed fastener stack (list_fastener_stacks); a solid find_contacts did not test (a broken instance) is unknown (EOP_CONTACT_NOT_TESTED), never a pass. A joint naming no solids is flagged in unverifiedReasons. A composite strap (record productForm / designation) adds the warning EOP_CFRP_IN_PATH (status unchanged: a metallic path is needed). Part-geometry paths are not evaluated. Returns data { status, rows: [{ pathId, name, totalOhm, totalMilliohm, elements: [{ kind, ohm, share, provenance }], limit?, status, code, findings, warnings, unverified, unverifiedReasons, reviewRequired, disposition, inputsHash }], counts, open }.',
+    'A joint also counts as touching when its two solids are consecutive layers of a placed fastener stack (list_fastener_stacks); a solid find_contacts did not test (a broken instance) is unknown (EOP_CONTACT_NOT_TESTED), never a pass. A joint naming no solids is flagged in unverifiedReasons. A composite strap (record productForm / designation) adds the warning EOP_CFRP_IN_PATH (status unchanged: a metallic path is needed). Part-geometry paths are not evaluated. ' +
+    'Without pathIds it also lists every lightning zone label (set_lightning_zone) with the paths naming that solid; a composite solid in a zone with no path warns EOP_LIGHTNING_ZONE_NO_PATH (status unchanged). ' +
+    'Returns data { status, rows: [{ pathId, name, totalOhm, totalMilliohm, elements: [{ kind, ohm, share, provenance }], limit?, status, code, findings, warnings, unverified, unverifiedReasons, reviewRequired, disposition, inputsHash }], counts, open, zones: [{ labelId, entityId, zone, source, bondPaths, composite, code, message }] }.',
   params: z.object({
     pathIds: z.array(z.string()).optional().describe('Only these bond paths (ids from define_bond_path). Omit for all.'),
   }),
@@ -88,17 +91,24 @@ export const checkBonding = defineCommand({
     const tally = Object.entries(counts)
       .map(([name, n]) => `${name} ${n}`)
       .join(', ');
+    const zones = pathIds === undefined ? zoneRows(doc) : [];
+    const unpathed = zones.filter((zone) => zone.code !== null).map((zone) => `${zone.entityId} zone ${zone.zone}`);
+    const zoneText =
+      zones.length === 0
+        ? ''
+        : `; ${zones.length} zoned solid(s)${unpathed.length > 0 ? `, EOP_LIGHTNING_ZONE_NO_PATH: ${unpathed.join(', ')}` : ''}`;
     const summary =
       `${COMMAND}: ${status} - ${rows.length} path(s) (${tally || 'none defined'}); ` +
-      `every limit is unverified and every path needs a qualified engineer${worst.length > 0 ? `; ${worst.join('; ')}` : ''}.`;
+      `every limit is unverified and every path needs a qualified engineer${worst.length > 0 ? `; ${worst.join('; ')}` : ''}${zoneText}.`;
     return report(doc, summary, {
       status,
       rows,
       counts,
       open: open.map((row) => row.pathId),
+      zones,
       reviewRequired: true,
       notes: [
-        'bond limits are programme rules supplied by the owner (no default); part-geometry paths are not evaluated; CFRP is detected from the strap material record text only',
+        'bond limits are programme rules supplied by the owner (no default); part-geometry paths are not evaluated; CFRP is detected from the material record text only (straps and zoned solids)',
       ],
     });
   },

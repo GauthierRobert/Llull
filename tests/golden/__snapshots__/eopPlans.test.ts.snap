@@ -1,0 +1,926 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`eop_end_to_end plan (VC-EOP-02, 05, 06, 08, 09; zones) > the slice, the bond row at 75 degC, the zone rows and every query are pinned > check_bonding 1`] = `
+{
+  "counts": {
+    "fail": 1,
+  },
+  "notes": [
+    "bond limits are programme rules supplied by the owner (no default); part-geometry paths are not evaluated; CFRP is detected from the material record text only (straps and zoned solids)",
+  ],
+  "open": [
+    "bp-17.1",
+  ],
+  "reviewRequired": true,
+  "rows": [
+    {
+      "code": "EOP_BOND_RESISTANCE_EXCEEDED",
+      "disposition": "pending_human",
+      "elements": [
+        {
+          "kind": "joint",
+          "ohm": 0.0005,
+          "provenance": "test input of this validation case (not a property claim)",
+          "share": 0.192547324,
+        },
+        {
+          "kind": "strap",
+          "ohm": 0.00209676422,
+          "provenance": "strap_cu: test input of this validation case (not a property claim) (linearCoefficient test input of this validation case (not a property claim)); linear temperature coefficient rho0 (1 + alpha (T - T0)) at 75 degC; R = rho L / A",
+          "share": 0.807452676,
+        },
+      ],
+      "findings": [
+        {
+          "code": "EOP_BOND_RESISTANCE_EXCEEDED",
+          "message": "2.596764 mohm exceeds the limit 2.5 mohm (bond_class_R_test)",
+        },
+      ],
+      "inputsHash": "6db34381b1655405d5b4a7b6d852b74ac15906e34cce19f029b9ee442c69dbd1",
+      "limit": {
+        "limitOhm": 0.0025,
+        "ruleId": "bond_class_R_test",
+        "source": "rule table entry for this test (unverified)",
+        "unit": "mohm",
+        "unverified": true,
+        "value": 2.5,
+      },
+      "name": "box_to_structure_hot",
+      "pathId": "bp-17.1",
+      "reviewReason": "electrical bonding is a design-assurance finding: a qualified EMC / lightning engineer reviews every path",
+      "reviewRequired": true,
+      "status": "fail",
+      "totalMilliohm": 2.59676422,
+      "totalOhm": 0.00259676422,
+      "unverified": true,
+      "unverifiedReasons": [
+        "EOP_LIMIT_UNVERIFIED: the limit is a programme rule entered as given; no command marks it verified",
+      ],
+      "warnings": [],
+    },
+  ],
+  "status": "fail",
+  "zones": [
+    {
+      "bondPaths": [],
+      "code": "EOP_LIGHTNING_ZONE_NO_PATH",
+      "composite": true,
+      "entityId": "box-4.1",
+      "labelId": "lz-15.1",
+      "message": "composite solid box-4.1 is in lightning zone 2A but no bond path names it: add a metallic path / expanded foil and define_bond_path",
+      "source": "zoning drawing of this validation case (test input)",
+      "zone": "2A",
+    },
+    {
+      "bondPaths": [
+        "bp-17.1",
+      ],
+      "code": null,
+      "composite": false,
+      "entityId": "box-2.1",
+      "labelId": "lz-16.1",
+      "message": null,
+      "source": "zoning drawing of this validation case (test input)",
+      "zone": "3",
+    },
+  ],
+}
+`;
+
+exports[`eop_end_to_end plan (VC-EOP-02, 05, 06, 08, 09; zones) > the slice, the bond row at 75 degC, the zone rows and every query are pinned > check_surface_properties 1`] = `
+{
+  "counts": {
+    "pass": 1,
+    "warn": 1,
+  },
+  "items": [
+    {
+      "assignmentId": "sc-12.1",
+      "coating": "white_paint",
+      "entityId": "box-4.1",
+      "findings": [
+        {
+          "code": "EOP_SURFACE_PROPERTY_MISSING",
+          "message": "absorptivitySolar {"lifeState":"EOL"} unavailable: white_paint absorptivitySolar {"lifeState":"EOL"}: evaluate_property: PROP_NO_MODEL_FOR_PROPERTY — material 'white_paint' has no absorptivitySolar model for this direction / basis / condition; no-op.",
+          "severity": "warn",
+        },
+      ],
+      "location": "exposed",
+      "status": "warn",
+    },
+    {
+      "assignmentId": "sc-14.1",
+      "coating": "alodine_test",
+      "entityId": "box-3.1",
+      "findings": [],
+      "location": "bonded_interface",
+      "status": "pass",
+    },
+  ],
+  "reviewRequired": true,
+  "status": "warn",
+  "unmatched": [],
+}
+`;
+
+exports[`eop_end_to_end plan (VC-EOP-02, 05, 06, 08, 09; zones) > the slice, the bond row at 75 degC, the zone rows and every query are pinned > document 1`] = `
+{
+  "document": {
+    "animations": {},
+    "camera": {
+      "azimuth": 2.35619449,
+      "distance": 12,
+      "polar": 1.04719755,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+    },
+    "components": {},
+    "configurations": {},
+    "constraintOrder": [],
+    "constraints": {},
+    "displayPrecision": 3,
+    "driveRelationOrder": [],
+    "driveRelations": {},
+    "electroOptical": {
+      "bondPaths": {
+        "#26": {
+          "elements": [
+            {
+              "interfaces": [
+                "#1",
+                "#3",
+              ],
+              "kind": "joint",
+              "resistance": {
+                "unit": "mohm",
+                "value": 0.5,
+              },
+              "source": {
+                "citation": "test input of this validation case (not a property claim)",
+              },
+            },
+            {
+              "crossSection": {
+                "unit": "mm^2",
+                "value": 10,
+              },
+              "kind": "strap",
+              "length": {
+                "unit": "mm",
+                "value": 1000,
+              },
+              "material": "strap_cu",
+            },
+          ],
+          "from": "#1",
+          "id": "#26",
+          "limit": {
+            "ruleId": "bond_class_R_test",
+            "source": {
+              "citation": "rule table entry for this test (unverified)",
+            },
+            "unit": "mohm",
+            "unverified": true,
+            "value": 2.5,
+          },
+          "name": "box_to_structure_hot",
+          "temperature": {
+            "unit": "degC",
+            "value": 75,
+          },
+          "to": "#3",
+        },
+      },
+      "coatings": {
+        "#17": {
+          "coating": "white_paint",
+          "electrical": "unknown",
+          "entityId": "#4",
+          "id": "#17",
+          "location": "exposed",
+        },
+        "#20": {
+          "coating": "alodine_test",
+          "electrical": "conductive",
+          "entityId": "#3",
+          "id": "#20",
+          "location": "bonded_interface",
+          "source": {
+            "citation": "test input of this validation case (not a property claim)",
+          },
+        },
+      },
+      "dispositions": {},
+      "zones": {
+        "#22": {
+          "entityId": "#4",
+          "id": "#22",
+          "source": {
+            "citation": "zoning drawing of this validation case (test input)",
+          },
+          "zone": "2A",
+        },
+        "#24": {
+          "entityId": "#1",
+          "id": "#24",
+          "source": {
+            "citation": "zoning drawing of this validation case (test input)",
+          },
+          "zone": "3",
+        },
+      },
+    },
+    "entities": {
+      "#1": {
+        "color": "#6b8f9c",
+        "id": "#1",
+        "kind": "box",
+        "layerId": "#2",
+        "position": [
+          100,
+          75,
+          40,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          200,
+          150,
+          80,
+        ],
+      },
+      "#3": {
+        "color": "#6b8f9c",
+        "id": "#3",
+        "kind": "box",
+        "layerId": "#2",
+        "position": [
+          100,
+          75,
+          -2.5,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          300,
+          200,
+          5,
+        ],
+      },
+      "#4": {
+        "color": "#6b8f9c",
+        "id": "#4",
+        "kind": "box",
+        "layerId": "#2",
+        "materialId": "cfrp_skin",
+        "position": [
+          100,
+          75,
+          -6,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          400,
+          300,
+          2,
+        ],
+      },
+    },
+    "featureHistory": [
+      {
+        "affected": [],
+        "id": "#5",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#6",
+        "name": "add_box",
+        "params": {
+          "anchor": "min",
+          "position": [
+            0,
+            0,
+            0,
+          ],
+          "size": [
+            200,
+            150,
+            80,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#3",
+        ],
+        "id": "#7",
+        "name": "add_box",
+        "params": {
+          "anchor": "min",
+          "position": [
+            -50,
+            -25,
+            -5,
+          ],
+          "size": [
+            300,
+            200,
+            5,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#4",
+        ],
+        "id": "#8",
+        "name": "add_box",
+        "params": {
+          "anchor": "min",
+          "position": [
+            -100,
+            -75,
+            -7,
+          ],
+          "size": [
+            400,
+            300,
+            2,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#9",
+        "name": "define_material_record",
+        "params": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "strap_cu",
+          "licence": "company-proprietary",
+          "productForm": "strap",
+          "specs": [],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#10",
+        "name": "define_property_model",
+        "params": {
+          "material": "strap_cu",
+          "model": {
+            "basis": "company",
+            "form": {
+              "coefficient": 0.00393,
+              "kind": "linearCoefficient",
+              "reference": 20,
+              "referenceValue": 1.7241e-8,
+              "variable": "T",
+            },
+            "id": "rho_lin",
+            "preferred": true,
+            "property": "electricalResistivity",
+            "source": {
+              "citation": "test input of this validation case (not a property claim)",
+            },
+            "unit": "ohm*m",
+            "validity": [
+              {
+                "data": [
+                  -55,
+                  150,
+                ],
+                "unit": "degC",
+                "variable": "T",
+              },
+            ],
+            "variables": [
+              {
+                "unit": "degC",
+                "variable": "T",
+              },
+            ],
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#11",
+        "name": "define_material_record",
+        "params": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "cfrp_skin",
+          "licence": "company-proprietary",
+          "productForm": "laminate",
+          "specs": [],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#4",
+        ],
+        "id": "#12",
+        "name": "assign_material",
+        "params": {
+          "entityIds": [
+            "#4",
+          ],
+          "materialName": "cfrp_skin",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#13",
+        "name": "define_material_record",
+        "params": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "white_paint",
+          "licence": "company-proprietary",
+          "productForm": "coating",
+          "specs": [],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#14",
+        "name": "define_property_model",
+        "params": {
+          "material": "white_paint",
+          "model": {
+            "basis": "company",
+            "condition": {
+              "lifeState": "BOL",
+            },
+            "form": {
+              "kind": "constant",
+              "value": 0.2,
+            },
+            "id": "abs_bol",
+            "preferred": true,
+            "property": "absorptivitySolar",
+            "source": {
+              "citation": "test input of this validation case (not a property claim)",
+            },
+            "unit": "1",
+            "validity": [],
+            "variables": [],
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#15",
+        "name": "define_property_model",
+        "params": {
+          "material": "white_paint",
+          "model": {
+            "basis": "company",
+            "condition": {
+              "opticalKind": "hemispherical_total",
+            },
+            "form": {
+              "kind": "constant",
+              "value": 0.9,
+            },
+            "id": "eps_ht",
+            "preferred": true,
+            "property": "emissivityIr",
+            "source": {
+              "citation": "test input of this validation case (not a property claim)",
+            },
+            "unit": "1",
+            "validity": [],
+            "variables": [],
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#17",
+        ],
+        "id": "#16",
+        "name": "assign_surface_coating",
+        "params": {
+          "coating": "white_paint",
+          "entityId": "#4",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#18",
+        "name": "define_material_record",
+        "params": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "alodine_test",
+          "licence": "company-proprietary",
+          "productForm": "coating",
+          "specs": [],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#20",
+        ],
+        "id": "#19",
+        "name": "assign_surface_coating",
+        "params": {
+          "coating": "alodine_test",
+          "electrical": "conductive",
+          "entityId": "#3",
+          "location": "bonded_interface",
+          "source": {
+            "citation": "test input of this validation case (not a property claim)",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#22",
+        ],
+        "id": "#21",
+        "name": "set_lightning_zone",
+        "params": {
+          "entityId": "#4",
+          "source": {
+            "citation": "zoning drawing of this validation case (test input)",
+          },
+          "zone": "2A",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#24",
+        ],
+        "id": "#23",
+        "name": "set_lightning_zone",
+        "params": {
+          "entityId": "#1",
+          "source": {
+            "citation": "zoning drawing of this validation case (test input)",
+          },
+          "zone": "3",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#26",
+        ],
+        "id": "#25",
+        "name": "define_bond_path",
+        "params": {
+          "elements": [
+            {
+              "interfaces": [
+                "#1",
+                "#3",
+              ],
+              "kind": "joint",
+              "resistance": {
+                "unit": "mohm",
+                "value": 0.5,
+              },
+              "source": {
+                "citation": "test input of this validation case (not a property claim)",
+              },
+            },
+            {
+              "crossSection": {
+                "unit": "mm^2",
+                "value": 10,
+              },
+              "kind": "strap",
+              "length": {
+                "unit": "mm",
+                "value": 1000,
+              },
+              "material": "strap_cu",
+            },
+          ],
+          "from": "#1",
+          "limit": {
+            "ruleId": "bond_class_R_test",
+            "source": {
+              "citation": "rule table entry for this test (unverified)",
+            },
+            "unit": "mohm",
+            "value": 2.5,
+          },
+          "name": "box_to_structure_hot",
+          "temperature": {
+            "unit": "degC",
+            "value": 75,
+          },
+          "to": "#3",
+        },
+        "suppressed": false,
+      },
+    ],
+    "groups": {},
+    "jointOrder": [],
+    "joints": {},
+    "layerOrder": [
+      "#2",
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "locked": false,
+        "name": "Layer 0",
+        "visible": true,
+      },
+    },
+    "materials": {
+      "alodine_test": {
+        "color": "#b0b0b0",
+        "density": 0,
+        "metalness": 0.8,
+        "name": "alodine_test",
+        "record": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "alodine_test",
+          "licence": "company-proprietary",
+          "productForm": "coating",
+          "specs": [],
+        },
+        "roughness": 0.4,
+      },
+      "cfrp_skin": {
+        "color": "#b0b0b0",
+        "density": 0,
+        "metalness": 0.8,
+        "name": "cfrp_skin",
+        "record": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "cfrp_skin",
+          "licence": "company-proprietary",
+          "productForm": "laminate",
+          "specs": [],
+        },
+        "roughness": 0.4,
+      },
+      "strap_cu": {
+        "color": "#b0b0b0",
+        "density": 0,
+        "metalness": 0.8,
+        "name": "strap_cu",
+        "propertyModels": [
+          {
+            "basis": "company",
+            "coefficientsSha256": "50e4b3f64c4dff55ecc4c491b44c66d78e87e112c8e7d6e97d2ed2b533a9088b",
+            "form": {
+              "coefficient": 0.00393,
+              "kind": "linearCoefficient",
+              "reference": 20,
+              "referenceValue": 1.7241e-8,
+              "variable": "T",
+            },
+            "id": "rho_lin",
+            "preferred": true,
+            "property": "electricalResistivity",
+            "provenance": {
+              "citation": "test input of this validation case (not a property claim)",
+            },
+            "unit": "ohm*m",
+            "validity": [
+              {
+                "data": [
+                  -55,
+                  150,
+                ],
+                "unit": "degC",
+                "variable": "T",
+              },
+            ],
+            "variables": [
+              {
+                "unit": "degC",
+                "variable": "T",
+              },
+            ],
+          },
+        ],
+        "record": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "strap_cu",
+          "licence": "company-proprietary",
+          "productForm": "strap",
+          "specs": [],
+        },
+        "roughness": 0.4,
+      },
+      "white_paint": {
+        "color": "#b0b0b0",
+        "density": 0,
+        "metalness": 0.8,
+        "name": "white_paint",
+        "propertyModels": [
+          {
+            "basis": "company",
+            "coefficientsSha256": "68cdc4ea9e4ca330e2bd263bab5e763d43b5df215f3b125f91838eb67e5a72ff",
+            "condition": {
+              "lifeState": "BOL",
+            },
+            "form": {
+              "kind": "constant",
+              "value": 0.2,
+            },
+            "id": "abs_bol",
+            "preferred": true,
+            "property": "absorptivitySolar",
+            "provenance": {
+              "citation": "test input of this validation case (not a property claim)",
+            },
+            "unit": "1",
+            "validity": [],
+            "variables": [],
+          },
+          {
+            "basis": "company",
+            "coefficientsSha256": "60950a0df24d149eb03fea8dd9a3b517ef9dcd128854bdcce7ceaabf933f4a46",
+            "condition": {
+              "opticalKind": "hemispherical_total",
+            },
+            "form": {
+              "kind": "constant",
+              "value": 0.9,
+            },
+            "id": "eps_ht",
+            "preferred": true,
+            "property": "emissivityIr",
+            "provenance": {
+              "citation": "test input of this validation case (not a property claim)",
+            },
+            "unit": "1",
+            "validity": [],
+            "variables": [],
+          },
+        ],
+        "record": {
+          "designation": "validation test record",
+          "exportMarking": {
+            "regime": "none",
+          },
+          "id": "white_paint",
+          "licence": "company-proprietary",
+          "productForm": "coating",
+          "specs": [],
+        },
+        "roughness": 0.4,
+      },
+    },
+    "nextStepNumber": 18,
+    "order": [
+      "#1",
+      "#3",
+      "#4",
+    ],
+    "parameters": {},
+    "recipes": {},
+    "selection": [],
+    "units": "mm",
+  },
+  "format": "llull-document",
+  "version": 3,
+}
+`;
+
+exports[`eop_end_to_end plan (VC-EOP-02, 05, 06, 08, 09; zones) > the slice, the bond row at 75 degC, the zone rows and every query are pinned > electrical_resistance 1`] = `
+{
+  "dcOhm": 0.0209676422,
+  "formula": "R = rho L / A",
+  "provenance": [
+    "strap_cu: test input of this validation case (not a property claim) (linearCoefficient test input of this validation case (not a property claim))",
+  ],
+  "rho": 2.09676422e-8,
+  "temperatureModel": "linear temperature coefficient rho0 (1 + alpha (T - T0)) at 75 degC",
+  "unverified": false,
+  "unverifiedReasons": [],
+}
+`;
+
+exports[`eop_end_to_end plan (VC-EOP-02, 05, 06, 08, 09; zones) > the slice, the bond row at 75 degC, the zone rows and every query are pinned > normal_reflectance 1`] = `
+{
+  "R": 0.04,
+  "formula": "R = ((n1 - n2)^2 + k^2) / ((n1 + n2)^2 + k^2); lossless slab T = (1 - R) / (1 + R)",
+  "k": 0,
+  "n1": 1,
+  "n2": 1.5,
+  "slabT": 0.923076923,
+  "unverified": true,
+  "unverifiedReasons": [
+    "EOP_VALUE_UNSOURCED: the refractive indices were supplied by the caller without a record",
+  ],
+}
+`;
+
+exports[`eop_end_to_end plan (VC-EOP-02, 05, 06, 08, 09; zones) > the slice, the bond row at 75 degC, the zone rows and every query are pinned > optical_balance 1`] = `
+{
+  "alpha": 0.2,
+  "alphaOverEps": 0.222222222,
+  "assumptions": [
+    "flat plate",
+    "no conduction",
+    "no albedo or planet infrared",
+    "isothermal",
+    "hemispherical total emissivity",
+  ],
+  "eps": 0.9,
+  "formula": "alpha S cos(theta) = n eps sigma T^4",
+  "incidenceAngleDeg": 0,
+  "iterations": 0,
+  "provenance": [
+    "white_paint absorptivitySolar: test input of this validation case (not a property claim)",
+    "white_paint emissivityIr: test input of this validation case (not a property claim)",
+  ],
+  "radiatingFaces": 1,
+  "reviewRequired": true,
+  "sigma": {
+    "defaulted": true,
+    "source": "exact SI constants k, h, c: sigma = 2 pi^5 k^4 / (15 h^3 c^2)",
+    "unit": "W/(m^2*K^4)",
+    "value": 5.67037442e-8,
+  },
+  "solarFluxW_m2": 1361,
+  "state": "BOL",
+  "temperatureDegC": -2.90450145,
+  "temperatureK": 270.245499,
+  "unverified": true,
+  "unverifiedReasons": [
+    "EOP_DEFAULT_APPLIED: state was not given, BOL absorptivity was used (state a life state to clear this)",
+  ],
+}
+`;
+
+exports[`eop_end_to_end plan (VC-EOP-02, 05, 06, 08, 09; zones) > the slice, the bond row at 75 degC, the zone rows and every query are pinned > shield_absorption 1`] = `
+{
+  "dB": 13.1435581,
+  "formula": "A = 20 log10(e) t / delta",
+  "mur": 1,
+  "note": "absorption term only: reflection loss and apertures are not included",
+  "provenance": [
+    "caller-supplied resistivity (no record)",
+  ],
+  "rho": 1.7241e-8,
+  "skinDepthM": 0.0000660847662,
+  "thicknessOverDelta": 1.51320805,
+  "unverified": true,
+  "unverifiedReasons": [
+    "EOP_VALUE_UNSOURCED: the resistivity was supplied by the caller without a record",
+  ],
+}
+`;

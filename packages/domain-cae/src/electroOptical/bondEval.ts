@@ -65,7 +65,7 @@ const LIMIT_UNVERIFIED = 'EOP_LIMIT_UNVERIFIED: the limit is a programme rule en
 const FAIL_ORDER = ['EOP_COATING_INSULATES', 'EOP_BOND_RESISTANCE_EXCEEDED'];
 
 /** A composite material cannot replace a metallic bond path: its record names a composite product form or designation (a heuristic on the record text, stated in the warning). */
-const COMPOSITE_TEXT = /cfrp|carbon|composite|laminate|prepreg|fabric|gfrp|kevlar/i;
+export const COMPOSITE_TEXT = /cfrp|carbon|composite|laminate|prepreg|fabric|gfrp|kevlar/i;
 
 interface Evaluated {
   readonly row: BondElementRow;
@@ -110,7 +110,7 @@ function evaluateElement(
   const record = Object.hasOwn(doc.materials, element.material) ? doc.materials[element.material]?.record : undefined;
   const composite = COMPOSITE_TEXT.test(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
   return {
-    row: strap(bulkResistance(rho.rho, length.value, area.value), `${rho.provenance}; R = rho L / A`),
+    row: strap(bulkResistance(rho.rho, length.value, area.value), `${rho.provenance}; ${rho.temperatureModel}; R = rho L / A`),
     ...(composite
       ? {
           warning: {

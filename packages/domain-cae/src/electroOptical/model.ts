@@ -4,7 +4,15 @@ import { z } from '@core/commands/schema';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import type { CadDocument } from '@core/model/types';
-import { COATING_LOCATIONS, DISPOSITIONS, ELECTRICAL_EFFECTS, type BondDisposition, type ElectroOpticalModel } from './types';
+import {
+  COATING_LOCATIONS,
+  DISPOSITIONS,
+  ELECTRICAL_EFFECTS,
+  LIGHTNING_ZONES,
+  type BondDisposition,
+  type ElectroOpticalModel,
+  type LightningZoneLabel,
+} from './types';
 
 const EMPTY: ElectroOpticalModel = { coatings: {}, bondPaths: {}, dispositions: {} };
 
@@ -19,6 +27,9 @@ export const dispositionOf = (doc: CadDocument, id: string): BondDisposition | u
   const { dispositions } = electroOpticalOf(doc);
   return Object.hasOwn(dispositions, id) ? dispositions[id] : undefined;
 };
+
+/** The zone labels (none in a file written before set_lightning_zone). */
+export const zonesOf = (doc: CadDocument): Readonly<Record<string, LightningZoneLabel>> => electroOpticalOf(doc).zones ?? {};
 
 const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
 const keySchema = z
@@ -69,6 +80,8 @@ const coatingSchema = z.strictObject({
   source: sourceSchema.optional(),
 });
 
+const zoneSchema = z.strictObject({ id: keySchema, entityId: keySchema, zone: z.enum(LIGHTNING_ZONES), source: sourceSchema });
+
 const dispositionSchema = z.strictObject({
   pathId: keySchema,
   decision: z.enum(DISPOSITIONS),
@@ -88,6 +101,7 @@ const sliceSchema = z
     coatings: z.record(keySchema, coatingSchema),
     bondPaths: z.record(keySchema, pathSchema),
     dispositions: z.record(keySchema, dispositionSchema),
+    zones: z.record(keySchema, zoneSchema).optional(),
   })
   .superRefine((slice, ctx) => {
     const bad = (path: (string | number)[], message: string): void => ctx.addIssue({ code: 'custom', path, message });
@@ -109,6 +123,12 @@ const sliceSchema = z
       if (path.limit !== undefined && badUnit(path.limit, 'ohm')) bad(['bondPaths', key, 'limit', 'unit'], 'must be a resistance unit');
       if (path.temperature !== undefined && badUnit(path.temperature, 'K'))
         bad(['bondPaths', key, 'temperature', 'unit'], 'must be a temperature unit');
+    }
+    const zoned = new Set<string>();
+    for (const [key, label] of Object.entries(slice.zones ?? {})) {
+      if (label.id !== key) bad(['zones', key, 'id'], `must equal its key '${key}'`);
+      if (zoned.has(label.entityId)) bad(['zones', key, 'entityId'], `'${label.entityId}' has more than one zone label`);
+      zoned.add(label.entityId);
     }
     for (const [key, disposition] of Object.entries(slice.dispositions)) {
       if (disposition.pathId !== key) bad(['dispositions', key, 'pathId'], `must equal its key '${key}'`);
