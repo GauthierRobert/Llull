@@ -15,6 +15,9 @@ export interface GuardRefusal {
   readonly error: CommandError;
 }
 
+/** Commands that replace the whole document (a loaded file is checked on load; a restored snapshot by its command): reference guards exempt them. */
+export const WHOLE_DOCUMENT_REPLACEMENTS: ReadonlySet<string> = new Set(['load_document', 'clear_document', 'restore_revision_snapshot']);
+
 /** What a guard may know about the call (additive; guards that ignore it keep working). */
 export interface GuardContext {
   /** True while history replay re-runs recorded steps: a reference guard added after the steps were recorded must not refuse them (L8). */

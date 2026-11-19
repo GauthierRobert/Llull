@@ -31,7 +31,9 @@ function references(doc: CadDocument): Reference[] {
 
 /**
  * @invariant a command may not remove an entity or material that a coating assignment, bond path or lightning zone label still references
- * @invariant never refuses a history replay (steps recorded before the guard re-run as recorded, L8)
+ * @invariant never refuses a step re-run by history replay; the net result of a history meta-command is still checked (L8)
+ * @invariant known limit: instantiate_recipe re-runs its inner steps without the replaying flag (core recipes.ts), so a recipe step re-run by
+ *   replay is still guarded
  */
 export const electroOpticalReferenceGuard: DerivationGuard = {
   domain: 'electro-optical',
