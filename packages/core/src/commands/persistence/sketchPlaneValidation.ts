@@ -2,9 +2,8 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
-import { hypotOf } from '../../lib/hypotOf';
 
-const isUnit = (value: unknown): boolean => isVec3(value) && Math.abs(hypotOf(value) - 1) < 1e-6;
+const isUnit = (value: unknown): boolean => isVec3(value) && Math.abs(Math.hypot(value[0], value[1], value[2]) - 1) < 1e-6;
 
 function frameProblem(id: string, frame: unknown): string | null {
   if (!isRecord(frame) || !isVec3(frame['origin']) || !isUnit(frame['normal']) || !isUnit(frame['xDir']))

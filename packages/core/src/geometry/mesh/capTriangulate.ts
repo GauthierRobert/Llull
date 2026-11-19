@@ -1,3 +1,4 @@
+import { maxOf } from '../../lib/arrayExtrema';
 /**
  * Watertight polygon triangulation for plane-cut caps: ear clipping on a polygon with holes (holes bridged to the outline) that keeps every
  * input vertex, including collinear ones, so the cap shares each section edge with the clipped mesh (no T-junctions).
@@ -95,10 +96,10 @@ export function triangulateCap(outer: ReadonlyArray<Point2>, holes: ReadonlyArra
   };
   const outline = makeRing(outer, true);
   const holeRings = holes.map((hole) => makeRing(hole, false));
-  const scale = Math.max(1e-300, ...outer.flatMap((p) => [Math.abs(p[0]), Math.abs(p[1])]));
+  const scale = Math.max(1e-300, maxOf(outer.flatMap((p) => [Math.abs(p[0]), Math.abs(p[1])])));
   const eps = 1e-12 * scale * scale;
   let ring = outline;
-  const pending = [...holeRings].sort((a, b) => Math.max(...b.map((v) => v.p[0])) - Math.max(...a.map((v) => v.p[0])));
+  const pending = [...holeRings].sort((a, b) => maxOf(b.map((v) => v.p[0])) - maxOf(a.map((v) => v.p[0])));
   for (const hole of pending) {
     const start = hole.reduce((best, v, k) => (v.p[0] > (hole[best] as RingVertex).p[0] ? k : best), 0);
     const from = (hole[start] as RingVertex).p;

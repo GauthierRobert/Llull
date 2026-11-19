@@ -12,6 +12,7 @@ import { biCgStab } from '../../lib/biCgStab';
 import { conjugateGradient } from '../../lib/conjugateGradient';
 import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
+import { hypot3 } from '../../lib/vec3';
 
 export interface HarmonicMap {
   /** Parameters (u, v) in [0, 1] of every vertex of the region, by mesh vertex index. */
@@ -175,7 +176,7 @@ function pickCorners(loop: ReadonlyArray<number>, point: (v: number) => Vec3, ar
   const turning = loop.map((v, i) => {
     const [before, here, ahead] = [point(loop[(i + n - (window % n)) % n] as number), point(v), point(loop[(i + window) % n] as number)];
     const [a, b] = [sub(here, before), sub(ahead, here)];
-    return Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));
+    return Math.atan2(hypot3(cross(a, b)), dot(a, b));
   });
   const apart = (i: number, j: number): number => {
     const d = Math.abs((arc[i] as number) - (arc[j] as number));
@@ -240,7 +241,7 @@ function cotangentWeights(mesh: MeshData, faces: ReadonlyArray<number>): Map<num
     for (let k = 0; k < 3; k++) {
       const [apex, a, b] = [ids[k] as number, ids[(k + 1) % 3] as number, ids[(k + 2) % 3] as number];
       const [ea, eb] = [sub(point(a), point(apex)), sub(point(b), point(apex))];
-      const area2 = Math.hypot(...cross(ea, eb));
+      const area2 = hypot3(cross(ea, eb));
       if (!(area2 > 0)) continue;
       const key = Math.min(a, b) * vertexCount + Math.max(a, b);
       weights.set(key, (weights.get(key) ?? 0) + dot(ea, eb) / area2 / 2);
@@ -259,7 +260,7 @@ function meanValueWeights(mesh: MeshData, faces: ReadonlyArray<number>): Map<num
     for (let k = 0; k < 3; k++) {
       const [apex, a, b] = [ids[k] as number, ids[(k + 1) % 3] as number, ids[(k + 2) % 3] as number];
       const [ea, eb] = [sub(point(a), point(apex)), sub(point(b), point(apex))];
-      const [la, lb, area2] = [Math.hypot(...ea), Math.hypot(...eb), Math.hypot(...cross(ea, eb))];
+      const [la, lb, area2] = [Math.hypot(ea[0], ea[1], ea[2]), Math.hypot(eb[0], eb[1], eb[2]), hypot3(cross(ea, eb))];
       if (!(area2 > 0)) continue;
       // tan(theta / 2) = |ea x eb| / (|ea| |eb| + ea . eb)
       const half = area2 / (la * lb + dot(ea, eb));
@@ -410,7 +411,7 @@ export function harmonicMap(mesh: MeshData, faces: ReadonlyArray<number>, option
   if ('code' in topology) return topology;
   const point = pointOf(mesh);
   const { loop } = topology;
-  const lengths = loop.map((v, i) => Math.hypot(...sub(point(loop[(i + 1) % loop.length] as number), point(v))));
+  const lengths = loop.map((v, i) => hypot3(sub(point(loop[(i + 1) % loop.length] as number), point(v))));
   const perimeter = lengths.reduce((sum, length) => sum + length, 0);
   if (!(perimeter > 0)) return notDisk('the boundary loop of the region has no length');
   const arc: number[] = [];
@@ -506,8 +507,8 @@ export function parameterStretch(
       ((e2[2] as number) * du1 - (e1[2] as number) * du2) / det,
     ];
     const w = Math.abs(det);
-    u += w * Math.hypot(...pu);
-    v += w * Math.hypot(...pv);
+    u += w * Math.hypot(pu[0], pu[1], pu[2]);
+    v += w * Math.hypot(pv[0], pv[1], pv[2]);
     weight += w;
   }
   return weight > 0 ? { u: u / weight, v: v / weight } : { u: 1, v: 1 };

@@ -25,7 +25,6 @@ import { defaultFitTolerance, exactKernel } from './faceSession';
 import { faceRefField } from './schemas';
 import { isSketchFailure, sketchOutline, type SketchOutline } from './sketchProfiles';
 import { appendAll } from '../../lib/appendAll';
-import { hypotOf } from '../../lib/hypotOf';
 
 const MAX_ENTITIES = 200;
 
@@ -203,7 +202,7 @@ export const projectToFace = defineCommand({
     const first = doc.entities[params.entityIds[0] as string] as Entity;
     let direction: Vec3;
     if (params.direction !== undefined) {
-      if (!params.direction.every(Number.isFinite) || hypotOf(params.direction) === 0)
+      if (!params.direction.every(Number.isFinite) || Math.hypot(params.direction[0], params.direction[1], params.direction[2]) === 0)
         return fail('WRP_PARAM_INVALID', 'direction must be a non-zero [x, y, z]', [], ['direction']);
       direction = normalize3(params.direction);
     } else {

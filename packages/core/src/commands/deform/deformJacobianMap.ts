@@ -46,7 +46,7 @@ function sampleAt(rest: ArrayLike<number>, a: number, b: number, c: number, nudg
   const [ux, uy, uz] = [at(b, 0) - at(a, 0), at(b, 1) - at(a, 1), at(b, 2) - at(a, 2)];
   const [vx, vy, vz] = [at(c, 0) - at(a, 0), at(c, 1) - at(a, 1), at(c, 2) - at(a, 2)];
   const normal: Vec3 = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
-  const length = hypotOf(normal) || 1;
+  const length = Math.hypot(normal[0], normal[1], normal[2]) || 1;
   return [0, 1, 2].map((k) => (at(a, k) + at(b, k) + at(c, k)) / 3 - (nudge * (normal[k] as number)) / length) as unknown as Vec3;
 }
 

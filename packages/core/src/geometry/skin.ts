@@ -10,7 +10,6 @@ import { add3, centroid3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/
 import { triangulatePolygon } from '../lib/triangulate';
 import type { Triangle } from './triangles';
 import { appendAll } from '../lib/appendAll';
-import { hypotOf } from '../lib/hypotOf';
 
 /** Two triangles of the quad a-b-c-d (wound a → b → c). */
 export const quad = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): Triangle[] => [
@@ -64,7 +63,7 @@ export function skinTriangles(rings: ReadonlyArray<ReadonlyArray<Vec3>>): Triang
   for (let i = 0; i + 1 < rings.length; i++)
     appendAll(triangles, ringWalls(rings[i] as readonly Vec3[], rings[i + 1] as readonly Vec3[], false));
   const travel = sub3(centroid3(last), centroid3(first));
-  const direction: Vec3 = hypotOf(travel) > 1e-12 ? travel : normalize3(ringNormal(first));
+  const direction: Vec3 = Math.hypot(travel[0], travel[1], travel[2]) > 1e-12 ? travel : normalize3(ringNormal(first));
   appendAll(triangles, [...cap(first, scale3(direction, -1)), ...cap(last, direction)]);
   return triangles;
 }

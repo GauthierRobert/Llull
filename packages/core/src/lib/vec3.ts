@@ -44,6 +44,11 @@ export function len3(a: Vec3): number {
   return Math.sqrt(dot3(a, a));
 }
 
+/** `Math.hypot(a[0], a[1], a[2])`: the bits of `Math.hypot(...a)` (len3's sqrt of the dot product can differ in the last bit). */
+export function hypot3(a: readonly [number, number, number]): number {
+  return Math.hypot(a[0], a[1], a[2]);
+}
+
 export function distanceSq3(a: Vec3, b: Vec3): number {
   const delta = sub3(a, b);
   return dot3(delta, delta);

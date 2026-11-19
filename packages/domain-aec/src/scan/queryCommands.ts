@@ -14,7 +14,6 @@ import { assetBox, inRegion, resolveRegion, type MetricRegion } from './region';
 import { cloudIdParam, regionParam } from './schemas';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 import { appendAll } from '@lib/appendAll';
-import { hypotOf } from '@lib/hypotOf';
 
 /** Largest number of points one query_cloud_points call returns (AF-12). */
 export const MAX_QUERY_POINTS = 200_000;
@@ -292,7 +291,7 @@ export const measureCloud = defineCommand({
     }
     const [a = [0, 0, 0], b = [0, 0, 0]] = ends;
     const delta = vecFromM(doc, [b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
-    const distance = hypotOf(delta);
+    const distance = Math.hypot(delta[0], delta[1], delta[2]);
     return report(doc, `Distance ${distance.toPrecision(7)} ${doc.units}.`, {
       cloudId,
       distance,

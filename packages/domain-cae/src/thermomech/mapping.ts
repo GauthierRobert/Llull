@@ -6,7 +6,7 @@
  */
 
 import type { FeMeshArtifact } from '@core/model/analysis';
-import { cross3, dot3, sub3 } from '@lib/vec3';
+import { cross3, dot3, hypot3, sub3 } from '@lib/vec3';
 import { closestPointOnTriangle } from '@core/geometry/triangleQueries';
 import { hypotOf } from '@lib/hypotOf';
 import { maxOf, minOf } from '@lib/arrayExtrema';
@@ -86,7 +86,7 @@ function closestOnTet(c: readonly [Vec, Vec, Vec, Vec], p: Vec): { readonly poin
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const [i, j, k] of FACES) {
     const point = closestPointOnTriangle(p, [c[i as 0], c[j as 0], c[k as 0]]);
-    const distance = hypotOf(sub3(p, point));
+    const distance = hypot3(sub3(p, point));
     if (distance < bestDistance) {
       best = point;
       bestDistance = distance;

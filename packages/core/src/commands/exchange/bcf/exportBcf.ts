@@ -21,6 +21,7 @@ import { rasterScenePixels } from '../../render/raster';
 import { styleViewpoint, type ViewpointStyle } from './bcfColouring';
 import { bcfExtensionsXml, bcfMarkupXml, bcfVersionXml, bcfVisualizationXml, type MarkupComment, type MarkupViewpoint } from './bcfXml';
 import { appendAll } from '../../../lib/appendAll';
+import { spliceAll } from '../../../lib/spliceAll';
 
 const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -182,10 +183,10 @@ export const exportBcf = defineCommand({
         data: encoder.encode(bcfMarkupXml(topic, markupViews, created, params.author ?? 'llull', comments, version)),
       });
     }
-    entries.unshift(
+    spliceAll(entries, 0, 0, [
       { name: 'bcf.version', data: encoder.encode(bcfVersionXml(version)) },
       ...(version === '3.0' ? [{ name: 'extensions.xml', data: encoder.encode(bcfExtensionsXml(exported)) }] : []),
-    );
+    ]);
     const outcome = run?.result();
     if (outcome !== undefined && 'code' in outcome) return fail(outcome.code, outcome.message, [], ['snapshotRenderer']);
     const archive = zipStore(entries);

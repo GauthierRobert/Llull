@@ -21,7 +21,6 @@ import { type WallNode, axisFrame, bearingOf } from './pinBearingMath';
 import { BLOCK, slaveAreas } from './reader';
 import { forceUnitName } from './pretensionRules';
 import { maxOf, minOf } from '@lib/arrayExtrema';
-import { hypotOf } from '@lib/hypotOf';
 
 const n = (value: number): string => significantNumber(value, 5);
 
@@ -91,7 +90,7 @@ export const pinInHole = defineCommand({
         'holeDiameter',
       );
     if (pinLoad !== undefined && !(Number.isFinite(pinLoad) && pinLoad > 0)) return fail('pinLoad must be finite and > 0', 'pinLoad');
-    const length = hypotOf(params.axisDirection);
+    const length = Math.hypot(params.axisDirection[0], params.axisDirection[1], params.axisDirection[2]);
     if (!(length > 0) || ![...params.axisPoint, ...params.axisDirection].every(Number.isFinite))
       return fail('axisPoint must be finite and axisDirection a non-zero finite vector', 'axisDirection');
     const axis = scale3(params.axisDirection, 1 / length);
@@ -100,7 +99,7 @@ export const pinInHole = defineCommand({
       return fail(`plate '${params.plateEntityId}' or pin '${params.pinEntityId}' is not an entity of the document`, 'plateEntityId');
     const trial: Vec3 = Math.abs(axis[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
     const across = cross3(axis, trial);
-    const lateral = scale3(across, 1 / hypotOf(across));
+    const lateral = scale3(across, 1 / Math.hypot(across[0], across[1], across[2]));
     const thickness = span[1] - span[0];
     const middle = add3(params.axisPoint, scale3(axis, (span[0] + span[1]) / 2));
     const formulation = params.formulation ?? (analysis.contact === undefined ? 'surface_to_surface' : undefined);

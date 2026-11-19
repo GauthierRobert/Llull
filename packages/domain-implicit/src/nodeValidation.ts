@@ -1,6 +1,7 @@
 /** Value validation of the raw field nodes of the `implicit` slice (05 IMP D3). */
 
 import { isRecord } from '@lib/isRecord';
+import { hypotOf } from '@lib/hypotOf';
 
 const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transform', 'tpms', 'struts', 'graph', 'voronoi', 'scalar']);
 const SHAPES = new Set(['sphere', 'box', 'cylinder', 'capsule', 'torus', 'cone', 'plane']);
@@ -24,7 +25,7 @@ function validMap(map: unknown): boolean {
       return (
         isVec3(map['origin']) &&
         isVec3(map['axis']) &&
-        Math.hypot(...(map['axis'] as number[])) > 0 &&
+        hypotOf(map['axis'] as number[]) > 0 &&
         isWhole(map['cellsAround']) &&
         isPositive(map['radialCellSize'])
       );

@@ -7,6 +7,7 @@ import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { normalOf } from './editMesh';
 import type { SurfaceIndex } from './surfaceIndex';
+import { appendAll } from '../../lib/appendAll';
 
 const SEGMENTS = 32;
 
@@ -21,7 +22,7 @@ export interface DrainTool {
 }
 
 function unit(v: Vec3): Vec3 {
-  const l = Math.hypot(...v) || 1;
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / l, v[1] / l, v[2] / l];
 }
 
@@ -40,8 +41,8 @@ function cylinder(centre: Vec3, axis: Vec3, radius: number, halfLength: number):
     centre[1] + radius * (Math.cos(angle) * u[1] + Math.sin(angle) * v[1]) + along * axis[1],
     centre[2] + radius * (Math.cos(angle) * u[2] + Math.sin(angle) * v[2]) + along * axis[2],
   ];
-  for (let k = 0; k < SEGMENTS; k++) positions.push(...at((2 * Math.PI * k) / SEGMENTS, -halfLength));
-  for (let k = 0; k < SEGMENTS; k++) positions.push(...at((2 * Math.PI * k) / SEGMENTS, halfLength));
+  for (let k = 0; k < SEGMENTS; k++) appendAll(positions, at((2 * Math.PI * k) / SEGMENTS, -halfLength));
+  for (let k = 0; k < SEGMENTS; k++) appendAll(positions, at((2 * Math.PI * k) / SEGMENTS, halfLength));
   positions.push(centre[0] - halfLength * axis[0], centre[1] - halfLength * axis[1], centre[2] - halfLength * axis[2]);
   positions.push(centre[0] + halfLength * axis[0], centre[1] + halfLength * axis[1], centre[2] + halfLength * axis[2]);
   const [bottomCentre, topCentre] = [2 * SEGMENTS, 2 * SEGMENTS + 1];

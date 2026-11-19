@@ -18,7 +18,6 @@ import { replaceEntities, withEntity } from '../entity/entityOps';
 import { evaluateRecipe, kernelResultEntity } from '../kernelShape';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import { validateSolidTarget } from './modifyTarget';
-import { hypotOf } from '../../lib/hypotOf';
 
 /** Euler angles (M = Rx·Ry·Rz, Rz = 0) turning +Z onto unit `n`. */
 function tiltOnto([nx, ny, nz]: Vec3): Vec3 {
@@ -67,7 +66,7 @@ function splitAlong(
   if ('summary' in validation) return validation;
   const { entity } = validation;
   if (!kernel) return noop(doc, kernelUnavailable('split_body'));
-  if (hypotOf(normal) === 0) return fail('plane.normal must be non-zero');
+  if (Math.hypot(normal[0], normal[1], normal[2]) === 0) return fail('plane.normal must be non-zero');
   const n = normalize3(normal);
   const source = operandRecipe(kernel, entity);
   const shape = kernel.evaluate(source);

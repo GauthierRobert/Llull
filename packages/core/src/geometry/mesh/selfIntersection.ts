@@ -2,6 +2,7 @@
 
 import { segmentHitsTriangle } from '../../lib/segmentTriangle';
 import type { Vec3 } from '../../model/vectors';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface SelfIntersections {
   readonly count: number;
@@ -50,7 +51,7 @@ export function findSelfIntersections(
     faces.push(c);
     for (let axis = 0; axis < 3; axis++) {
       const values = [c[0][axis] as number, c[1][axis] as number, c[2][axis] as number];
-      const [min, max] = [Math.min(...values), Math.max(...values)];
+      const [min, max] = [minOf(values), maxOf(values)];
       boxes[f * 6 + axis] = min;
       boxes[f * 6 + 3 + axis] = max;
       sizeSum += max - min;

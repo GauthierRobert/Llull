@@ -13,6 +13,8 @@ import type { FeTopologyArtifact } from '@core/model/topology';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { base64ToUint8Array } from '@lib/base64';
+import { hypotOf } from '@lib/hypotOf';
+import { minOf } from '@lib/arrayExtrema';
 
 let current: FeArtifactPort | null = null;
 let installed: FeArtifactPort | null = null;
@@ -119,7 +121,7 @@ function vonMises(stress: readonly number[]): number {
 
 const QUANTITIES = {
   von_mises: { field: 'STRESS', scalar: vonMises },
-  u_mag: { field: 'DISP', scalar: (values: readonly number[]) => Math.hypot(...values.slice(0, 3)) },
+  u_mag: { field: 'DISP', scalar: (values: readonly number[]) => hypotOf(values.slice(0, 3)) },
 } as const;
 
 export type FeQuantity = keyof typeof QUANTITIES;
@@ -142,7 +144,7 @@ export function feResultInput(doc: CadDocument, caseId: string, quantity: FeQuan
     return missing(`the artifact store holds no mesh and results of analysis '${caseId}'`, [caseId]);
   const { field: fieldName, scalar } = QUANTITIES[quantity];
   const candidates = set.steps.filter((entry) => entry.fields[fieldName] !== undefined && (step === undefined || entry.step === step));
-  const wanted = step ?? Math.min(...candidates.map((entry) => entry.step));
+  const wanted = step ?? minOf(candidates.map((entry) => entry.step));
   const chosen = candidates.filter((entry) => entry.step === wanted).at(-1);
   const field = chosen?.fields[fieldName];
   if (chosen === undefined || field === undefined)

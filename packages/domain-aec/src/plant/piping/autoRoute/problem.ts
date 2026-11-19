@@ -14,7 +14,6 @@ import { resolveFlangeSet } from '../flangeSet';
 import { createSpecLookup, isMiss, pipeOutsideDiameter } from '../specLookup';
 import { AXIS_VECTORS, firstBlocking, type Int3, type RouteProblem } from './lattice';
 import { collectObstacles, portOwnership } from './obstacles';
-import { hypotOf } from '@lib/hypotOf';
 
 export type Endpoint = { readonly portId: string } | { readonly point: Vec3; readonly direction: Vec3 };
 
@@ -84,7 +83,7 @@ const plus = (p: Int3, axis: number, length: number): Int3 => {
 
 /** Axis index of a unit axis direction, or null. */
 function axisIndex(direction: Vec3): number | null {
-  const length = hypotOf(direction);
+  const length = Math.hypot(direction[0], direction[1], direction[2]);
   if (!(length > 0)) return null;
   for (let axis = 0; axis < 6; axis++) {
     const v = AXIS_VECTORS[axis] as Int3;

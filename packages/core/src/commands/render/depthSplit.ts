@@ -5,7 +5,6 @@
 
 import type { Vec3 } from '../../model/types';
 import type { PreDepthPolygon } from './types';
-import { hypotOf } from '../../lib/hypotOf';
 
 type Tri = readonly [Vec3, Vec3, Vec3];
 
@@ -42,7 +41,7 @@ function isConvex(verts: readonly Vec3[]): boolean {
     const u: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
     const v: Vec3 = [c[0] - b[0], c[1] - b[1], c[2] - b[2]];
     const turn: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-    if (hypotOf(turn) < 1e-12) continue;
+    if (Math.hypot(turn[0], turn[1], turn[2]) < 1e-12) continue;
     if (reference === null) reference = turn;
     else if (reference[0] * turn[0] + reference[1] * turn[1] + reference[2] * turn[2] < 0) return false;
   }

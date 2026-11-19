@@ -84,12 +84,12 @@ export const intersectBox = (a: Box, b: Box): Box => {
 
 /** Frame of a point relative to origin with local z along axis (any non-zero vector): local = (d . e1, d . e2, d . axis). */
 export function axisFrame(b: FieldBuilder, frame: Frame, origin: Vec3, axis: Vec3): Frame {
-  const length = Math.hypot(...axis);
+  const length = Math.hypot(axis[0], axis[1], axis[2]);
   const w: Vec3 = [axis[0] / length, axis[1] / length, axis[2] / length];
   const helper: Vec3 = Math.abs(w[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const cross = (p: Vec3, q: Vec3): Vec3 => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]];
   const e1raw = cross(helper, w);
-  const norm = Math.hypot(...e1raw);
+  const norm = Math.hypot(e1raw[0], e1raw[1], e1raw[2]);
   const e1: Vec3 = [e1raw[0] / norm, e1raw[1] / norm, e1raw[2] / norm];
   const e2 = cross(w, e1);
   const d = [b.shift(frame.x, -origin[0]), b.shift(frame.y, -origin[1]), b.shift(frame.z, -origin[2])] as const;

@@ -10,7 +10,6 @@ import type { Vec3 } from '../../model/types';
 import type { RasterScene } from '../../model/raster';
 import { type Camera, cameraBasis, makeProjector, projectPoint } from './camera';
 import type { Polygon3D, SurfaceShading } from './types';
-import { hypotOf } from '../../lib/hypotOf';
 import { appendAll } from '../../lib/appendAll';
 
 const SUPERSAMPLE = 2;
@@ -21,7 +20,7 @@ const SUPERSAMPLE_MAX_PIXELS = 1_200_000;
 export const supersampleFor = (width: number, height: number): number => (width * height > SUPERSAMPLE_MAX_PIXELS ? 1 : SUPERSAMPLE);
 const LIGHT: Vec3 = (() => {
   const v: Vec3 = [0.6, -0.8, 1.0];
-  const length = hypotOf(v);
+  const length = Math.hypot(v[0], v[1], v[2]);
   return [v[0] / length, v[1] / length, v[2] / length];
 })();
 const AMBIENT = 0.35;
@@ -129,7 +128,7 @@ function perspective(cam: Camera, fovDeg: number, w: number, h: number, near: nu
     },
     viewAt: (p) => {
       const d: Vec3 = [p[0] - cam.position[0], p[1] - cam.position[1], p[2] - cam.position[2]];
-      const length = hypotOf(d) || 1;
+      const length = Math.hypot(d[0], d[1], d[2]) || 1;
       return [d[0] / length, d[1] / length, d[2] / length];
     },
   };

@@ -9,7 +9,6 @@ import type { Vec2, Vec3 } from '@core/model/vectors';
 import { add3, scale3 } from '@lib/vec3';
 import type { IsoGraph, WalkStep } from './isoGraph';
 import { depthOf, projectIso, type NorthArrow } from './isoProjection';
-import { hypotOf } from '@lib/hypotOf';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const L0 = 200;
@@ -61,10 +60,10 @@ function meet(p: Vec2, q: Vec2, r: Vec2, s: Vec2): Vec2 | null {
   const d2: Vec2 = [s[0] - r[0], s[1] - r[1]];
   const denominator = d1[0] * d2[1] - d1[1] * d2[0];
   const offset: Vec2 = [r[0] - p[0], r[1] - p[1]];
-  const scaleOf = hypotOf(d1) * hypotOf(d2);
+  const scaleOf = Math.hypot(d1[0], d1[1]) * Math.hypot(d2[0], d2[1]);
   if (Math.abs(denominator) <= 1e-9 * scaleOf) {
-    if (Math.abs(offset[0] * d1[1] - offset[1] * d1[0]) > 1e-6 * hypotOf(d1)) return null;
-    const length = hypotOf(d1);
+    if (Math.abs(offset[0] * d1[1] - offset[1] * d1[0]) > 1e-6 * Math.hypot(d1[0], d1[1])) return null;
+    const length = Math.hypot(d1[0], d1[1]);
     const unit: Vec2 = [d1[0] / length, d1[1] / length];
     const along = (point: Vec2): number => (point[0] - p[0]) * unit[0] + (point[1] - p[1]) * unit[1];
     const low = Math.max(0, Math.min(along(r), along(s)));

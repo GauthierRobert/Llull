@@ -12,7 +12,6 @@ import { commentText, linesText, num, row } from '../decks/format';
 import { densityToAnalysis, stressPerMpa } from '../decks/units';
 import { isLaminateRefusal, laminateOf, type Laminate } from './laminate';
 import { SHELL_OFFSET } from './meshGeometry';
-import { hypotOf } from '@lib/hypotOf';
 import { appendAll } from '@lib/appendAll';
 
 const SHELL_TYPES: ReadonlySet<string> = new Set(['S3', 'S4', 'S6', 'S8']);
@@ -49,7 +48,7 @@ export function compositePlane(ctx: DeckContext, entityId: string): Vec3 | strin
 /** The rosette 0-degree axis projected on the shell plane (unit), or null when it is normal to it. */
 export function projectedAxis(axis: Vec3, normal: Vec3): Vec3 | null {
   const inPlane = sub3(axis, [normal[0] * dot3(axis, normal), normal[1] * dot3(axis, normal), normal[2] * dot3(axis, normal)]);
-  return hypotOf(inPlane) < 1e-6 ? null : normalize3(inPlane);
+  return Math.hypot(inPlane[0], inPlane[1], inPlane[2]) < 1e-6 ? null : normalize3(inPlane);
 }
 
 /** Plausible lamina densities, kg/m^3: outside them the value was almost certainly entered in another unit than g per cubic document unit. */

@@ -13,7 +13,6 @@ import { arcPoints, curvedWallArc, curvedWallBand } from '../../building/geometr
 import { stairBlocks, stairPoint } from '../../building/geometry/stairGeometry';
 import { supportShape } from '../piping/supportParts';
 import { carrierOfSupport } from '../piping/pipeCarrier';
-import { hypotOf } from '@lib/hypotOf';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
 export type OrientedBox = { readonly center: Vec3; readonly axes: readonly [Vec3, Vec3, Vec3]; readonly half: Vec3 };
@@ -35,7 +34,7 @@ export function boxOverlap(a: OrientedBox, b: OrientedBox): number {
   for (const u of a.axes)
     for (const v of b.axes) {
       const axis = cross3(u, v);
-      const length = hypotOf(axis);
+      const length = Math.hypot(axis[0], axis[1], axis[2]);
       if (length > 1e-9) axes.push([axis[0] / length, axis[1] / length, axis[2] / length]);
     }
   const delta = sub3(b.center, a.center);

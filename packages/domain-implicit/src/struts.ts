@@ -6,6 +6,7 @@
 import type { StrutBeam, StrutSet } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
 import type { StrutCell } from './model';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 interface CellDefinition {
   readonly nodes: readonly Vec3[];
@@ -238,7 +239,7 @@ export function strutBookkeeping(cell: StrutCell): {
     }
   const counts = [...valence.values()];
   const lengthPerCell = bonds.reduce((sum, [a, b]) => sum + bondLength(nodes, a, b), 0);
-  return { beams: bonds.length, nodes: valence.size, valenceMin: Math.min(...counts), valenceMax: Math.max(...counts), lengthPerCell };
+  return { beams: bonds.length, nodes: valence.size, valenceMin: minOf(counts), valenceMax: maxOf(counts), lengthPerCell };
 }
 
 /**

@@ -5,7 +5,6 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
 import type { StackView } from './stackRead';
-import { hypotOf } from '@lib/hypotOf';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 
 interface PlateExtent {
@@ -34,12 +33,12 @@ export interface StackGeometry {
  * @failure a plate that is not a document entity, a zero axis -> { message }
  */
 export function stackGeometry(doc: CadDocument, stack: StackView): StackGeometry | { readonly message: string } {
-  const length = hypotOf(stack.axis.direction);
+  const length = Math.hypot(stack.axis.direction[0], stack.axis.direction[1], stack.axis.direction[2]);
   if (!(length > 0)) return { message: `stack '${stack.id}' has a zero axis direction` };
   const direction = scale3(stack.axis.direction, 1 / length);
   const trial: Vec3 = Math.abs(direction[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const across = cross3(direction, trial);
-  const lateral = scale3(across, 1 / hypotOf(across));
+  const lateral = scale3(across, 1 / Math.hypot(across[0], across[1], across[2]));
   const second = cross3(direction, lateral);
   const plates: PlateExtent[] = [];
   for (const layer of stack.layers) {

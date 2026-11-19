@@ -3,7 +3,6 @@
 import type { PrintIdealization } from '@core/model/printIdealization';
 import type { Vec3 } from '@core/model/vectors';
 import { pow } from '@lib/pow';
-import { hypotOf } from '@lib/hypotOf';
 import { maxOf } from '@lib/arrayExtrema';
 
 type Triangle = readonly [Vec3, Vec3, Vec3];
@@ -30,7 +29,7 @@ export function skinEstimate(triangles: readonly Triangle[], axis: Vec3, wall: n
   let skin = 0;
   for (const [a, b, c] of triangles) {
     const normal = cross(sub(b, a), sub(c, a));
-    const twiceArea = hypotOf(normal);
+    const twiceArea = Math.hypot(normal[0], normal[1], normal[2]);
     signed += dot(a, cross(b, c)) / 6;
     if (twiceArea === 0) continue;
     const along = Math.min(1, Math.abs(dot(normal, axis)) / twiceArea);

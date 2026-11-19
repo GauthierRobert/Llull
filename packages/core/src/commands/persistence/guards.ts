@@ -256,7 +256,7 @@ function revolutionProblem(v: Record<string, unknown>): string | null {
   const { segments, axis, angle } = v;
   if (!Number.isInteger(segments) || (segments as number) < 3 || (segments as number) > MAX_REVOLVE_SEGMENTS)
     return `segments must be an integer 3..${MAX_REVOLVE_SEGMENTS}, got ${String(segments)}`;
-  if (!isVec3(axis) || hypotOf(axis) < 1e-12) return 'axis must be a non-zero [x, y, z] of finite numbers';
+  if (!isVec3(axis) || Math.hypot(axis[0], axis[1], axis[2]) < 1e-12) return 'axis must be a non-zero [x, y, z] of finite numbers';
   if (!isFiniteNumber(angle) || angle <= 0 || angle > 2 * Math.PI + 1e-9) return `angle must be in (0, 2π], got ${String(angle)}`;
   return firstProblem(pointListProblem(v, 'profile', 3, MAX_STORED_PROFILE_POINTS), curvesProblem(v['curves']));
 }

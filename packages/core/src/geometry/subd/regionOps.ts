@@ -11,6 +11,7 @@ import { edgeKey } from './edgeKey';
 import { mintElementId } from './elements';
 import { type CageTopology, buildTopology, connectedRegions, newellVector, regionBoundary } from './topology';
 import { appendAll } from '../../lib/appendAll';
+import { spliceAll } from '../../lib/spliceAll';
 
 /** Position of vertex `v` of region `k` after the operation (`boundary`: v is duplicated, else it moves in place). */
 type Place = (k: number, v: number, boundary: boolean) => Vec3;
@@ -83,7 +84,7 @@ function carrySharpness(
     if (!moved) out.push([a, b, s]);
     appendAll(out, copies);
   }
-  state.sharp.splice(0, state.sharp.length, ...out);
+  spliceAll(state.sharp, 0, state.sharp.length, out);
   duplicates.forEach((dup) => {
     for (const corner of [...state.corners]) if (dup.has(corner.v)) state.corners.push({ v: dup.get(corner.v) as number, s: corner.s });
   });

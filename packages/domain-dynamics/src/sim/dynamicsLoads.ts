@@ -15,7 +15,6 @@ import { RAD_PER_S_PER_RPM, propellerOutput } from './forceLaws';
 import type { SimulationData } from './simulationReport';
 import { pointAtPose } from '@core/geometry/bodyPose';
 import { reactionsOf } from './reactionsView';
-import { hypotOf } from '@lib/hypotOf';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export const LOAD_LAYERS = ['gravity', 'joints', 'drives', 'thrust', 'reactions'] as const;
@@ -96,7 +95,7 @@ function centreAt(context: Context, bodyId: string): Vec3 | undefined {
 
 function weightItems(context: Context): LoadItem[] {
   const { dynamics, doc } = context;
-  const g = hypotOf(dynamics.gravity);
+  const g = Math.hypot(dynamics.gravity[0], dynamics.gravity[1], dynamics.gravity[2]);
   const items: LoadItem[] = [];
   for (const body of Object.values(dynamics.bodies)) {
     const props = bodyMassProperties(doc, body);

@@ -6,10 +6,9 @@
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { ContactPair } from '@core/model/contact';
 import type { Vec3 } from '@core/model/vectors';
-import { cross3, sub3 } from '@lib/vec3';
+import { cross3, hypot3, sub3 } from '@lib/vec3';
 import { faceNodes, indexMesh, type MeshIndex } from '../thermal/meshGeometry';
 import { pairTargetKey } from '../hash/targets';
-import { hypotOf } from '@lib/hypotOf';
 
 /** frd block and component names CalculiX writes for CDIS / CSTR. */
 export const BLOCK = 'CONTACT';
@@ -56,7 +55,7 @@ export function slaveAreas(index: MeshIndex, mesh: FeMeshArtifact, pair: Contact
     const corners = nodes.slice(0, 3).map((node) => index.coordinates.get(node));
     const [a, b, c] = corners;
     if (a === undefined || b === undefined || c === undefined) continue;
-    const area = hypotOf(cross3(sub3(b, a), sub3(c, a))) / 2;
+    const area = hypot3(cross3(sub3(b, a), sub3(c, a))) / 2;
     for (const node of nodes.slice(0, 3)) areas.set(node, (areas.get(node) ?? 0) + area / 3);
   }
   return areas;

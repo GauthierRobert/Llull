@@ -59,7 +59,7 @@ const clamp = (value: number, low: number, high: number): number => Math.min(hig
 
 /** Reference acceleration (m/s²) and angular acceleration (rad/s²) the residual is divided by. */
 function scales(vehicle: TrimVehicle): { linear: number; angular: number } {
-  const g = Math.max(hypotOf(vehicle.gravity), 1);
+  const g = Math.max(Math.hypot(vehicle.gravity[0], vehicle.gravity[1], vehicle.gravity[2]), 1);
   const radius = Math.sqrt(Math.max(vehicle.inertia[0][0] + vehicle.inertia[1][1] + vehicle.inertia[2][2], 1e-12) / (2 * vehicle.massKg));
   return { linear: g, angular: g / Math.max(radius, 1e-3) };
 }

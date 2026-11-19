@@ -1,7 +1,6 @@
 /** Load-case multiplier history of a nonlinear case: the values every step starts from and ends at (pure; step time = 1). */
 
 import type { FeaLoad, NonlinearSettings } from '@core/model/analysis';
-import { hypotOf } from '@lib/hypotOf';
 
 export interface StepMultipliers {
   readonly stepId: string;
@@ -26,7 +25,7 @@ export function multiplierHistory(nonlinear: NonlinearSettings): StepMultipliers
 /** Base value of a load: pressure magnitude, force / moment / gravity vector length (the multiplier scales this). */
 export function loadBaseValue(load: FeaLoad): number {
   if (load.kind === 'pressure' || load.magnitude !== undefined) return load.magnitude ?? 0;
-  return load.vector === undefined ? 0 : hypotOf(load.vector);
+  return load.vector === undefined ? 0 : Math.hypot(load.vector[0], load.vector[1], load.vector[2]);
 }
 
 /**

@@ -11,7 +11,6 @@ import { buildDatasheetMotor, datasheetDescription, foreignField } from './motor
 import { inductionSheetSchema, pmsmSheetSchema, stepperSheetSchema } from './machineSchemas';
 import { datasheetSchema, gearheadSchema, sourceSchema, toSource } from './motorSchemas';
 import { maxOf } from '@lib/arrayExtrema';
-import { hypotOf } from '@lib/hypotOf';
 
 /**
  * @affects adds 1 motor to doc.dynamics (affected: [motorId])
@@ -202,7 +201,7 @@ export const addPropeller = defineCommand({
     if (joint === undefined) return fail(`joint '${params.joint}' not found (add_body_joint first)`);
     if (joint.kind !== 'revolute') return fail(`joint '${params.joint}' is prismatic; a propeller needs a revolute joint`);
     const thrustDirection = params.thrustDirection ?? joint.axis;
-    if (hypotOf(thrustDirection) < 1e-12) return fail('thrustDirection must be non-zero');
+    if (Math.hypot(thrustDirection[0], thrustDirection[1], thrustDirection[2]) < 1e-12) return fail('thrustDirection must be non-zero');
     const table = params.table;
     if (table !== undefined) {
       if (table.source.trim() === '') return fail('table needs a non-empty source');

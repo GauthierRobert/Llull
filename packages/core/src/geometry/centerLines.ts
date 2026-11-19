@@ -45,7 +45,7 @@ function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | nu
   const line = (localDirection: Vec3, from: number, to: number, radius: number): RoundAxis | null => {
     const origin = world([0, 0, 0]);
     const direction = sub3(world(localDirection), origin);
-    if (hypotOf(direction) < 1e-12 || !(radius > 0)) return null;
+    if (Math.hypot(direction[0], direction[1], direction[2]) < 1e-12 || !(radius > 0)) return null;
     return { origin, direction: normalize3(direction), from: from * scale, to: to * scale, radius };
   };
   switch (entity.kind) {
@@ -198,7 +198,7 @@ function pitchCircles(marks: ReadonlyArray<CentreMark>, unit: number): Array<Omi
     const offsets = group.map(({ center: [x, y] }) => [x - center[0], y - center[1]] as const);
     const pitch = hypotOf(offsets[0] ?? [0, 0]);
     const radius = group[0]?.radius ?? 0;
-    if (!(pitch > radius) || offsets.some((o) => Math.abs(hypotOf(o) - pitch) > unit * 10)) continue;
+    if (!(pitch > radius) || offsets.some((o) => Math.abs(Math.hypot(o[0], o[1]) - pitch) > unit * 10)) continue;
     const angles = offsets.map(([x, y]) => Math.atan2(y, x)).sort((a, b) => a - b);
     const step = (2 * Math.PI) / angles.length;
     const even = angles.every((angle, i) => {

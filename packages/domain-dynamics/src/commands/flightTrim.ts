@@ -22,7 +22,6 @@ import {
   type TrimVehicle,
   type Wrench,
 } from '../flight/trimModel';
-import { hypotOf } from '@lib/hypotOf';
 
 const DEG = 180 / Math.PI;
 /** Airspeed (hover) and flight-path angle (level) of a condition that gives none. */
@@ -183,7 +182,7 @@ function trimData(trim: Trimmed): Record<string, unknown> {
   const velocity = bodyVelocity(condition.airspeedMps, state.flightPath, state.roll, state.pitch);
   const wrench: Wrench = wrenchAt(vehicle, { velocity, rates: [0, 0, 0], roll: state.roll, pitch: state.pitch }, state.controls);
   const accelerations = trimAccelerations(vehicle, condition, state);
-  const weight = vehicle.massKg * hypotOf(vehicle.gravity);
+  const weight = vehicle.massKg * Math.hypot(vehicle.gravity[0], vehicle.gravity[1], vehicle.gravity[2]);
   const world = rotateInverse(orientationOf(state.roll, state.pitch), [0, 0, 1]);
   return {
     scenario: trim.scenarioId,

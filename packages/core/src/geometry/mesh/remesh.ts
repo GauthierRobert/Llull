@@ -13,6 +13,8 @@ import type { Vec3 } from '../../model/vectors';
 import { EditMesh, normalOf } from './editMesh';
 import { type SphereRegion, insideRegion } from './region';
 import { SurfaceIndex } from './surfaceIndex';
+import { hypot3 } from '../../lib/vec3';
+import { minOf } from '../../lib/arrayExtrema';
 
 export interface RemeshParams {
   readonly targetEdge?: number;
@@ -72,7 +74,7 @@ function quality(a: Vec3, b: Vec3, c: Vec3): number {
     (c[0] - a[0]) ** 2 +
     (c[1] - a[1]) ** 2 +
     (c[2] - a[2]) ** 2;
-  return sum > 0 ? (2 * Math.sqrt(3) * Math.hypot(...normalOf(a, b, c))) / sum : 0;
+  return sum > 0 ? (2 * Math.sqrt(3) * hypot3(normalOf(a, b, c))) / sum : 0;
 }
 
 /** A replacement triangle is acceptable when it keeps the orientation and is not a sliver (or is no worse than what it replaces). */
@@ -149,7 +151,7 @@ class Remesher {
         const shared = this.mesh.facesOnEdge(a, b);
         if (shared.length !== 2) continue;
         const [n1, n2] = [this.mesh.faceNormal(shared[0] as number), this.mesh.faceNormal(shared[1] as number)];
-        const l = Math.hypot(...n1) * Math.hypot(...n2);
+        const l = Math.hypot(n1[0], n1[1], n1[2]) * Math.hypot(n2[0], n2[1], n2[2]);
         if (l > 0 && dot(n1, n2) / l < cosFeature) this.feature.add(edgeKey(a, b));
       }
   }
@@ -195,7 +197,7 @@ class Remesher {
     const [p, pa, pb] = [this.mesh.p(v), this.mesh.p(a), this.mesh.p(b)];
     const u: Vec3 = [pa[0] - p[0], pa[1] - p[1], pa[2] - p[2]];
     const w: Vec3 = [pb[0] - p[0], pb[1] - p[1], pb[2] - p[2]];
-    const cosine = dot(u, w) / (Math.hypot(...u) * Math.hypot(...w) || 1);
+    const cosine = dot(u, w) / (Math.hypot(u[0], u[1], u[2]) * Math.hypot(w[0], w[1], w[2]) || 1);
     return Math.PI - Math.acos(Math.max(-1, Math.min(1, cosine))) > this.params.featureAngleRad ? 'fixed' : 'slide';
   }
 
@@ -333,7 +335,7 @@ class Remesher {
           [pc, pb, pd],
         ];
     if (dist(pc, pd) > HIGH * this.edgeTarget(c, d) && dist(pc, pd) > dist(pa, pb)) return false;
-    const floor = Math.min(QUALITY_FLOOR, ...oldFaces.map((o) => quality(...o)));
+    const floor = Math.min(QUALITY_FLOOR, minOf(oldFaces.map((o) => quality(...o))));
     if (!quad.every((t) => acceptable(reference, t) && quality(...t) >= floor)) return false;
     return mesh.flip(a, b);
   }
@@ -365,7 +367,7 @@ class Remesher {
       const fn = this.mesh.faceNormal(f);
       n = [n[0] + fn[0], n[1] + fn[1], n[2] + fn[2]];
     }
-    const l = Math.hypot(...n) || 1;
+    const l = Math.hypot(n[0], n[1], n[2]) || 1;
     return [n[0] / l, n[1] / l, n[2] / l];
   }
 
@@ -382,7 +384,7 @@ class Remesher {
         let q: Vec3 = [0, 0, 0];
         for (const f of mesh.vFaces[v] as Set<number>) {
           const [a, b, c] = mesh.corners(f).map((x) => mesh.p(x)) as [Vec3, Vec3, Vec3];
-          const w = Math.hypot(...normalOf(a, b, c)) / 2;
+          const w = hypot3(normalOf(a, b, c)) / 2;
           q = [q[0] + (w * (a[0] + b[0] + c[0])) / 3, q[1] + (w * (a[1] + b[1] + c[1])) / 3, q[2] + (w * (a[2] + b[2] + c[2])) / 3];
           weight += w;
         }

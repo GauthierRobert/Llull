@@ -7,12 +7,11 @@
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { BoltPretension } from '@core/model/contact';
 import type { Vec3 } from '@core/model/vectors';
-import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
+import { add3, cross3, dot3, hypot3, scale3, sub3 } from '@lib/vec3';
 import { faceNodes, indexMesh, type MeshIndex } from '../thermal/meshGeometry';
 import { BLOCK, COMPONENTS, slaveAreas } from './reader';
 import { preloadForce } from './pretensionDeck';
 import { isCutRefusal, numberDuplicates, outwardAreaVector, pretensionCut, type PretensionCut } from './pretensionSection';
-import { hypotOf } from '@lib/hypotOf';
 
 type Step = FeResultsArtifact['steps'][number];
 
@@ -231,8 +230,8 @@ export function boltRows(
           time: step.time,
           preload: preloadForce(planned.bolt.preload, lengthToAnalysis),
           axialForce: axial,
-          shearForce: hypotOf(sub3(force, scale3(axis, axial))),
-          bendingMoment: hypotOf(sub3(moment, scale3(axis, torsion))),
+          shearForce: hypot3(sub3(force, scale3(axis, axial))),
+          bendingMoment: hypot3(sub3(moment, scale3(axis, torsion))),
           torsion,
           reactionForce: ((total) => (total === null ? null : -dot3(total, axis)))(
             duplicateReactionAt(results, planned.position, step.time),
@@ -269,7 +268,7 @@ export function clampRows(analysis: AnalysisCase, mesh: FeMeshArtifact, results:
         const at = index.coordinates.get(node);
         if (at === undefined) return false;
         const offset = sub3(at, planned.cut.centroid);
-        return hypotOf(sub3(offset, scale3(axis, dot3(offset, axis)))) <= radius;
+        return hypot3(sub3(offset, scale3(axis, dot3(offset, axis)))) <= radius;
       });
       const zoneArea = zone.reduce((sum, [, area]) => sum + area, 0);
       if (zoneArea <= 0) continue;

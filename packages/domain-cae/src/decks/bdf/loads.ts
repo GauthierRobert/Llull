@@ -8,7 +8,6 @@ import { planeAxis } from '../mechanical';
 import { cardLines } from './fields';
 import { failed, integer, real, refusal, type Rounding } from './model';
 import { appendAll } from '@lib/appendAll';
-import { hypotOf } from '@lib/hypotOf';
 
 const DOF_COMPONENT = { ux: 1, uy: 2, uz: 3, rx: 4, ry: 5, rz: 6 } as const;
 const SHELL_CARDS: ReadonlySet<string> = new Set(['S3', 'S4', 'S6', 'S8']);
@@ -90,7 +89,7 @@ function add(into: Map<number, Vec3>, node: number, vector: Vec3): void {
 }
 
 const unit = (vector: Vec3): { readonly magnitude: number; readonly direction: Vec3 } => {
-  const magnitude = hypotOf(vector);
+  const magnitude = Math.hypot(vector[0], vector[1], vector[2]);
   return { magnitude, direction: magnitude === 0 ? [0, 0, 0] : [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude] };
 };
 

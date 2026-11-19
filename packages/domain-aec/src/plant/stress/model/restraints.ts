@@ -9,7 +9,6 @@ import type { Vec3 } from '@core/model/vectors';
 import type { StressModel, StressRestraint } from './schema';
 import type { Layout, LayoutFailure } from './layoutTypes';
 import type { SourceSupport } from './sources';
-import { hypotOf } from '@lib/hypotOf';
 
 export interface Contact {
   readonly node: number;
@@ -142,7 +141,7 @@ function mapExtra(
     const friction = restraint.frictionCoefficient ?? 0;
     const normals: (1 | -1)[] = restraint.oneWay === '+' ? [1] : restraint.oneWay === '-' ? [-1] : [1, -1];
     if (restraint.direction !== undefined) {
-      const size = hypotOf(restraint.direction);
+      const size = Math.hypot(restraint.direction[0], restraint.direction[1], restraint.direction[2]);
       const direction: Vec3 = [restraint.direction[0] / size, restraint.direction[1] / size, restraint.direction[2] / size];
       if (friction > 0 && alignedAxis(direction) === null)
         return {

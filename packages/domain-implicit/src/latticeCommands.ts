@@ -11,6 +11,7 @@ import { type CellMap, type Law, type StrutsNode, type TpmsControl, type TpmsNod
 import { addNode } from './nodeResult';
 import { strutGeometry } from './struts';
 import { controlInterval, solveRelativeDensity } from './tpmsControl';
+import { minOf } from '@lib/arrayExtrema';
 
 const cellSizeSchema = z
   .union([z.number(), vec3('Cell size per axis [x, y, z].')])
@@ -84,7 +85,10 @@ function mapProblem(
       path: 'map.cellsAround',
       ids: [],
     };
-  if (!(Number.isFinite(map.radialCellSize) && map.radialCellSize > 0) || (map.kind === 'cylindrical' && Math.hypot(...map.axis) === 0))
+  if (
+    !(Number.isFinite(map.radialCellSize) && map.radialCellSize > 0) ||
+    (map.kind === 'cylindrical' && Math.hypot(map.axis[0], map.axis[1], map.axis[2]) === 0)
+  )
     return { code: 'IMP_PARAM_RANGE', message: 'map needs radialCellSize > 0 and (cylindrical) a non-zero axis', path: 'map', ids: [] };
   return null;
 }
@@ -254,7 +258,7 @@ export const addStrutLattice = defineCommand({
       return fail('IMP_STRUT_RADIUS_RANGE', `radius must be > 0 (got ${p.radius})`, 'radius');
     if (typeof p.radius === 'string' && p.nodeRadius !== undefined)
       return fail('IMP_PARAM_CONFLICT', 'nodeRadius applies to a constant radius only', 'nodeRadius');
-    const shortest = Math.min(...strutGeometry(p.cell, cellSize, Number.isFinite(range.hi) ? range.hi : 1e-6, undefined).lengths);
+    const shortest = minOf(strutGeometry(p.cell, cellSize, Number.isFinite(range.hi) ? range.hi : 1e-6, undefined).lengths);
     if (Number.isFinite(range.hi) && 2 * range.hi >= shortest)
       return fail(
         'IMP_STRUT_RADIUS_RANGE',

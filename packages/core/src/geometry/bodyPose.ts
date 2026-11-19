@@ -116,7 +116,7 @@ function relativeRotation(a: Quaternion, b: Quaternion): { axis: Vec3; angle: nu
   const w = bw * aw - bx * ax - by * ay - bz * az;
   const v: Vec3 = [bw * ax + bx * aw + by * az - bz * ay, bw * ay - bx * az + by * aw + bz * ax, bw * az + bx * ay - by * ax + bz * aw];
   const sign = w < 0 ? -1 : 1;
-  const sine = hypotOf(v);
+  const sine = Math.hypot(v[0], v[1], v[2]);
   if (sine < 1e-12) return null;
   return { axis: [(v[0] * sign) / sine, (v[1] * sign) / sine, (v[2] * sign) / sine], angle: 2 * Math.atan2(sine, w * sign) };
 }

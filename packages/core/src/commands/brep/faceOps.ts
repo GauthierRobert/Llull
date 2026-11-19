@@ -11,7 +11,6 @@ import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { dot3, normalize3, sub3 } from '../../lib/vec3';
 import { planarFace, runFaceOp, type FaceOpContext } from './faceOpRun';
-import { hypotOf } from '../../lib/hypotOf';
 
 const faceIndices = z
   .array(z.number().int().nonnegative())
@@ -33,7 +32,7 @@ const planeSchema = z
 
 const DEFAULT_PULL: Vec3 = [0, 0, 1];
 const degrees = (radians: number): string => `${round6((radians * 180) / Math.PI)}°`;
-const unit = (v: Vec3): Vec3 | null => (hypotOf(v) > 0 ? normalize3(v) : null);
+const unit = (v: Vec3): Vec3 | null => (Math.hypot(v[0], v[1], v[2]) > 0 ? normalize3(v) : null);
 
 /** Lowest point of the solid along `direction` (the default neutral plane of a draft: the parting line at the bottom). */
 function lowestAlong(context: FaceOpContext, direction: Vec3): Vec3 | null {

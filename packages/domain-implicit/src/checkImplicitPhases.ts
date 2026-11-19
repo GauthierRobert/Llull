@@ -13,6 +13,7 @@ import { bodyMeshIsClosedManifold } from './meshFacts';
 import { type ImplicitBody, bodyOf, fieldOf } from './model';
 import { overhang } from './overhang';
 import type { measureWalls } from './wallChecks';
+import { minOf } from '@lib/arrayExtrema';
 
 type Severity = 'fail' | 'warn';
 
@@ -125,15 +126,15 @@ export function meshFindings(
       remediation: 'report a bug; re-realise with create_implicit_body',
     });
   const smallest = [features.wall, features.strut].filter((v): v is number => v !== null);
-  if (smallest.length > 0 && Math.min(...smallest) < 2 * body.voxel)
+  if (smallest.length > 0 && minOf(smallest) < 2 * body.voxel)
     add({
       code: 'IMP_CHECK_RESOLUTION_COARSE',
       severity: 'warn',
       ids: [id],
-      value: Math.min(...smallest),
+      value: minOf(smallest),
       limit: 2 * body.voxel,
       location: null,
-      message: `the smallest wall / strut ${Math.min(...smallest)} ${unit} is under 2 voxels (${2 * body.voxel} ${unit}): the mesh does not resolve it`,
+      message: `the smallest wall / strut ${minOf(smallest)} ${unit} is under 2 voxels (${2 * body.voxel} ${unit}): the mesh does not resolve it`,
       remediation: 'halve the voxel',
     });
 }
@@ -249,7 +250,7 @@ function overhangFinding(inputs: ProcessInputs, full: MeshData | null, buildDire
   if (
     process.criticalAngleDeg === undefined ||
     !(process.criticalAngleDeg > 0 && process.criticalAngleDeg <= 90) ||
-    Math.hypot(...buildDirection) === 0
+    Math.hypot(buildDirection[0], buildDirection[1], buildDirection[2]) === 0
   ) {
     outcome.notEvaluated.push('overhang');
     return;

@@ -10,7 +10,6 @@ import { changed, commandError, failer, rejection } from '@core/commands/noop';
 import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { dynamicsOf, withDynamics } from './bodies';
 import { BODY_JOINT_KINDS, bodyJointKind } from './kinematicKinds';
-import { hypotOf } from '@lib/hypotOf';
 
 const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
 
@@ -49,7 +48,7 @@ function checkJointInputs(dynamics: DynamicsModel, params: JointInput): CheckedJ
   if (typeof kind === 'object') return kind.refusal;
   const spherical = kind === 'spherical';
   const axis: Vec3 = params.axis ?? [0, 0, 1];
-  if (!spherical && (params.axis === undefined || hypotOf(axis) < 1e-12)) return 'axis must be a non-zero vector';
+  if (!spherical && (params.axis === undefined || Math.hypot(axis[0], axis[1], axis[2]) < 1e-12)) return 'axis must be a non-zero vector';
   const requestedSpeed = params.initialRpm !== undefined || (params.initialVelocity ?? 0) !== 0;
   if (spherical && ((params.damping ?? 0) !== 0 || (params.friction ?? 0) !== 0 || requestedSpeed))
     return 'a spherical joint has no damping, friction or initial speed (put them on the tree joints)';

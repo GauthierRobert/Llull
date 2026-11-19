@@ -8,7 +8,6 @@ import { idOrNext } from '@lib/explicitId';
 import { flightOf, idTakenInDynamicsOrFlight, ISA_SEA_LEVEL_DENSITY, type Rotor, type RotorCoefficients } from '../flight/model';
 import { dynamicsOf } from './bodies';
 import { compileRotor, rotorOutput } from '../flight/rotorLaw';
-import { hypotOf } from '@lib/hypotOf';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Why `bodyId` cannot carry a flight load (missing or fixed), or null. */
@@ -102,7 +101,7 @@ export const addRotor = defineCommand({
     const fail = failer(doc, 'add_rotor');
     const problem = bodyProblem(doc, params.body);
     if (problem !== null) return fail(problem);
-    if (hypotOf(params.axis) < 1e-12) return fail('axis must be non-zero');
+    if (Math.hypot(params.axis[0], params.axis[1], params.axis[2]) < 1e-12) return fail('axis must be non-zero');
     const { table, thrustCoefficient: ct, powerCoefficient: cp } = params;
     if (table !== undefined && (ct !== undefined || cp !== undefined))
       return fail('give the static pair (thrustCoefficient + powerCoefficient) OR table, not both');

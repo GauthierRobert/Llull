@@ -11,7 +11,6 @@ import { type DrapeNet, buildNet } from './net';
 import { type ShearLimits, type ShearSummary, summarizeShear } from './shear';
 import { type DrapeSurface, drapeSurfaceOf } from './surfaceQuery';
 import { maxOf, minOf } from '@lib/arrayExtrema';
-import { hypotOf } from '@lib/hypotOf';
 
 export interface PieceDrape {
   readonly index: number;
@@ -176,7 +175,9 @@ export function drapePly(part: CompositePart, ply: Ply, options: PlyDrapeOptions
       seedUv,
       net,
       coverage: pieceCoverage(net, piece),
-      summary: summarizeShear(net, options.limits, (node) => insideOrOn(node.hit.uv, piece, 1e-6 * (1 + hypotOf(node.hit.uv)))),
+      summary: summarizeShear(net, options.limits, (node) =>
+        insideOrOn(node.hit.uv, piece, 1e-6 * (1 + Math.hypot(node.hit.uv[0], node.hit.uv[1]))),
+      ),
     });
   }
   return { ok: true, stepLength: d, pieces };

@@ -13,7 +13,6 @@ import { placedSurface, surfacePoleExtent } from '../../geometry/nurbsSurface';
 import { chainCurves, sizeOfCurves, worldCurves } from './curveInputs';
 import { refuseSrf } from './shared';
 import { isRefusal, sig, surfaceEntityOf } from './surfaceShared';
-import { hypotOf } from '../../lib/hypotOf';
 
 /**
  * @affects replaces the surface (rectangle) or the trim loops (curves) of 1 nurbs_surface entity (same id)
@@ -97,7 +96,7 @@ export const trimSurface = defineCommand({
     const ids = curveIds as string[];
     if (ids.length === 0 || ids.length > 12)
       return refuseSrf(doc, 'trim_surface', 'SRF_PARAM_INVALID', 'curveIds needs 1..12 curves', [id], ['params.curveIds']);
-    if (projectAlong !== undefined && !(hypotOf(projectAlong) > 0))
+    if (projectAlong !== undefined && !(Math.hypot(projectAlong[0], projectAlong[1], projectAlong[2]) > 0))
       return refuseSrf(
         doc,
         'trim_surface',

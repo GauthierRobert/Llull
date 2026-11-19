@@ -11,6 +11,7 @@ import type { IsoMesh } from '../../lib/isosurface/tetra';
 import { isClosedManifold } from '../../lib/isosurface/measures';
 import { evaluateWithGradient } from './gradient';
 import { type PreparedProgram, evaluateAt } from './interpret';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** The mesh and the number of cells that were split into one vertex per sheet. */
 export interface DualContoured extends IsoMesh {
@@ -156,7 +157,7 @@ function solveQef(data: readonly Crossing[], lo: readonly number[], hi: readonly
     }
   }
   const { values, vectors } = eigen3(ata);
-  const largest = Math.max(...values.map(Math.abs), 1e-300);
+  const largest = Math.max(maxOf(values.map(Math.abs)), 1e-300);
   const shift = new Float64Array(3);
   for (let k = 0; k < 3; k += 1) {
     const lambda = at(values, k);

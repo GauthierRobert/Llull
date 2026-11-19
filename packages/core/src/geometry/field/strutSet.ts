@@ -7,6 +7,8 @@
 import type { Vec3 } from '../../model/types';
 import type { StrutSet } from './program';
 import { BVH_MIN_SEGMENTS, buildStrutBvh } from './strutBvh';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 export interface StrutEvaluator {
   /** Signed distance at (x, y, z); `radius` >= 0 replaces every beam radius (spherical caps), -1 keeps the beam radii. */
@@ -97,7 +99,7 @@ export function prepareStrutSet(set: StrutSet): StrutEvaluator {
     };
   }
   const { cell, origin } = periodic;
-  const reach = Math.max(0, ...own.flatMap((beam) => [beam.ra, beam.rb]));
+  const reach = Math.max(0, maxOf(own.flatMap((beam) => [beam.ra, beam.rb])));
   const segments: Segment[] = [];
   for (let i = -1; i <= 1; i += 1)
     for (let j = -1; j <= 1; j += 1)
@@ -141,9 +143,7 @@ function boxGap(seg: Segment, lo: Vec3, hi: Vec3): number {
     [seg.ay, seg.ay + seg.dy],
     [seg.az, seg.az + seg.dz],
   ];
-  return Math.hypot(
-    ...ends.map(([a, b], axis) => Math.max(Math.min(a, b) - (hi[axis] as number), (lo[axis] as number) - Math.max(a, b), 0)),
-  );
+  return hypotOf(ends.map(([a, b], axis) => Math.max(Math.min(a, b) - (hi[axis] as number), (lo[axis] as number) - Math.max(a, b), 0)));
 }
 
 /**
@@ -154,7 +154,7 @@ function bucketLists(segments: readonly Segment[], cell: Vec3): Segment[][] {
   const lists: Segment[][] = [];
   const size: Vec3 = [cell[0] / BUCKETS, cell[1] / BUCKETS, cell[2] / BUCKETS];
   const radii = segments.flatMap((seg) => [seg.ra, seg.rb]);
-  const spread = radii.length === 0 ? 0 : Math.max(...radii) - Math.min(...radii);
+  const spread = radii.length === 0 ? 0 : maxOf(radii) - minOf(radii);
   for (let k = 0; k < BUCKETS; k += 1)
     for (let j = 0; j < BUCKETS; j += 1)
       for (let i = 0; i < BUCKETS; i += 1) {
@@ -163,7 +163,7 @@ function bucketLists(segments: readonly Segment[], cell: Vec3): Segment[][] {
         const corners = [lo[0], hi[0]].flatMap((x) => [lo[1], hi[1]].flatMap((y) => [lo[2], hi[2]].map((z): Vec3 => [x, y, z])));
         const bound = Math.min(
           Infinity,
-          ...segments.map((seg) => Math.max(...corners.map((c) => pointSegmentDistance(seg, c[0], c[1], c[2])))),
+          minOf(segments.map((seg) => maxOf(corners.map((c) => pointSegmentDistance(seg, c[0], c[1], c[2]))))),
         );
         lists.push(segments.filter((seg) => boxGap(seg, lo, hi) <= bound + spread + 1e-9));
       }

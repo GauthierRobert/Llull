@@ -12,7 +12,6 @@ import { refuseFll } from '../codes';
 import { cleanSource, fitCoupons, sourceSchema, toMpa } from './couponCommands';
 import { isPrintedRefusal, printedProperties } from './properties';
 import { PRINT_CASE_TYPES } from './validate';
-import { hypotOf } from '@lib/hypotOf';
 
 const NAME = 'set_print_idealization';
 /** Relative gap between the fitted solid modulus C and the solid coupon modulus above which the result carries a warning. */
@@ -119,7 +118,7 @@ export const setPrintIdealization = defineCommand({
         .map(([key]) => key);
       return fail('FLL_PRINT_PARAM', `missing ${absent.join(', ')}`, absent);
     }
-    const length = hypotOf(layerAxis);
+    const length = Math.hypot(layerAxis[0], layerAxis[1], layerAxis[2]);
     if (!(length > 0) || !Number.isFinite(length)) return fail('FLL_PRINT_PARAM', 'layerAxis must be a non-zero vector', ['layerAxis']);
     if (coupon === undefined)
       return fail('FLL_PRINT_COUPON_MISSING', 'no coupon values: llull ships no typical printed-part moduli or strengths', ['coupon']);

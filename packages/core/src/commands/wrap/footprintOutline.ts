@@ -10,10 +10,9 @@ import type { Vec2, Vec3 } from '../../model/types';
 import type { CurveSegment } from '../../model/curve';
 import { sampleSegment, type PlaneSegment } from '../../geometry/planeSegments';
 import { pointAt2 } from '../../lib/nurbs/curve2d';
-import { cross3, dot3, sub3 } from '../../lib/vec3';
+import { cross3, dot3, hypot3, sub3 } from '../../lib/vec3';
 import { powInt } from '../../lib/powInt';
 import { maxOf } from '../../lib/arrayExtrema';
-import { hypotOf } from '../../lib/hypotOf';
 import { appendAll } from '../../lib/appendAll';
 
 export interface Outline {
@@ -124,9 +123,9 @@ export function fittedOutline(image: (uv: Vec2) => Vec3, pieces: readonly PlaneS
 
 const chordSag = (a: Vec3, mid: Vec3, b: Vec3): number => {
   const chord = sub3(b, a);
-  const length = hypotOf(chord);
+  const length = Math.hypot(chord[0], chord[1], chord[2]);
   const toMid = sub3(mid, a);
-  return length > 0 ? hypotOf(cross3(chord, toMid)) / length : hypotOf(toMid);
+  return length > 0 ? hypot3(cross3(chord, toMid)) / length : Math.hypot(toMid[0], toMid[1], toMid[2]);
 };
 
 /** The polygon outline of a closed loop, repeated and collinear points removed (see the module comment). */

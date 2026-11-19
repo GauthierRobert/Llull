@@ -6,7 +6,6 @@ import type { Vec3 } from '@core/model/vectors';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { faceNodes, indexMesh, type MeshIndex } from '../thermal/meshGeometry';
 import { pairTargetKey } from '../hash/targets';
-import { hypotOf } from '@lib/hypotOf';
 
 /** Most node x face tests one check may run (named guard: larger meshes skip the measurement with a note). */
 const MAX_OVERCLOSURE_TESTS = 2e7;
@@ -36,7 +35,7 @@ function masterFaces(index: MeshIndex, mesh: FeMeshArtifact, pair: ContactPair):
     const e1 = sub3(b, a);
     const e2 = sub3(c, a);
     const raw = cross3(e1, e2);
-    const length = hypotOf(raw);
+    const length = Math.hypot(raw[0], raw[1], raw[2]);
     if (!(length > 0)) continue;
     const sign = dot3(raw, sub3(d, a)) > 0 ? -1 : 1;
     faces.push({ a, e1, e2, normal: [(sign * raw[0]) / length, (sign * raw[1]) / length, (sign * raw[2]) / length] });

@@ -9,7 +9,6 @@ import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { add3, cross3, scale3, sub3, dot3 } from '@lib/vec3';
 import { faceNodes, indexMesh, type MeshElement, type MeshIndex } from '../thermal/meshGeometry';
-import { hypotOf } from '@lib/hypotOf';
 
 export interface PretensionCut {
   /** Faces of the low-side elements shared with a high-side element, sorted (element id, CalculiX face label). */
@@ -110,7 +109,7 @@ export function pretensionCut(
   index: MeshIndex = indexMesh(mesh),
 ): PretensionCut | CutRefusal {
   const refuse = (message: string): CutRefusal => ({ code: 'CNT_PRETENSION_SECTION_INVALID', message });
-  const length = hypotOf(normal);
+  const length = Math.hypot(normal[0], normal[1], normal[2]);
   if (!(length > 0)) return refuse('the section normal is the zero vector');
   const unit = scale3(normal, 1 / length);
   const part = [...index.elements.values()].filter((element) => element.entityId === entityId);

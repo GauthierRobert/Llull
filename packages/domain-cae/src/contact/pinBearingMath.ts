@@ -5,7 +5,6 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import { cross3, dot3, scale3, sub3 } from '@lib/vec3';
-import { hypotOf } from '@lib/hypotOf';
 
 export interface WallNode {
   readonly node: number;
@@ -48,12 +47,12 @@ export interface Bearing {
 
 /** Frame with the reference direction made perpendicular to the axis, or null when the axis or the direction is zero / parallel. */
 export function axisFrame(origin: Vec3, axis: Vec3, direction: Vec3): AxisFrame | null {
-  const length = hypotOf(axis);
+  const length = Math.hypot(axis[0], axis[1], axis[2]);
   if (!(length > 0)) return null;
   const unit = scale3(axis, 1 / length);
   const across = sub3(direction, scale3(unit, dot3(direction, unit)));
-  const size = hypotOf(across);
-  if (!(size > 1e-12 * Math.max(1, hypotOf(direction)))) return null;
+  const size = Math.hypot(across[0], across[1], across[2]);
+  if (!(size > 1e-12 * Math.max(1, Math.hypot(direction[0], direction[1], direction[2])))) return null;
   return { origin, axis: unit, reference: scale3(across, 1 / size) };
 }
 
@@ -81,7 +80,7 @@ export function bearingOf(frame: AxisFrame, nodes: readonly WallNode[]): Bearing
   for (const wall of nodes) {
     const rel = sub3(wall.at, frame.origin);
     const radial = sub3(rel, scale3(frame.axis, dot3(rel, frame.axis)));
-    const radius = hypotOf(radial);
+    const radius = Math.hypot(radial[0], radial[1], radial[2]);
     if (!(radius > 0)) continue;
     const outward = scale3(radial, 1 / radius);
     const angleDeg = (Math.atan2(dot3(outward, second), dot3(outward, frame.reference)) * 180) / Math.PI;

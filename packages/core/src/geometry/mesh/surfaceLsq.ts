@@ -52,7 +52,7 @@ export function regionFrame(mesh: MeshData, faces: ReadonlyArray<number>): Regio
       point(mesh.indices[3 * f + 2] as number),
     ];
     const cross = cross3(sub3(b, a), sub3(c, a));
-    const size = Math.hypot(...cross) / 2;
+    const size = Math.hypot(cross[0], cross[1], cross[2]) / 2;
     const middle: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
     return { cross, size, middle, corners: [a, b, c] as const };
   });

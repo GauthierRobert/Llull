@@ -173,7 +173,7 @@ export const deformLattice = defineCommand({
           {
             origin: frame?.origin ?? [0, 0, 0],
             axis,
-            reference: frame?.reference ?? (Math.abs(axis[0]) < 0.99 * hypotOf(axis) ? [1, 0, 0] : [0, 1, 0]),
+            reference: frame?.reference ?? (Math.abs(axis[0]) < 0.99 * Math.hypot(axis[0], axis[1], axis[2]) ? [1, 0, 0] : [0, 1, 0]),
           },
           'centre',
         );

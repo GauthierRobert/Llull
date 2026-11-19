@@ -6,6 +6,7 @@
 
 import type { Vec3 } from '../../model/vectors';
 import { closestPointOnTriangle, rayTriangleDistance } from '../triangleQueries';
+import { appendAll } from '../../lib/appendAll';
 
 const LEAF = 6;
 
@@ -66,7 +67,7 @@ export class SurfaceIndex {
         box[axis + 3] = Math.max(box[axis + 3] as number, this.corners[o + k] as number);
       }
     }
-    this.boxes.push(...box);
+    appendAll(this.boxes, box);
     if (end - start > LEAF) {
       const [ex, ey, ez] = [0, 1, 2].map((a) => (box[a + 3] as number) - (box[a] as number)) as [number, number, number];
       const axis = ex >= ey && ex >= ez ? 0 : ey >= ez ? 1 : 2;

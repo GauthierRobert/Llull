@@ -12,7 +12,6 @@ import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { is3D } from '@core/model/types';
 import { toM, vecToM } from './model';
 import { sub3 } from '@lib/vec3';
-import { hypotOf } from '@lib/hypotOf';
 import { appendAll } from '@lib/appendAll';
 
 export type Primitive =
@@ -40,7 +39,7 @@ export type Resolved =
 function frame(a: Vec3): [Vec3, Vec3] {
   const helper: Vec3 = Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const c: Vec3 = [a[1] * helper[2] - a[2] * helper[1], a[2] * helper[0] - a[0] * helper[2], a[0] * helper[1] - a[1] * helper[0]];
-  const n = hypotOf(c);
+  const n = Math.hypot(c[0], c[1], c[2]);
   const u: Vec3 = [c[0] / n, c[1] / n, c[2] / n];
   return [u, [a[1] * u[2] - a[2] * u[1], a[2] * u[0] - a[0] * u[2], a[0] * u[1] - a[1] * u[0]]];
 }
@@ -48,7 +47,7 @@ function frame(a: Vec3): [Vec3, Vec3] {
 /** Triangles of a tube of `segments` facets (vertices on the circle), counter-clockwise from outside, with end caps when `capped`. */
 export function tubeTriangles(start: Vec3, end: Vec3, radius: number, segments: number, capped: boolean): number[] {
   const d = sub3(end, start);
-  const length = hypotOf(d);
+  const length = Math.hypot(d[0], d[1], d[2]);
   const a: Vec3 = [d[0] / length, d[1] / length, d[2] / length];
   const [u, w] = frame(a);
   const ring = (base: Vec3, k: number): Vec3 => {

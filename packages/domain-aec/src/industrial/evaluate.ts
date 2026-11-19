@@ -20,7 +20,6 @@ import { cross3, dot3, normalize3OrZero, sub3 } from '@lib/vec3';
 import { shapeOf } from './equipment/equipmentShape';
 import { evaluateNozzles } from '../plant/equipment/evaluate/evaluateNozzles';
 import { evaluateParametricEquipment } from '../plant/equipment/evaluate/evaluateEquipment';
-import { hypotOf } from '@lib/hypotOf';
 
 // prettier-ignore
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
@@ -76,7 +75,7 @@ export function polygonNormal(points: ReadonlyArray<Vec3>): Vec3 {
 /** Local plane frame of a panel: origin, in-plane axes (e1, e2) and unit normal. */
 export function panelFrame(corners: ReadonlyArray<Vec3>): { origin: Vec3; e1: Vec3; e2: Vec3; normal: Vec3 } | null {
   const normalVector = polygonNormal(corners);
-  if (hypotOf(normalVector) < 1e-9 || corners.length < 3) return null;
+  if (Math.hypot(normalVector[0], normalVector[1], normalVector[2]) < 1e-9 || corners.length < 3) return null;
   const normal = normalize3OrZero(normalVector);
   const origin = corners[0] as Vec3;
   const e1 = normalize3OrZero(sub3(corners[1] as Vec3, origin));

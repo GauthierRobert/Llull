@@ -21,7 +21,6 @@ import { fontDecal } from './decalFont';
 import { wrapFaceAt } from './decalWrapFace';
 import { localTriangles } from '../../geometry/solidTriangles';
 import { replaceEntity } from '../entity/entityOps';
-import { hypotOf } from '../../lib/hypotOf';
 
 const MAX_DECAL_TEXT = 64;
 const MAX_DECALS_PER_ENTITY = 64;
@@ -51,7 +50,7 @@ function decalProblem(
   if (p.width !== undefined && !(p.width > 0)) return `width must be > 0 (got ${p.width})`;
   if (p.depth !== undefined && !(p.depth > 0)) return `depth must be > 0 (got ${p.depth})`;
   if (p.background !== undefined && !isHexColor(p.background)) return `background must be a #rrggbb colour (got "${p.background}")`;
-  if (hypotOf(p.normal) < 1e-12) return 'normal must be non-zero';
+  if (Math.hypot(p.normal[0], p.normal[1], p.normal[2]) < 1e-12) return 'normal must be non-zero';
   if ((entity.decals?.length ?? 0) >= MAX_DECALS_PER_ENTITY) return `entity '${p.id}' already has ${MAX_DECALS_PER_ENTITY} decals`;
   return null;
 }

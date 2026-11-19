@@ -15,7 +15,7 @@ const MAX_LISTED_POINTS = 2000;
 
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const unit = (v: Vec3): Vec3 => {
-  const length = Math.hypot(...v);
+  const length = Math.hypot(v[0], v[1], v[2]);
   return [v[0] / length, v[1] / length, v[2] / length];
 };
 
@@ -71,7 +71,8 @@ export const sectionField = defineCommand({
     const n = Math.round(resolution);
     if (!(n >= 8 && n <= MAX_RESOLUTION))
       return fail('IMP_PARAM_RANGE', `resolution must be an integer 8..${MAX_RESOLUTION} (got ${resolution})`, 'resolution');
-    if (!(Math.hypot(...plane.normal) > 0)) return fail('IMP_PARAM_RANGE', 'plane.normal must be non-zero', 'plane.normal');
+    if (!(Math.hypot(plane.normal[0], plane.normal[1], plane.normal[2]) > 0))
+      return fail('IMP_PARAM_RANGE', 'plane.normal must be non-zero', 'plane.normal');
     const compiled = compileField(doc, target.fieldId);
     if (!compiled.ok) return refuseImplicit(doc, 'section_field', compiled.code, compiled.message, compiled.ids);
     const normal = unit(plane.normal);

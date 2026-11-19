@@ -6,11 +6,10 @@ import { safeName, type DeckContext, type DeckSections } from '../../decks/conte
 import { commentText, linesText, row } from '../../decks/format';
 import { densityToAnalysis, stressPerMpa } from '../../decks/units';
 import { isPrintedRefusal, printedProperties } from './properties';
-import { hypotOf } from '@lib/hypotOf';
 
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const unit = (v: Vec3): Vec3 => {
-  const length = hypotOf(v);
+  const length = Math.hypot(v[0], v[1], v[2]);
   return [v[0] / length, v[1] / length, v[2] / length];
 };
 

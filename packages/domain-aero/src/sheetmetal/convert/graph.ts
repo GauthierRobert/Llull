@@ -5,10 +5,9 @@ import type { FtrCode } from '@core/model/manufacturing';
 import type { Frame3, SheetCutout, SheetNode } from '@core/model/sheetMetal';
 import { orient2 } from '@lib/vec2';
 import { toCounterClockwise } from '@lib/polygon';
-import { add3, cross3, dot3, normalize3, scale3, sub3 } from '@lib/vec3';
+import { add3, cross3, dot3, hypot3, normalize3, scale3, sub3 } from '@lib/vec3';
 import { bendGeometry, worldToFrame } from '../frames';
 import { type CylinderFacts, type Loop3, type PlaneFacts, type SolidFacts, chainLoop, planeGap } from './faces';
-import { hypotOf } from '@lib/hypotOf';
 
 export interface ConvertFailure {
   readonly code: FtrCode;
@@ -44,7 +43,7 @@ export function estimateThickness(facts: SolidFacts): number | null {
   cylinders.forEach((a, i) => {
     for (const b of cylinders.slice(i + 1)) {
       const parallel = Math.abs(dot3(a.axis, b.axis)) > 1 - 1e-9;
-      const offAxis = hypotOf(cross3(sub3(b.origin, a.origin), a.axis));
+      const offAxis = hypot3(cross3(sub3(b.origin, a.origin), a.axis));
       if (parallel && offAxis < 1e-6 && Math.abs(a.radius - b.radius) > 1e-6)
         gaps.push({ gap: Math.abs(a.radius - b.radius), weight: Math.min(a.area, b.area) });
     }

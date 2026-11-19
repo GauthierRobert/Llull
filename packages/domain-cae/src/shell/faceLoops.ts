@@ -3,9 +3,8 @@
 import type { MeshData } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { quantizedKey } from '@lib/quantize';
-import { cross3, dot3, normalize3, sub3 } from '@lib/vec3';
+import { cross3, dot3, hypot3, normalize3, sub3 } from '@lib/vec3';
 import { extentOf } from './types';
-import { hypotOf } from '@lib/hypotOf';
 
 export interface PlanarLoops {
   readonly outer: readonly Vec3[];
@@ -28,8 +27,8 @@ function withoutCollinear(loop: readonly Vec3[], tolerance: number): Vec3[] {
     const before = loop[(index - 1 + loop.length) % loop.length] ?? point;
     const after = loop[(index + 1) % loop.length] ?? point;
     const span = sub3(after, before);
-    const length = hypotOf(span);
-    return length === 0 || hypotOf(cross3(sub3(point, before), span)) / length > tolerance;
+    const length = Math.hypot(span[0], span[1], span[2]);
+    return length === 0 || hypot3(cross3(sub3(point, before), span)) / length > tolerance;
   });
 }
 

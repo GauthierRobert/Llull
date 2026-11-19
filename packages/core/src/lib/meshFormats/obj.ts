@@ -4,6 +4,7 @@ import { triangulatePolygon } from '../triangulate';
 import type { Point2 } from '../polygon';
 import { type MeshParseFailure, type ParsedBody, type ParsedMeshFile, parseFailure } from './types';
 import { ObjLineScanner } from './objScan';
+import { appendAll } from '../appendAll';
 
 const TEXTURE_COORDINATES = 'texture coordinates';
 const NORMALS = 'normals';
@@ -88,7 +89,7 @@ class ObjBuild {
       if (values.length !== 3 || !values.every(Number.isFinite)) {
         return parseFailure('MESH_IMPORT_PARSE', `bad vertex at line ${index + 1}: "${line.slice(0, 60)}"`);
       }
-      this.positions.push(...values);
+      appendAll(this.positions, values);
     } else if (keyword === 'f') {
       const vertexCount = this.positions.length / 3;
       const corners: number[] = [];

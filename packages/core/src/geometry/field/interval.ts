@@ -6,6 +6,7 @@
 
 import type { Vec3 } from '../../model/types';
 import { OPS, type PreparedProgram, SLOTS } from './interpret';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface FieldBox {
   readonly min: Vec3;
@@ -22,13 +23,13 @@ function sinRange(lo: number, hi: number): [number, number] {
   const containsMax = Math.floor((hi - HALF_PI) / TWO_PI) >= Math.ceil((lo - HALF_PI) / TWO_PI);
   const containsMin = Math.floor((hi + HALF_PI) / TWO_PI) >= Math.ceil((lo + HALF_PI) / TWO_PI);
   const ends = [Math.sin(lo), Math.sin(hi)];
-  return [containsMin ? -1 : Math.min(...ends), containsMax ? 1 : Math.max(...ends)];
+  return [containsMin ? -1 : minOf(ends), containsMax ? 1 : maxOf(ends)];
 }
 
 function divRange(al: number, ah: number, bl: number, bh: number): [number, number] {
   if (bl <= 0 && bh >= 0) return [-Infinity, Infinity];
   const products = [safeMul(al, 1 / bl), safeMul(al, 1 / bh), safeMul(ah, 1 / bl), safeMul(ah, 1 / bh)];
-  return [Math.min(...products), Math.max(...products)];
+  return [minOf(products), maxOf(products)];
 }
 
 const absRange = (al: number, ah: number): [number, number] => [
@@ -104,7 +105,7 @@ export function evaluateInterval(prepared: PreparedProgram, box: FieldBox): [num
         break;
       case 'mul': {
         const products = [safeMul(al, bl), safeMul(al, bh), safeMul(ah, bl), safeMul(ah, bh)];
-        set(i, Math.min(...products), Math.max(...products));
+        set(i, minOf(products), maxOf(products));
         break;
       }
       case 'div': {

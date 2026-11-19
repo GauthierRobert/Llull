@@ -80,4 +80,62 @@ describe('maxOf / minOf', () => {
     expect(maxOf(values)).toBe(largest);
     expect(minOf(values)).toBe(smallest);
   });
+
+  it('apply ToNumber like the built-ins: undefined / null / strings / valueOf, one conversion per item, all items even after a NaN', () => {
+    const asNumbers = (values: unknown[]): number[] => values as number[];
+    const lists: unknown[][] = [
+      [undefined],
+      [1, undefined],
+      [null],
+      [null, -1],
+      ['5'],
+      ['5', 7],
+      [' 3 ', '-0'],
+      ['x', 2],
+      [true, false],
+      [[], [4]],
+    ];
+    for (const values of lists) {
+      expect(Object.is(maxOf(asNumbers(values)), Math.max(...asNumbers(values))), `max ${String(values)}`).toBe(true);
+      expect(Object.is(minOf(asNumbers(values)), Math.min(...asNumbers(values))), `min ${String(values)}`).toBe(true);
+    }
+    expect(maxOf(asNumbers([undefined]))).toBeNaN();
+    expect(minOf(asNumbers([1, undefined]))).toBeNaN();
+    expect(maxOf(asNumbers(['5']))).toBe(5);
+
+    const trace = (log: string[]): unknown[] => [
+      { valueOf: () => (log.push('a'), NaN) },
+      2,
+      { valueOf: () => (log.push('b'), 9) },
+      { valueOf: () => (log.push('c'), -4) },
+    ];
+    for (const [helper, builtin] of [
+      [maxOf, Math.max],
+      [minOf, Math.min],
+    ] as const) {
+      const helperLog: string[] = [];
+      const builtinLog: string[] = [];
+      expect(Object.is(helper(asNumbers(trace(helperLog))), builtin(...asNumbers(trace(builtinLog))))).toBe(true);
+      expect(helperLog).toEqual(['a', 'b', 'c']);
+      expect(helperLog).toEqual(builtinLog);
+    }
+    const once = {
+      calls: 0,
+      valueOf(): number {
+        return 10 + this.calls++;
+      },
+    };
+    expect(maxOf(asNumbers([once, 3]))).toBe(10);
+    expect(once.calls).toBe(1);
+  });
+
+  it('convert the items the spread read, even when a valueOf changes the source array', () => {
+    const run = (call: (values: number[]) => number): number => {
+      const values: unknown[] = [];
+      values.push({ valueOf: () => ((values[1] = 100), (values.length = 1), 1) }, 5, 6);
+      return call(values as number[]);
+    };
+    expect(run(maxOf)).toBe(run((values) => Math.max(...values)));
+    expect(run(minOf)).toBe(run((values) => Math.min(...values)));
+  });
 });

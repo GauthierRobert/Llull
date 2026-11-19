@@ -3,8 +3,10 @@
  * - `no-import-meta`: server/ and desktop/ ship as CommonJS bundles (esbuild --format=cjs) but type-check with bundler resolution,
  *   so tsc does not flag ESM-only `import.meta`.
  * - `no-builtin-pow`: powers go through `pow` (fdlibm, bit-identical on every engine) or `powInt` (exact products), never `**` / Math.pow.
- * - `no-spread-call`: no spread argument in Math.max / Math.min / Math.hypot / `.push`: a spread passes every element as a call
- *   argument and throws RangeError above ~1.5e5 items (PERF1 row 12). Use maxOf / minOf / appendAll from @lib/arrayExtrema.
+ * - `no-spread-call`: no spread argument list (`f(...xs)`, `f.apply(t, xs)`, `f.call(t, ...xs)`, `Reflect.apply(f, t, xs)`) into
+ *   Math.max / min / hypot, `.push` / `.unshift` / `.splice`, String.fromCharCode / fromCodePoint: it passes every element as a call
+ *   argument and throws RangeError above ~1.5e5 items (PERF1 row 12). Use maxOf / minOf (@lib/arrayExtrema), hypotOf (@lib/hypotOf),
+ *   appendAll (@lib/appendAll), spliceAll (@lib/spliceAll), or decode char codes in chunks.
  */
 const noImportMeta = {
   meta: { type: 'problem', docs: { description: 'Disallow import.meta in CommonJS-bundled sources' } },
@@ -49,25 +51,72 @@ const noBuiltinPow = {
   },
 };
 
-const SPREAD_MATH_METHODS = new Set(['max', 'min', 'hypot']);
+/** Built-ins whose arguments a spread fills one per item: Math.max / min / hypot, String.fromCharCode / fromCodePoint. */
+const SPREAD_STATIC_METHODS = { Math: new Set(['max', 'min', 'hypot']), String: new Set(['fromCharCode', 'fromCodePoint']) };
+/** Array methods with a rest parameter, flagged on any receiver. */
+const SPREAD_ARRAY_METHODS = new Set(['push', 'unshift', 'splice']);
+const GLOBAL_OBJECTS = new Set(['globalThis', 'window', 'self']);
 
-/** `Math.max` / `Math.min` / `Math.hypot`, or any non-computed `.push`. */
-const isSpreadSensitiveCallee = (callee) => {
-  if (callee.type !== 'MemberExpression' || callee.computed || callee.property.type !== 'Identifier') return false;
-  const method = callee.property.name;
-  if (method === 'push') return true;
-  return callee.object.type === 'Identifier' && callee.object.name === 'Math' && SPREAD_MATH_METHODS.has(method);
+/** `node` without parentheses and TS-only wrappers (`(Math)`, `Math as typeof Math`, `Math!`). */
+const unwrap = (node) =>
+  node.type === 'ParenthesizedExpression' ||
+  node.type === 'TSAsExpression' ||
+  node.type === 'TSNonNullExpression' ||
+  node.type === 'TSSatisfiesExpression'
+    ? unwrap(node.expression)
+    : node;
+
+/** The property name of `x.name` / `x['name']` (optional chains included), else undefined. */
+const memberName = (node) => {
+  if (node.type !== 'MemberExpression') return undefined;
+  if (!node.computed && node.property.type === 'Identifier') return node.property.name;
+  if (node.computed && node.property.type === 'Literal' && typeof node.property.value === 'string') return node.property.value;
+  return undefined;
 };
 
+/** The global `name` (`Math`), or `globalThis.Math` / `window.Math` / `self.Math`. */
+const isGlobal = (node, name) => {
+  const target = unwrap(node);
+  if (target.type === 'Identifier') return target.name === name;
+  return memberName(target) === name && unwrap(target.object).type === 'Identifier' && GLOBAL_OBJECTS.has(unwrap(target.object).name);
+};
+
+/** A function whose call throws RangeError past the engine's argument limit when a big array is spread into it. */
+const isSpreadSensitive = (node) => {
+  const callee = unwrap(node);
+  const method = memberName(callee);
+  if (method === undefined) return false;
+  if (SPREAD_ARRAY_METHODS.has(method)) return true;
+  return Object.entries(SPREAD_STATIC_METHODS).some(([owner, methods]) => methods.has(method) && isGlobal(callee.object, owner));
+};
+
+/** `f.apply(t, xs)` or `Reflect.apply(f, t, xs)` on a spread-sensitive f: the whole list goes in as arguments. */
+const isApplyOfSensitive = (callee, args) => {
+  if (memberName(callee) !== 'apply') return false;
+  if (isGlobal(callee.object, 'Reflect')) return args[0] !== undefined && isSpreadSensitive(args[0]);
+  return isSpreadSensitive(callee.object);
+};
+
+/** `f(…)` or `f.call(t, …)` on a spread-sensitive f. */
+const spreadsInto = (callee) => isSpreadSensitive(callee) || (memberName(callee) === 'call' && isSpreadSensitive(callee.object));
+
 const noSpreadCall = {
-  meta: { type: 'problem', docs: { description: 'Disallow spread arguments in Math.max / Math.min / Math.hypot / push' } },
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        'Disallow spread / apply argument lists in Math.max / min / hypot, push / unshift / splice, String.fromCharCode / fromCodePoint',
+    },
+  },
   create(context) {
     const message =
-      'A spread argument throws RangeError above ~1.5e5 items: use maxOf / minOf / appendAll from @lib/arrayExtrema (or name the components of a small tuple).';
+      'A spread (or apply) argument list throws RangeError above ~1.5e5 items: use maxOf / minOf from @lib/arrayExtrema, hypotOf from @lib/hypotOf, appendAll from @lib/appendAll, spliceAll from @lib/spliceAll, a chunked String.fromCharCode, or name the components of a small tuple.';
     return {
       CallExpression(node) {
-        if (!isSpreadSensitiveCallee(node.callee)) return;
-        for (const argument of node.arguments) if (argument.type === 'SpreadElement') context.report({ node: argument, message });
+        const callee = unwrap(node.callee);
+        if (isApplyOfSensitive(callee, node.arguments)) context.report({ node, message });
+        else if (spreadsInto(callee))
+          for (const argument of node.arguments) if (argument.type === 'SpreadElement') context.report({ node: argument, message });
       },
     };
   },

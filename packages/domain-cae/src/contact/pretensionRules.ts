@@ -8,7 +8,6 @@ import { boundsCorners, entityBoundsInDoc } from '@core/geometry/bounds';
 import { dot3, sub3 } from '@lib/vec3';
 import { withCase } from '../shared/access';
 import type { PairProblem } from './pairRules';
-import { hypotOf } from '@lib/hypotOf';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
@@ -30,7 +29,10 @@ export function pretensionValueProblem(bolt: Omit<BoltPretension, 'id' | 'name'>
     if (!positive(preload.torque) || !positive(preload.diameter))
       return problem('CNT_PRELOAD_INVALID', 'torque and diameter must be finite and > 0', 'preload.torque');
   }
-  if (![...section.point, ...section.normal].every(Number.isFinite) || !(hypotOf(section.normal) > 0))
+  if (
+    ![...section.point, ...section.normal].every(Number.isFinite) ||
+    !(Math.hypot(section.normal[0], section.normal[1], section.normal[2]) > 0)
+  )
     return problem('CNT_PRETENSION_SECTION_INVALID', 'section.point must be finite and section.normal a non-zero finite vector', 'section');
   return null;
 }

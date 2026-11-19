@@ -16,6 +16,7 @@ import { interpolateGrid } from './surfaceFit';
 import type { NurbsSurfaceData } from './surfaceTypes';
 import type { NurbsCurveData } from './types';
 import { maxOf } from '../arrayExtrema';
+import { spliceAll } from '../spliceAll';
 
 export type GordonResult =
   | {
@@ -172,7 +173,7 @@ export function gordonSurface(
     u.forEach((row, i) => (u[i] = order.map((j) => row[j] as number)));
     guides = order.map((j) => guides[j] as NurbsCurveData);
     const reordered = order.map((j) => v[j] as number[]);
-    v.splice(0, J, ...reordered);
+    spliceAll(v, 0, J, reordered);
   }
   const ordered = (list: ReadonlyArray<number>): boolean => list.every((x, k) => k === 0 || x > (list[k - 1] as number) + 1e-9);
   if (!v.every(ordered))
