@@ -4,7 +4,8 @@
  * even-odd per scanline (section caps with holes included) at 2× supersampling, outlined where the normal, the depth or the entity
  * changes, then averaged down and embedded in the SVG as a compressed PNG; empty pixels stay transparent so the ground grid shows only
  * where nothing covers it. `rasterScenePixels` is the reference per-pixel stage (the hash path); the native CPU twin in `llull-raster`
- * reproduces it bit for bit, and a host's `ctx.raster` may replace it (a picture, never a digest).
+ * reproduces it bit for bit, and a host's `ctx.raster` may replace it (a picture, never a digest). A port that also returns the PNG of its
+ * pixels (`RasterImage.png`, byte-identical to `encodePng(…, true)`) has it embedded as is instead of re-encoding (PERF1 §5 row 10).
  */
 
 import type { RasterScene } from '../../model/raster';
@@ -192,9 +193,17 @@ export function rasterScenePixels(scene: RasterScene): Uint8Array {
   return rgba;
 }
 
+/** PNGs a native raster already encoded, by the RGBA array it returned (the same bytes `encodePng(…, true)` writes for it). */
+const encodedByPort = new WeakMap<Uint8Array, Uint8Array>();
+
+/** Records that `png` is the compressed PNG of `rgba` (a port's `RasterImage.png`): `rasterImageSvg` then embeds it as is. */
+export function rememberEncodedPng(rgba: Uint8Array, png: Uint8Array): void {
+  encodedByPort.set(rgba, png);
+}
+
 /** `<image>` element (PNG data URL) of a `width` × `height` RGBA image covering the canvas. */
 export function rasterImageSvg(width: number, height: number, rgba: Uint8Array): string {
-  const png = encodePng(width, height, rgba, true);
+  const png = encodedByPort.get(rgba) ?? encodePng(width, height, rgba, true);
   return `  <image x="0" y="0" width="${width}" height="${height}" href="data:image/png;base64,${uint8ArrayToBase64(png)}"/>`;
 }
 

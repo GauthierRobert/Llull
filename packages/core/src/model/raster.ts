@@ -44,6 +44,8 @@ export interface RasterImage {
   readonly reason?: string;
   /** Binary version, e.g. "llull-compute 0.1.0". */
   readonly version: string;
+  /** Optional: the PNG of `rgba` byte for byte as `encodePng(width, height, rgba, true)` writes it (encoded natively, PERF1 §5 row 10). */
+  readonly png?: Uint8Array;
 }
 
 export type RasterOutcome =

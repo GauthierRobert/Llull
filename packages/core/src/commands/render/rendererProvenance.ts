@@ -7,6 +7,7 @@
 import type { RasterPort, RasterScene } from '../../model/raster';
 import { sha256Hex } from '../../lib/sha256';
 import type { PixelStage } from './types';
+import { rememberEncodedPng } from './raster';
 
 /** Bump when the reference raster's pixels change for the same inputs (pins `svgSha256` goldens, Q6). */
 export const REFERENCE_RENDERER_VERSION = 'llull-ts-raster/2';
@@ -52,6 +53,7 @@ export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu'): NativeRun {
       version: image.version,
       ...(image.reason !== undefined ? { reason: image.reason } : {}),
     };
+    if (image.png !== undefined) rememberEncodedPng(image.rgba, image.png);
     return image.rgba;
   };
   return {

@@ -6,32 +6,24 @@
 //! `explicit <folder>` (crate `llull-explicit`, PHY-19 RS-8a; contract in `llull_explicit::job`), `geomq <folder>` (crate `llull-geomq`,
 //! RS-6 clearance / thickness / view-factor batches; contract in `llull_geomq`), `bvh <folder>` (crate `llull-bvh`, plant 09 VIS-M8e instance BVH build; contract in `llull_bvh::job`), `media <folder>` (crate `llull-media`, PHY-22 MOV M2 GIF / AV1-in-MP4 encoder; one `progress` event per frame, contract in `llull_media::job`), `meshops <folder>` (crate `llull-meshops`, 07 MSH M3 decimate / smooth, bit-identical to the TypeScript mesh engine, and M6 `quad_remesh` by the vendored QuadriFlow), `flow <folder>` (crate `llull-flow-lbm`, 12 CFD M2
 //! lattice-Boltzmann steady flow; one `progress` event per drag sample, contract in `llull_flow_lbm::job`), `flow-query <folder>` (crate `llull-flow-core`, 12 CFD M3a probes / slices / streamlines on a recorded field; contract in `llull_flow_core::query`), `field <folder>` (crate `llull-field`, 05 IMP M4 voxel meshing / measures of a FieldProgram tape, bit-identical to the TypeScript engine; contract in `llull_field`).
-//! An unknown job ends with an `error`
+//! `raster-serve`: the persistent scene raster (`llull_raster::serve`, PERF1 §5 row 10): length-framed frames over stdin / stdout until end
+//! of input, no job folder and no NDJSON events. An unknown job ends with an `error`
 //! event and exit code 2. `cloud import|op <folder>`: crate `llull-cloud` (plant 10 point clouds, RS-3 / RS-4). The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
 
 use llull_protocol::{emit, Event, Output};
-use llull_raster::Produced;
 use std::io::{stdin, stdout, ErrorKind, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute homogenize <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder> | llull-compute geomq <job-folder> | llull-compute bvh <job-folder> | llull-compute media <job-folder> | llull-compute meshops <job-folder> | llull-compute flow <job-folder> | llull-compute flow-query <job-folder> | llull-compute field <job-folder>";
+    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute raster-serve | llull-compute topopt <job-folder> | llull-compute homogenize <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder> | llull-compute geomq <job-folder> | llull-compute bvh <job-folder> | llull-compute media <job-folder> | llull-compute meshops <job-folder> | llull-compute flow <job-folder> | llull-compute flow-query <job-folder> | llull-compute field <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
         ("post", [task, folder, ..]) => llull_post::run(task, Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
         ("raster", [folder, ..]) => {
             let (outputs, produced) = llull_raster::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message))?;
-            let note = match produced {
-                Produced::Cpu => None,
-                Produced::Gpu { adapter } => {
-                    Some(("NATIVE_RASTER_GPU", format!("drawn on the GPU ({adapter}): a picture, not bit-identical")))
-                }
-                Produced::CpuFallback { reason } => {
-                    Some(("NATIVE_RASTER_CPU_FALLBACK", format!("GPU raster unavailable ({reason}); drawn by the CPU twin")))
-                }
-            };
+            let note = llull_raster::produced_warning(&produced);
             if let Some((code, message)) = note {
                 let _ = emit(out, &Event::Warning { code, message: &message });
             }
@@ -100,6 +92,15 @@ fn main() -> ExitCode {
     if args.first().map(String::as_str) == Some("--version") {
         println!("llull-compute {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
+    }
+    if args.first().map(String::as_str) == Some("raster-serve") {
+        return match llull_raster::serve::serve(stdin().lock(), stdout().lock()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("llull-compute raster-serve: {error}");
+                ExitCode::from(2)
+            }
+        };
     }
     let mut out = stdout().lock();
     let Some(job) = args.first() else {
