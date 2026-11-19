@@ -11,6 +11,7 @@ import { quantizedKey } from '@lib/quantize';
 import { marchingTetrahedra } from '@lib/isosurface/tetra';
 import { triangulatePolygon } from '@lib/triangulate';
 import { marchingSquares, nodeGridOfVoxels, type Point } from './contours';
+import { appendAll } from '@lib/appendAll';
 
 type Axes = readonly [number, number, number];
 
@@ -25,7 +26,7 @@ class MeshBuilder {
     const known = this.byKey.get(key);
     if (known !== undefined) return known;
     const index = this.positions.length / 3;
-    this.positions.push(...point);
+    appendAll(this.positions, point);
     this.byKey.set(key, index);
     return index;
   }

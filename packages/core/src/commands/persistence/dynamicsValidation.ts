@@ -9,6 +9,7 @@ import { dcMotorProblem, driveProblem, driveReferenceProblems, profileProblem } 
 import { lossesProblem, propellerExtrasProblem } from './engineValidation';
 import { referenceSeriesBudgetProblems, referenceSeriesProblem, referenceSeriesReferenceProblems } from './referenceSeriesValidation';
 import { jointPhysicsProblem, loadScheduleProblem, transmissionProblem, transmissionReferenceProblems } from './transmissionsValidation';
+import { appendAll } from '../../lib/appendAll';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
 const isNonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
@@ -207,11 +208,11 @@ export function dynamicsProblems(value: unknown): string[] {
       }
     }
   }
-  errors.push(
+  appendAll(errors, [
     ...driveReferenceProblems(value),
     ...transmissionReferenceProblems(value),
     ...referenceSeriesReferenceProblems(value),
     ...referenceSeriesBudgetProblems(value),
-  );
+  ]);
   return errors;
 }

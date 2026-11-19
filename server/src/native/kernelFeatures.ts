@@ -17,6 +17,7 @@ import { orientedChain } from './kernelLeaves';
 import type { StepAssemblyPart, StepOccurrence } from '@core/geometry/kernel';
 import type { ExchangeWriteRequest } from '@core/geometry/kernelExchange';
 import { takesShapeFirst, type FeatureLowering, type FeatureLowerings } from './kernelProtocol';
+import { appendAll } from '@lib/appendAll';
 
 type FeatureRecipe = Extract<ShapeRecipe, { op: 'feature' }>;
 
@@ -90,7 +91,7 @@ function assemblyHandles(occurrences: readonly StepOccurrence<unknown>[]): unkno
   const visit = ({ part }: StepOccurrence<unknown>): void => {
     if (seen.has(part)) return;
     seen.add(part);
-    handles.push(...part.shapes);
+    appendAll(handles, part.shapes);
     for (const child of part.children ?? []) visit(child);
   };
   occurrences.forEach(visit);

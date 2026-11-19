@@ -6,6 +6,7 @@ import { MM_PER_UNIT, fromMm } from '../../model/units';
 import { entityBoundsInDoc } from '../../geometry/bounds';
 import { type ContactBody, type ContactPair, contactPairs } from '../../geometry/contacts';
 import { expandInstance } from '../../geometry/instanceExpansion';
+import { appendAll } from '../../lib/appendAll';
 
 const COMMAND = 'find_contacts';
 /** 1e-4 in: the 08 MAT stack contact tolerance (COR FR-COR-14). */
@@ -101,7 +102,7 @@ export const findContacts = defineCommand({
           return fail('COR_ENTITY_NOT_SOLID', `'${id}' (${entity.kind}) is not a 3D solid`, FIND_REMEDIATION, [id]);
         continue;
       }
-      bodies.push(...solidsOf(doc, entity, '', 0, skipped));
+      appendAll(bodies, solidsOf(doc, entity, '', 0, skipped));
     }
     const tol = fromMm(doc, toleranceMm);
     const { pairs, nearMisses } = contactPairs(bodies, tol, tol * (nearMissFactor ?? 1), ctx?.spatialIndex);

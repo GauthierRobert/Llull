@@ -33,6 +33,7 @@ import {
   minCurvatureRadius,
   sampleChain,
 } from '../../geometry/curveSegments';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Default bend radius as a multiple of the section half-size (a long-radius pipe elbow). */
 const DEFAULT_BEND_FACTOR = 3;
@@ -61,7 +62,7 @@ function resolveSection(
   const exact = curves.some((segment) => segment.type !== 'line');
   return {
     section: { shape: 'profile', profile, ...(exact ? { curves } : {}) },
-    halfSize: Math.max(...profile.map(([x, y]) => Math.hypot(x, y))),
+    halfSize: maxOf(profile.map(([x, y]) => Math.hypot(x, y))),
   };
 }
 
@@ -341,7 +342,7 @@ function runSweepProfile(
   if ('document' in design) return design;
   const fitRefusal = fitToleranceRefusal(doc, sweepEntity, params.fitTolerance);
   if (fitRefusal !== null) return fitRefusal;
-  const bend = Math.min(...path.map(minCurvatureRadius));
+  const bend = minOf(path.map(minCurvatureRadius));
   if (sweepEntity.orientation?.mode !== 'axis_plane' && bend <= halfSize * design.maxScale)
     return refuseSweep(
       doc,

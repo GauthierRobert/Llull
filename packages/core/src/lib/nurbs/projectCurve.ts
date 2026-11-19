@@ -5,6 +5,7 @@ import { cross3, dot3, sub3 } from '../vec3';
 import { closestOnSurface, refineOnSurface, surfaceProbe, type SurfaceProbe } from './closest';
 import { surfaceDerivatives, surfaceDomain } from './surface';
 import type { NurbsSurfaceData } from './surfaceTypes';
+import { hypotOf } from '../hypotOf';
 
 export type Uv = readonly [number, number];
 
@@ -37,7 +38,7 @@ function rayHit(surface: NurbsSurfaceData, target: Vec3, direction: Vec3, u0: nu
       point[1] + t * direction[1] - target[1],
       point[2] + t * direction[2] - target[2],
     ];
-    if (Math.hypot(...residual) <= tolerance) return [u, v];
+    if (hypotOf(residual) <= tolerance) return [u, v];
     const determinant = dot3(su, cross3(sv, direction));
     if (!(Math.abs(determinant) > 1e-300)) return null;
     const r: Vec3 = [-residual[0], -residual[1], -residual[2]];

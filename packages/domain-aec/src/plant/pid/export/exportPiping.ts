@@ -5,6 +5,7 @@ import { attributeNodes, equipmentTag } from './exportAttributes';
 import type { Chain } from './exportChains';
 import { centerLine, connectionPoints, endpointRef, identity, position, type ExportContext, warn } from './exportContext';
 import { el, type XNode } from './xmlWrite';
+import { appendAll } from '@lib/appendAll';
 
 function nozzleNode(ctx: ExportContext, nozzle: PidNozzle): XNode {
   const id = ctx.ids.get(nozzle.id) ?? '';
@@ -99,9 +100,9 @@ function segmentNode(ctx: ExportContext, chain: Chain, line: PidLine): XNode {
   const body: XNode[] = [...component(chain.leading)];
   chain.pieces.forEach((piece, index) => {
     body.push(centerLine(piece.route));
-    body.push(...component(chain.inner[index]));
+    appendAll(body, component(chain.inner[index]));
   });
-  body.push(...component(chain.trailing));
+  appendAll(body, component(chain.trailing));
   for (const id of chain.extras) {
     const item = ctx.pid.items[id];
     const node = item === undefined ? undefined : extraNode(ctx, item);

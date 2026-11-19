@@ -17,6 +17,7 @@ import {
 } from '@lib/laminate/clt';
 import { type Criterion, DEFAULT_F12_STAR, type Strengths, strengthRatio, strengthsOf } from '@lib/laminate/failure';
 import { larc03Constants, larc03Index, larc03Ratio } from './larc03';
+import { appendAll } from '@lib/appendAll';
 
 type Outcome<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly code: string; readonly message: string };
 
@@ -36,7 +37,11 @@ export function criteriaProblem(materials: readonly LaminaMaterial[], criteria: 
     const lacking = 'missing' in strengths ? [...strengths.missing] : [];
     if (criteria.includes('larc03')) {
       const larc = larc03Constants(material);
-      if ('missing' in larc) lacking.push(...larc.missing.filter((name) => !lacking.includes(name)));
+      if ('missing' in larc)
+        appendAll(
+          lacking,
+          larc.missing.filter((name) => !lacking.includes(name)),
+        );
     }
     return lacking.length === 0 ? [] : [`"${material.name}" lacks ${lacking.join(', ')}`];
   });

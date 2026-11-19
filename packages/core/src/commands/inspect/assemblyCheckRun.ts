@@ -25,6 +25,8 @@ import { realiseJoint } from '../../geometry/assemblyCheck/jointRealisation';
 import { type PartScope, candidateIds, collectParts, scopedIds } from '../../geometry/assemblyParts';
 import { assemblyLinks, intentOf } from '../../geometry/assemblyGraph';
 import { powInt } from '../../lib/powInt';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 export interface AssemblyCheckParams extends PartScope {
   readonly clearanceMm?: number | undefined;
@@ -154,8 +156,8 @@ function withExactBounds(parts: readonly AssemblyPart[], analyses: ReadonlyMap<s
   return parts.map((part) => {
     const lumps = analyses.get(part.id)?.lumps ?? [];
     if (lumps.length === 0) return part;
-    const min = [0, 1, 2].map((k) => Math.min(...lumps.map((lump) => lump.bounds.min[k] ?? Infinity), part.min[k] ?? Infinity));
-    const max = [0, 1, 2].map((k) => Math.max(...lumps.map((lump) => lump.bounds.max[k] ?? -Infinity), part.max[k] ?? -Infinity));
+    const min = [0, 1, 2].map((k) => Math.min(minOf(lumps.map((lump) => lump.bounds.min[k] ?? Infinity)), part.min[k] ?? Infinity));
+    const max = [0, 1, 2].map((k) => Math.max(maxOf(lumps.map((lump) => lump.bounds.max[k] ?? -Infinity)), part.max[k] ?? -Infinity));
     return { ...part, min: min as unknown as Vec3, max: max as unknown as Vec3 };
   });
 }
@@ -241,7 +243,7 @@ export function runAssemblyCheck(
       ),
     );
   const validity = validateParts(kernel, collected.parts, tolerances);
-  items.push(...validity.items);
+  appendAll(items, validity.items);
   const parts = withExactBounds(collected.parts, validity.analyses);
 
   const links = assemblyLinks(doc, new Set(allIds));
@@ -281,18 +283,19 @@ export function runAssemblyCheck(
   }
   if (pairsNotRun) items.push(kernelUnsupportedItem(subjectIds, 'pair classification (distance / analyze)'));
 
-  items.push(...connectivityItems({ parts: allIds, strongLinks, touchLinks, grounded: links.grounded }));
+  appendAll(items, connectivityItems({ parts: allIds, strongLinks, touchLinks, grounded: links.grounded }));
   const reported = items.filter((entry) => entry.ids.length === 0 || entry.ids.some((id) => subjects.has(id)));
   if (thicknessOn)
-    reported.push(
-      ...thicknessItems(parts, (part) => !subjects.has(part.id) || validity.excluded.has(part.id), threshold, rays, tolerances, engine),
+    appendAll(
+      reported,
+      thicknessItems(parts, (part) => !subjects.has(part.id) || validity.excluded.has(part.id), threshold, rays, tolerances, engine),
     );
   if (params.includeJoints !== false) {
     const bodyInScope = (bodyId: string): boolean =>
       selected === null || (doc.dynamics?.bodies[bodyId]?.entityIds ?? []).some((id) => subjects.has(id));
-    reported.push(...jointItems(doc, kernel, new Map(parts.map((part) => [part.id, part])), bodyInScope, mmPerUnit));
+    appendAll(reported, jointItems(doc, kernel, new Map(parts.map((part) => [part.id, part])), bodyInScope, mmPerUnit));
   }
-  reported.push(...staleReferenceItem(doc));
+  appendAll(reported, staleReferenceItem(doc));
 
   const provenanceParams = { ...params };
   const inputsHash = hashText(

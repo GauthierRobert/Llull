@@ -4,6 +4,7 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import { fromMm, toMm } from '@core/model/units';
 import type { BuildingModel, SteelMemberElement } from '@aec/building/types';
 import { findProfile } from '../../../steel/profiles';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** A member top may be this far below the grating underside, mm. */
 const SUPPORT_GAP_MM = 10;
@@ -134,7 +135,7 @@ export type PanelSplit = { readonly ok: true; readonly panels: GratingPanel[] } 
 
 export const groupOf = (members: ReadonlyArray<SupportLine>): SupportGroup => ({
   sMm: members.reduce((sum, line) => sum + line.sMm, 0) / members.length,
-  halfWidthMm: Math.max(...members.map((line) => line.halfWidthMm)),
+  halfWidthMm: maxOf(members.map((line) => line.halfWidthMm)),
   members,
 });
 
@@ -163,13 +164,13 @@ export function spanRange(a: SupportGroup, b: SupportGroup, from: number, to: nu
   const spans = [from, to].map((p) => Math.abs(at(lb, p) - at(la, p)));
   const centre = Math.abs(b.sMm - a.sMm);
   if (Math.abs(lb.slope - la.slope) < 1e-6) return { minMm: centre, maxMm: centre };
-  return { minMm: Math.min(...spans), maxMm: Math.max(...spans) };
+  return { minMm: minOf(spans), maxMm: maxOf(spans) };
 }
 
 /** Extent of a ring across the bars, mm. */
 export function acrossExtent(ring: Ring, direction: Vec2): readonly [number, number] {
   const values = ring.map((point) => -point[0] * direction[1] + point[1] * direction[0]);
-  return [Math.min(...values), Math.max(...values)];
+  return [minOf(values), maxOf(values)];
 }
 
 /**
@@ -179,7 +180,7 @@ export function acrossExtent(ring: Ring, direction: Vec2): readonly [number, num
  */
 export function splitPanels(region: Ring, direction: Vec2, candidates: ReadonlyArray<SupportLine>): PanelSplit {
   const along = (point: Vec2): number => point[0] * direction[0] + point[1] * direction[1];
-  const [sMin, sMax] = [Math.min(...region.map(along)), Math.max(...region.map(along))];
+  const [sMin, sMax] = [minOf(region.map(along)), maxOf(region.map(along))];
   const [pMin, pMax] = acrossExtent(region, direction);
   const usable = candidates
     .filter((line) => line.sMm >= sMin - END_TOLERANCE_MM && line.sMm <= sMax + END_TOLERANCE_MM)

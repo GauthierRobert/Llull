@@ -3,6 +3,7 @@
 import { z } from '@core/commands/schema';
 import { isRecord } from '@lib/isRecord';
 import { MAX_TURBULENCE_TAU_S } from './turbulence';
+import { maxOf } from '@lib/arrayExtrema';
 
 const RESERVED_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 const text = z.string().trim().min(1);
@@ -20,7 +21,7 @@ export const turbulenceSchema = z.strictObject({
 
 /** Why `spec` (a turbulence field) cannot be realised, or null: a filter time constant L / V over MAX_TURBULENCE_TAU_S. */
 export function turbulenceProblem(spec: { readonly lengthScaleM: readonly number[]; readonly airspeedMps: number }): string | null {
-  const tau = Math.max(...spec.lengthScaleM) / spec.airspeedMps;
+  const tau = maxOf(spec.lengthScaleM) / spec.airspeedMps;
   return tau > MAX_TURBULENCE_TAU_S
     ? `turbulence lengthScaleM / airspeedMps = ${tau.toPrecision(4)} s exceeds ${MAX_TURBULENCE_TAU_S} s`
     : null;

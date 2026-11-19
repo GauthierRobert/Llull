@@ -8,6 +8,7 @@ import { z } from '../schema';
 import { codedRejection } from '../noop';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export const chordToleranceField = z
   .number()
@@ -55,7 +56,7 @@ export function budgetRefusal(
   overBudget: ReadonlyArray<{ readonly id: string; readonly minimum: number }>,
 ): CommandResult | null {
   if (overBudget.length === 0) return null;
-  const minimum = Math.max(...overBudget.map((entry) => entry.minimum));
+  const minimum = maxOf(overBudget.map((entry) => entry.minimum));
   return codedRejection(
     doc,
     command,

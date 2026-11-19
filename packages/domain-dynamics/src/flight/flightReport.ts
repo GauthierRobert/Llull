@@ -5,6 +5,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { len3 } from '@lib/vec3';
 import type { FlightRuntime } from './flightLoads';
 import { bodyDragForce, rotorOutput, STATIC_ADVANCE_RATIO_LIMIT, type RotorOutput } from './rotorLaw';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 interface RotorResult {
   readonly body: string;
@@ -73,7 +74,7 @@ export function flightData(
     outputs[rotor.rotor.id] = series;
     const js = series.map((output) => output.advanceRatio);
     const outside = series.filter((output) => output.outsideRange).length;
-    const range = { min: Math.min(...js), max: Math.max(...js), final: end.advanceRatio };
+    const range = { min: minOf(js), max: maxOf(js), final: end.advanceRatio };
     rotors[rotor.rotor.id] = {
       body: rotor.rotor.bodyId,
       rpm: rotor.rotor.rpm,
@@ -90,7 +91,7 @@ export function flightData(
       const validated =
         coefficients.kind === 'static'
           ? `a static pair is valid at |J| <= ${STATIC_ADVANCE_RATIO_LIMIT}`
-          : `its table covers J ${Math.min(...coefficients.points.map((point) => point[0]))} to ${Math.max(...coefficients.points.map((point) => point[0]))}, the end values are held`;
+          : `its table covers J ${minOf(coefficients.points.map((point) => point[0]))} to ${maxOf(coefficients.points.map((point) => point[0]))}, the end values are held`;
       warnings.push(
         `FLT_OUTSIDE_VALIDATED_RANGE: rotor '${rotor.rotor.id}' runs at J ${range.min.toFixed(3)} to ${range.max.toFixed(3)} (${outside} of ${series.length} samples outside: ${validated})`,
       );
@@ -104,7 +105,7 @@ export function flightData(
     const forces = samples.map((state) => len3(bodyDragForce(drag, state)));
     const speed = len3(last(samples)?.linearVelocity ?? ([0, 0, 0] as Vec3));
     dragSeries[drag.bodyId] = forces;
-    bodyDrag[drag.bodyId] = { finalSpeedMps: speed, finalForceN: forces.at(-1) ?? 0, peakForceN: Math.max(0, ...forces) };
+    bodyDrag[drag.bodyId] = { finalSpeedMps: speed, finalForceN: forces.at(-1) ?? 0, peakForceN: Math.max(0, maxOf(forces)) };
   }
   if (options.energy)
     warnings.push(

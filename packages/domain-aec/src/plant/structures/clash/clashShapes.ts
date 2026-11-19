@@ -7,6 +7,7 @@
 import type { Vec2, Vec3 } from '@core/model/types';
 import type { OrientedBox } from '../../../industrial/clash/clashBoxes';
 import { sweepFrame } from '../../../shared/mesh';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const MAX_STRIPS = 8;
 
@@ -55,7 +56,7 @@ export function plateBoxes(outline: ReadonlyArray<Vec2>, angle: number, zBottom:
   const local = outline.map((point): Vec2 => [point[0] * cos + point[1] * sin, -point[0] * sin + point[1] * cos]);
   const xs = local.map((point) => point[0]);
   const ys = local.map((point) => point[1]);
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const [x0, x1, y0, y1] = [minOf(xs), maxOf(xs), minOf(ys), maxOf(ys)];
   if (!(x1 > x0) || !(y1 > y0)) return [];
   const rectangular = Math.abs(area(local) - (x1 - x0) * (y1 - y0)) <= 1e-6 * (x1 - x0) * (y1 - y0);
   const strips = rectangular ? 1 : MAX_STRIPS;
@@ -70,7 +71,7 @@ export function plateBoxes(outline: ReadonlyArray<Vec2>, angle: number, zBottom:
         );
     if (piece.length < 3) continue;
     const [px, py] = [piece.map((point) => point[0]), piece.map((point) => point[1])];
-    const [minX, maxX, minY, maxY] = [Math.min(...px), Math.max(...px), Math.min(...py), Math.max(...py)];
+    const [minX, maxX, minY, maxY] = [minOf(px), maxOf(px), minOf(py), maxOf(py)];
     if (!(maxX > minX) || !(maxY > minY)) continue;
     const [cx, cy] = [(minX + maxX) / 2, (minY + maxY) / 2];
     boxes.push({

@@ -24,6 +24,7 @@ import {
   storeMesh,
   withConventions,
 } from './meshCommon';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Vertices within this fraction of the bounding-box diagonal of the plane are snapped onto it (named default). */
 const SNAP_FRACTION = 1e-12;
@@ -62,7 +63,7 @@ export const cutMesh = defineCommand({
     const assets = contextOf(ctx).meshAssets;
     const loaded = loadSolidMesh(doc, id, undefined, assets);
     if (isLoadFailure(loaded)) return meshRejection(doc, 'cut_mesh', loaded.code, loaded.message, loaded.ids);
-    if (!(Math.hypot(...plane.normal) > 0)) return reject('MESH_PARAM_INVALID', 'plane.normal must be a non-zero vector', 'plane.normal');
+    if (!(hypotOf(plane.normal) > 0)) return reject('MESH_PARAM_INVALID', 'plane.normal must be a non-zero vector', 'plane.normal');
     const epsilon = SNAP_FRACTION * meshDiagonal(loaded.mesh.positions);
     if (!crossesPlane(loaded.mesh, plane.origin, plane.normal, epsilon))
       return reject('MESH_CUT_MISSES', 'the plane does not cross the mesh (all vertices are on one side)', 'plane');

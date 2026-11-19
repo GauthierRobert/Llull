@@ -7,6 +7,7 @@ import { type CheckItem, findingKey } from '../../model/checkResult';
 import type { GeometryKernel, ShapeAnalysis } from '../kernel';
 import { type AssemblyPart, type CheckTolerances, KERNEL_REMEDIATION } from './partTypes';
 import { powInt } from '../../lib/powInt';
+import { appendAll } from '../../lib/appendAll';
 
 /** Absolute volume (mm3) at or below which a part is empty. */
 const EMPTY_VOLUME_MM3 = 1e-6;
@@ -106,7 +107,7 @@ export function validateParts(kernel: GeometryKernel, parts: readonly AssemblyPa
     analyses.set(part.id, analysis);
     const found = partItems(part, analysis, tolerances);
     if (found.some((entry) => entry.code === 'FPR_PART_INVALID' || entry.code === 'FPR_PART_EMPTY')) excluded.add(part.id);
-    items.push(...found);
+    appendAll(items, found);
   }
   return { items, analyses, excluded };
 }

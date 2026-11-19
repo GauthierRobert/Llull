@@ -21,6 +21,7 @@ import {
   tagDuplicate,
   tagNonstandard,
 } from './ruleDevices';
+import { appendAll } from '@lib/appendAll';
 
 /** The rule functions; the two nozzle codes come from one pass. */
 const RUNNERS: ReadonlyArray<{ readonly codes: readonly PidRule[]; readonly run: (ctx: CheckContext, sheetId?: string) => Finding[] }> = [
@@ -56,7 +57,11 @@ export function runChecks(
   const ctx = buildContext(pid, options.sheetId);
   const found: Finding[] = [];
   for (const runner of RUNNERS)
-    if (runner.codes.some((code) => wanted.has(code))) found.push(...runner.run(ctx, options.sheetId).filter((f) => wanted.has(f.code)));
+    if (runner.codes.some((code) => wanted.has(code)))
+      appendAll(
+        found,
+        runner.run(ctx, options.sheetId).filter((f) => wanted.has(f.code)),
+      );
   const acceptances = pid.acceptances ?? {};
   /** An acceptance hides a finding only when it still describes it: same severity, and a signature for an error (a record without one is not proof). */
   const accepted = (f: Finding): boolean => {

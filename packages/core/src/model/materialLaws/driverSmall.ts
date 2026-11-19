@@ -21,6 +21,7 @@ import { advance, backStressOf, initialState, type PointState, type TimeSlice } 
 import { equivalentStrain, vonMises } from './tensor';
 import { isLawFailure, newTrace, type ResolveEnv } from './resolve';
 import type { PropertyRecord } from '../propertyModelEval';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface SmallRunInput {
   readonly record: PropertyRecord;
@@ -68,7 +69,7 @@ function solveIncrement(model: SmallModel, state: PointState, target: IncrementT
   let current: { readonly state: PointState; readonly r: number[] } | null = { state: first, r: firstResidual };
   for (let iteration = 0; iteration < MAX_NEWTON; iteration += 1) {
     if (current === null) return null;
-    if (Math.max(...current.r.map(Math.abs)) <= tolerance) return current.state;
+    if (maxOf(current.r.map(Math.abs)) <= tolerance) return current.state;
     const jacobian: number[][] = target.unknown.map(() => new Array<number>(target.unknown.length).fill(0));
     for (let j = 0; j < x.length; j += 1) {
       const h = 1e-5 * Math.max(Math.abs(x[j] ?? 0), strainScale);
@@ -85,7 +86,7 @@ function solveIncrement(model: SmallModel, state: PointState, target: IncrementT
     x = x.map((value, k) => value + (step[k] ?? 0));
     current = residual(x);
   }
-  return current !== null && Math.max(...current.r.map(Math.abs)) <= tolerance * 10 ? current.state : null;
+  return current !== null && maxOf(current.r.map(Math.abs)) <= tolerance * 10 ? current.state : null;
 }
 
 const rowOf = (state: PointState, step: number, increment: number, time: number, T: number | null, withCreep: boolean): DriverRow => ({

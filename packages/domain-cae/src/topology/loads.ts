@@ -8,6 +8,7 @@ import type { FeaLoad } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/types';
 import { dofComponents, type MappedTarget } from './mapping';
 import type { TopologyGrid } from './voxel';
+import { hypotOf } from '@lib/hypotOf';
 
 export interface NodalForces {
   readonly dofs: number[];
@@ -33,7 +34,7 @@ function spread(grid: TopologyGrid, mapped: MappedTarget, vector: Vec3, perNode:
 /** Out-of-plane share of a world vector on a 2D grid (0 on a 3D grid). */
 function outOfPlane(grid: TopologyGrid, vector: Vec3): number {
   if (grid.dimension === 3) return 0;
-  const length = Math.hypot(...vector);
+  const length = hypotOf(vector);
   return length === 0 ? 0 : Math.abs(vector[grid.axes[2] ?? 2] ?? 0) / length;
 }
 

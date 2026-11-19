@@ -19,6 +19,7 @@ import { externalClashes } from './clashPlant';
 import { externalBodies } from './clashSources';
 import { STAIR_HEADROOM_MM, slabPenetrations, stairPenetrations } from './clashSlabs';
 import { columnsInOpening } from '../../building/geometry/openingColumns';
+import { hypotOf } from '@lib/hypotOf';
 
 const CLEARANCE_OBSTACLES: ReadonlySet<BimCategory> = new Set(['equipment', 'member', 'column', 'wall', 'curvedWall', 'stair']);
 
@@ -74,7 +75,7 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
     const ab = sub3(b, a);
     const ap = sub3(point, a);
     const t = clamp01(dot3(ap, ab) / (dot3(ab, ab) || 1));
-    best = Math.min(best, Math.hypot(...sub3(ap, scale3(ab, t))));
+    best = Math.min(best, hypotOf(sub3(ap, scale3(ab, t))));
   }
   return best;
 }

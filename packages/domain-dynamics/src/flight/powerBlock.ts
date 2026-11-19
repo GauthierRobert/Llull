@@ -17,6 +17,7 @@ import {
   type PackLaw,
 } from './powerChain';
 import type { FlightBattery, FlightPowertrain } from './powerModel';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** A powertrain compiled for one run. */
 export interface PowerRuntime {
@@ -117,10 +118,10 @@ export function stepPower(
   aux[base + POWER.current] = currentA;
   aux[base + POWER.minVoltage] = Math.min(aux[base + POWER.minVoltage] as number, volts);
   aux[base + POWER.peakCurrent] = Math.max(aux[base + POWER.peakCurrent] as number, currentA);
-  const motorPeak = Math.max(0, ...motors.map((motor) => motor.currentA));
+  const motorPeak = Math.max(0, maxOf(motors.map((motor) => motor.currentA)));
   aux[base + POWER.peakMotorCurrent] = Math.max(aux[base + POWER.peakMotorCurrent] as number, motorPeak);
   if (motorPeak > runtime.motor.peakCurrentA) aux[base + POWER.overCurrentSteps] = (aux[base + POWER.overCurrentSteps] as number) + 1;
-  const throttle = volts > 0 ? Math.max(0, ...motors.map((motor) => motor.voltageV / volts)) : 0;
+  const throttle = volts > 0 ? Math.max(0, maxOf(motors.map((motor) => motor.voltageV / volts))) : 0;
   aux[base + POWER.peakThrottle] = Math.max(aux[base + POWER.peakThrottle] as number, throttle);
   if (solved === null || (currentA > 0 && volts < runtime.pack.cutoffV) || next <= 0) aux[base + POWER.cutoffTime] = time;
 }

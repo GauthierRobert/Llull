@@ -26,6 +26,7 @@ import type { ShapeHandle } from '../../geometry/kernelTypes';
 import type { BlendSection } from '../../geometry/kernelPorts';
 import type { EdgeRadius, ShapeRecipe, Vec3 } from '../../model/types';
 import type { BlendProfile } from '../../model/blendTypes';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -204,7 +205,7 @@ function radiusReadback(fine: Fine, record: LawRecord | undefined, direction: bo
   const lawT =
     record === undefined || direction === null || span !== null ? [] : controlParameters(record.law).map((u) => (direction ? u : 1 - u));
   const at = [...new Set([...grid, ...lawT].map((t) => sig(t)))].sort((a, b) => a - b).map((t) => ({ t, value: sig(radiusAtT(fine, t)) }));
-  return { min: sig(Math.min(...radii)), max: sig(Math.max(...radii)), at };
+  return { min: sig(minOf(radii)), max: sig(maxOf(radii)), at };
 }
 
 function lawComparable(record: LawRecord | undefined, direction: boolean | null): boolean {

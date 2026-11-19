@@ -5,6 +5,7 @@ import type { Vec2 } from '@core/model/types';
 import { DxfWriter, assembleDxf } from '@lib/dxfWriter';
 import { escapeXml } from '@lib/escapeXml';
 import type { PlanLayer, PlanPrimitive } from './planSymbols';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const MARGIN_MM = 500;
 
@@ -51,8 +52,8 @@ function extent(primitives: readonly PlanPrimitive[]): { min: Vec2; max: Vec2 } 
   });
   if (points.length === 0) return { min: [0, 0], max: [0, 0] };
   return {
-    min: [Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1]))],
-    max: [Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))],
+    min: [minOf(points.map((p) => p[0])), minOf(points.map((p) => p[1]))],
+    max: [maxOf(points.map((p) => p[0])), maxOf(points.map((p) => p[1]))],
   };
 }
 

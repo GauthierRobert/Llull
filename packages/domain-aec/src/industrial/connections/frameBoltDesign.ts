@@ -6,6 +6,7 @@ import { fromMm, toMm } from '@core/model/units';
 import { withElement } from '../../building/model';
 import { buildingConnectionSolids } from './evaluateConnections';
 import { connectionCheck, type CheckRow } from '../frames/frameCheckSolve';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const BOLT_SIZES_MM = [20, 24, 27, 30];
 
@@ -88,7 +89,7 @@ function rowSpacingOk(doc: Pick<CadDocument, 'units'>, building: BuildingModel, 
         .filter((solid) => solid.part.startsWith('bolt') && solid.part.endsWith('-l'))
         .map((solid) => {
           const values = solid.outline.map(([, y]) => y);
-          return (Math.min(...values) + Math.max(...values)) / 2;
+          return (minOf(values) + maxOf(values)) / 2;
         }),
     ),
   ].sort((a, b) => a - b);

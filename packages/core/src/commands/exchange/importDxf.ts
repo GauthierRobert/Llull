@@ -15,6 +15,7 @@ import { isFinitePrimitive, makeRegion, regionGeometry, scalePrimitive, toEntiti
 import { aciToHex, insUnitsMillimetres } from '../../lib/dxfUnits';
 import { MAX_IMPORT_TRIANGLES } from '../limits';
 import { MM_PER_UNIT } from '../../model/units';
+import { appendAll } from '../../lib/appendAll';
 
 /** Entities created by one import at most (larger drawings are truncated, and say so). */
 export const MAX_DXF_ENTITIES = 20000;
@@ -151,7 +152,7 @@ export const importDxf = defineCommand({
         faceTriangles += triangles;
         const mesh = faces.get(layerId) ?? { positions: [], indices: [], color };
         const base = mesh.positions.length / 3;
-        for (const corner of primitive.corners) mesh.positions.push(...corner);
+        for (const corner of primitive.corners) appendAll(mesh.positions, corner);
         mesh.indices.push(base, base + 1, base + 2);
         if (primitive.corners.length === 4) mesh.indices.push(base, base + 2, base + 3);
         faces.set(layerId, mesh);

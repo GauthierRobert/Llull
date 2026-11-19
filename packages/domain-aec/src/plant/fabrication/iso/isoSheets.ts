@@ -10,6 +10,7 @@ import type { LineAnalysis } from '../analysis';
 import { isoIssue } from '../codes';
 import { isWeldJoint, nodeKey, type JointClass, type JointNode } from '../joints';
 import type { IsoDefinition, IsoIssue } from '../model';
+import { maxOf } from '@lib/arrayExtrema';
 
 export type SheetMode =
   | {
@@ -119,7 +120,7 @@ export function planSheets(analysis: LineAnalysis, mode: SheetMode): SheetPlan {
     };
     for (const index of memberList) {
       const given = stored[components[index]?.id ?? ''];
-      const parent = Math.max(-1, ...earlier(index));
+      const parent = Math.max(-1, maxOf(earlier(index)));
       const sheet = given ?? (parent < 0 ? 1 : (sheetOf[parent] as number));
       count = Math.max(count, sheet);
       place(index, sheet);

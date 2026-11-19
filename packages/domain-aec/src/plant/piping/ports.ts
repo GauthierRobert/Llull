@@ -12,6 +12,7 @@ import { elementsOf, getBuilding } from '../../building/model';
 import { equipmentPorts } from '../equipment/geometry/ports';
 import { getPiping, runPoints } from './model';
 import { endDn, startDn } from './runSizes';
+import { hypotOf } from '@lib/hypotOf';
 
 export interface ResolvedPort {
   /** The id as the agent passes it: `tie-3`, `P-101:N2`, `run-4:end`. */
@@ -26,7 +27,7 @@ export type PortResolution =
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const unit = (v: Vec3): Vec3 => {
-  const length = Math.hypot(...v);
+  const length = hypotOf(v);
   return length > 0 ? [v[0] / length, v[1] / length, v[2] / length] : [0, 0, 0];
 };
 

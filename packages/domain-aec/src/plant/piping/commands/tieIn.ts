@@ -5,6 +5,7 @@ import type { TieInPoint } from '@aec/plant/types';
 import { nextId } from '@lib/id';
 import { getPiping, refuse, withPiping } from '../model';
 import { map3 } from '@lib/vec3';
+import { hypotOf } from '@lib/hypotOf';
 
 export const END_TYPES = ['BW', 'FL', 'SW', 'SC', 'PL', 'WAF', 'LUG'] as const;
 
@@ -36,7 +37,7 @@ export const addTieInPoint = defineCommand({
   }),
   run: (doc, { tag, position, direction, dn, endType, rating, facing, kind = 'tie_in' }): CommandResult => {
     const piping = getPiping(doc);
-    const length = Math.hypot(...direction);
+    const length = hypotOf(direction);
     if (!(length > 1e-12)) return refuse(doc, 'add_tie_in_point', 'RTE_INVALID_PORT', 'the direction is zero', [], ['direction']);
     const clash = piping.tieInOrder.find((id) => piping.tieIns[id]?.tag === tag);
     if (clash !== undefined)

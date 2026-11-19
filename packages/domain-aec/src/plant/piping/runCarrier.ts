@@ -12,6 +12,7 @@ import { fromMm } from '@core/model/units';
 import type { PipeElement } from '@aec/building/types';
 import { runPoints, getPiping } from './model';
 import { deriveRun } from './routeParts';
+import { minOf } from '@lib/arrayExtrema';
 
 export type CarrierDoc = Pick<CadDocument, 'building' | 'plant' | 'units'>;
 
@@ -39,7 +40,7 @@ export function runCarrierPipe(doc: CarrierDoc, runId: string, levelId?: string)
   const centreline: Vec3[] = derivation.ok
     ? [(derivation.legs[0] ?? { start: run.start.point }).start, ...derivation.legs.map((leg) => leg.end)]
     : runPoints(run);
-  const frame = levelId ?? levelOfElevation(doc.building, fromMm(doc, Math.min(...centreline.map((point) => point[2]))));
+  const frame = levelId ?? levelOfElevation(doc.building, fromMm(doc, minOf(centreline.map((point) => point[2]))));
   const elevation = doc.building?.levels[frame]?.elevation ?? 0;
   return {
     id: run.id,

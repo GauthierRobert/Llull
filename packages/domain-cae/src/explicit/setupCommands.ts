@@ -21,6 +21,7 @@ import {
   withinHistoryCap,
 } from './defaults';
 import { explicitCase, supportedUnits, withSpec } from './model';
+import { hypotOf } from '@lib/hypotOf';
 
 const timeSchema = z.object({
   value: z.number().describe('Numeric value.'),
@@ -355,7 +356,7 @@ export const addRigidWall = defineCommand({
     const found = requireSpec(doc, analysisId, fail);
     if ('document' in found) return found;
     const { analysisCase, spec } = found;
-    const length = Math.hypot(...normal);
+    const length = hypotOf(normal);
     if (!(length > 0) || !Number.isFinite(length) || !point.every(Number.isFinite))
       return fail('EXP_RIGID_WALL_INVALID', 'the wall needs a finite point and a non-zero normal', [], ['normal']);
     if (Object.values(spec.rigidWalls).some((wall) => wall.name === name))

@@ -18,6 +18,7 @@ import { checkBuilt, prepare, type Prepared } from './runChecks';
 import { type DeformOutcome, deformData, deformSummary } from './runReport';
 import { deformSheet } from './runSheet';
 import { type DeformTarget, type Refusal, isRefusal, isTarget, loadTarget } from './target';
+import { appendAll } from '../../lib/appendAll';
 
 /**
  * Run a deformation request against the document: one body, or each body of `ids` in turn.
@@ -36,7 +37,7 @@ export function runDeform(doc: CadDocument, ctx: ExecutionContext | undefined, r
     if (part.affected.length === 0)
       return { ...part, document: doc, summary: `${part.summary} (body '${id}' of ${ids.length}; nothing was changed)` };
     current = part.document;
-    affected.push(...part.affected);
+    appendAll(affected, part.affected);
     parts.push(part);
   }
   const summary = `${command}: ${ids.length} bodies → ${affected.join(', ')}. ${parts.map((part) => part.summary.replace(`${command}: `, '')).join(' ')}`;

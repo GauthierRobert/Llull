@@ -10,6 +10,7 @@ import type { GeometryKernel } from './kernel';
 import { expandInstance } from './instanceExpansion';
 import type { AssemblyPart } from './assemblyCheck/partTypes';
 import { operandRecipe } from './operandRecipe';
+import { appendAll } from '../lib/appendAll';
 
 export interface PartScope {
   readonly ids?: readonly string[] | undefined;
@@ -49,7 +50,7 @@ function instanceSolids(doc: CadDocument, instance: InstanceEntity, depth: numbe
     }
     const nested = instanceSolids(doc, member as InstanceEntity, depth + 1);
     if (nested === null) return null;
-    solids.push(...nested);
+    appendAll(solids, nested);
   }
   return solids;
 }

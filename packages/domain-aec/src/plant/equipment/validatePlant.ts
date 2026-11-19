@@ -6,6 +6,7 @@ import { isVec3 } from '@lib/vec3';
 import { headSpecSchema } from './model';
 import { PLANT_EQUIPMENT_SCHEMA } from './plantData';
 import { exchangerErrors, pumpErrors, supportErrors, tankErrors } from './validateTemplates';
+import { appendAll } from '@lib/appendAll';
 
 function vesselErrors(template: Record<string, unknown>, at: string): string[] {
   const errors: string[] = [];
@@ -76,9 +77,9 @@ export function plantDataErrors(key: string, plant: unknown): string[] {
   const kind = isRecord(template) ? template['kind'] : undefined;
   const check = typeof kind === 'string' ? checks.get(kind) : undefined;
   if (!isRecord(template) || check === undefined) errors.push(`${at}.template.kind must be vessel, exchanger, tank, pump or block`);
-  else if (check !== null) errors.push(...check(template, `${at}.template`));
+  else if (check !== null) appendAll(errors, check(template, `${at}.template`));
   if (!Array.isArray(plant['nozzles'])) errors.push(`${at}.nozzles must be an array`);
-  else plant['nozzles'].forEach((nozzle, index) => errors.push(...nozzleErrors(nozzle, `${at}.nozzles.${index}`)));
+  else plant['nozzles'].forEach((nozzle, index) => appendAll(errors, nozzleErrors(nozzle, `${at}.nozzles.${index}`)));
   if (plant['design'] !== undefined && !isRecord(plant['design'])) errors.push(`${at}.design must be an object`);
   return errors;
 }

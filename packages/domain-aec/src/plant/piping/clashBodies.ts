@@ -23,6 +23,7 @@ import { operatorBodies } from './operator';
 import { supportsByRun } from './runSupports';
 import { deriveRun } from './routeParts';
 import { attachedRunIds, refRunId } from './runLinks';
+import { hypotOf } from '@lib/hypotOf';
 
 /** The box of a straight piece from `a` to `b` with a square section of half side `half`; null for a zero-length piece. */
 function pieceBox(a: Vec3, b: Vec3, half: number): OrientedBox | null {
@@ -49,7 +50,7 @@ function flangePieces(part: RoutedPart): Piece[] {
   const pipeOd = part.dims['pipeOutsideDiameter'];
   if (face === undefined || back === undefined || outer === undefined || pipeOd === undefined) return [];
   const axis = sub3(back.position, face.position);
-  const length = Math.hypot(...axis);
+  const length = hypotOf(axis);
   if (!(length > 0)) return [];
   const plate = Math.min(part.dims['thickness'] ?? length, length);
   const edge = add3(face.position, scale3(axis, plate / length));

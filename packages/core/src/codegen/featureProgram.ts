@@ -34,6 +34,7 @@ import type {
   Term3,
   TracedCall,
 } from './program';
+import { appendAll } from '../lib/appendAll';
 
 const EPSILON = 1e-9;
 
@@ -339,7 +340,7 @@ function lowerSnapshot(doc: CadDocument, parameters: ProgramParameter[], ctx: Lo
       lowered.features.length === 1 && first?.op === 'solid' && entity.name !== undefined
         ? [{ ...first, name: entity.name }]
         : [first, ...rest].filter((feature): feature is Feature => feature !== undefined);
-    features.push(...named);
+    appendAll(features, named);
     if (lowered.triangles) notes.push(meshNote(`${entity.kind} '${entity.id}'`, entity));
   }
   return { units: doc.units, source: 'snapshot', parameters, features, outputs: outputsFor(doc, variables), notes };
@@ -448,14 +449,14 @@ function lowerStep(
       if ((current.kind === 'mesh' && current.brep !== undefined) || current.kind === 'instance') {
         // A kernel result edited in place (set_thread, ...) or an instance: rebuild its recipe(s) so feature notes (thread, drill point) survive.
         const lowered = entityFeatures(current, after, rawParams, ctx, namer, base, variables);
-        features.push(...lowered.features);
+        appendAll(features, lowered.features);
         if (lowered.triangles) notes.push(meshNote(`step ${stepNumber} (${step.name}): ${current.kind} '${current.id}'`, current));
       } else features.push(solidFeature(current, after, rawParams, ctx, base(variable)));
     }
   }
   for (const entity of created) {
     const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables, stepTrace(event, created, ctx));
-    features.push(...lowered.features);
+    appendAll(features, lowered.features);
     if (lowered.triangles) notes.push(meshNote(`step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}'`, entity));
   }
   return features;
@@ -528,7 +529,7 @@ function buildProgram(
   const stepNumbers = new Map(doc.featureHistory.map((s, i) => [s.id, i + 1]));
   const replayed = replayHistory(doc, doc.featureHistory, getCommand, undefined, (event) => {
     const stepNumber = stepNumbers.get(event.step.id) ?? 0;
-    features.push(...lowerStep(event, stepNumber, variables, ctx, namer, notes));
+    appendAll(features, lowerStep(event, stepNumber, variables, ctx, namer, notes));
   });
   const mismatch = historyMismatch(doc, replayed);
   if (mismatch !== null) {

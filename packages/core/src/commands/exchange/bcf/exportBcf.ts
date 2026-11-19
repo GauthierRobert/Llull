@@ -20,6 +20,7 @@ import { nativeRun } from '../../render/rendererProvenance';
 import { rasterScenePixels } from '../../render/raster';
 import { styleViewpoint, type ViewpointStyle } from './bcfColouring';
 import { bcfExtensionsXml, bcfMarkupXml, bcfVersionXml, bcfVisualizationXml, type MarkupComment, type MarkupViewpoint } from './bcfXml';
+import { appendAll } from '../../../lib/appendAll';
 
 const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -140,7 +141,7 @@ export const exportBcf = defineCommand({
           styles.set(viewpointId, style);
           if (style.large) large.push({ viewpointId, coloured: style.coloured });
         }
-        if (style.large) legendLabels.push(...style.legend);
+        if (style.large) appendAll(legendLabels, style.legend);
         const visinfo = bcfVisualizationXml(
           doc,
           guid,

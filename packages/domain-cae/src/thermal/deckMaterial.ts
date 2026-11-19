@@ -12,6 +12,7 @@ import {
   type PropertyTable,
   type ThermalProperty,
 } from './material';
+import { appendAll } from '@lib/appendAll';
 
 const HEAT_PROPERTY: Readonly<Record<ThermalProperty, { readonly keyword: string; readonly label: string }>> = {
   k: { keyword: '*CONDUCTIVITY', label: 'k' },
@@ -67,7 +68,7 @@ export function propertyCards(ctx: DeckContext, thermal: ThermalSetup, entityId:
     if ('code' in table) return { code: table.code, message: table.message, ids: [entityId, ...table.ids] };
     const rotated = table.orthotropic === undefined || entity === undefined ? null : orthotropicRotationProblem(entityId, entity.rotation);
     if (rotated !== null) return { code: 'THM_MATERIAL_ORTHO_ROTATED', message: rotated, ids: [entityId] };
-    lines.push(...cardLines(table, thermal.temperatureScale));
+    appendAll(lines, cardLines(table, thermal.temperatureScale));
   }
   return { text: linesText(lines) };
 }

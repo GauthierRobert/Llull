@@ -12,6 +12,7 @@ import { cross3, dot3, normalize3OrZero, sub3 } from '../../lib/vec3';
 import type { BezierPatch } from '../subdivisionPatches';
 import type { Cage } from '../subdivision';
 import { buildTopology } from './topology';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Stations along an edge (shares of its length) where the normals are compared. */
 const STATIONS = [1 / 8, 2 / 8, 3 / 8, 4 / 8, 5 / 8, 6 / 8, 7 / 8];
@@ -143,7 +144,7 @@ export function fitTangentPlanes(refined: Cage, patches: readonly BezierPatch[],
       low[k] = Math.min(low[k] as number, p[k] as number);
       high[k] = Math.max(high[k] as number, p[k] as number);
     }
-  const extent = Math.max(Math.hypot(...high.map((h, k) => h - (low[k] as number))), 1e-300);
+  const extent = Math.max(hypotOf(high.map((h, k) => h - (low[k] as number))), 1e-300);
   const step = 1e-6 * extent;
   /** The largest normal angle of each quad at the guard stations when it is first visited: the bound of every later step (a per-step ratio would ratchet). */
   const initialGuard = new Map<number, number>();

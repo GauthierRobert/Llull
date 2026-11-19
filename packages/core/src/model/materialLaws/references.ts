@@ -4,6 +4,7 @@ import { lawIssues } from '../materialLawCatalog';
 import { UNVERIFIED_BASES } from '../propertyModel';
 import { modelUnverifiedReasons, type PropertyRecord } from '../propertyModelEval';
 import type { MaterialModel } from '../materialModel';
+import { appendAll } from '../../lib/appendAll';
 
 /** Ids of the `{ propertyModelId }` parameters inside a law, in document order without duplicates. */
 function referencedPropertyModels(value: unknown): string[] {
@@ -32,7 +33,11 @@ export function modelUnverifiedReasonsOf(model: MaterialModel, record: PropertyR
   if (model.fit !== undefined && model.reviewedBy === undefined) reasons.push('fit not reviewed');
   for (const id of referencedPropertyModels(model.model)) {
     const property = record.propertyModels?.find((candidate) => candidate.id === id);
-    if (property !== undefined) reasons.push(...modelUnverifiedReasons(property).map((reason) => `property model '${id}': ${reason}`));
+    if (property !== undefined)
+      appendAll(
+        reasons,
+        modelUnverifiedReasons(property).map((reason) => `property model '${id}': ${reason}`),
+      );
   }
   return reasons;
 }

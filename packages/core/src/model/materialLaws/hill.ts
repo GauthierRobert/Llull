@@ -9,6 +9,7 @@ import type { J2State } from './j2';
 import { solveLinear, type Matrix } from './linalg';
 import { solveDecreasing } from './scalar';
 import { zero6, type Vec6 } from './tensor';
+import { minOf } from '../../lib/arrayExtrema';
 
 export interface HillCoefficients {
   readonly F: number;
@@ -136,7 +137,7 @@ export function hillUpdate(material: HillMaterial, state: J2State, dEps: readonl
     const stress = stressAt(multiplier);
     return stress === null ? Number.NaN : hillEquivalent(P, stress) - material.yieldStress(state.equivalentPlasticStrain + multiplier);
   };
-  const smallestStiffness = Math.min(...C.map((row, i) => row[i] ?? Number.POSITIVE_INFINITY));
+  const smallestStiffness = minOf(C.map((row, i) => row[i] ?? Number.POSITIVE_INFINITY));
   let hi = trialEquivalent / smallestStiffness + Number.MIN_VALUE;
   for (let i = 0; i < 60 && residual(hi) > 0; i += 1) hi *= 2;
   const solved = solveDecreasing(residual, 0, hi, 1e-10 * material.referenceYield);

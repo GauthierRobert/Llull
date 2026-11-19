@@ -7,6 +7,7 @@
  */
 
 import type { SimulationData } from '../sim/simulationReport';
+import { maxOf } from '@lib/arrayExtrema';
 
 const GRID = 144;
 /** Smallest turn of the driving joint (radians) the comparison needs. */
@@ -77,15 +78,15 @@ export function phaseAlignedChange(a: SimulationData, b: SimulationData): PhaseC
     const [va, vb] = [sample(pa, sa, 'jointVelocity', id), sample(pb, sb, 'jointVelocity', id)];
     const [xa, xb] = [sample(pa, sa, 'jointPosition', id), sample(pb, sb, 'jointPosition', id)];
     if (va === null || vb === null || xa === null || xb === null) continue;
-    const peak = Math.max(...va.map(Math.abs), ...vb.map(Math.abs));
-    const reach = Math.max(...xa.map(Math.abs), ...xb.map(Math.abs));
+    const peak = Math.max(maxOf(va.map(Math.abs)), maxOf(vb.map(Math.abs)));
+    const reach = Math.max(maxOf(xa.map(Math.abs)), maxOf(xb.map(Math.abs)));
     const rms = (p: number[], q: number[]): number =>
       Math.sqrt(p.reduce((sum, value, i) => sum + (value - (q[i] ?? 0)) ** 2, 0) / p.length);
     const meanAbs = (p: number[]): number => p.reduce((sum, value) => sum + Math.abs(value), 0) / p.length;
     const speed = peak > 1e-9 ? rms(va, vb) / peak : 0;
     // positions are compared as excursions about their cycle mean, so a joint far from zero is not diluted by its offset
     const [ma, mb] = [xa.reduce((s, v) => s + v, 0) / xa.length, xb.reduce((s, v) => s + v, 0) / xb.length];
-    const excursion = Math.max(...xa.map((v) => Math.abs(v - ma)), ...xb.map((v) => Math.abs(v - mb)));
+    const excursion = Math.max(maxOf(xa.map((v) => Math.abs(v - ma))), maxOf(xb.map((v) => Math.abs(v - mb))));
     const position =
       excursion > 1e-9
         ? rms(

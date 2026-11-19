@@ -5,6 +5,8 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
 import type { StackView } from './stackRead';
+import { hypotOf } from '@lib/hypotOf';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 interface PlateExtent {
   readonly entityId: string;
@@ -32,12 +34,12 @@ export interface StackGeometry {
  * @failure a plate that is not a document entity, a zero axis -> { message }
  */
 export function stackGeometry(doc: CadDocument, stack: StackView): StackGeometry | { readonly message: string } {
-  const length = Math.hypot(...stack.axis.direction);
+  const length = hypotOf(stack.axis.direction);
   if (!(length > 0)) return { message: `stack '${stack.id}' has a zero axis direction` };
   const direction = scale3(stack.axis.direction, 1 / length);
   const trial: Vec3 = Math.abs(direction[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const across = cross3(direction, trial);
-  const lateral = scale3(across, 1 / Math.hypot(...across));
+  const lateral = scale3(across, 1 / hypotOf(across));
   const second = cross3(direction, lateral);
   const plates: PlateExtent[] = [];
   for (const layer of stack.layers) {
@@ -47,14 +49,9 @@ export function stackGeometry(doc: CadDocument, stack: StackView): StackGeometry
     const corners = boundsCorners(entityBoundsInDoc(doc, entity)).map((corner) => sub3(corner, stack.axis.origin));
     const extent = (axis: Vec3): number => {
       const values = corners.map((corner) => dot3(corner, axis));
-      return Math.max(...values) - Math.min(...values);
+      return maxOf(values) - minOf(values);
     };
-    plates.push({
-      entityId: layer.entityId,
-      low: Math.min(...along),
-      high: Math.max(...along),
-      width: Math.min(extent(lateral), extent(second)),
-    });
+    plates.push({ entityId: layer.entityId, low: minOf(along), high: maxOf(along), width: Math.min(extent(lateral), extent(second)) });
   }
   plates.sort((a, b) => a.low - b.low);
   return {
@@ -62,6 +59,6 @@ export function stackGeometry(doc: CadDocument, stack: StackView): StackGeometry
     plates,
     pointAt: (s) => add3(stack.axis.origin, scale3(direction, s)),
     lateral,
-    axisAligned: Math.max(...direction.map(Math.abs)) > 1 - 1e-9,
+    axisAligned: maxOf(direction.map(Math.abs)) > 1 - 1e-9,
   };
 }

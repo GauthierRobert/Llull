@@ -15,6 +15,7 @@ import { evaluateSurface, surfaceDomain } from './surface';
 import { interpolateGrid } from './surfaceFit';
 import type { NurbsSurfaceData } from './surfaceTypes';
 import type { NurbsCurveData } from './types';
+import { maxOf } from '../arrayExtrema';
 
 export type GordonResult =
   | {
@@ -129,7 +130,7 @@ export function gordonSurface(
     collapsed.some((flag) => !flag) &&
     sections.every((section, i) => {
       const poles = section.poles;
-      const size = Math.max(...poles.map((pole) => distance3(pole, poles[0] as Vec3)), 1e-12);
+      const size = Math.max(maxOf(poles.map((pole) => distance3(pole, poles[0] as Vec3))), 1e-12);
       return collapsed[i] === true || distance3(poles[0] as Vec3, poles[poles.length - 1] as Vec3) < 1e-9 * size;
     });
   const u: number[][] = []; // u[i][j]: parameter on section i of guide j
@@ -251,7 +252,7 @@ export function gordonSurface(
       seamGap = Math.max(seamGap, distance3(evaluateSurface(fit.surface, uMin, t), evaluateSurface(fit.surface, uMax, t)));
     }
   const size = Math.max(
-    ...sections.flatMap((section) => section.poles.map((pole) => distance3(pole, sections[0]?.poles[0] as Vec3))),
+    maxOf(sections.flatMap((section) => section.poles.map((pole) => distance3(pole, sections[0]?.poles[0] as Vec3)))),
     1e-9,
   );
   const limit = Math.max(10 * tolerance, 1e-3 * size);

@@ -11,6 +11,7 @@ import type { LevelSetAnswer } from '../geometry/field/levelSetExport';
 import type { CadDocument } from '../model/types';
 import { BUILTIN_OVERLAY_KINDS, type RenderOverlay } from '../model/renderOverlay';
 import type { EntityPropertyProvider } from '../model/entityProperties';
+import { appendAll } from '../lib/appendAll';
 
 const installed: CadPlugin[] = [];
 const listeners: Array<(plugin: CadPlugin) => void> = [];
@@ -56,8 +57,8 @@ function reconcileExtensions(previous: CadDocument, next: CadDocument): { docume
     if (extension.reconcile === undefined) continue;
     const result = extension.reconcile(previous, document);
     document = result.document;
-    notes.push(...result.notes);
-    affected.push(...result.affected);
+    appendAll(notes, result.notes);
+    appendAll(affected, result.affected);
   }
   return { document, notes, affected };
 }

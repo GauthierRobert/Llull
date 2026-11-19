@@ -8,6 +8,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { add3, dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
 import type { NetworkComponent, PcfComponentType, PipingNetwork } from '../model';
+import { hypotOf } from '@lib/hypotOf';
 
 /** Direction class of a segment: along a plant axis, a slight fall along a horizontal axis, or skew. */
 export type AxisClass = '+E' | '-E' | '+N' | '-N' | '+U' | '-U' | 'slope' | 'skew';
@@ -68,7 +69,7 @@ const LETTER = ['E', 'N', 'U'] as const;
 export function classifyDirection(dir: Vec3): AxisClass {
   for (let axis = 0; axis < 3; axis++) {
     const along = dir[axis] as number;
-    const others = Math.hypot(...dir.filter((_value, at) => at !== axis));
+    const others = hypotOf(dir.filter((_value, at) => at !== axis));
     if (Math.abs(along) > 0 && others <= AXIS_TOLERANCE * Math.abs(along)) return `${along > 0 ? '+' : '-'}${LETTER[axis]}` as AxisClass;
   }
   const horizontal = Math.hypot(dir[0], dir[1]);

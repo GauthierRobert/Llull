@@ -3,6 +3,7 @@
 import type { StairElement } from '@aec/building/types';
 import type { Vec2 } from '@core/model/types';
 import { polygonArea } from '@lib/polygon';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Plan point `along` the first flight from the stair start and `across` it (left of travel positive). */
 export function stairPoint(stair: StairElement, along: number, across: number): Vec2 {
@@ -179,12 +180,7 @@ export function stairBlocks(stair: StairElement): StairBlock[] {
 export function stairExtent(stair: StairElement): { minAlong: number; maxAlong: number; minAcross: number; maxAcross: number } {
   const corners = stairBlocks(stair).flatMap(blockCorners);
   const [alongs, acrosses] = [corners.map((corner) => corner[0]), corners.map((corner) => corner[1])];
-  return {
-    minAlong: Math.min(...alongs),
-    maxAlong: Math.max(...alongs),
-    minAcross: Math.min(...acrosses),
-    maxAcross: Math.max(...acrosses),
-  };
+  return { minAlong: minOf(alongs), maxAlong: maxOf(alongs), minAcross: minOf(acrosses), maxAcross: maxOf(acrosses) };
 }
 
 /**

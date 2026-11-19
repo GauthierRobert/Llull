@@ -12,6 +12,8 @@ import { RADIUS_LAW_TOLERANCE, checkRadius, type LawRecord } from './checkBlendR
 import { roundContact } from './checkBlendStars';
 import type { BlendRow, Contact } from './checkBlendRows';
 import type { CreaseWorld } from './checkCornerCrease';
+import { maxOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -33,7 +35,7 @@ function faceTolerancesOf(world: BlendFaceWorld, face: BlendFace): Tolerances {
   const { graph, topology, laws, tolerances, g0Param } = world;
   // width of the blend: its area over its longest edge (the contact lines)
   const longest = Math.max(
-    ...graph.edgeFaces.flatMap((around, edge) => (around.includes(face.index) ? [topology.edges[edge]?.length ?? 0] : [])),
+    maxOf(graph.edgeFaces.flatMap((around, edge) => (around.includes(face.index) ? [topology.edges[edge]?.length ?? 0] : []))),
     0,
   );
   const profiled = (laws.get(face.index)?.profile?.type ?? 'circular') !== 'circular';
@@ -60,7 +62,7 @@ function supportContacts(
     if (contact === null) return void unverified++;
     const name = topology.edges[edge]?.name;
     contacts.push({ edge, ...(name === undefined ? {} : { name }), ...roundContact(contact) });
-    findings.push(...contactFindings(entityId, face.index, edge, contact, faceTolerances, requireG2, unit));
+    appendAll(findings, contactFindings(entityId, face.index, edge, contact, faceTolerances, requireG2, unit));
   });
   return { contacts, unverified };
 }
@@ -103,7 +105,7 @@ function chainJunctions(
       ...(crease > 0 ? { creaseRad: sig(crease) } : {}),
       ...roundContact(joint),
     });
-    findings.push(...contactFindings(entityId, face.index, junction.edge, joint, jointTolerances, false, unit));
+    appendAll(findings, contactFindings(entityId, face.index, junction.edge, joint, jointTolerances, false, unit));
     if (verdict.endsOff > faceTolerances.g1AngleRad)
       findings.push({
         entityId,

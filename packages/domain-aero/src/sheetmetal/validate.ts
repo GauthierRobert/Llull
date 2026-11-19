@@ -3,6 +3,7 @@
 import { isRecord } from '@lib/isRecord';
 import { isVec2List, isVec2 } from '@lib/vec2';
 import { isVec3 } from '@lib/vec3';
+import { appendAll } from '@lib/appendAll';
 
 const positive = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
 const nonNegative = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value >= 0;
@@ -33,7 +34,7 @@ function ruleErrors(name: string, rule: unknown): string[] {
   const errors: string[] = [];
   if (!positive(rule['thickness'])) errors.push(`${path}.thickness must be > 0`);
   if (!nonNegative(rule['insideRadius'])) errors.push(`${path}.insideRadius must be >= 0`);
-  errors.push(...kErrors(`${path}.k`, rule['k']));
+  appendAll(errors, kErrors(`${path}.k`, rule['k']));
   for (const [key, threshold] of Object.entries(isRecord(rule['thresholds']) ? rule['thresholds'] : {}))
     if (
       !isRecord(threshold) ||
@@ -152,7 +153,7 @@ function partErrors(key: string, part: unknown, rules: Record<string, unknown>):
   const rootNode = typeof part['root'] === 'string' ? nodes[part['root']] : undefined;
   if (!isRecord(rootNode) || rootNode['type'] !== 'flat') errors.push(`${path}.root must be a flat`);
   for (const [id, node] of Object.entries(nodes)) {
-    errors.push(...nodeErrors(`${path}.nodes.${id}`, node, nodes));
+    appendAll(errors, nodeErrors(`${path}.nodes.${id}`, node, nodes));
     if (isRecord(node) && node['id'] !== id) errors.push(`${path}.nodes.${id}.id must equal its key`);
   }
   if (

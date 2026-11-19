@@ -7,6 +7,7 @@ import { isRecord } from '@lib/isRecord';
 import { isVec2List } from '@lib/vec2';
 import { isVec3 } from '@lib/vec3';
 import { outlineEntities, outlineIdsOf } from './derive';
+import { appendAll } from '@lib/appendAll';
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -126,7 +127,7 @@ export function compositesErrors(slice: unknown): string[] {
       if (p['id'] !== id) out.push(`composites.parts.${id}.id must equal its key`);
       if (!isRecord(surface) || !['plane', 'cylinder', 'cone', 'sphere', 'nurbs'].includes(surface['type'] as string))
         out.push(`composites.parts.${id}.surface.type must be plane, cylinder, cone, sphere or nurbs`);
-      else out.push(...surfaceErrors(`composites.parts.${id}.surface`, surface));
+      else appendAll(out, surfaceErrors(`composites.parts.${id}.surface`, surface));
       if (!isVec2List(p['outline']) || p['outline'].length < 3)
         out.push(`composites.parts.${id}.outline must be at least 3 [x, y] vertices`);
       if (!isRecord(slice['rosettes']) || !isText(p['rosetteId']) || !Object.hasOwn(slice['rosettes'], p['rosetteId']))
@@ -163,7 +164,7 @@ export function compositesErrors(slice: unknown): string[] {
           !(boundary['kind'] === 'polygons' && Array.isArray(boundary['polygons']) && boundary['polygons'].every(isVec2List)))
       )
         out.push(`composites.plies.${id}.boundary must be whole_face or polygons`);
-      out.push(...plyExtraErrors(`composites.plies.${id}`, p));
+      appendAll(out, plyExtraErrors(`composites.plies.${id}`, p));
       return out;
     }),
     ...(slice['sections'] === undefined

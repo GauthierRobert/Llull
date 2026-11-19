@@ -10,6 +10,7 @@ import { wrapPatch } from './decalWrap';
 import { facetNormal } from './tessellation';
 import { edgeCrossing, forEachEdge } from './planeEdges';
 import type { Triangle } from './triangles';
+import { appendAll } from '../lib/appendAll';
 
 /** Decal projector axes: x along the text, y up the text, z = outward normal. */
 export function decalAxes(decal: Pick<Decal, 'normal' | 'angle'>): { x: Vec3; y: Vec3; z: Vec3 } {
@@ -62,7 +63,7 @@ export function decalPatch(decal: Decal, triangles: readonly Triangle[]): { posi
     }
     for (let k = 1; k + 1 < polygon.length; k++) {
       for (const q of [polygon[0], polygon[k], polygon[k + 1]] as Vec3[]) {
-        positions.push(...toWorld(q));
+        appendAll(positions, toWorld(q));
         uvs.push(q[0] / decal.width + 0.5, 0.5 - q[1] / decal.height);
       }
     }

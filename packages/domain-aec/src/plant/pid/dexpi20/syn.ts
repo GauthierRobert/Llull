@@ -2,6 +2,7 @@
 
 import { xmlAttr, xmlChildren, type XmlElement } from '@lib/xmlRead';
 import { decodeName } from './names20';
+import { appendAll } from '@lib/appendAll';
 
 /** Builds an element of the Proteus tree; `at` is the 2.0 element it stands for (its line and column are kept for diagnostics). */
 export function syn(
@@ -41,7 +42,7 @@ export const idOf = (object: XmlElement): string | undefined => {
 export function componentObjects(object: XmlElement, property?: string): XmlElement[] {
   const found: XmlElement[] = [];
   for (const components of xmlChildren(object, 'Components'))
-    if (property === undefined || xmlAttr(components, 'property') === property) found.push(...xmlChildren(components, 'Object'));
+    if (property === undefined || xmlAttr(components, 'property') === property) appendAll(found, xmlChildren(components, 'Object'));
   return found;
 }
 

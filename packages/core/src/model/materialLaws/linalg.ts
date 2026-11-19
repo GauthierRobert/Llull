@@ -1,6 +1,7 @@
 /** Small dense linear algebra for the constitutive kernels: Gauss elimination with partial pivoting and a pivot-checked LDLᵀ. */
 
 import { invertDense, solveDense } from '../../lib/denseLinalg';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export type Matrix = number[][];
 
@@ -28,7 +29,7 @@ export interface PivotReport {
  */
 export function pivotReport(a: readonly (readonly number[])[], relativeFloor = 1e-12): PivotReport {
   const n = a.length;
-  const floor = relativeFloor * Math.max(...a.map((row, i) => Math.abs(row[i] ?? 0)), Number.MIN_VALUE);
+  const floor = relativeFloor * Math.max(maxOf(a.map((row, i) => Math.abs(row[i] ?? 0))), Number.MIN_VALUE);
   const lower: number[][] = Array.from({ length: n }, () => new Array<number>(n).fill(0));
   const pivots: number[] = [];
   for (let k = 0; k < n; k += 1) {

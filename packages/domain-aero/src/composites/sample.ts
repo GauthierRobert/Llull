@@ -6,6 +6,7 @@ import { polygonCentroid } from '@lib/polygon';
 import { insideOrOn, plyCovers } from './geometry2d';
 import { pliesOf } from './state';
 import { toFlat } from './surface';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface StackEntry {
   readonly ply: Ply;
@@ -45,7 +46,7 @@ export function representativePoint(model: CompositesModel, part: CompositePart,
   const centre = polygonCentroid(zone.boundary);
   const xs = zone.boundary.map(([x]) => x);
   const ys = zone.boundary.map(([, y]) => y);
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const [x0, x1, y0, y1] = [minOf(xs), maxOf(xs), minOf(ys), maxOf(ys)];
   const grid: Vec2[] = [];
   for (let i = 1; i < 12; i++) for (let j = 1; j < 12; j++) grid.push([x0 + ((x1 - x0) * i) / 12, y0 + ((y1 - y0) * j) / 12]);
   const candidates = [centre, ...grid].filter((point) => insideOrOn(point, zone.boundary, 0));

@@ -11,6 +11,7 @@ import { genericAttributes } from './from20Attributes';
 import { orient, readDiagram, sheetOf, type DiagramFacts, type Placement } from './from20Diagram';
 import { ASSOCIATION_PROPERTY } from './names20';
 import { association, classOf, componentObjects, dataOf, idOf, referenceIds, syn } from './syn';
+import { appendAll } from '@lib/appendAll';
 
 export interface From20 {
   readonly ok: true;
@@ -198,7 +199,7 @@ function segment(ctx: Ctx, object: XmlElement): XmlElement {
   for (const pipe of pipes) {
     emit(referenceIds(pipe, 'SourceItem')[0]);
     const id = idOf(pipe);
-    body.push(...coordinates(id === undefined ? [] : (ctx.facts.routes.get(id) ?? []), pipe));
+    appendAll(body, coordinates(id === undefined ? [] : (ctx.facts.routes.get(id) ?? []), pipe));
     emit(referenceIds(pipe, 'TargetItem')[0]);
   }
   for (const item of items) {
@@ -342,7 +343,7 @@ function indexNodes(root: XmlElement): Ctx['nodeIndex'] {
       const id = idOf(node);
       if (owner !== undefined && id !== undefined && !index.has(id)) index.set(id, { owner, index: position });
     });
-    stack.push(...componentObjects(object));
+    appendAll(stack, componentObjects(object));
   }
   return index;
 }

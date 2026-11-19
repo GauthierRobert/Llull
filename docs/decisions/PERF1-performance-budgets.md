@@ -106,7 +106,7 @@ Also measured, no gate scenario yet: `explicit_run` at 20 000 hex8 did not finis
 | 9 | 2D snapping: all segment intersections recomputed per placed point, 610–870 ms at 100 000 entities | | split cursor-independent intersections from the from-point ones |
 | 10 | `render_view`: 0.75–1.9 s at 1280 × 720; the native path pays a process start and a JS PNG encoder per frame | | persistent raster process, native PNG |
 | 11 | LBM throughput ~8 M cell-updates/s; topology ~100–330 ms per iteration; `mapNodalField` TypeScript fallback 5–11 s at 69k nodes | not profiled inside the binaries | |
-| 12 | 563 `Math.min(...array)` / `Math.max(...array)` spreads remain in `packages/` and `server/`: each is a RangeError above ~1.5·10⁵ items | by grep | a lint rule and linear helpers |
+| 12 | Spread calls `Math.max/min/hypot(...xs)`, `push(...xs)`: a RangeError above ~1.5·10⁵ items (1 843 spread arguments found by the rule) | 2·10⁵ / 10⁶ items: RangeError → `maxOf` 1.1 / 4.5 ms, `appendAll` 3.5 / 21 ms (10⁵: `Math.max(...)` 2.4 ms, `maxOf` 0.45 ms) | done: `@lib/arrayExtrema` `maxOf` / `minOf`, `@lib/hypotOf` (V8's algorithm, bit-identical), `@lib/appendAll`, exact built-in semantics (empty, NaN, ±0; tests); lint `llull/no-spread-call` (error) on `packages/*/src`, `server/src`, `src/app`; 1 524 calls replaced, goldens unchanged. Open: 174 in the files of the mesh / field / implicit lanes (`.oxlintrc.json` override `TODO(PERF1-12)`); `src/ui` (64) out of scope, left to the front-end review |
 
 **Scope (owner, 2026-11-18): PERF1 work does not touch the front-end** (`src/ui/**`, `desktop/`): a separate front-end review owns it.
 Row 9 (2D snapping, `src/ui/viewport/2d/snapping`) and every viewport frame-time question are handed to that review; nothing in

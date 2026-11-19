@@ -3,6 +3,7 @@
 import type { NonlinearSettings } from '@core/model/analysis';
 import type { Imperfection } from '@core/model/nonlinear';
 import { isRecord } from '@lib/isRecord';
+import { appendAll } from '@lib/appendAll';
 
 /** Most modes one imperfection combines, and most imperfections per case (bounded deck work, AF-12). */
 export const MAX_IMPERFECTION_MODES = 20;
@@ -70,7 +71,7 @@ export function imperfectionProblems(nonlinear: Record<string, unknown>, where: 
     const source = entry['amplitudeSource'];
     if (typeof source !== 'string' || source.trim() === '' || source.length > MAX_SOURCE_TEXT)
       problems.push(`${here}: amplitudeSource must be non-empty text of at most ${MAX_SOURCE_TEXT} characters`);
-    problems.push(...modeProblems(entry['modes'], here));
+    appendAll(problems, modeProblems(entry['modes'], here));
   }
   return problems;
 }

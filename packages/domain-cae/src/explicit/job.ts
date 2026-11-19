@@ -16,6 +16,7 @@ import { jobHeating, type JobHeating } from './heating';
 import { explicitMaterial, type ExplicitMaterial } from './laws';
 import { feaTetMesh, structuredHexMesh, type ExplicitMesh } from './mesh';
 import { explicitCase, supportedUnits } from './model';
+import { hypotOf } from '@lib/hypotOf';
 
 interface ExplicitJobWall {
   readonly name: string;
@@ -137,7 +138,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
   const walls = spec.rigidWallOrder.flatMap((id) => {
     const wall = spec.rigidWalls[id];
     if (wall === undefined) return [];
-    const length = Math.hypot(...wall.normal);
+    const length = hypotOf(wall.normal);
     return [{ name: wall.name, point: scaled(wall.point, lengthToAnalysis), normal: scaled(wall.normal, 1 / length) }];
   });
   return {

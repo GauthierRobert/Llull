@@ -19,6 +19,8 @@ import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrap
 import type { FaceRefInput, FaceSession, PlacementInput, ResolvedChart } from './faceSession';
 import type { SketchOutline } from './sketchProfiles';
 import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineCurves, probePoints, type MappedCurve } from './wrapMapping';
+import { appendAll } from '../../lib/appendAll';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const MAX_PROBES = 48;
 
@@ -89,7 +91,10 @@ export function runWrapChain(input: ChainWrap): CommandResult {
         ...kept.filter((piece) => piece.closed).map((piece) => piece.role),
         ...kept.filter((piece) => !piece.closed).map(() => 'open' as const),
       ];
-      mapped.push(...curves.map((curve, index) => ({ ...curve, role: roles[index] ?? curve.role })));
+      appendAll(
+        mapped,
+        curves.map((curve, index) => ({ ...curve, role: roles[index] ?? curve.role })),
+      );
     }
     if (mapped.length === 0) continue;
     const pieces = mapped.map((curve) => curve.pieces);
@@ -141,8 +146,8 @@ export function runWrapChain(input: ChainWrap): CommandResult {
     parts.push({ face: face.session.face, kind: face.session.surface.type, curves: mapped.length, length3d: length });
   }
   if (created.length === 0) return fail('WRP_OUTSIDE_FACE', 'the sketch lies on none of the chain faces', params.entityIds);
-  const curveStrain = Math.max(0, ...records.map((record) => record['maxLengthStrain'] as number));
-  const joinStrain = Math.max(0, ...chain.edges.map((edge) => edge.mismatch));
+  const curveStrain = Math.max(0, maxOf(records.map((record) => record['maxLengthStrain'] as number)));
+  const joinStrain = Math.max(0, maxOf(chain.edges.map((edge) => edge.mismatch)));
   const strain = Math.max(curveStrain, joinStrain);
   if (!chain.developable && curveStrain > limit)
     return {

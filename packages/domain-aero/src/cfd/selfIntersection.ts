@@ -4,6 +4,7 @@ import type { Vec3 } from '@core/model/types';
 import { segmentPiercesTriangle } from '@core/geometry/triangleQueries';
 import type { IndexedSurface } from './weld';
 import { MAX_REPORTED_POINTS, surfaceBounds } from './topology';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Above this many triangles the test is skipped (reported as not run) to keep `prepare_cfd_case` interactive. */
 export const MAX_INTERSECTION_TRIANGLES = 200_000;
@@ -49,8 +50,8 @@ export function findSelfIntersections(surface: IndexedSurface): IntersectionRepo
   for (let t = 0; t < count; t++)
     for (let a = 0; a < 3; a++) {
       const values = [0, 1, 2].map((k) => surface.vertices[(surface.triangles[t * 3 + k] ?? 0) * 3 + a] ?? 0);
-      lows[t * 3 + a] = Math.min(...values);
-      highs[t * 3 + a] = Math.max(...values);
+      lows[t * 3 + a] = minOf(values);
+      highs[t * 3 + a] = maxOf(values);
     }
   const order = Array.from({ length: count }, (_, t) => t).sort((p, q) => (lows[p * 3 + axis] ?? 0) - (lows[q * 3 + axis] ?? 0) || p - q);
   const examples: Array<{ triangles: [number, number]; at: Vec3 }> = [];

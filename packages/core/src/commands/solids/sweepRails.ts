@@ -16,6 +16,7 @@ import { orientedFrames } from '../../geometry/sweepEval/frames';
 import { deriveAnchors, railOffsets, type Outline, type RailIssue } from '../../geometry/sweepEval/rails';
 import { worldCurves, sizeOfCurves } from '../surface/curveInputs';
 import { refuseSwg } from '../surface/swgRefusal';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export const railFields = {
   guideIds: z
@@ -91,12 +92,12 @@ export function midlineSpine(a: NurbsCurveData, b: NurbsCurveData): CurveSegment
     const span = distance3(first, end);
     if (!(arcLengthSamples(a, 1).length > 0 && arcLengthSamples(b, 1).length > 0)) return 'a rail has zero length';
     const direction = span > 0 ? scale3(sub3(end, first), 1 / span) : ([0, 0, 0] as Vec3);
-    const sag = Math.max(...mids.map((p) => len3(cross3(sub3(p, first), direction))));
+    const sag = maxOf(mids.map((p) => len3(cross3(sub3(p, first), direction))));
     if (span > 0 && sag <= MID_TOLERANCE * span) return [{ type: 'line', points: [first, end] }];
     const fit = interpolatePoints(mids, { degree: 3, parameterization: 'chord' });
     if ('code' in fit) return `the rails' midline cannot be fitted: ${fit.message}`;
     const probes = midpoints(a, b, 2 * count).filter((_, k) => k % 2 === 1);
-    last = Math.max(...probes.map((p) => closestOnCurve(fit.curve, p).distance));
+    last = maxOf(probes.map((p) => closestOnCurve(fit.curve, p).distance));
     if (last <= MID_TOLERANCE * Math.max(span, 1e-9) + 1e-9) return curveChain(fit.curve);
   }
   return `the midline of the rails deviates ${last.toExponential(2)} from its fit; give a pathId for the spine`;

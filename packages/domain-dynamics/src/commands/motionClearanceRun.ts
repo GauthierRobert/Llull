@@ -20,6 +20,7 @@ import { type MotionPrefetch, prefetchMotion } from './motionPrefetch';
 import { type PairTravel, type SubstepPrefetch, prefetchSubsteps, substepCount, substepMoment } from './motionSubsteps';
 import type { GeometryQueryEngine } from '@core/geometry/geometryQueries';
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Most contact intervals per pair whose overlap volume is computed with the kernel. */
 const MAX_CLASSIFIED = 12;
@@ -97,7 +98,7 @@ export function planMotion(input: MotionPlanInput): MotionPlan {
       ),
     );
     const thin = Math.min(part.max[0] - part.min[0], part.max[1] - part.min[1], part.max[2] - part.min[2]);
-    return { part, bvh: buildMeshBvh(part.mesh ?? { positions: [], indices: [] }), body, radius: Math.max(...corners), thin };
+    return { part, bvh: buildMeshBvh(part.mesh ?? { positions: [], indices: [] }), body, radius: maxOf(corners), thin };
   });
   const moves = (p: MotionPart): boolean => p.body !== null && movingBodies.has(p.body);
   const pairs: Array<readonly [MotionPart, MotionPart]> = [];

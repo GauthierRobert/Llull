@@ -13,6 +13,7 @@ import { joinCurves } from '../lib/nurbs/joinCurves';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import { mapSegment2, sampleSegment, type PlaneSegment } from './planeSegments';
 import type { FaceChart } from './chartFrame';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 const lift2 = (curve: NurbsCurve2Data): NurbsCurveData => ({ ...curve, poles: curve.poles.map(([x, y]): Vec3 => [x, y, 0]) });
 const drop3 = (curve: NurbsCurveData): NurbsCurve2Data => ({ ...curve, poles: curve.poles.map(([x, y]): Vec2 => [x, y]) });
@@ -132,7 +133,7 @@ export function mapPieces(chart: FaceChart, pieces: readonly PlaneSegment[], tol
   }
   const mapped: PlaneSegment[] = [];
   for (const piece of pieces) {
-    const reach = Math.max(...sampleSegment(piece, 9).map((p) => Math.hypot(p[0] - chart.anchorChart[0], p[1] - chart.anchorChart[1])));
+    const reach = maxOf(sampleSegment(piece, 9).map((p) => Math.hypot(p[0] - chart.anchorChart[0], p[1] - chart.anchorChart[1])));
     const fitted = fitSpans(
       piece,
       (point) => {
@@ -231,7 +232,7 @@ export function lengthOnFace(chart: FaceChart, pieces: readonly PlaneSegment[]):
 export function extentOf(pieces: readonly PlaneSegment[]): { min: Vec2; max: Vec2 } {
   const points = pieces.flatMap((piece) => sampleSegment(piece, 33));
   return {
-    min: [Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1]))],
-    max: [Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))],
+    min: [minOf(points.map((p) => p[0])), minOf(points.map((p) => p[1]))],
+    max: [maxOf(points.map((p) => p[0])), maxOf(points.map((p) => p[1]))],
   };
 }

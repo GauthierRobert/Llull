@@ -9,6 +9,7 @@ import type { CageState } from './cageState';
 import { edgeKey } from './edgeKey';
 import { mintElementId } from './elements';
 import { type CageTopology } from './topology';
+import { minOf } from '../../lib/arrayExtrema';
 
 /** Drops the vertices no face uses; remaps faces, sharp edges (kept only while they are still edges) and corners. Returns old -> new index (-1 = dropped). */
 export function compactState(state: CageState): number[] {
@@ -79,7 +80,7 @@ export function weldClusters(
 ): { vertices: number; faces: number } {
   const target = state.vertices.map((_, v) => v);
   for (const cluster of clusters) {
-    const rep = Math.min(...cluster);
+    const rep = minOf(cluster);
     if (atCentre) state.vertices[rep] = centroid3(cluster.map((v) => state.vertices[v] as Vec3));
     for (const v of cluster) target[v] = rep;
   }

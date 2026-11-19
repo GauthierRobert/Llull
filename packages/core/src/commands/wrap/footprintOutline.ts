@@ -12,6 +12,9 @@ import { sampleSegment, type PlaneSegment } from '../../geometry/planeSegments';
 import { pointAt2 } from '../../lib/nurbs/curve2d';
 import { cross3, dot3, sub3 } from '../../lib/vec3';
 import { powInt } from '../../lib/powInt';
+import { maxOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
+import { appendAll } from '../../lib/appendAll';
 
 export interface Outline {
   /** Lines and Beziers of the outline, joined end to start (absent for a sampled polygon). */
@@ -116,14 +119,14 @@ export function fittedOutline(image: (uv: Vec2) => Vec3, pieces: readonly PlaneS
   const forward = fitted.flatMap((entry) => entry.segments);
   const counterClockwise = signedArea(tessellated(forward)) >= 0;
   const segments = counterClockwise ? forward : [...forward].reverse().map(reversedSegment);
-  return { segments, profile: tessellated(segments), deviation: Math.max(0, ...fitted.map((entry) => entry.deviation)) };
+  return { segments, profile: tessellated(segments), deviation: Math.max(0, maxOf(fitted.map((entry) => entry.deviation))) };
 }
 
 const chordSag = (a: Vec3, mid: Vec3, b: Vec3): number => {
   const chord = sub3(b, a);
-  const length = Math.hypot(...chord);
+  const length = hypotOf(chord);
   const toMid = sub3(mid, a);
-  return length > 0 ? Math.hypot(...cross3(chord, toMid)) / length : Math.hypot(...toMid);
+  return length > 0 ? hypotOf(cross3(chord, toMid)) / length : hypotOf(toMid);
 };
 
 /** The polygon outline of a closed loop, repeated and collinear points removed (see the module comment). */
@@ -149,8 +152,9 @@ export function sampledPolygon(
       count *= 2;
     }
     deviation = Math.max(deviation, found);
-    points.push(
-      ...sampleSegment(piece, count + 1)
+    appendAll(
+      points,
+      sampleSegment(piece, count + 1)
         .slice(0, -1)
         .map(image),
     );

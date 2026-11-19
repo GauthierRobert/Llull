@@ -14,6 +14,7 @@ import { FLANGED_JOINT, INSTRUMENT } from '../routeFlangedInline';
 import { defaultStem, INLINE_COMPONENT_TYPES } from '../routeInline';
 import { isStraight } from '../routeStraight';
 import { isValve } from '../runSizes';
+import { hypotOf } from '@lib/hypotOf';
 
 export const portOrPoint = z.union([
   z.object({ portId: z.string().min(1).describe('Port id: a tie-in id, "<tag>:<mark>" of an equipment nozzle, or "<runId>:start|end".') }),
@@ -157,7 +158,7 @@ export function buildInline(
     return refuse(doc, command, 'RTE_SIZE_MISMATCH', `${fields.type} has one size: dn2 is for reducers`, [], [`${path}.dn2`]);
   if (!oneSize && fields.dn2 === undefined)
     return refuse(doc, command, 'RTE_SIZE_MISMATCH', `a reducer needs dn2, the size the run continues at`, [], [`${path}.dn2`]);
-  if (fields.stemDirection !== undefined && !(Math.hypot(...fields.stemDirection) > 1e-12))
+  if (fields.stemDirection !== undefined && !(hypotOf(fields.stemDirection) > 1e-12))
     return refuse(doc, command, 'RTE_INVALID_PORT', 'the stem direction is zero', [], [`${path}.stemDirection`]);
   const stem = valve ? (fields.stemDirection === undefined ? defaultStem(legDirection) : unitVector(fields.stemDirection)) : undefined;
   const eccentric = fields.type === 'reducerEccentric';
@@ -209,7 +210,7 @@ export function resolveEndpoint(
 ): ResolvedEndpoint | CommandResult {
   if (!('portId' in endpoint)) {
     if (endpoint.direction === undefined) return { end: { point: endpoint.point } };
-    const length = Math.hypot(...endpoint.direction);
+    const length = hypotOf(endpoint.direction);
     if (!(length > 1e-12)) return refuse(doc, command, 'RTE_INVALID_PORT', `the ${side} direction is zero`, [], [`${side}.direction`]);
     return { end: { point: endpoint.point, direction: unitVector(endpoint.direction) } };
   }

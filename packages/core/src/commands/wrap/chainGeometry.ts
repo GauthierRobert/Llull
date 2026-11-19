@@ -4,6 +4,7 @@ import { chartPointOf } from '../../geometry/chartInverse';
 import { buildChart } from '../../geometry/faceChart';
 import { distance3 } from '../../lib/vec3';
 import type { FaceSession } from './faceSession';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -78,7 +79,7 @@ export function chartCoordinates(chart: FaceChart, points: readonly Vec3[], boun
 export const dist2 = (a: Vec2, b: Vec2): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 /** Largest extent of a set of points (the scale a closed edge's coincident ends are judged against). */
-export const edgeScale = (points: readonly Vec3[]): number => Math.max(...points.map((p) => distance3(p, points[0] as Vec3)));
+export const edgeScale = (points: readonly Vec3[]): number => maxOf(points.map((p) => distance3(p, points[0] as Vec3)));
 
 /** Largest distance of the points from the line through the first and the last. */
 export function straightness(points: readonly Vec2[]): number {
@@ -86,7 +87,7 @@ export function straightness(points: readonly Vec2[]): number {
   const length = dist2(first, last);
   if (!(length > 0)) return Infinity;
   const d: Vec2 = [(last[0] - first[0]) / length, (last[1] - first[1]) / length];
-  return Math.max(...points.map((p) => Math.abs(d[0] * (p[1] - first[1]) - d[1] * (p[0] - first[0]))));
+  return maxOf(points.map((p) => Math.abs(d[0] * (p[1] - first[1]) - d[1] * (p[0] - first[0]))));
 }
 
 export interface Candidate {
@@ -130,8 +131,8 @@ export function childChart(
         method,
       );
       if ('error' in chart) continue;
-      const residual = Math.max(
-        ...points.map((point, k) => {
+      const residual = maxOf(
+        points.map((point, k) => {
           const uv = chart.uvAt(chainPoints[k] as Vec2);
           return uv === null ? Infinity : distance3(chart.pointAt(uv), point);
         }),

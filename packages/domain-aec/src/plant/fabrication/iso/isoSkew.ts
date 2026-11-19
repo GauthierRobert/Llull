@@ -12,6 +12,7 @@ import type { IsoGraph } from './isoGraph';
 import type { IsoLayout } from './isoLayout';
 import { projectIso, type NorthArrow } from './isoProjection';
 import type { IsoPrimitive } from './isoRender';
+import { hypotOf } from '@lib/hypotOf';
 
 /** A leg shorter than this (mm) is no leg: the run is a skew by rounding only. */
 const MIN_LEG_MM = 0.05;
@@ -56,7 +57,7 @@ export function skewFigures(graph: IsoGraph, layout: IsoLayout, northArrow: Nort
     const geometry = skewGeometry(d);
     if (geometry.legs.length < 2) continue;
     const projected = projectIso(d, northArrow);
-    const factor = Math.hypot(to[0] - from[0], to[1] - from[1]) / (Math.hypot(...projected) || 1);
+    const factor = Math.hypot(to[0] - from[0], to[1] - from[1]) / (hypotOf(projected) || 1);
     const corners: Vec2[] = [from];
     for (const leg of geometry.legs) {
       const sign = Math.sign(d[leg.axis]);

@@ -18,6 +18,7 @@ import { transientStartProblems } from './transientCheck';
 import { expressionProblem, resolveTemperatureField, thermalSourceProblem, thermomechOf } from './field';
 import { refuseTmc, remediationOf } from './refusal';
 import { kelvinOf, temperatureIn } from './units';
+import { appendAll } from '@lib/appendAll';
 
 export interface ThermomechCheckItem {
   readonly code: string;
@@ -167,8 +168,9 @@ function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMe
     }
     const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
     if (isOrthotropicCte(material)) {
-      items.push(
-        ...orthoPartProblems(doc, setup, entityId, materialId, referenceKelvin).map((p) => item(p.code, p.severity, p.message, p.ids)),
+      appendAll(
+        items,
+        orthoPartProblems(doc, setup, entityId, materialId, referenceKelvin).map((p) => item(p.code, p.severity, p.message, p.ids)),
       );
       continue;
     }
@@ -224,13 +226,16 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string, artif
     );
   }
   if (coupled) {
-    items.push(...checkThermalItems(doc, analysisId));
-    items.push(...transientStartProblems(analysisCase, setup).map((p) => item(p.code, p.severity, p.message, p.ids)));
-  } else items.push(...fieldItems(doc, analysisCase, setup, artifacts));
+    appendAll(items, checkThermalItems(doc, analysisId));
+    appendAll(
+      items,
+      transientStartProblems(analysisCase, setup).map((p) => item(p.code, p.severity, p.message, p.ids)),
+    );
+  } else appendAll(items, fieldItems(doc, analysisCase, setup, artifacts));
   if (reference !== null && Number.isFinite(reference))
-    items.push(...partItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale)));
+    appendAll(items, partItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale)));
   if (!coupled && reference !== null && Number.isFinite(reference))
-    items.push(...elasticItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale), artifacts));
+    appendAll(items, elasticItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale), artifacts));
   if (!analysisCase.loadOrder.some((id) => analysisCase.loads[id]?.loadCase === setup.loadCaseName))
     items.push(
       item(

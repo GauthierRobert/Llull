@@ -13,6 +13,7 @@ import { ELEVATION_DIRECTIONS, buildElevationDrawing, type ElevationDirection } 
 import { PAPER_FIELD, SCALE_FIELD, sheetFitWarning, type Viewport, composeSheetSvg, fitScale } from '../../shared/sheetFrame';
 import { sheetDrawingArea } from '@core/geometry/sheetLayout';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
+import { minOf } from '@lib/arrayExtrema';
 
 export interface ElevationSheet {
   readonly filename: string;
@@ -69,7 +70,7 @@ function buildElevationSheet(
   const ground = building.levelOrder.map((id) => building.levels[id]?.elevation).filter((value): value is number => value !== undefined);
   // A ground line only where there is a building to stand on (a machine part has none).
   if (ground.length > 0) {
-    const groundY = toPaper([0, Math.min(...ground)])[1];
+    const groundY = toPaper([0, minOf(ground)])[1];
     const belowGrade = toPaper([0, minZ])[1] - groundY;
     if (options.cutAt === undefined && belowGrade > 0) {
       view.push(

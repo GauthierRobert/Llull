@@ -8,6 +8,7 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
 import type { FaceDetail } from '@core/geometry/kernelPorts';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface Frame {
   readonly min: Vec3;
@@ -78,8 +79,8 @@ export function facingFacePoint(faces: readonly FaceDetail[], side: string): Vec
   if (spec === undefined) return null;
   const facing = faces.filter((f) => f.normal !== undefined && f.normal[spec.axis] * spec.sign > 0.999);
   const along = (f: FaceDetail): number => f.centroid[spec.axis] * spec.sign;
-  const tolerance = 1e-6 * Math.max(1, ...facing.map((f) => Math.abs(along(f))));
-  const outermost = Math.max(...facing.map(along));
+  const tolerance = 1e-6 * Math.max(1, maxOf(facing.map((f) => Math.abs(along(f)))));
+  const outermost = maxOf(facing.map(along));
   const best = facing.filter((f) => along(f) >= outermost - tolerance).sort((a, b) => b.area - a.area)[0];
   if (best === undefined) return null;
   const distance = (p: Vec3): number => Math.hypot(p[0] - best.centroid[0], p[1] - best.centroid[1], p[2] - best.centroid[2]);

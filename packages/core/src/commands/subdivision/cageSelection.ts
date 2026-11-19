@@ -15,6 +15,8 @@ import {
 } from '../../geometry/subd/elements';
 import { type CageTopology, buildTopology } from '../../geometry/subd/topology';
 import { worldOf } from './shared';
+import { appendAll } from '../../lib/appendAll';
+import { hypotOf } from '../../lib/hypotOf';
 
 export interface SelectionInput {
   readonly vertexIndices?: readonly number[] | undefined;
@@ -63,7 +65,7 @@ export function resolveSelection(entity: SubdivisionEntity, input: SelectionInpu
     };
   const named = resolveVertices(entity, [...(input.vertexIndices ?? []), ...(input.vertices ?? [])], 'params.vertices');
   if (isRefProblem(named)) return named;
-  seeds.push(...named.items);
+  appendAll(seeds, named.items);
   if (input.vertexIndices !== undefined || named.byIndex) {
     indexed = true;
     record['vertices'] = named.ids;
@@ -81,7 +83,7 @@ export function resolveSelection(entity: SubdivisionEntity, input: SelectionInpu
   if (input.faces !== undefined) {
     const faces = resolveFaces(entity, input.faces, 'params.faces');
     if (isRefProblem(faces)) return faces;
-    for (const f of faces.items) seeds.push(...(entity.faces[f] as ReadonlyArray<number>));
+    for (const f of faces.items) appendAll(seeds, entity.faces[f] as ReadonlyArray<number>);
     if (faces.byIndex) {
       indexed = true;
       record['faces'] = faces.ids;
@@ -104,7 +106,7 @@ export function selectionDistances(
   if (selection.mode === 'all') return world.map(() => 0);
   const outside = (p: Vec3): number => {
     const box = region as { min: Vec3; max: Vec3 };
-    return Math.hypot(...p.map((value, axis) => Math.max((box.min[axis] as number) - value, 0, value - (box.max[axis] as number))));
+    return hypotOf(p.map((value, axis) => Math.max((box.min[axis] as number) - value, 0, value - (box.max[axis] as number))));
   };
   if (selection.mode === 'region' && metric === 'euclidean') return world.map(outside);
   const seeds = selection.mode === 'region' ? world.flatMap((p, v) => (outside(p) <= 1e-9 ? [v] : [])) : selection.seeds;

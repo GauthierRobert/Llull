@@ -15,6 +15,7 @@ import { nodeCoordinates, nodeEntities } from '../results/fields';
 import { evaluateCycles, isEvaluationFailure, type Evaluation, type Failure } from './evaluate';
 import { cyclesOfNode, fatigueFieldInput, FIELD_COMPONENTS, FLAG_BITS, governingJobIndex, readFatigueField } from './feField';
 import { item, type Item } from './items';
+import { minOf } from '@lib/arrayExtrema';
 
 /** Relative agreement required between the native and the TypeScript damage of a hot spot (VC-FAT-43: same formulas in f64). */
 const NATIVE_TOLERANCE = 1e-12;
@@ -143,7 +144,7 @@ export function evaluateFeCase(
       ),
     );
   const margins = hotSpots.map((spot) => spot.evaluation.margin);
-  const minMargin = margins.some((margin) => margin === null) ? null : Math.min(...(margins as number[]));
+  const minMargin = margins.some((margin) => margin === null) ? null : minOf(margins as number[]);
   const status = hotSpots.reduce<Evaluation['status']>(
     (worst, spot) => (STATUS_RANK[spot.evaluation.status] > STATUS_RANK[worst] ? spot.evaluation.status : worst),
     'PASS',

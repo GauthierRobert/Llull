@@ -5,6 +5,7 @@ import { isStringArray } from '../../lib/isStringArray';
 import { isReservedKey } from '../../lib/reservedKey';
 import { DISPOSITION_STATUSES, INTENT_KINDS, REVIEW_CHECKS } from '../../model/prototype';
 import { referencesProblems } from './engineValidation';
+import { appendAll } from '../../lib/appendAll';
 
 const KINDS: readonly string[] = INTENT_KINDS;
 const STATUSES: readonly string[] = DISPOSITION_STATUSES;
@@ -64,6 +65,6 @@ export function prototypeProblems(value: unknown): string[] {
     if (problem !== null) errors.push(problem);
   }
   if (new Set(value['grounded']).size !== value['grounded'].length) errors.push('prototype.grounded contains duplicate ids');
-  errors.push(...referencesProblems(value['references']), ...dispositionsProblems(value['dispositions']));
+  appendAll(errors, [...referencesProblems(value['references']), ...dispositionsProblems(value['dispositions'])]);
   return errors;
 }

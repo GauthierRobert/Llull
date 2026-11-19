@@ -1,6 +1,7 @@
 /** Portal hall plan/roof geometry shared by the member and cladding phases. */
 
 import type { SteelProfile } from '../../steel/profiles';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Resolved steel sections of a portal hall. */
 export interface PortalProfiles {
@@ -82,7 +83,7 @@ export function buildHallGeometry(input: HallGeometryInput): HallGeometry {
       { side: 1, lowX: b, lowZ: eave, highX: middle, highZ: peak },
     ];
   };
-  const ridge = Math.max(...spanBounds.flatMap((bounds) => slopesOf(bounds).map((slope) => slope.highZ)));
+  const ridge = maxOf(spanBounds.flatMap((bounds) => slopesOf(bounds).map((slope) => slope.highZ)));
   return {
     mm,
     h: (profile) => mm(profile.h),

@@ -4,6 +4,7 @@ import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { memoByObject } from '@lib/memoByObject';
+import { hypotOf } from '@lib/hypotOf';
 
 export interface MeshElement {
   readonly id: number;
@@ -126,7 +127,7 @@ export function integrateFace(
   g: (temperature: number) => number,
 ): FaceIntegral {
   const [a, b, c] = nodes.slice(0, 3).map((node) => at(index, node));
-  const area = a === undefined || b === undefined || c === undefined ? 0 : Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / 2;
+  const area = a === undefined || b === undefined || c === undefined ? 0 : hypotOf(cross3(sub3(b, a), sub3(c, a))) / 2;
   const values = nodes.map(field);
   const mean = RULE.reduce((sum, [l1, l2, l3, w]) => sum + w * g(interpolate(values, l1, l2, l3)), 0);
   return { area, integral: area * mean };

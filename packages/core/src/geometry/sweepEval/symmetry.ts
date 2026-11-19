@@ -4,6 +4,7 @@ import type { SweepEntity, Vec2 } from '../../model/types';
 import type { SweepEvaluation, SweepShape } from './evaluate';
 import { sectionTransforms } from './laws';
 import { sectionLoops } from './sections';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Highest rotational symmetry order tested. */
 const MAX_ORDER = 24;
@@ -57,7 +58,7 @@ export function sectionSymmetryOrder(section: SweepEntity['section']): number {
   const known = orders.get(section);
   if (known !== undefined) return known;
   const loop = sectionLoops(section).outer;
-  const tolerance = Math.max(...loop.map(([x, y]) => Math.hypot(x, y)), 1e-12) * 1e-9;
+  const tolerance = Math.max(maxOf(loop.map(([x, y]) => Math.hypot(x, y))), 1e-12) * 1e-9;
   let order = 1;
   for (let k = Math.min(MAX_ORDER, loop.length); k > 1; k--)
     if (loop.length % k === 0 && rotatesOntoShift(loop, k, tolerance)) {

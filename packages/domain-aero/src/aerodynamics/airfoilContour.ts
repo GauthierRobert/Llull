@@ -2,6 +2,7 @@
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { nacaOrdinates, parseNaca, type NacaSection } from './naca';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Largest polyline accepted as panels (the dense solve is O(n³)): 2 × 400 per side + 1. */
 export const MAX_CONTOUR_POINTS = 801;
@@ -44,8 +45,8 @@ export function polylineContour(doc: CadDocument, entityId: string): AirfoilCont
     return Math.hypot(next[0] - point[0], next[1] - point[1]) > 1e-12;
   });
   const xs = raw.map(([x]) => x);
-  const leading = Math.min(...xs);
-  const chord = Math.max(...xs) - leading;
+  const leading = minOf(xs);
+  const chord = maxOf(xs) - leading;
   if (!(chord > 0)) return `'${entityId}' has zero chord along its local x axis`;
   const clockwise = signedArea(raw) < 0 ? raw : [...raw].reverse();
   const n = clockwise.length;

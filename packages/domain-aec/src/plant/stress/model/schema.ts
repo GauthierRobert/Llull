@@ -5,6 +5,7 @@
 
 import { z } from '@core/commands/schema';
 import { RULE_SET_IDS } from '../code/ruleSets';
+import { hypotOf } from '@lib/hypotOf';
 
 const finite = z.number().refine(Number.isFinite, 'must be finite');
 const positive = finite.refine((value) => value > 0, 'must be positive');
@@ -117,7 +118,7 @@ export const windSchema = z.object({
   ),
   dragCoefficient: positive.describe('Drag (shape) coefficient Cf of the pipe cross-section, for example 0.7 to 1.2 for a round pipe.'),
   direction: vec3
-    .refine((v) => Math.hypot(...v) > 0, 'must not be the zero vector')
+    .refine((v) => hypotOf(v) > 0, 'must not be the zero vector')
     .describe('Direction the wind blows toward [x, y, z], global axes; normalised, normally horizontal.'),
 });
 

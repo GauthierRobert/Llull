@@ -9,6 +9,7 @@ import type { EngineLosses } from '@core/model/dynamics';
 import type { AppliedLoads, SimulationState } from '@core/dynamics/physicsEngine';
 import { cylinderState, type CylinderRuntime } from '../cylinderLoads';
 import { combineContributions, type AccuracyBand, type AccuracyOrigin } from '../accuracy';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Speed below which the loss torque is smoothed (named, TR-FPR-15), rad/s. */
 const FRICTION_SMOOTHING_RAD_S = 1;
@@ -134,7 +135,7 @@ function lossStateAt(losses: EngineLosses, runtimes: readonly CylinderRuntime[],
   if (lead === undefined) return null;
   const { cycleIndex } = cylinderState(lead, theta);
   const rpm = lead.heldRpm(cycleIndex);
-  const peakPa = Math.max(...own.map((runtime) => runtime.curveAt(rpm).peakPa));
+  const peakPa = maxOf(own.map((runtime) => runtime.curveAt(rpm).peakPa));
   return {
     losses,
     runtimes: own,

@@ -8,6 +8,7 @@ import { LIFECYCLE_STATES, isLegalTransition } from './transitions';
 import { REVISION_LABEL } from './schemes';
 import { isSealed } from './records';
 import { membersHash } from './structure';
+import { appendAll } from '@lib/appendAll';
 
 export const PART_NUMBER = /^[A-Z0-9][A-Z0-9._\-/]{0,63}$/i;
 
@@ -69,7 +70,7 @@ function itemErrors(raw: unknown): string[] {
     errors.push('plm.item.currentRevision is not a revision');
   for (const [label, revision] of Object.entries(revisions)) {
     if (!REVISION_LABEL.test(label)) errors.push(`plm.item.revisions key '${label}' must be 1-16 characters of A-Z, 0-9 and -`);
-    errors.push(...revisionErrors(`plm.item.revisions.${label}`, revision));
+    appendAll(errors, revisionErrors(`plm.item.revisions.${label}`, revision));
   }
   if (!isRecord(raw['marking']) || !isText(raw['marking']['regime'])) errors.push('plm.item.marking.regime must be a string');
   return errors;
@@ -155,7 +156,7 @@ function sealedErrors(slice: Record<string, unknown>): string[] {
     }
     for (const [name, record] of Object.entries(raw)) {
       if (!isRecord(record) || record[field] !== name) errors.push(`plm.${key}.${name} is not a record stored under its own ${field}`);
-      else if (shapeErrors(key, `plm.${key}.${name}`, record).length > 0) errors.push(...shapeErrors(key, `plm.${key}.${name}`, record));
+      else if (shapeErrors(key, `plm.${key}.${name}`, record).length > 0) appendAll(errors, shapeErrors(key, `plm.${key}.${name}`, record));
       else if (!isSealed(record)) errors.push(`plm.${key}.${name} does not hash to its seal (edited by hand?)`);
     }
   }
@@ -171,7 +172,7 @@ export const plmDocument: DocumentExtension = {
     const errors = itemErrors(slice['item']);
     if (!isRecord(slice['changes']) || !Array.isArray(slice['changeOrder']) || !isRecord(slice['policy']))
       errors.push('plm needs changes, changeOrder and policy');
-    errors.push(...baselineErrors(slice['baselines']), ...sealedErrors(slice));
+    appendAll(errors, [...baselineErrors(slice['baselines']), ...sealedErrors(slice)]);
     return errors;
   },
   derivedEntityIds: () => new Set(),

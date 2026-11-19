@@ -13,6 +13,7 @@ import { refuseFracture } from './codes';
 import { criticalSizes, growthLife } from './integrate';
 import { betaOf, netYieldStress, sizeLimit, solvedGeometry, withSize } from './kSolutions';
 import { isFailure, resolveGrowth, type GrowthSetup } from './setup';
+import { appendAll } from '@lib/appendAll';
 
 const caseIdSchema = z.string().describe('Crack-growth case id (affected[0] of create_crack_growth_case).');
 
@@ -310,7 +311,7 @@ export const checkDamageTolerance = defineCommand({
     const setup = resolveGrowth(doc, growthCase);
     if (isFailure(setup)) items.push(item(setup.code, 'error', setup.message, 'see create_crack_growth_case', setup.ids));
     else {
-      items.push(...unverifiedItem(setup));
+      appendAll(items, unverifiedItem(setup));
       const life = growthLife(setup, setup.a0, 40);
       if (life.stopReason === 'initial_critical')
         items.push(item('FRC_INITIAL_CRITICAL', 'fail', 'Kmax >= Kc at aInitial', 'smaller flaw or redesign', [params.caseId]));

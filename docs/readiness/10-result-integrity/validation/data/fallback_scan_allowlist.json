@@ -243,7 +243,7 @@
     },
     {
       "file": "domain-aec/src/plant/structures/access/edgeChecks.ts",
-      "match": "Math.max(0, ...rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0));",
+      "match": "Math.max(0, maxOf(rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0)));",
       "reason": "rule entry without a minimum contributes 0 to a max over rulesets"
     },
     {

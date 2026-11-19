@@ -9,6 +9,7 @@ import type { LoadFactors } from './steelBeamAnalysis';
 import { amplificationOf, horneAlphaCritical } from './steelDesign';
 import type { FrameSystem, StoreyPiece } from './steelFrameModel';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface FrameSolutions {
   /** 1.35 G + 1.5 Q with the notional forces toward +u and −u. */
@@ -80,7 +81,7 @@ export function solveFrameSystem(system: FrameSystem, notionalFactor: number): F
     const to = layout.nodes.indexOf(piece.top);
     const compression = Math.max(
       0,
-      ...layout.members.slice(from, to).flatMap((index) => (ulsPlus.members[index]?.axial ?? []).map((axial) => -axial)),
+      maxOf(layout.members.slice(from, to).flatMap((index) => (ulsPlus.members[index]?.axial ?? []).map((axial) => -axial))),
     );
     return [{ id: piece.columnId, height: piece.height, compression, drift: driftOf(horne, piece) }];
   });

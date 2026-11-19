@@ -5,6 +5,7 @@
 
 import type { Vec2 } from '../../model/vectors';
 import type { RawContour } from './glyf';
+import { maxOf, minOf } from '../arrayExtrema';
 
 export type OutlineSegment =
   | { readonly kind: 'line'; readonly from: Vec2; readonly to: Vec2 }
@@ -198,8 +199,8 @@ export function loopBox(loop: OutlineLoop): OutlineBox | null {
   }
   if (points.length === 0) return null;
   return {
-    min: [Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1]))],
-    max: [Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))],
+    min: [minOf(points.map((p) => p[0])), minOf(points.map((p) => p[1]))],
+    max: [maxOf(points.map((p) => p[0])), maxOf(points.map((p) => p[1]))],
   };
 }
 

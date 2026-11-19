@@ -9,6 +9,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { computeSif, isSifRefusal, type SifComponent } from '../code/sif';
 import type { RuleSet } from '../code/ruleSets';
 import type { ElementEndSif, FeElement, Junction, LayoutFailure } from './layoutTypes';
+import { hypotOf } from '@lib/hypotOf';
 
 export interface JunctionFitting {
   readonly fitting: Extract<SifComponent, 'welding_tee' | 'unreinforced_tee' | 'reinforced_tee' | 'weldolet'>;
@@ -19,7 +20,7 @@ const COLLINEAR = Math.cos((5 * Math.PI) / 180);
 
 const unit = (a: Vec3, b: Vec3): Vec3 => {
   const d: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-  const l = Math.hypot(...d);
+  const l = hypotOf(d);
   return [d[0] / l, d[1] / l, d[2] / l];
 };
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -70,7 +71,7 @@ export function applyJunctions(
       return refuse(`${named}: no two of the three pipe pieces are collinear (a Y junction or an elbow with a stub)`, ids);
     const branch = [0, 1, 2].find((i) => !header?.includes(i)) as number;
     const axis = away[header[0]] as Vec3;
-    const sine = Math.hypot(...cross(axis, away[branch] as Vec3));
+    const sine = hypotOf(cross(axis, away[branch] as Vec3));
     if (sine < Math.cos((15 * Math.PI) / 180))
       return refuse(
         `${named}: the branch is more than 15 degrees from perpendicular to the header (only 90 degree tees are modelled)`,
@@ -82,7 +83,7 @@ export function applyJunctions(
     const sif = computeSif(set, { component: choice.fitting, odMm: headerElement.odMm, wallMm: headerElement.wallMm, padMm: choice.padMm });
     if (isSifRefusal(sif)) return refuse(`${named}: ${sif.reason}`, ids);
     const normal = cross(axis, away[branch] as Vec3);
-    const size = Math.hypot(...normal);
+    const size = hypotOf(normal);
     const planeNormal: Vec3 = [normal[0] / size, normal[1] / size, normal[2] / size];
     members.forEach((_, i) => {
       const own: ElementEndSif = {

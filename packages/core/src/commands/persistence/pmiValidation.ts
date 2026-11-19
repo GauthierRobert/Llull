@@ -12,6 +12,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
+import { appendAll } from '../../lib/appendAll';
 
 const SIZE_KINDS = ['diameter', 'radius', 'width', 'spherical_diameter', 'spherical_radius', 'angular', 'curve_length'];
 const SAFE_ID = /^[A-Za-z0-9._-]+$/;
@@ -242,7 +243,7 @@ export function pmiProblems(value: unknown): string[] {
   const errors: string[] = [];
   if (!isOneOf(PMI_STANDARDS, value['standard'])) errors.push(`pmi.standard must be one of ${PMI_STANDARDS.join(', ')}`);
   if (!isOptional(value['generalToleranceNote'], (v) => typeof v === 'string')) errors.push('pmi.generalToleranceNote must be a string');
-  errors.push(...itemErrors(items), ...referenceErrors(items));
+  appendAll(errors, [...itemErrors(items), ...referenceErrors(items)]);
   const listed = new Set(order);
   if (listed.size !== order.length) errors.push('pmi.order contains duplicate ids');
   for (const id of order) if (!Object.hasOwn(items, id)) errors.push(`pmi.order: '${id}' does not reference a known item`);

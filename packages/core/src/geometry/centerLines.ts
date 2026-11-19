@@ -16,6 +16,8 @@ import { revolutionAxisIndex } from './revolution';
 import { MAX_RECIPE_DEPTH, recipeOf } from './shapeRecipe';
 import { lowerFeature } from './featureLowering';
 import { type ViewFrame } from './viewProjection';
+import { hypotOf } from '../lib/hypotOf';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 /** A round feature: `radius` about the line origin + t·direction, t in [from, to]. */
 interface RoundAxis {
@@ -43,7 +45,7 @@ function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | nu
   const line = (localDirection: Vec3, from: number, to: number, radius: number): RoundAxis | null => {
     const origin = world([0, 0, 0]);
     const direction = sub3(world(localDirection), origin);
-    if (Math.hypot(...direction) < 1e-12 || !(radius > 0)) return null;
+    if (hypotOf(direction) < 1e-12 || !(radius > 0)) return null;
     return { origin, direction: normalize3(direction), from: from * scale, to: to * scale, radius };
   };
   switch (entity.kind) {
@@ -55,11 +57,11 @@ function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | nu
       return line([0, 0, 1], -entity.tubeRadius, entity.tubeRadius, (entity.ringRadius + entity.tubeRadius) * scale);
     case 'revolution': {
       const axial = entity.profile.map(([, along]) => along);
-      const radius = Math.max(...entity.profile.map(([radial]) => Math.abs(radial)));
+      const radius = maxOf(entity.profile.map(([radial]) => Math.abs(radial)));
       // The axis the mesh really spins about (dominant world axis, sign ignored).
       const direction: [number, number, number] = [0, 0, 0];
       direction[revolutionAxisIndex(entity.axis)] = 1;
-      return line(direction, Math.min(...axial), Math.max(...axial), radius * scale);
+      return line(direction, minOf(axial), maxOf(axial), radius * scale);
     }
     case 'sphere':
       return entity.radius > 0 ? { origin: world([0, 0, 0]), direction: null, from: 0, to: 0, radius: entity.radius * scale } : null;
@@ -194,9 +196,9 @@ function pitchCircles(marks: ReadonlyArray<CentreMark>, unit: number): Array<Omi
       group.reduce((sum, mark) => sum + mark.center[1], 0) / group.length,
     ];
     const offsets = group.map(({ center: [x, y] }) => [x - center[0], y - center[1]] as const);
-    const pitch = Math.hypot(...(offsets[0] ?? [0, 0]));
+    const pitch = hypotOf(offsets[0] ?? [0, 0]);
     const radius = group[0]?.radius ?? 0;
-    if (!(pitch > radius) || offsets.some((o) => Math.abs(Math.hypot(...o) - pitch) > unit * 10)) continue;
+    if (!(pitch > radius) || offsets.some((o) => Math.abs(hypotOf(o) - pitch) > unit * 10)) continue;
     const angles = offsets.map(([x, y]) => Math.atan2(y, x)).sort((a, b) => a - b);
     const step = (2 * Math.PI) / angles.length;
     const even = angles.every((angle, i) => {
@@ -225,7 +227,7 @@ export function centerLinePrimitives(
     return kept ? [kept] : [];
   });
   if (axes.length === 0) return [];
-  const unit = Math.max(...axes.map((axis) => axis.radius)) * 1e-4;
+  const unit = maxOf(axes.map((axis) => axis.radius)) * 1e-4;
   const seen = new Set<string>();
   const primitives: DrawingPrimitive[] = [];
   const marks = new Map<string, CentreMark>();

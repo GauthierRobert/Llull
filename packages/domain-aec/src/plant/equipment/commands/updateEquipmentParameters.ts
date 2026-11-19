@@ -35,6 +35,7 @@ import {
   vesselInputOf,
   type VesselIssue,
 } from './vesselParams';
+import { hypotOf } from '@lib/hypotOf';
 
 const MOVED = 1e-6;
 const TEMPLATE_KEYS = [
@@ -280,7 +281,7 @@ export const updateEquipmentParameters = defineCommand({
     const before = portPositions(equipmentPorts(building, element));
     const movedPorts = equipmentPorts(building, next).flatMap((port) => {
       const was = before.get(port.id);
-      const distance = was === undefined ? 0 : Math.hypot(...port.position.map((value, index) => value - (was.position[index] as number)));
+      const distance = was === undefined ? 0 : hypotOf(port.position.map((value, index) => value - (was.position[index] as number)));
       return was !== undefined && distance > MOVED ? [{ id: port.id, from: was.position, to: port.position, distance }] : [];
     });
     const connectedPipes = [...new Set(movedPorts.flatMap((port) => connectedPipeIds(building, port.id)))];

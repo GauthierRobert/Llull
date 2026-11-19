@@ -10,6 +10,7 @@ import { buildTopology } from '../../geometry/subd/topology';
 import { dirRejection } from './codes';
 import { edgeRefField, isEntity, subdivisionOf } from './shared';
 import { finishedCage, isCommandResult, topologyResult } from './topologyResult';
+import { appendAll } from '../../lib/appendAll';
 
 const COMMAND = 'loop_cut_cage';
 const MAX_CUTS = 32;
@@ -83,7 +84,10 @@ export const loopCutCage = defineCommand({
       if (new Set(ring.faces).size !== ring.faces.length)
         return reject('DIR_LOOP_SELF_CROSS', 'the quad strip crosses one face twice (cut from another edge)', ['params.edge']);
       for (const [s, t] of ring.edges) done.add(edgeKey(s, t));
-      stripFaces.push(...ring.faces.map((f) => state.faceIds[f] as string));
+      appendAll(
+        stripFaces,
+        ring.faces.map((f) => state.faceIds[f] as string),
+      );
       cutRing(state, ring, forward ? fractions : fractions.map((f) => 1 - f).reverse());
     }
     const updated = finishedCage(doc, COMMAND, entity, state);

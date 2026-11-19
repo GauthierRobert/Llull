@@ -7,6 +7,7 @@ import type { Vec2 } from '../../model/vectors';
 import { escapeXml } from '../../lib/escapeXml';
 import { positiveSweep, toDegrees } from '../../lib/angle';
 import type { DraftItem, DraftShape } from './draftExport';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface SvgOptions {
   /** Millimetres per document unit. */
@@ -104,7 +105,7 @@ function growShape(box: Box, shape: DraftShape): void {
         }
       return;
     case 'text': {
-      const widest = Math.max(...shape.content.split(/\r?\n/).map((line) => line.length)) * shape.height * GLYPH_WIDTH;
+      const widest = maxOf(shape.content.split(/\r?\n/).map((line) => line.length)) * shape.height * GLYPH_WIDTH;
       const left = shape.anchor === 'left' ? 0 : shape.anchor === 'center' ? -widest / 2 : -widest;
       const [c, s] = [Math.cos(shape.rotation), Math.sin(shape.rotation)];
       const lines = shape.content.split(/\r?\n/).length;

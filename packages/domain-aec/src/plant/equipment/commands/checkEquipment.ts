@@ -12,6 +12,7 @@ import type { ElementCheck, EquipmentIssue } from '../codecheck/findings';
 import { remediationOf } from '../model';
 import { equipmentRefParam, findEquipment } from './equipmentRef';
 import { REVIEW_REASON } from './vesselThickness';
+import { appendAll } from '@lib/appendAll';
 
 type Status = 'fail' | 'warn' | 'pass_with_review' | 'pass';
 
@@ -93,7 +94,7 @@ export const checkEquipment = defineCommand({
             : kind === 'tank'
               ? checkTank(element, mm)
               : checkPump(element);
-      issues.push(...check.issues);
+      appendAll(issues, check.issues);
       reviewRequired ||= check.reviewRequired;
       const reason = check.reviewRequired ? (check.reviewReason ?? REVIEW_REASON) : undefined;
       if (reason !== undefined && !reasons.includes(reason)) reasons.push(reason);

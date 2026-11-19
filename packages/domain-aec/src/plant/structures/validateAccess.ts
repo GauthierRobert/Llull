@@ -10,6 +10,7 @@ import { findGratingType } from './grating/gratingTypes';
 import { platformParamsValid } from './platform/platformSpec';
 import { rackParamsValid } from './rack/rackSpec';
 import { railingStructureProblem } from './railing/railingValidate';
+import { appendAll } from '@lib/appendAll';
 
 const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
 
@@ -157,14 +158,14 @@ export function accessElementErrors(key: string, element: Record<string, unknown
     }
     if (element['role'] !== 'guardrail' && element['role'] !== 'handrail')
       errors.push(`building element ${key}: role must be guardrail or handrail`);
-    errors.push(...railingOpeningErrors(key, element['openings']), ...railingHostErrors(key, element['host'], elements));
+    appendAll(errors, [...railingOpeningErrors(key, element['openings']), ...railingHostErrors(key, element['host'], elements)]);
     if (errors.length === 0) {
       const problem = railingStructureProblem(element as unknown as RailingElement);
       if (problem !== null) errors.push(`building element ${key}: ${problem.message}`);
     }
   }
-  if (category === 'ladder') errors.push(...ladderErrors(key, element));
-  if (category === 'steelStair') errors.push(...steelStairErrors(key, element));
-  if (category === 'assembly') errors.push(...assemblyErrors(key, element, elements));
+  if (category === 'ladder') appendAll(errors, ladderErrors(key, element));
+  if (category === 'steelStair') appendAll(errors, steelStairErrors(key, element));
+  if (category === 'assembly') appendAll(errors, assemblyErrors(key, element, elements));
   return errors;
 }

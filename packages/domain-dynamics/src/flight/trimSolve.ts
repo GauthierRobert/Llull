@@ -10,6 +10,8 @@ import { elementAt } from '@lib/elementAt';
 import { solveDense } from '@lib/denseLinalg';
 import { rotateInverse } from './frames';
 import { orientationOf, stateDerivative, type TrimVehicle } from './trimModel';
+import { hypotOf } from '@lib/hypotOf';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface TrimCondition {
   /** Speed relative to the air along the flight path, m/s. */
@@ -52,12 +54,12 @@ export function bodyVelocity(airspeed: number, flightPath: number, roll: number,
   return [u, v, w];
 }
 
-const norm = (values: readonly number[]): number => Math.hypot(...values);
+const norm = (values: readonly number[]): number => hypotOf(values);
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
 
 /** Reference acceleration (m/s²) and angular acceleration (rad/s²) the residual is divided by. */
 function scales(vehicle: TrimVehicle): { linear: number; angular: number } {
-  const g = Math.max(Math.hypot(...vehicle.gravity), 1);
+  const g = Math.max(hypotOf(vehicle.gravity), 1);
   const radius = Math.sqrt(Math.max(vehicle.inertia[0][0] + vehicle.inertia[1][1] + vehicle.inertia[2][2], 1e-12) / (2 * vehicle.massKg));
   return { linear: g, angular: g / Math.max(radius, 1e-3) };
 }
@@ -143,7 +145,7 @@ function solveFrom(vehicle: TrimVehicle, condition: TrimCondition, start: TrimSt
   let r = residualOf(z);
   let damping = 1e-3;
   let iterations = 0;
-  while (iterations < MAX_ITERATIONS && Math.max(...r.map(Math.abs)) > TRIM_TOLERANCE) {
+  while (iterations < MAX_ITERATIONS && maxOf(r.map(Math.abs)) > TRIM_TOLERANCE) {
     iterations += 1;
     const columns = z.map((_, k) => {
       const up = z.map((value, i) => (i === k ? value + JACOBIAN_STEP : value));
@@ -171,7 +173,7 @@ function solveFrom(vehicle: TrimVehicle, condition: TrimCondition, start: TrimSt
     }
     if (!accepted) break;
   }
-  const residual = Math.max(...r.map(Math.abs));
+  const residual = maxOf(r.map(Math.abs));
   if (residual <= TRIM_TOLERANCE) return { ok: true, state: unpack(vehicle, condition, z), iterations, residual };
   const offset = free ? 3 : 2;
   const stuck = vehicle.controls.filter((_, i) => {

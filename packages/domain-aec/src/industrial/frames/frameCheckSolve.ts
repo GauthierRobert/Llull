@@ -11,6 +11,7 @@ import { amplificationOf, horneAlphaCritical } from '../steelDesign/steelDesign'
 import { boltResistance, isBoltRefusal } from '../steelDesign/steelBolts';
 import { refusedFields, type RowRefusal } from '../common/utilisation';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface CheckRow {
   readonly frame: string;
@@ -133,7 +134,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     const increment = Math.max(0, piece.compression - (above?.compression ?? 0));
     if (increment > 0) entering.set(piece.member.geometry.b, increment);
   }
-  const tallest = Math.max(...frame.columnTops.map((top) => top.height), 1) / 1000;
+  const tallest = Math.max(maxOf(frame.columnTops.map((top) => top.height)), 1) / 1000;
   const alphaH = clamp(2 / Math.sqrt(tallest), 2 / 3, 1);
   const loaded = frame.columnTops.filter((top) =>
     pieces.some((piece) => piece.member.elementId === top.elementId && piece.compression > 0),
@@ -173,7 +174,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     const span = frame.spans.find(([x0, x1]) => middle >= x0 && middle <= x1);
     const length = span ? span[1] - span[0] : Math.hypot(b.x - a.x, b.y - a.y);
     const critical = (Math.PI ** 2 * member.geometry.E * member.geometry.I) / length ** 2;
-    const compression = Math.max(0, ...forces.axial.map((value) => -value));
+    const compression = Math.max(0, maxOf(forces.axial.map((value) => -value)));
     if (compression / critical > rafterRatio) {
       rafterRatio = compression / critical;
       if (rafterRatio > 0.09) criticalMember ??= member.elementId;
@@ -201,16 +202,16 @@ export function connectionCheck(
   if (!solids || !plate) return null;
   const plateYs = plate.outline.map(([, y]) => toMm(doc, y));
   // Hogging (negative) moment: tension at the top, compression at the bottom edge.
-  const compression = moment < 0 ? Math.min(...plateYs) : Math.max(...plateYs);
+  const compression = moment < 0 ? minOf(plateYs) : maxOf(plateYs);
   const levers = solids
     .filter((solid) => solid.part.startsWith('bolt'))
     .map((bolt) => {
       const ys = bolt.outline.map(([, y]) => toMm(doc, y));
-      return Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - compression);
+      return Math.abs((minOf(ys) + maxOf(ys)) / 2 - compression);
     });
   if (levers.length === 0) return null;
   const sumSquares = levers.reduce((sum, lever) => sum + lever * lever, 0);
-  const tension = (Math.abs(moment) * Math.max(...levers)) / sumSquares;
+  const tension = (Math.abs(moment) * maxOf(levers)) / sumSquares;
   const perBoltShear = Math.abs(shear) / levers.length;
   const resistance = boltResistance(toMm(doc, connection.boltDiameter), boltClass);
   if (isBoltRefusal(resistance)) return { ...refusedFields(resistance), check: `bolts not checked — ${resistance.message}` };

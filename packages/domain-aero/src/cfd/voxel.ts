@@ -7,6 +7,7 @@
 import type { Vec3 } from '@core/model/types';
 import type { IndexedSurface } from './weld';
 import { powInt } from '@lib/powInt';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Rows (y, z cells) beyond which the cast is skipped. */
 export const MAX_RAY_ROWS = 4_000_000;
@@ -37,10 +38,10 @@ function castRows(surface: IndexedSurface, min: Vec3, max: Vec3, h: number): Row
     if (Math.abs(nx) <= 1e-14 * Math.hypot(nx, ny3, nz3)) continue;
     const ys = [ay, ay + uy, ay + wy];
     const zs = [az, az + uz, az + wz];
-    const jLow = Math.max(0, Math.ceil((Math.min(...ys) - min[1]) / h - 0.5 - SHIFT_Y));
-    const jHigh = Math.min(ny - 1, Math.floor((Math.max(...ys) - min[1]) / h - 0.5 - SHIFT_Y));
-    const kLow = Math.max(0, Math.ceil((Math.min(...zs) - min[2]) / h - 0.5 - SHIFT_Z));
-    const kHigh = Math.min(nz - 1, Math.floor((Math.max(...zs) - min[2]) / h - 0.5 - SHIFT_Z));
+    const jLow = Math.max(0, Math.ceil((minOf(ys) - min[1]) / h - 0.5 - SHIFT_Y));
+    const jHigh = Math.min(ny - 1, Math.floor((maxOf(ys) - min[1]) / h - 0.5 - SHIFT_Y));
+    const kLow = Math.max(0, Math.ceil((minOf(zs) - min[2]) / h - 0.5 - SHIFT_Z));
+    const kHigh = Math.min(nz - 1, Math.floor((maxOf(zs) - min[2]) / h - 0.5 - SHIFT_Z));
     for (let j = jLow; j <= jHigh; j++) {
       const py = min[1] + (j + 0.5 + SHIFT_Y) * h;
       for (let k = kLow; k <= kHigh; k++) {

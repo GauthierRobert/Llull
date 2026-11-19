@@ -2,6 +2,7 @@
 
 import { excitationHz } from './campbellMath';
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface CampbellInput {
   readonly modes: readonly { readonly mode: number; readonly frequencyHz: number }[];
@@ -32,9 +33,9 @@ function niceCeil(value: number): number {
 
 /** The chart; every number is formatted to two decimals so equal input gives byte-equal text. */
 export function campbellSvg(input: CampbellInput, title: string): string {
-  const rpmMax = niceCeil(Math.max(0, ...input.bands.map((band) => band.highRpm)) * 1.1);
-  const rayEnd = Math.max(0, ...input.harmonics.map((entry) => excitationHz(entry.harmonic, rpmMax)));
-  const frequencyMax = niceCeil(rayEnd > 0 ? rayEnd : Math.max(0, ...input.modes.map((mode) => mode.frequencyHz)) * 1.1);
+  const rpmMax = niceCeil(Math.max(0, maxOf(input.bands.map((band) => band.highRpm))) * 1.1);
+  const rayEnd = Math.max(0, maxOf(input.harmonics.map((entry) => excitationHz(entry.harmonic, rpmMax))));
+  const frequencyMax = niceCeil(rayEnd > 0 ? rayEnd : Math.max(0, maxOf(input.modes.map((mode) => mode.frequencyHz))) * 1.1);
   const plotWidth = CAMPBELL_WIDTH - LEFT - RIGHT;
   const plotHeight = HEIGHT - TOP - BOTTOM;
   const x = (rpm: number): number => LEFT + (rpm / rpmMax) * plotWidth;

@@ -15,6 +15,7 @@ import { minimiseFuzzCase } from '@protocol/fuzz/minimise';
 import { kindsForKernel, runFuzzSeed, summariseFuzz, type SeedReport } from '@protocol/fuzz/session';
 import { FUZZ_FEATURE_KINDS, type FuzzFailure, type FuzzFeatureKind } from '@protocol/fuzz/types';
 import { booleanFlag, stringFlag, type ParsedArgv } from './argv';
+import { appendAll } from '@lib/appendAll';
 
 /** The slice of the CLI I/O port the fuzz needs (structurally a `CliIo`). */
 export interface FuzzIo {
@@ -234,10 +235,10 @@ export async function fuzzOneCli(args: ParsedArgv, io: FuzzIo): Promise<number> 
     `  identity: ${report.identity.ok ? 'ok' : 'FAIL'} ${report.identity.label}`,
   ];
   if (minimised !== null)
-    lines.push(
+    appendAll(lines, [
       `minimised to ${minimised.steps.length} of ${fuzzCase.steps.length} steps in ${minimised.tests} runs: ${failureText(minimised.failure)}`,
       ...minimised.steps.map((s) => `  - ${s.kind}: ${s.label}`),
-    );
+    ]);
   else if (minimise && report.design.ok) lines.push('nothing to minimise: the design passes.');
   if (out !== undefined) lines.push(`plan written to ${out} (replay: llull run ${out} --doc repro.llull.json)`);
   else if (minimised !== null) lines.push(JSON.stringify(plan, null, 2));

@@ -12,6 +12,7 @@ import { remediationOf } from '../codes';
 import { ruleById, type RulesetName } from '../rules/ruleTable';
 import { guardedSegments } from '../railing/railingLayout';
 import type { Finding } from './finding';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Drop samples along an edge: every <= 250 mm, the first and last inset by 5 mm so that a curved neighbour (a sector panel) still contains the end samples; at most 200. */
 const SAMPLE_STEP_MM = 250;
@@ -45,15 +46,15 @@ const RAILING_OFFSET_MM = 150;
  * (grade A rows ISO-GRD-TOP 1100 mm, OSHA-GRD-TOP 990.6 mm), mm.
  */
 const guardHeightMm = (rulesets: readonly RulesetName[]): number =>
-  Math.max(0, ...rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0));
+  Math.max(0, maxOf(rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0)));
 
 /**
  * Largest clear opening a guard-rail may leave between rails (grade A rows ISO-GRD-GAP 500 mm, OSHA-GRD-MID 19 in): the strictest of the requested
  * rulesets. A gap between a walking surface and a vessel shell no wider than this is treated like the space between two rails.
  */
 const guardOpeningMm = (rulesets: readonly RulesetName[]): number =>
-  Math.min(
-    ...rulesets.map((ruleset) => (ruleset === 'iso_14122' ? ruleById('ISO-GRD-GAP').max : ruleById('OSHA-GRD-MID').maxOpening) ?? Infinity),
+  minOf(
+    rulesets.map((ruleset) => (ruleset === 'iso_14122' ? ruleById('ISO-GRD-GAP').max : ruleById('OSHA-GRD-MID').maxOpening) ?? Infinity),
   );
 
 type Ring = readonly Vec2[];
@@ -184,7 +185,7 @@ function buildScene(doc: CadDocument, building: BuildingModel, rulesets: readonl
     surfaces,
     shells,
     openingMm: guardOpeningMm(rulesets),
-    groundMm: elevations.length === 0 ? 0 : Math.min(...elevations),
+    groundMm: elevations.length === 0 ? 0 : minOf(elevations),
     walls,
     railings,
     guardMm: guardHeightMm(rulesets),
@@ -307,7 +308,7 @@ function surfaceEdges(scene: Scene, id: string, threshold: EdgeThreshold): EdgeR
         a[0] + (b[0] - a[0]) * t + nx * SAMPLE_OFFSET_MM,
         a[1] + (b[1] - a[1]) * t + ny * SAMPLE_OFFSET_MM,
       ];
-      const drop = Math.max(...sampleParameters(length).map((t) => dropAt(scene, id, surface.topMm, sample(t))));
+      const drop = maxOf(sampleParameters(length).map((t) => dropAt(scene, id, surface.topMm, sample(t))));
       const guarded = drop > threshold.mm && (shellCloses(scene, surface, a, b) || guardCoverage(scene, surface, a, b) >= COVERAGE);
       const isProtected = drop <= threshold.mm || guarded;
       const location = `${label} edge ${index}`;

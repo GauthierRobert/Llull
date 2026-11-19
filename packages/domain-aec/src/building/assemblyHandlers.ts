@@ -7,6 +7,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { AssemblyElement, AssemblyKind, BuildingModel } from './types';
+import { appendAll } from '@lib/appendAll';
 
 export type Regeneration =
   | { readonly ok: true; readonly building: BuildingModel; readonly partIds: string[] }
@@ -52,7 +53,7 @@ export function followAssemblyHosts(doc: CadDocument, building: BuildingModel, h
     const built = handler.regenerate(doc, next, next.elements[assembly.id] as AssemblyElement);
     if (!built.ok) return { ok: false, message: `${assembly.kind} ${assembly.id} cannot follow ${assembly.hostId}: ${built.message}` };
     next = built.building;
-    ids.push(assembly.id, ...built.partIds);
+    appendAll(ids, [assembly.id, ...built.partIds]);
   }
   return { ok: true, building: next, ids };
 }

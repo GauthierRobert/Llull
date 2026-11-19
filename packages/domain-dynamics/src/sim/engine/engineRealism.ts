@@ -28,6 +28,8 @@ import { combustionOrigin } from './combustionOrigin';
 import { efficiencyBand, fmepAt, fmepBand, frictionOrigin, lossBands, ownsCylinder } from './engineLosses';
 import { elementAt } from '@lib/elementAt';
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Share of the connecting-rod mass counted as reciprocating (the usual lumped-mass rule, named). */
 const ROD_RECIPROCATING_SHARE = 1 / 3;
@@ -128,7 +130,7 @@ function lossReport(input: RealismInput, record: EngineLosses): LossReport | nul
     .filter((runtime) => runtime.cylinder.crank === record.crank)
     .reduce((total, runtime) => total + runtime.layout.displacementM3, 0);
   const cycleRad = lead.cylinder.cycle === 'four_stroke' ? 4 * Math.PI : 2 * Math.PI;
-  const peakPa = Math.max(...own.map((runtime) => runtime.curveAt(cycle.meanRpm).peakPa));
+  const peakPa = maxOf(own.map((runtime) => runtime.curveAt(cycle.meanRpm).peakPa));
   const fmep = fmepAt(record, cycle.meanRpm, peakPa);
   const friction = (fmep.pa * displacement) / cycleRad;
   const brake = report.meanTorqueNm - friction;
@@ -277,8 +279,9 @@ function plausibilityFindings(input: RealismInput, losses: LossReport | null): P
     if (model.kind === 'table') continue;
     const curve = runtime.curveAt(input.report.lastCycle?.meanRpm ?? 1000);
     const cycleDeg = curve.cycleDeg;
-    found.push(
-      ...outsideBand(
+    appendAll(
+      found,
+      outsideBand(
         'peakPressureAngle',
         degreesAfterTdc(curve.peakAngleDeg, cycleDeg),
         PEAK_ANGLE_BAND_DEG,
@@ -290,8 +293,9 @@ function plausibilityFindings(input: RealismInput, losses: LossReport | null): P
     );
     const burn = model.kind === 'wiebe' ? model : model.burn;
     const ca50 = 'ca50Deg' in burn ? burn.ca50Deg : burn.startDeg + burn.durationDeg * pow(Math.LN2 / burn.a, 1 / (burn.m + 1));
-    found.push(
-      ...outsideBand(
+    appendAll(
+      found,
+      outsideBand(
         'ca50',
         ca50,
         CA50_BAND_DEG,
@@ -303,8 +307,9 @@ function plausibilityFindings(input: RealismInput, losses: LossReport | null): P
     );
   }
   if (losses !== null)
-    found.push(
-      ...outsideBand(
+    appendAll(
+      found,
+      outsideBand(
         'mechanicalEfficiency',
         losses.mechanicalEfficiency,
         MECHANICAL_EFFICIENCY_BAND,
@@ -325,8 +330,9 @@ function plausibilityFindings(input: RealismInput, losses: LossReport | null): P
         ? undefined
         : inertiaAboutAxis(body, scale3(joint.anchor, input.metresPerUnit), joint.axis));
     if (inertia !== undefined)
-      found.push(
-        ...outsideBand(
+      appendAll(
+        found,
+        outsideBand(
           'propellerInertia',
           inertia,
           ROTAX_PROPELLER_INERTIA_BAND,
@@ -338,8 +344,9 @@ function plausibilityFindings(input: RealismInput, losses: LossReport | null): P
       );
     const torque = input.propellerTorqueNm[propeller.id];
     if (torque !== undefined)
-      found.push(
-        ...outsideBand(
+      appendAll(
+        found,
+        outsideBand(
           'propellerTorque',
           Math.abs(torque),
           [0, ROTAX_MAX_PROPELLER_TORQUE_NM],

@@ -7,6 +7,8 @@
 
 import type { Vec2 } from '../model/vectors';
 import { pointInPolygon, segmentIntersection, segmentsIntersect, signedArea, toCounterClockwise } from './polygon';
+import { appendAll } from './appendAll';
+import { maxOf, minOf } from './arrayExtrema';
 
 const SNAP = 1e-7;
 
@@ -145,7 +147,7 @@ export function unionPolygons(polygons: readonly (readonly Vec2[])[]): Vec2[][] 
       const [ring] = result.splice(index, 1);
       const [first, ...extra] = unionPair(ring as Vec2[], merged);
       merged = first ?? merged;
-      result.push(...extra);
+      appendAll(result, extra);
     }
     result.push(merged);
   }
@@ -199,10 +201,10 @@ interface Box {
 }
 
 const boxOf = (ring: readonly Vec2[]): Box => ({
-  minX: Math.min(...ring.map((p) => p[0])) - SNAP,
-  maxX: Math.max(...ring.map((p) => p[0])) + SNAP,
-  minY: Math.min(...ring.map((p) => p[1])) - SNAP,
-  maxY: Math.max(...ring.map((p) => p[1])) + SNAP,
+  minX: minOf(ring.map((p) => p[0])) - SNAP,
+  maxX: maxOf(ring.map((p) => p[0])) + SNAP,
+  minY: minOf(ring.map((p) => p[1])) - SNAP,
+  maxY: maxOf(ring.map((p) => p[1])) + SNAP,
 });
 
 const boxesTouch = (a: Box, b: Box): boolean => a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;

@@ -8,6 +8,7 @@ import { roundTo } from '../../lib/compactNumber';
 import { dot3 } from '../../lib/vec3';
 import { type Group, type Model, distanceToAxis, outwardNormal } from './model';
 import type { RecognizedBend, RecognizedChamfer, RecognizedFillet } from './types';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const FULL_TURN = 2 * Math.PI - 1e-3;
 /** Spans closer than this (radians) are the same bend angle. */
@@ -89,7 +90,7 @@ export function recognizeChamfers(model: Model, taken: Set<Group>): RecognizedCh
     if (sides.length !== 2 || first?.other == null || second?.other == null || Math.abs(dot3(first.other, second.other)) > 1e-3) continue;
     const lengths = sides.map(({ entry }) => model.topology.edges[entry.edge]?.length ?? 0);
     const area = group.faces.reduce((sum, face) => sum + (model.graph.faces[face]?.area ?? 0), 0);
-    const along = Math.max(...lengths);
+    const along = maxOf(lengths);
     if (!(along > 0)) continue;
     taken.add(group);
     chamfers.push({ distance: r(area / along / Math.SQRT2), faceIndices: [...group.faces].sort((a, b) => a - b) });

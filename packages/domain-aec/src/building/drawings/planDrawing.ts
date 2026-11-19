@@ -16,6 +16,7 @@ import {
 import { stairPrimitives } from './planStairs';
 import { crossingColumnPrimitives, industrialPrimitives } from './planIndustrial';
 import { supportPrimitives } from './planSupports';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * Builds the plan of `levelId` (or the active / lowest level).
@@ -32,19 +33,19 @@ export function buildPlanDrawing(doc: PlanSource, levelId: string | undefined, o
   for (const element of orderedElements(building)) {
     if (!('levelId' in element)) continue;
     if (element.levelId !== level.id) {
-      primitives.push(...crossingColumnPrimitives(doc, element, level, cutHeight));
+      appendAll(primitives, crossingColumnPrimitives(doc, element, level, cutHeight));
       continue;
     }
     switch (element.category) {
       case 'wall':
         walls.push(element);
-        primitives.push(...wallPrimitives(building, element, cutHeight));
+        appendAll(primitives, wallPrimitives(building, element, cutHeight));
         break;
       case 'curvedWall':
-        primitives.push(...curvedWallPrimitives(building, element, cutHeight));
+        appendAll(primitives, curvedWallPrimitives(building, element, cutHeight));
         break;
       case 'slab':
-        primitives.push(...slabPrimitives(element));
+        appendAll(primitives, slabPrimitives(element));
         break;
       case 'column':
         primitives.push(columnPrimitive(element));
@@ -58,7 +59,7 @@ export function buildPlanDrawing(doc: PlanSource, levelId: string | undefined, o
         });
         break;
       case 'stair':
-        primitives.push(...stairPrimitives(doc, element));
+        appendAll(primitives, stairPrimitives(doc, element));
         break;
       case 'member':
       case 'footing':
@@ -67,17 +68,17 @@ export function buildPlanDrawing(doc: PlanSource, levelId: string | undefined, o
       case 'pipe':
       case 'tray':
       case 'plate':
-        primitives.push(...industrialPrimitives(doc, element, cutHeight));
+        appendAll(primitives, industrialPrimitives(doc, element, cutHeight));
         break;
       case 'pipeSupport':
-        primitives.push(...supportPrimitives(doc, building, element));
+        appendAll(primitives, supportPrimitives(doc, building, element));
         break;
       case 'room':
-        primitives.push(...roomPrimitives(doc, element));
+        appendAll(primitives, roomPrimitives(doc, element));
         break;
     }
   }
-  for (const grid of elementsOf(building, 'grid')) primitives.push(...gridPrimitives(doc, grid));
-  if (options.dimensions !== false) primitives.push(...dimensionPrimitives(doc, building, walls));
+  for (const grid of elementsOf(building, 'grid')) appendAll(primitives, gridPrimitives(doc, grid));
+  if (options.dimensions !== false) appendAll(primitives, dimensionPrimitives(doc, building, walls));
   return { level, primitives, bounds: drawingBounds(primitives) };
 }

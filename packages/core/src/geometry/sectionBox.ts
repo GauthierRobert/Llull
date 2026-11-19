@@ -8,6 +8,7 @@ import type { SectionBox, SectionPlane } from '../model/review';
 import type { Vec3 } from '../model/vectors';
 import { dot3, len3, scale3 } from '../lib/vec3';
 import { boundsCorners, type Bounds } from './bounds';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 export type SectionClass = 'inside' | 'crossing' | 'outside';
 
@@ -69,8 +70,8 @@ export function classifyAgainstSection(box: SectionBox, bounds: Bounds): Section
     return [(centre[0] ?? 0) + dx * cos + dy * sin, (centre[1] ?? 0) - dx * sin + dy * cos, corner[2]];
   });
   const axes = [0, 1, 2] as const;
-  const lows = axes.map((axis) => Math.min(...local.map((point) => point[axis])));
-  const highs = axes.map((axis) => Math.max(...local.map((point) => point[axis])));
+  const lows = axes.map((axis) => minOf(local.map((point) => point[axis])));
+  const highs = axes.map((axis) => maxOf(local.map((point) => point[axis])));
   if (axes.some((axis) => (highs[axis] ?? 0) < min[axis] || (lows[axis] ?? 0) > max[axis])) return 'outside';
   return axes.every((axis) => (lows[axis] ?? 0) >= min[axis] && (highs[axis] ?? 0) <= max[axis]) ? 'inside' : 'crossing';
 }

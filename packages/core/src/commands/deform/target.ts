@@ -14,6 +14,7 @@ import { cross3, dot3, normalize3 } from '../../lib/vec3';
 import { currentContext } from '../context';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defRejection } from './codes';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface DeformTarget {
   readonly entity: Entity;
@@ -223,7 +224,7 @@ export function extentWithin(target: DeformTarget, frame: DeformFrame, start: nu
       ]),
     );
     const zs = corners.map((q) => q[2]);
-    if (Math.max(...zs) <= start || Math.min(...zs) >= end) continue;
+    if (maxOf(zs) <= start || minOf(zs) >= end) continue;
     for (const q of corners) points.push(q[0], q[1], q[2]);
   }
   if (points.length === 0) return whole;

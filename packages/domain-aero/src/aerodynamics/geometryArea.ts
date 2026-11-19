@@ -9,6 +9,7 @@ import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { toMetres } from '@core/model/units';
 import { projectedArea, type ProjectedArea } from './projectedArea';
 import type { Triangle } from '@core/geometry/triangles';
+import { hypotOf } from '@lib/hypotOf';
 
 const DEFAULT_FLOW_DIRECTION: Vec3 = [1, 0, 0];
 const DEFAULT_RESOLUTION = 400;
@@ -48,7 +49,7 @@ export function geometryArea(
   resolution: number = DEFAULT_RESOLUTION,
 ): GeometryAreaResult {
   const direction = (flowDirection ?? DEFAULT_FLOW_DIRECTION) as Vec3;
-  if (!direction.every(Number.isFinite) || !(Math.hypot(...direction) > 0) || !(resolution >= 50 && resolution <= 2000))
+  if (!direction.every(Number.isFinite) || !(hypotOf(direction) > 0) || !(resolution >= 50 && resolution <= 2000))
     return {
       ok: false,
       code: 'AER_PARAM_INVALID',

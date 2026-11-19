@@ -22,6 +22,7 @@ import { measureSpecOf, nodeSeries, type MeasureSpec, type Tensor } from './feSt
 import { toMpa } from './lifeMath';
 import { countCycles, type CountingMethod, type ResidueRule } from './rainflow';
 import { fatigueCaseOf, historyOf } from './store';
+import { appendAll } from '@lib/appendAll';
 
 const FATIGUE_FIELD_SOLVER = 'llull-compute post fatigue';
 /** Values per node: damage per block, cycles counted, largest equivalent amplitude (MPa), flags. */
@@ -235,7 +236,7 @@ export function fatigueFieldInput(
     }
   }
   const faces: CutFace[] = copyNodes.map((entry, index) => ({ ...entry, jobIndex: nodeIds.length + index }));
-  values.push(...copyValues);
+  appendAll(values, copyValues);
   if (nodeIds.length === 0)
     return failure('FAT_RESULTS_MISSING', 'no mesh node has a finite stress tensor in every mapped load case', [analysisId]);
   const { method, residue, gate } = fatigueCase.counting;

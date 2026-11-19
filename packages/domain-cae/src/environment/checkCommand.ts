@@ -12,6 +12,7 @@ import { refuseEnv, type EnvItem } from './codes';
 import { spaceEnvironmentOf } from './model';
 import { outgassingOf, screenMaterial, type MaterialOutgassing, type OutgassingItem } from './outgassing';
 import { resolveProfile, shippedProfile, SHIPPED_PROFILE_IDS } from './profiles';
+import { appendAll } from '@lib/appendAll';
 
 const COMMAND = 'check_space_environment';
 const NOTE =
@@ -85,7 +86,7 @@ export const checkSpaceEnvironment = defineCommand({
     for (const [material, entityIds] of users) {
       const read = outgassingOf(doc, ctx, material);
       data.set(material, read);
-      screened.push(...screenMaterial(material, entityIds, read, profile));
+      appendAll(screened, screenMaterial(material, entityIds, read, profile));
     }
     const items = reviewItems(doc, ctx?.humanSignature ?? null, screened, profile.id, mission.deviations ?? {});
     const open = items.filter((item) => !covered(item));

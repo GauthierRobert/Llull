@@ -4,6 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
 import { tableRejection } from '@core/commands/noop';
+import { hypotOf } from '@lib/hypotOf';
 
 export const EMPTY_PIPING: PipingModel = { tieIns: {}, tieInOrder: [], lines: {}, lineOrder: [], runs: {}, runOrder: [], entityIds: {} };
 
@@ -103,7 +104,7 @@ export function locateOnRun(run: PipeRun, point: Vec3, toleranceMm = 0.01): { le
   for (let leg = 0; leg + 1 < points.length; leg++) {
     const [a, b] = [points[leg] as Vec3, points[leg + 1] as Vec3];
     const axis: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const length = Math.hypot(...axis);
+    const length = hypotOf(axis);
     if (!(length > 0)) continue;
     const offset: Vec3 = [point[0] - a[0], point[1] - a[1], point[2] - a[2]];
     const distance = (offset[0] * axis[0] + offset[1] * axis[1] + offset[2] * axis[2]) / length;

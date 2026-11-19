@@ -6,6 +6,7 @@ import { bomRows, boltingOf, type BomRow, type Bolting } from '../bom';
 import { isoIssue, refuseIso } from '../codes';
 import { definedPlan } from '../iso/isoSheets';
 import { allLineIds } from '../lineNetwork';
+import { appendAll } from '@lib/appendAll';
 
 function bomSummary(
   params: {
@@ -142,7 +143,7 @@ export const pipingBom = defineCommand({
       const inScope = (index: number): boolean =>
         params.scope === 'sheet' ? sheetIndices.has(index) : spoolPosition < 0 || analysis.spools.spoolOf.get(index) === spoolPosition;
       const result = bomRows(analysis.read.network.components, inScope);
-      missing.push(...result.withoutItemCode);
+      appendAll(missing, result.withoutItemCode);
       for (const row of result.rows) {
         const have = rows.get(row.itemCode);
         rows.set(

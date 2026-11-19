@@ -6,6 +6,7 @@ import { refuseIso } from '../codes';
 import { cutPieces } from '../cutList';
 import { isWeldJoint } from '../joints';
 import { nestPieces, tooLong } from '../stockNesting';
+import { maxOf } from '@lib/arrayExtrema';
 
 /**
  * @affects none (query: returns the same document)
@@ -111,7 +112,7 @@ export const cutList = defineCommand({
         doc,
         'cut_list',
         'ISO_STOCK_TOO_SHORT',
-        `${long.length} piece(s) longer than the longest stock length ${Math.max(...(params.stockLengthsMm ?? []))} mm (with kerf ${kerf} mm): ${long.map((piece) => `${piece.piece} ${piece.cutLengthMm} mm`).join(', ')}`,
+        `${long.length} piece(s) longer than the longest stock length ${maxOf(params.stockLengthsMm ?? [])} mm (with kerf ${kerf} mm): ${long.map((piece) => `${piece.piece} ${piece.cutLengthMm} mm`).join(', ')}`,
         long.map((piece) => piece.componentId),
         ['stockLengthsMm'],
       );

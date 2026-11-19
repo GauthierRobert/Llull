@@ -17,6 +17,7 @@ import {
   quote,
   parameterLines,
 } from './format';
+import { appendAll } from '../lib/appendAll';
 
 function vector(terms: readonly Term[]): string {
   return `[${terms.map(formatTerm).join(', ')}]`;
@@ -117,8 +118,9 @@ export function emitOpenScad(program: FeatureProgram): string {
     '',
     '/* [Parameters] */',
   ];
-  lines.push(
-    ...parameterLines(program, '//', (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`),
+  appendAll(
+    lines,
+    parameterLines(program, '//', (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`),
   );
   lines.push('', '/* [Hidden] */', '');
   const version = new Map<string, number>();
@@ -160,7 +162,7 @@ export function emitOpenScad(program: FeatureProgram): string {
         return `// ${commentText(feature.text)}`;
     }
   };
-  lines.push(...featureLinesWithHeadings(program, '//', featureLine));
+  appendAll(lines, featureLinesWithHeadings(program, '//', featureLine));
   lines.push('', '// ── result ──');
   for (const output of program.outputs) {
     const label = output.name !== undefined ? ` // ${commentText(output.name)}` : '';

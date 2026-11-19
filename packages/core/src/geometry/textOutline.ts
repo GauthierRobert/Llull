@@ -13,6 +13,7 @@ import { FontError } from '../lib/font/reader';
 import { layoutText, MAX_TEXT_CHARACTERS, type TextLayout } from '../lib/font/layout';
 import { flattenLoop, loopArea, loopBox, loopLength, type OutlineLoop, type OutlineSegment } from '../lib/font/outline';
 import type { PointMapper } from './textOnCurve';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 interface TextRegion extends FillRegion {
   /** Outer area minus hole areas, document units squared. */
@@ -152,8 +153,8 @@ function outlineOf(entity: OutlineEntity, font: ParsedFont, mapper?: PointMapper
       points.length === 0
         ? null
         : {
-            min: [Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1]))],
-            max: [Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))],
+            min: [minOf(points.map((p) => p[0])), minOf(points.map((p) => p[1]))],
+            max: [maxOf(points.map((p) => p[0])), maxOf(points.map((p) => p[1]))],
           },
   };
 }

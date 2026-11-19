@@ -8,6 +8,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { jacobiRotate } from '@lib/symmetricEigen';
 import { cross3, len3, sub3 } from '@lib/vec3';
 import type { DeckContext } from './context';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Corner positions (0-based) of the four tetrahedron faces in CalculiX numbering (S1 = 1-2-3, S2 = 1-4-2, S3 = 2-4-3, S4 = 3-4-1). */
 export const TET_FACES: readonly (readonly [number, number, number])[] = [
@@ -130,7 +131,7 @@ export function momentForces(mesh: FeMeshArtifact, nodes: readonly number[], mom
       for (let j = 0; j < 3; j++) put(inertia, i, j, at(inertia, i, j) + (i === j ? square : 0) - (d[i] ?? 0) * (d[j] ?? 0));
   }
   const { values, vectors } = eigenSymmetric(inertia);
-  const largest = Math.max(...values);
+  const largest = maxOf(values);
   const omega = [0, 0, 0];
   values.forEach((value, index) => {
     if (!(value > RANK_TOLERANCE * largest)) return;

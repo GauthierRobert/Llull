@@ -41,6 +41,7 @@ import {
   type Embedding,
   type FontNames,
 } from './sfnt';
+import { maxOf } from '../arrayExtrema';
 
 export { MAX_FONT_BYTES };
 
@@ -221,7 +222,7 @@ function controlPointsTop(cff: Cff | null, source: GlyphSource | null, glyph: nu
             : (source as GlyphSource),
           glyph,
         ).flatMap((contour) => contour.map((p) => p.y));
-  return ys.length === 0 ? null : Math.max(...ys);
+  return ys.length === 0 ? null : maxOf(ys);
 }
 
 function readVerticalLine(tables: Tables, header: Header, metric: (tag: string) => number): ParsedFont['verticalLine'] {

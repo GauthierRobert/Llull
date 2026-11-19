@@ -9,6 +9,8 @@
 import type { Vec3 } from '../../model/types';
 import type { ShapeTopology } from '../kernel';
 import { distance3 } from '../../lib/vec3';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 export interface SolidVertex {
   readonly point: Vec3;
@@ -29,10 +31,8 @@ export function solidVertices(topology: ShapeTopology): readonly SolidVertex[] {
   const points: Vec3[] = [];
   const meeting: number[][] = [];
   const ends = topology.edges.flatMap((edge) => [edge.start, edge.end]);
-  const span = [0, 1, 2].map(
-    (axis) => Math.max(...ends.map((point) => point[axis] ?? 0)) - Math.min(...ends.map((point) => point[axis] ?? 0)),
-  );
-  const tolerance = COINCIDENT * Math.max(Math.hypot(...span), 1e-9);
+  const span = [0, 1, 2].map((axis) => maxOf(ends.map((point) => point[axis] ?? 0)) - minOf(ends.map((point) => point[axis] ?? 0)));
+  const tolerance = COINCIDENT * Math.max(hypotOf(span), 1e-9);
   for (const edge of topology.edges) {
     if (edge.degenerate) continue;
     for (const point of [edge.start, edge.end]) {

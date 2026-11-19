@@ -139,6 +139,32 @@
     },
     {
       "files": [
+        "packages/*/src/**/*.ts",
+        "server/src/**/*.ts",
+        "src/app/**/*.ts"
+      ],
+      "rules": {
+        "llull/no-spread-call": "error"
+      }
+    },
+    {
+      // TODO(PERF1-12): after lane merge — files other lanes were changing when the spread calls were replaced; fix them, then drop this.
+      "files": [
+        "packages/domain-implicit/src/**/*.ts",
+        "packages/core/src/geometry/field/**/*.ts",
+        "packages/core/src/geometry/mesh/**/*.ts",
+        "packages/core/src/lib/meshFormats/**/*.ts",
+        "packages/core/src/commands/mesh/importMeshFile.ts",
+        "packages/core/src/lib/base64.ts",
+        "server/src/native/fieldEngine.ts",
+        "server/src/meshAssets/**/*.ts"
+      ],
+      "rules": {
+        "llull/no-spread-call": "off"
+      }
+    },
+    {
+      "files": [
         "server/src/**/*.ts",
         "desktop/src/**/*.ts"
       ],

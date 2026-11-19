@@ -4,6 +4,7 @@ import { clamp01 } from '@lib/clamp';
 import type { Vec3 } from '@core/model/types';
 import { add3, distance3, dot3, scale3, sub3 } from '@lib/vec3';
 import { toVec3 } from '../common/memberSupport';
+import { hypotOf } from '@lib/hypotOf';
 
 /** Most points accepted for one pipe or cable tray run. */
 const MAX_ROUTE_POINTS = 1000;
@@ -44,7 +45,7 @@ function segmentsOf(route: ReadonlyArray<Vec3>): Segment[] {
   return route.slice(1).map((b, index): Segment => {
     const a = route[index] as Vec3;
     const delta = sub3(b, a);
-    const length = Math.hypot(...delta);
+    const length = hypotOf(delta);
     return { a, delta, length, direction: [delta[0] / length, delta[1] / length, delta[2] / length] };
   });
 }

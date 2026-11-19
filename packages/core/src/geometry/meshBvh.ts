@@ -8,6 +8,7 @@
 import type { MeshData, Vec3 } from '../model/types';
 import { PAIR_FLOATS, RESULT_FLOATS, triangleDistanceInto } from './triangleDistanceKernel';
 import { type Triangle, rayTriangleDistance } from './triangleQueries';
+import { appendAll } from '../lib/appendAll';
 
 const LEAF_SIZE = 8;
 
@@ -97,7 +98,7 @@ export function buildMeshBvh(mesh: MeshData): MeshBvh {
         centroidBox[3 + axis] = Math.max(centroidBox[3 + axis] ?? -Infinity, c);
       }
     }
-    boxes.push(...box);
+    appendAll(boxes, box);
     if (to - from <= LEAF_SIZE) return node;
     let axis = 0;
     let longest = -1;

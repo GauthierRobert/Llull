@@ -11,6 +11,7 @@ import { DesignError } from './errors';
 import type { CheckOp, Pair, Statement, ValueNode } from './parse';
 import { bindCommand } from './schemaValue';
 import { lengthFactor } from './units';
+import { maxOf } from '@lib/arrayExtrema';
 
 type CheckStatement = Extract<Statement, { kind: 'check' }>;
 
@@ -256,7 +257,7 @@ function expectedValue(node: ValueNode, unit: Metric['unit'], scope: CheckScope,
 
 function toleranceOf(statement: CheckStatement, expected: Expected, scope: CheckScope): number {
   const magnitude = Array.isArray(expected)
-    ? Math.max(1, ...expected.map(Math.abs))
+    ? Math.max(1, maxOf(expected.map(Math.abs)))
     : typeof expected === 'number'
       ? Math.abs(expected)
       : 0;

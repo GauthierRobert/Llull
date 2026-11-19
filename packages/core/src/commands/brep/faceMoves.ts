@@ -9,6 +9,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { tableRejection } from '../noop';
 import { runFaceOp, type FaceOpContext } from './faceOpRun';
+import { hypotOf } from '../../lib/hypotOf';
 
 const FACE_MOVE_REMEDIATION: Readonly<Record<string, string>> = {
   DIR_FACE_MOVE_PARAMS:
@@ -52,7 +53,7 @@ function planarPick(context: FaceOpContext): boolean {
 }
 
 const unit = (v: Vec3): Vec3 | null => {
-  const length = Math.hypot(...v);
+  const length = hypotOf(v);
   return length > 0 ? [v[0] / length, v[1] / length, v[2] / length] : null;
 };
 

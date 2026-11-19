@@ -9,6 +9,7 @@ import { FCD } from '../foundations/footingModel';
 import { MAX_UTILISATION } from '../foundations/foundationModel';
 import { refusedFields, type RowRefusal } from '../common/utilisation';
 import { bisect } from '@lib/bisect';
+import { maxOf } from '@lib/arrayExtrema';
 
 const CONCENTRATION_FACTOR = 1.5;
 /** Concrete bearing strength fjd = 2/3 × 1.5 × fcd (C25/30), N/mm². */
@@ -184,7 +185,7 @@ export function sizeBasePlate(
     const checks = demands.map((demand) => checkPlateMN(geometry, demand.normal, demand.moment, basis));
     const refusal = checks.find((check) => check.refusal !== undefined)?.refusal;
     if (refusal !== undefined) return { sizing, passes: false, refusal: refusal.message };
-    const worst = Math.max(0, ...checks.map((check) => check.utilisation));
+    const worst = Math.max(0, maxOf(checks.map((check) => check.utilisation)));
     if (worst <= target) return { sizing, passes: true };
     if (best === null || worst < best.worst) best = { sizing, worst };
   }

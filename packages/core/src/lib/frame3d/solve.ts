@@ -3,6 +3,7 @@ import { reverseCuthillMcKee } from './rcm';
 import { Skyline } from './skyline';
 import type { FrameAnalysis, FrameCaseResult, FrameDof, FrameLoadCase, FrameModel, FramePoint } from './types';
 import { validateCase, validateModel } from './validate';
+import { minOf } from '../arrayExtrema';
 
 /** A pivot of the Jacobi-scaled matrix (unit diagonal) at or below this marks a mechanism (rigid-body mode); stiff links stay far above it. */
 const PIVOT_TOLERANCE = 1e-12;
@@ -263,7 +264,7 @@ export function analyzeFrame(
     const equations = elementDofs(element.a, element.b)
       .map((dof) => numbering.equation[dof] as number)
       .filter((eq) => eq >= 0);
-    const lowest = Math.min(...equations);
+    const lowest = minOf(equations);
     for (const eq of equations) if (lowest < (first[eq] as number)) first[eq] = lowest;
   }
   const profile = Skyline.profileSize(first);

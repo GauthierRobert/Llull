@@ -32,6 +32,7 @@ import {
   MAX_SPLINE_CONTROL_POINTS,
 } from '../limits';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
 function imageProblem(v: Record<string, unknown>): string | null {
@@ -86,7 +87,7 @@ function decalsProblem(decals: unknown): string | null {
       return 'each decal needs an id and a text';
     if (decal['text'].trim() === '') return `decal ${decal['id']}: text must not be empty`;
     if (!isVec3(decal['center']) || !isVec3(decal['normal'])) return `decal ${String(decal['id'])}: center and normal must be finite Vec3`;
-    if (Math.hypot(...(decal['normal'] as readonly number[])) < 1e-12) return `decal ${String(decal['id'])}: normal must be non-zero`;
+    if (hypotOf(decal['normal'] as readonly number[]) < 1e-12) return `decal ${String(decal['id'])}: normal must be non-zero`;
     if (!isFiniteNumber(decal['angle']) || !['width', 'height', 'depth'].every((k) => isPositiveNumber(decal[k])))
       return `decal ${String(decal['id'])}: angle must be finite and width / height / depth > 0`;
     if (!isHexColor(decal['color']) || (decal['background'] !== undefined && !isHexColor(decal['background'])))
@@ -255,7 +256,7 @@ function revolutionProblem(v: Record<string, unknown>): string | null {
   const { segments, axis, angle } = v;
   if (!Number.isInteger(segments) || (segments as number) < 3 || (segments as number) > MAX_REVOLVE_SEGMENTS)
     return `segments must be an integer 3..${MAX_REVOLVE_SEGMENTS}, got ${String(segments)}`;
-  if (!isVec3(axis) || Math.hypot(...axis) < 1e-12) return 'axis must be a non-zero [x, y, z] of finite numbers';
+  if (!isVec3(axis) || hypotOf(axis) < 1e-12) return 'axis must be a non-zero [x, y, z] of finite numbers';
   if (!isFiniteNumber(angle) || angle <= 0 || angle > 2 * Math.PI + 1e-9) return `angle must be in (0, 2π], got ${String(angle)}`;
   return firstProblem(pointListProblem(v, 'profile', 3, MAX_STORED_PROFILE_POINTS), curvesProblem(v['curves']));
 }

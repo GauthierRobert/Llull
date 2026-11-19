@@ -23,6 +23,7 @@ import {
   type ResolveEnv,
 } from './resolve';
 import { resolveOrthotropicConstants } from './elasticResolve';
+import { appendAll } from '../../lib/appendAll';
 
 const VOCE_POINTS = 21;
 
@@ -109,7 +110,7 @@ function elasticCards(model: MaterialModel, context: Context): string[] | LawFai
         at(5, 5),
       ];
     }
-    lines.push(...calculixLines([...values, ...(temperature === null ? [] : [temperature])].map(calculixNumber)));
+    appendAll(lines, calculixLines([...values, ...(temperature === null ? [] : [temperature])].map(calculixNumber)));
   }
   return [header, ...lines];
 }
@@ -209,7 +210,10 @@ function plasticCards(model: MaterialModel, rate: MaterialModel | undefined, con
     for (const temperature of context.temperatures) {
       const points = build(temperature);
       if (isLawFailure(points)) return points;
-      out.push(...points.map(([stress, strain]) => row([stress, strain], temperature)));
+      appendAll(
+        out,
+        points.map(([stress, strain]) => row([stress, strain], temperature)),
+      );
     }
     return out;
   };
@@ -319,7 +323,7 @@ function hyperCards(model: MaterialModel, context: Context): string[] | LawFailu
   const suffix = count > 0 ? `,N=${count}` : '';
   const lines: string[] = [];
   for (const temperature of context.temperatures)
-    lines.push(...calculixLines([...values, ...(temperature === null ? [] : [temperature])].map(calculixNumber)));
+    appendAll(lines, calculixLines([...values, ...(temperature === null ? [] : [temperature])].map(calculixNumber)));
   return [`*HYPERELASTIC,${HYPER_CARD[law.kind]}${suffix}`, ...lines];
 }
 
@@ -374,7 +378,7 @@ export function writeCalculixCards(request: CardRequest): CardOutput | LawFailur
   if (slots.creep !== undefined) parts.push(creepCards(slots.creep, context));
   for (const part of parts) {
     if (isLawFailure(part)) return part;
-    lines.push(...part);
+    appendAll(lines, part);
   }
   return {
     lines,

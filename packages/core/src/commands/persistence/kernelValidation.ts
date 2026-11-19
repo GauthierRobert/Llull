@@ -9,6 +9,7 @@ import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isRecord } from '../../lib/isRecord';
 import { blobProblem } from '../../model/blobs';
 import { MAX_RECIPE_DEPTH } from '../../geometry/shapeRecipe';
+import { appendAll } from '../../lib/appendAll';
 
 const TOLERANCE_KEYS = ['linear', 'angular', 'maxImportTolerance'] as const;
 
@@ -83,7 +84,7 @@ function fontProblems(fonts: unknown, blobs: unknown): string[] {
       errors.push(
         `WRP_FONT_UNAVAILABLE: font '${id}' needs a font blob (font/ttf, font/otf or font/x-llull-stroke) in the document blobs — re-run import_font`,
       );
-    else errors.push(...variationProblems(id, record['variation']));
+    else appendAll(errors, variationProblems(id, record['variation']));
   }
   return errors;
 }
@@ -101,7 +102,7 @@ export function kernelSliceProblems(doc: Record<string, unknown>): string[] {
       );
     else if (problem !== null) errors.push(`${problem}: blob '${key}' bytes do not match its sha256, mediaType or size`);
   }
-  errors.push(...fontProblems(doc['fonts'], blobs));
+  appendAll(errors, fontProblems(doc['fonts'], blobs));
   const leaves: Array<readonly [string, string]> = [];
   const tooDeep = new Set<string>();
   for (const section of ['entities', 'components'] as const) {

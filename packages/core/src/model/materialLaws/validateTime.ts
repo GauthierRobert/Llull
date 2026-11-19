@@ -2,6 +2,7 @@
 
 import type { LawOf } from '../materialModel';
 import { constantValue, error, invalid, parameterIssues, positiveNumber, type MatlIssue, type ValidateContext } from './issues';
+import { appendAll } from '../../lib/appendAll';
 
 const seriesIssues = (
   terms: ReadonlyArray<{ readonly weight: number; readonly tau: { readonly value: number; readonly unit: string } }>,
@@ -12,7 +13,7 @@ const seriesIssues = (
   terms.forEach((term, i) => {
     const path = `model.${field}[${i}]`;
     const shape = parameterIssues(term.tau, 'time', `${path}.tau`, context);
-    if (shape.length > 0) issues.push(...shape);
+    if (shape.length > 0) appendAll(issues, shape);
     else if (!((constantValue(term.tau, 'time') ?? 1) > 0)) issues.push(error('MATL_PRONY_INVALID', `${path}.tau`, 'tau must be > 0'));
     if (!(Number.isFinite(term.weight) && term.weight > 0))
       issues.push(error('MATL_PRONY_INVALID', path, 'each Prony weight must be a finite number > 0'));
@@ -39,17 +40,17 @@ export function validateViscoelastic(law: LawOf<'visco_prony'>, context: Validat
   ];
   const shift = law.shift;
   if (shift?.kind === 'wlf') {
-    issues.push(
+    appendAll(issues, [
       ...parameterIssues(shift.C2, 'temperature', 'model.shift.C2', context),
       ...parameterIssues(shift.referenceTemperature, 'temperature', 'model.shift.referenceTemperature', context),
       ...positiveNumber(shift.C1, 'model.shift.C1', 'C1'),
-    );
+    ]);
     if ((constantValue(shift.C2, 'temperature') ?? 1) <= 0) issues.push(invalid('model.shift.C2', 'C2 must be > 0 K'));
   } else if (shift?.kind === 'arrhenius') {
-    issues.push(
+    appendAll(issues, [
       ...parameterIssues(shift.activationEnergy, 'energyPerMole', 'model.shift.activationEnergy', context),
       ...parameterIssues(shift.referenceTemperature, 'temperature', 'model.shift.referenceTemperature', context),
-    );
+    ]);
   }
   return issues;
 }
@@ -61,10 +62,10 @@ export function validateCreep(law: LawOf<'creep_norton' | 'creep_garofalo'>, con
     if (!(Number.isFinite(law.A) && law.A > 0)) issues.push(creep('model.A', 'A must be a finite number > 0'));
     if (!(Number.isFinite(law.n) && law.n > 0)) issues.push(creep('model.n', 'n must be a finite number > 0'));
     if (!(Number.isFinite(law.m) && law.m > -1)) issues.push(creep('model.m', 'm must be a finite number > −1'));
-    issues.push(
+    appendAll(issues, [
       ...parameterIssues({ value: 1, unit: law.stressUnit }, 'stress', 'model.stressUnit', context),
       ...parameterIssues({ value: 1, unit: law.timeUnit }, 'time', 'model.timeUnit', context),
-    );
+    ]);
     return issues;
   }
   const issues: MatlIssue[] = [

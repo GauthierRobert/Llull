@@ -17,6 +17,7 @@ import { rotate, rotateInverse } from './frames';
 import { thrustPerRpmSquared, type PreparedVehicle } from './flightRun';
 import type { BodyDrag } from './model';
 import { bodyDragForce, rotorOutput, type RotorOutput, type RotorRuntime } from './rotorLaw';
+import { hypotOf } from '@lib/hypotOf';
 
 /** Names of the 8 states, in order. */
 export const STATE_NAMES = ['u', 'v', 'w', 'p', 'q', 'r', 'roll', 'pitch'] as const;
@@ -97,7 +98,7 @@ export function trimVehicle(prepared: PreparedVehicle): TrimVehicle | null {
       return index < 0 ? [] : [index];
     });
     const stiffness = own.reduce((sum, index) => sum + thrustPerRpmSquared(rotors[index] as RotorRuntime), 0);
-    const weight = prepared.massKg * Math.hypot(...prepared.gravity);
+    const weight = prepared.massKg * hypotOf(prepared.gravity);
     const guess = stiffness > 0 ? Math.sqrt(weight / stiffness) : 0.5 * (controller.minRpm + controller.maxRpm);
     for (const index of controller.maxRpm > controller.minRpm ? own : []) {
       controls.push({

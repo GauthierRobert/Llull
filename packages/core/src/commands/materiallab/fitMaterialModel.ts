@@ -15,6 +15,7 @@ import { FIT_COMMAND, refuse } from './fitInputs';
 import { fitHyperelasticPolynomial, fitPronyFixedTimes, fitRambergOsgoodEngineering, type LinearParts } from './fitLinear';
 import { isNonlinearRequest, nonlinearFit, type NonlinearParts } from './fitNonlinear';
 import { fitParamsSchema } from './fitSchema';
+import { appendAll } from '../../lib/appendAll';
 
 const command = FIT_COMMAND;
 const TOOL_LINEAR = 'llull fit_material_model (Householder QR on model rows)';
@@ -73,8 +74,8 @@ export const fitMaterialModel = defineCommand({
     if (isNonlinearRequest(params)) {
       const nonlinear = nonlinearFit(doc, params, objective);
       if ('document' in nonlinear) return nonlinear;
-      warnings.push(...nonlinear.warnings);
-      defaults.push(...nonlinear.defaults);
+      appendAll(warnings, nonlinear.warnings);
+      appendAll(defaults, nonlinear.defaults);
       ({ convergence } = nonlinear);
       parts = nonlinear;
       method = 'levenberg_marquardt';

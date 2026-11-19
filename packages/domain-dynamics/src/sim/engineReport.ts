@@ -18,6 +18,7 @@ import { sliderRate } from './slider';
 import type { Topology } from './topology';
 import { elementAt } from '@lib/elementAt';
 import { dot3, scale3 } from '@lib/vec3';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Cycle-energy closure gate, 0.5 % (named, FR-FPR-16). */
 const ENERGY_CLOSURE_GATE = 0.005;
@@ -340,7 +341,7 @@ export function engineData(input: EngineInput): EngineData | null {
         `${crankSide === null ? '' : ` and the governor side (${(crankSide.ratio * 100).toFixed(2)} %)`}, gate ${ENERGY_CLOSURE_GATE * 100} %: use a smaller timestep or set_dynamics_solver`,
     );
   const inLastCycle = trace.times.flatMap((t, i) => (t >= elementAt(times, 0) - 1e-12 ? [elementAt(omega, i)] : []));
-  const measured = meanOmega > 0 ? (Math.max(...inLastCycle) - Math.min(...inLastCycle)) / meanOmega : 0;
+  const measured = meanOmega > 0 ? (maxOf(inLastCycle) - minOf(inLastCycle)) / meanOmega : 0;
   const meanTorque = simulatedWork / cycleRad;
   let [cumulative, high, low] = [0, 0, 0];
   total.forEach((value, k) => {

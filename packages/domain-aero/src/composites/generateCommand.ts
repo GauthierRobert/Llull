@@ -11,6 +11,7 @@ import { DEFAULT_DROP_RULES } from './rules';
 import { compositesOf, findPart, pliesOf, withComposites, zonesOf } from './state';
 import { isDoublyCurved } from './surface';
 import { blendZones } from './zones';
+import { maxOf } from '@lib/arrayExtrema';
 
 /**
  * @affects creates one ply per master-stack position (ply-<step>.<k>) and their outlines; with replaceGenerated removes the previously generated plies first
@@ -115,7 +116,7 @@ export const generatePliesFromZones = defineCommand({
       return { plan, id: result.ply.id, label };
     });
     const dropped = blend.plies.filter((plan) => plan.dropRank > 0);
-    const widest = Math.max(0, ...blend.plies.map((plan) => plan.extension));
+    const widest = Math.max(0, maxOf(blend.plies.map((plan) => plan.extension)));
     const data = {
       masterAngles: [...blend.master],
       plies: created.map(({ plan, id, label }) => ({

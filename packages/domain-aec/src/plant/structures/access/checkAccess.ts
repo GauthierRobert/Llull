@@ -14,6 +14,7 @@ import { checkPlatforms, type PlatformReport } from './platformChecks';
 import { checkRailing, RAILING_RULES_NOT_EVALUATED, railingRules } from './railingChecks';
 import { checkStair, checkSteelStair, CONCRETE_STAIR_HEADROOM_NOT_EVALUATED, STAIR_RULES_NOT_EVALUATED, stairRules } from './stairChecks';
 import { checkStairHeadroom, headroomContext, stairHeadroomRules, type StairHeadroomReport } from './stairHeadroom';
+import { appendAll } from '@lib/appendAll';
 
 type Verdict = 'pass' | 'warn' | 'fail';
 
@@ -169,7 +170,7 @@ export const checkAccess = defineCommand({
         routes: params.egressRoutesRequired ?? DEFAULT_EGRESS_ROUTES,
         source: params.egressSource,
       });
-      findings.push(...judged.findings);
+      appendAll(findings, judged.findings);
       platformReports = judged.reports;
     }
 
@@ -185,7 +186,7 @@ export const checkAccess = defineCommand({
           params.rulesets,
         );
         edges = result.edges;
-        findings.push(...result.findings);
+        appendAll(findings, result.findings);
       }
     }
 

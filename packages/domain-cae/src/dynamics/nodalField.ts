@@ -12,6 +12,7 @@ import { lengthUnitName, stressUnitName } from '../decks/units';
 import { caseOf } from '../shared/access';
 import { nodalRmsReference, type NodalFieldJob } from './math/randomResponse';
 import { isPostProblem, randomPost, type PostProblem } from './randomSetup';
+import { appendAll } from '@lib/appendAll';
 
 /** Node x component x modes^2 multiply-adds the TypeScript reference runs in fea_solve without llull-compute (§8 budget, ~10 s). */
 export const TS_NODAL_WORK_LIMIT = 4e9;
@@ -75,7 +76,7 @@ export function randomFieldInput(
     });
     if (rows.some((row) => row === null || row.length !== sources || row.some((v) => !Number.isFinite(v)))) continue;
     nodeIds.push(node);
-    for (const row of rows) values.push(...(row ?? []));
+    for (const row of rows) appendAll(values, row ?? []);
   }
   const relative = { kind: 'relative' as const, unity: false, scale: post.gravity };
   const components = names.map((_name, index) =>

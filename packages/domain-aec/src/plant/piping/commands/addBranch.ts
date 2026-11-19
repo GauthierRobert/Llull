@@ -12,6 +12,7 @@ import { refuseDerivation, rederive, withRuns } from '../runUpdate';
 import { createSpecLookup, isMiss } from '../specLookup';
 import { takeoffOf } from '../takeoff';
 import { isResolved, legsInput, portOrPoint, resolveEndpoint, viaInput, type ResolvedEndpoint } from './routeInput';
+import { hypotOf } from '@lib/hypotOf';
 
 const pieceRows = (runId: string, derivation: RunDerivation): Array<Record<string, unknown>> =>
   takeoffOf([{ runId, derivation }]).pipePieces.map((piece) => ({
@@ -146,7 +147,7 @@ export const addBranch = defineCommand({
     const aim: Vec3 | undefined =
       params.legs?.[0] !== undefined ? legVector(params.legs[0].direction) : (params.via?.[0] ?? target?.end.point);
     const direction = aim === undefined ? null : params.legs?.[0] !== undefined ? unitVector(aim) : unitVector(sub3(aim, position));
-    if (direction === null || !(Math.hypot(...direction) > 0))
+    if (direction === null || !(hypotOf(direction) > 0))
       return refuse(
         doc,
         'add_branch',

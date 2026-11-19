@@ -21,6 +21,7 @@ import { orientationField } from '../solids/sweepOrientation';
 import { localRails, midlineSpine, railCurves, railDesign, railFields } from '../solids/sweepRails';
 import { commitSurface, sig } from './surfaceShared';
 import { refuseSwg } from './swgRefusal';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const DEFAULT_COLOR = '#9fb4c7';
 
@@ -45,7 +46,9 @@ function resolveSection(
     const entity = doc.entities[sectionId];
     if (entity?.kind !== 'nurbs_curve') return `sectionId "${sectionId}" is not a nurbs_curve`;
     if (
-      entity.curve.poles.some((p) => Math.abs(p[2]) > 1e-9 * Math.max(1, ...entity.curve.poles.map((q) => Math.abs(q[0]) + Math.abs(q[1]))))
+      entity.curve.poles.some(
+        (p) => Math.abs(p[2]) > 1e-9 * Math.max(1, maxOf(entity.curve.poles.map((q) => Math.abs(q[0]) + Math.abs(q[1])))),
+      )
     )
       return `the section curve "${sectionId}" must lie in its XY plane (section coordinates x, y)`;
     const samples = sampleCurve(entity.curve, 64).map((p): Vec2 => [p[0], p[1]]);
@@ -55,7 +58,7 @@ function resolveSection(
     return {
       curve: entity.curve,
       outline: { kind: 'polyline', points: samples, closed },
-      reach: Math.max(...samples.map(([x, y]) => Math.hypot(x, y))),
+      reach: maxOf(samples.map(([x, y]) => Math.hypot(x, y))),
     };
   }
   const raw = section?.line ?? section?.points ?? [];
@@ -70,7 +73,7 @@ function resolveSection(
   return {
     curve: { degree: 1, poles: points.map(([x, y]): Vec3 => [x, y, 0]), knots, multiplicities },
     outline: { kind: 'polyline', points, closed: false },
-    reach: Math.max(...points.map(([x, y]) => Math.hypot(x, y))),
+    reach: maxOf(points.map(([x, y]) => Math.hypot(x, y))),
   };
 }
 

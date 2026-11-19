@@ -13,6 +13,7 @@ import { baseFrameAt, frameCurvatures, projectOnBase } from './flow';
 import { resolveFrame, toLocal } from './frame';
 import type { DeformNode } from './laws';
 import { type PredictedVolume, sectionAt } from './predictedVolume';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Sections per piece: sub-intervals x 3 Gauss points. */
 const SUBINTERVALS = 24;
@@ -40,14 +41,14 @@ export function predictedBaseFlowVolume(source: MeshData, node: Pick<DeformNode,
       toLocal(frame, [source.positions[v * 3] as number, source.positions[v * 3 + 1] as number, source.positions[v * 3 + 2] as number]),
     );
   const arcs = points.map((q) => projectOnBase(base, q));
-  const [from, to] = [Math.min(...arcs), Math.max(...arcs)];
+  const [from, to] = [minOf(arcs), maxOf(arcs)];
   // a base turning more than half a turn: the normal plane at s also cuts the far part of the body, whose vertices project elsewhere; only triangles
   // whose projected arc lengths bracket s are in the section
   const arcSpans = new Float64Array((indices.length / 3) * 2);
   for (let t = 0; t < indices.length / 3; t++) {
     const own = [0, 1, 2].map((k) => arcs[indices[t * 3 + k] as number] as number);
-    arcSpans[t * 2] = Math.min(...own);
-    arcSpans[t * 2 + 1] = Math.max(...own);
+    arcSpans[t * 2] = minOf(own);
+    arcSpans[t * 2 + 1] = maxOf(own);
   }
   const triangles = indices.length / 3;
   const perPiece = Math.max(2, Math.min(SUBINTERVALS, Math.floor(WORK_LIMIT / (count * 3 + triangles * 3))));
@@ -68,8 +69,8 @@ export function predictedBaseFlowVolume(source: MeshData, node: Pick<DeformNode,
       for (let t = 0; t < triangles; t++) {
         const hs = [0, 1, 2].map((k) => heights[indices[t * 3 + k] as number] as number);
         const brackets = (arcSpans[t * 2] as number) <= s && s <= (arcSpans[t * 2 + 1] as number);
-        spans[t * 2] = brackets ? Math.min(...hs) : Infinity;
-        spans[t * 2 + 1] = brackets ? Math.max(...hs) : Infinity;
+        spans[t * 2] = brackets ? minOf(hs) : Infinity;
+        spans[t * 2 + 1] = brackets ? maxOf(hs) : Infinity;
       }
       const section = sectionAt(local, indices, heights, spans, 0);
       const target = frameCurvatures(law, law.ratio * (s - law.z0));

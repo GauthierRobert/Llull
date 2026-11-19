@@ -14,6 +14,7 @@ import { execute } from '@core/commands/registry';
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { hashText } from '@lib/hash';
 import { jsonWithObjectMarks } from '@lib/jsonWithObjectMarks';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * Who sent a broadcast command: the REST API (the UI, scripts) or the `llull` CLI.
@@ -208,7 +209,7 @@ function hashRecipes(root: object): void {
     if (node === undefined || seen.has(node) || hashByRecipeNode.has(node)) continue;
     seen.add(node);
     order.push(node);
-    pending.push(...childRecipeNodes(node, true));
+    appendAll(pending, childRecipeNodes(node, true));
   }
   for (let i = order.length - 1; i >= 0; i--) {
     const node = order[i];

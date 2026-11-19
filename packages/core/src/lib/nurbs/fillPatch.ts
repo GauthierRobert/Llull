@@ -18,6 +18,7 @@ import { evaluateSurface } from './surface';
 import { elevateSurface, insertSurfaceKnot } from './surfaceEdit';
 import type { NurbsSurfaceData } from './surfaceTypes';
 import type { NurbsCurveData } from './types';
+import { maxOf } from '../arrayExtrema';
 
 export interface FilledLoop {
   readonly surface: NurbsSurfaceData;
@@ -39,7 +40,7 @@ function partition(lengths: ReadonlyArray<number>): number[][] {
         const sums = [lengths.slice(0, a), lengths.slice(a, b), lengths.slice(b, c), lengths.slice(c)].map((part) =>
           part.reduce((s, x) => s + x, 0),
         );
-        const worst = Math.max(...sums);
+        const worst = maxOf(sums);
         if (best === null || worst < best.worst) best = { cuts: [a, b, c], worst };
       }
   const [a, b, c] = (best as NonNullable<typeof best>).cuts;

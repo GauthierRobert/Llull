@@ -14,6 +14,7 @@ import { collectRuns, inlineObjects } from './lines3d';
 import { compareOrder } from './orderCompare';
 import { compareInlineSize, compareNozzles } from './nozzleCompare';
 import { pairUp, type Pairing } from './pairing';
+import { appendAll } from '@lib/appendAll';
 
 export type Scope3d = 'all' | 'equipment' | 'lines' | 'inline';
 
@@ -160,9 +161,9 @@ export function check3d(
       const placed = Object.hasOwn(building.elements, object.ids[0] ?? '') ? building.elements[object.ids[0] as string] : undefined;
       if (placed?.category === 'equipment') {
         const compared = compareNozzles(item.tag ?? item.id, placed, nozzlesOf.get(item.id) ?? [], connected, norm);
-        sink.findings.push(...compared.findings);
-        sink.skipped.push(...compared.skips);
-        matched.nozzles.push(...compared.matched);
+        appendAll(sink.findings, compared.findings);
+        appendAll(sink.skipped, compared.skips);
+        appendAll(matched.nozzles, compared.matched);
         for (const entry of compared.unplaced)
           sink.unmatchedPid.push({ id: entry.nozzle.id, kind: 'nozzle', label: entry.label, reason: 'unplaced' });
         for (const entry of compared.notInPid)
@@ -180,15 +181,15 @@ export function check3d(
       for (const [line, run] of pairing.pairs) {
         matched.lines.push(line.lineNumber ?? line.id);
         const compared = compareLine(pid, line, run, norm);
-        sink.findings.push(...compared.findings);
-        sink.skipped.push(...compared.skips);
+        appendAll(sink.findings, compared.findings);
+        appendAll(sink.skipped, compared.skips);
       }
     }
     if (scope === 'all' || scope === 'inline') {
       for (const [line, run] of pairing.pairs) {
         const order = compareOrder(pid, line, run, norm);
-        sink.findings.push(...order.findings);
-        sink.skipped.push(...order.skips);
+        appendAll(sink.findings, order.findings);
+        appendAll(sink.skipped, order.skips);
       }
       const tagged = items.filter((i): i is PidInline => i.kind === 'inline' && text(i.tag) !== undefined);
       const inlinePairing = pairUp(

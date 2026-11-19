@@ -1,6 +1,7 @@
 /** Midsurface data (05 §5.2): planar mid faces in the document frame, handed to the mesher as the geometry of a shell / plane-stress part. */
 
 import type { Vec3 } from '@core/model/vectors';
+import { hypotOf } from '@lib/hypotOf';
 
 /** One planar face of a midsurface. Lengths in document units, world frame; `outer` runs counter-clockwise about `normal`. */
 export interface MidFace {
@@ -65,5 +66,5 @@ export function extentOf(points: readonly Vec3[]): number {
       lo[axis] = Math.min(lo[axis] ?? Infinity, point[axis] ?? 0);
       hi[axis] = Math.max(hi[axis] ?? -Infinity, point[axis] ?? 0);
     }
-  return points.length === 0 ? 0 : Math.hypot(...hi.map((value, axis) => value - (lo[axis] ?? 0)));
+  return points.length === 0 ? 0 : hypotOf(hi.map((value, axis) => value - (lo[axis] ?? 0)));
 }

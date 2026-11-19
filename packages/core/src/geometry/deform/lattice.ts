@@ -11,6 +11,7 @@ import type { DeformLaw } from '../../model/deform';
 import type { Vec3 } from '../../model/vectors';
 import { map3 } from '../../lib/vec3';
 import { pow } from '../../lib/pow';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export type LatticeLaw = Extract<DeformLaw, { kind: 'lattice' }>;
 
@@ -445,7 +446,7 @@ export function determinantBounds(law: LatticeLaw): DeterminantBounds {
                 }
               }
         }
-    const stepSize = 0.5 / (SPAN_GRID * Math.max(...marks.map((m) => m.length - 1)));
+    const stepSize = 0.5 / (SPAN_GRID * maxOf(marks.map((m) => m.length - 1)));
     const atNode = (s: Vec3): number => determinantAtNormalised(law, s);
     const lowest = polish(atNode, minNode, stepSize, 1);
     const highest = polish(atNode, maxNode, stepSize, -1);

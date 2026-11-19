@@ -2,6 +2,7 @@
 
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
+import { minOf } from '@lib/arrayExtrema';
 
 /** Barycentric coordinates below this (relative to the element) still count as inside: mesher coordinates are single precision. */
 const INSIDE_TOLERANCE = 1e-5;
@@ -57,7 +58,7 @@ export function locatePoint(mesh: FeMeshArtifact, point: Vec3): PointWeights | n
       const known = corners as Vec3[];
       const lambda = barycentric(known, point);
       if (lambda === null) continue;
-      const score = Math.min(...lambda);
+      const score = minOf(lambda);
       if (best === null || score > best.score) best = { score, weights: weightsOf(ids, lambda, quadratic) };
     }
   }

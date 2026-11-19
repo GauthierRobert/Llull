@@ -3,6 +3,8 @@
  * - `no-import-meta`: server/ and desktop/ ship as CommonJS bundles (esbuild --format=cjs) but type-check with bundler resolution,
  *   so tsc does not flag ESM-only `import.meta`.
  * - `no-builtin-pow`: powers go through `pow` (fdlibm, bit-identical on every engine) or `powInt` (exact products), never `**` / Math.pow.
+ * - `no-spread-call`: no spread argument in Math.max / Math.min / Math.hypot / `.push`: a spread passes every element as a call
+ *   argument and throws RangeError above ~1.5e5 items (PERF1 row 12). Use maxOf / minOf / appendAll from @lib/arrayExtrema.
  */
 const noImportMeta = {
   meta: { type: 'problem', docs: { description: 'Disallow import.meta in CommonJS-bundled sources' } },
@@ -47,4 +49,31 @@ const noBuiltinPow = {
   },
 };
 
-export default { meta: { name: 'llull' }, rules: { 'no-import-meta': noImportMeta, 'no-builtin-pow': noBuiltinPow } };
+const SPREAD_MATH_METHODS = new Set(['max', 'min', 'hypot']);
+
+/** `Math.max` / `Math.min` / `Math.hypot`, or any non-computed `.push`. */
+const isSpreadSensitiveCallee = (callee) => {
+  if (callee.type !== 'MemberExpression' || callee.computed || callee.property.type !== 'Identifier') return false;
+  const method = callee.property.name;
+  if (method === 'push') return true;
+  return callee.object.type === 'Identifier' && callee.object.name === 'Math' && SPREAD_MATH_METHODS.has(method);
+};
+
+const noSpreadCall = {
+  meta: { type: 'problem', docs: { description: 'Disallow spread arguments in Math.max / Math.min / Math.hypot / push' } },
+  create(context) {
+    const message =
+      'A spread argument throws RangeError above ~1.5e5 items: use maxOf / minOf / appendAll from @lib/arrayExtrema (or name the components of a small tuple).';
+    return {
+      CallExpression(node) {
+        if (!isSpreadSensitiveCallee(node.callee)) return;
+        for (const argument of node.arguments) if (argument.type === 'SpreadElement') context.report({ node: argument, message });
+      },
+    };
+  },
+};
+
+export default {
+  meta: { name: 'llull' },
+  rules: { 'no-import-meta': noImportMeta, 'no-builtin-pow': noBuiltinPow, 'no-spread-call': noSpreadCall },
+};

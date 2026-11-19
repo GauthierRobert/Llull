@@ -7,6 +7,8 @@ import { consistentWeights, momentForces } from '../loadDistribution';
 import { planeAxis } from '../mechanical';
 import { cardLines } from './fields';
 import { failed, integer, real, refusal, type Rounding } from './model';
+import { appendAll } from '@lib/appendAll';
+import { hypotOf } from '@lib/hypotOf';
 
 const DOF_COMPONENT = { ux: 1, uy: 2, uz: 3, rx: 4, ry: 5, rz: 6 } as const;
 const SHELL_CARDS: ReadonlySet<string> = new Set(['S3', 'S4', 'S6', 'S8']);
@@ -75,7 +77,7 @@ export function constraintCards(
     const groups: [string, readonly number[]][] = [];
     if (zero.length > 0) groups.push([zero.join(''), nodes]);
     for (const [component] of moving) groups.push([String(component), nodes]);
-    for (const [text, group] of groups) spc.push(...cardLines('SPC1', [String(sid), text, ...group.map(String)]));
+    for (const [text, group] of groups) appendAll(spc, cardLines('SPC1', [String(sid), text, ...group.map(String)]));
     for (const [component, value] of moving) for (const node of nodes) enforced.push([node, component, value]);
   }
   return { spc, enforced };
@@ -88,7 +90,7 @@ function add(into: Map<number, Vec3>, node: number, vector: Vec3): void {
 }
 
 const unit = (vector: Vec3): { readonly magnitude: number; readonly direction: Vec3 } => {
-  const magnitude = Math.hypot(...vector);
+  const magnitude = hypotOf(vector);
   return { magnitude, direction: magnitude === 0 ? [0, 0, 0] : [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude] };
 };
 
@@ -152,7 +154,7 @@ function momentCards(
   const rbe = [integer(element, 'RBE3 element id'), '', String(grid), '123456', '1.', '123', ...nodes.map(String)];
   const bad = [...text, rbe[0] ?? ''].find((field) => typeof field !== 'string');
   if (bad !== undefined) return bad as unknown as DeckRefusal;
-  out.rigid.push(...cardLines('GRID', text as string[]), ...cardLines('RBE3', rbe as string[]));
+  appendAll(out.rigid, [...cardLines('GRID', text as string[]), ...cardLines('RBE3', rbe as string[])]);
   const { magnitude, direction } = unit(vector);
   const fields = [
     sidText,
@@ -163,7 +165,7 @@ function momentCards(
   ];
   const badField = fields.find(failed);
   if (badField !== undefined) return badField as DeckRefusal;
-  out.loads.push(...cardLines('MOMENT', fields as string[]));
+  appendAll(out.loads, cardLines('MOMENT', fields as string[]));
   out.comments.push(`$ llull: moment '${id}' on reference grid ${grid} (RBE3 ${element} over ${nodes.length} nodes)`);
   return null;
 }
@@ -217,7 +219,7 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
           // PLOAD4 on a shell acts along the element normal: the mesher's face 1 (loaded from the top side) pushes along -normal.
           const pressure = real(label === 2 ? load.magnitude : -load.magnitude, 'pressure', track);
           if (failed(pressure)) return pressure;
-          out.loads.push(...cardLines('PLOAD4', [sidText, String(elementId), pressure]));
+          appendAll(out.loads, cardLines('PLOAD4', [sidText, String(elementId), pressure]));
           continue;
         }
         const corners = TET_FACES[label - 1];
@@ -235,7 +237,7 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
         ];
         const badField = fields.find(failed);
         if (badField !== undefined) return badField as DeckRefusal;
-        out.loads.push(...cardLines('PLOAD4', fields as string[]));
+        appendAll(out.loads, cardLines('PLOAD4', fields as string[]));
       }
     }
   }
@@ -251,7 +253,7 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
     ];
     const badField = fields.find(failed);
     if (badField !== undefined) return badField as DeckRefusal;
-    out.loads.push(...cardLines('FORCE', fields as string[]));
+    appendAll(out.loads, cardLines('FORCE', fields as string[]));
   }
   const { magnitude, direction } = unit(gravity);
   if (magnitude > 0) {
@@ -263,7 +265,7 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
     ];
     const badField = fields.find(failed);
     if (badField !== undefined) return badField as DeckRefusal;
-    out.loads.push(...cardLines('GRAV', fields as string[]));
+    appendAll(out.loads, cardLines('GRAV', fields as string[]));
   }
   return out;
 }

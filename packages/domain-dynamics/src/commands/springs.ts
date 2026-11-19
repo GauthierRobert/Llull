@@ -11,6 +11,7 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { dynamicsOf, withDynamics } from './bodies';
+import { hypotOf } from '@lib/hypotOf';
 
 /** Attachment points closer than this (m) have no direction for the spring force. */
 const MIN_LENGTH_M = 1e-6;
@@ -101,7 +102,7 @@ export const addSpring = defineCommand({
     const pointB = worldPoint(doc, params.bodyB, params.pointB, frame, ctx?.kernel);
     if ('error' in pointB) return fail(pointB.error);
     const metres = toMetres(doc, 1);
-    const distance = Math.hypot(...pointA.map((c, i) => c - (pointB[i] ?? 0))) * metres;
+    const distance = hypotOf(pointA.map((c, i) => c - (pointB[i] ?? 0))) * metres;
     if (distance < MIN_LENGTH_M) return fail('pointA and pointB coincide: the spring needs two distinct attachment points');
     const freeLengthM =
       params.freeLengthMm !== undefined ? params.freeLengthMm / 1000 : distance - (params.preloadN ?? 0) / params.stiffness;

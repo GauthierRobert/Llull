@@ -8,6 +8,7 @@
 import type { ShapeTopology } from '../../geometry/kernel';
 import type { FaceGraph } from '../../geometry/kernelPorts';
 import { blendSource } from '../../geometry/blend/continuity';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface Junction {
   readonly edge: number;
@@ -71,7 +72,7 @@ export function supportCrease(
       const second = topology.faces.findIndex((candidate) => candidate.name === b);
       const edge = sharedEdge(topology, graph, first, second, junction);
       if (first < 0 || second < 0 || edge < 0) continue;
-      const found = Math.max(0, ...(measure(edge) ?? []).map((sample) => sample.g1));
+      const found = Math.max(0, maxOf((measure(edge) ?? []).map((sample) => sample.g1)));
       if (found <= CHAIN_CREASE_LIMIT) crease = Math.max(crease, found);
     }
   }
@@ -85,7 +86,7 @@ function sharedEdge(topology: ShapeTopology, graph: FaceGraph, first: number, se
     return entry === undefined ? [] : [entry.start, entry.end];
   };
   const reach = (edge: number): number =>
-    Math.min(Infinity, ...ends(edge).flatMap((a) => ends(junction).map((b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]))));
+    Math.min(Infinity, minOf(ends(edge).flatMap((a) => ends(junction).map((b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])))));
   let best = -1;
   graph.edgeFaces.forEach((around, edge) => {
     if (around.length !== 2 || !around.includes(first) || !around.includes(second)) return;
@@ -105,6 +106,6 @@ export function judgeJunction(
   g1AngleRad: number,
 ): { readonly allowance: number; readonly endsOff: number; readonly limit: number } {
   const ends = [samples[0]?.g1 ?? 0, samples[samples.length - 1]?.g1 ?? 0];
-  const endsOff = crease === 0 ? 0 : Math.max(...ends.map((angle) => Math.min(Math.abs(angle), Math.abs(angle - crease))));
+  const endsOff = crease === 0 ? 0 : maxOf(ends.map((angle) => Math.min(Math.abs(angle), Math.abs(angle - crease))));
   return { allowance: crease, endsOff, limit: g1AngleRad + crease };
 }

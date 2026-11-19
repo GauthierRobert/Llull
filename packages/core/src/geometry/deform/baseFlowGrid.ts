@@ -7,6 +7,8 @@
 import type { Vec3 } from '../../model/vectors';
 import { add3, dot3, len3, scale3, sub3 } from '../../lib/vec3';
 import { type FlowLaw, baseFrameAt, projectOnBase } from './flow';
+import { maxOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 /** Grid arc lengths per interval of the target table (a fold is sharpest inside an interval, not at a station) and the most arc lengths of the grid. */
 const PER_INTERVAL = 4;
@@ -51,7 +53,7 @@ export function baseFlowGrid(law: FlowLaw, points: ReadonlyArray<number>): numbe
   for (let k = 0; k < stations; k++) arcs.push(range.s[0] + ((range.s[1] - range.s[0]) * k) / (stations - 1));
   // a table with a sharp turn has so many stations that the uniform cap cannot sample every interval: sample the intervals whose turn matters at this width
   // (curvature x the widest offset), the sharpest first
-  const reach = Math.max(...range.x.map(Math.abs), ...range.y.map(Math.abs));
+  const reach = Math.max(maxOf(range.x.map(Math.abs)), maxOf(range.y.map(Math.abs)));
   const turns: Array<{ k: number; kappa: number }> = [];
   for (let k = 0; k + 1 < law.stations.length / STRIDE; k++) {
     const turn = len3(sub3(stationTangent(law, k + 1), stationTangent(law, k))) / law.step;
@@ -66,7 +68,7 @@ export function baseFlowGrid(law: FlowLaw, points: ReadonlyArray<number>): numbe
   const out: number[] = [];
   for (const s of arcs) {
     const own = baseFrameAt(base, s);
-    for (const x of range.x) for (const y of range.y) out.push(...add3(own.point, add3(scale3(own.n, x), scale3(own.b, y))));
+    for (const x of range.x) for (const y of range.y) appendAll(out, add3(own.point, add3(scale3(own.n, x), scale3(own.b, y))));
   }
   return out;
 }

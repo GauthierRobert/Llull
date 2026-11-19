@@ -11,6 +11,7 @@ import { embossPreviewResult } from './embossPreview';
 import type { EmbossRecipe } from './embossRecipe';
 import type { EmbossCall } from './embossRequest';
 import type { SketchOutline } from './sketchProfiles';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface EmbossReportInput {
   readonly mapped: MappedEmboss;
@@ -54,8 +55,8 @@ export function previewEmboss(
 }
 
 const spanOf = (mapped: MappedEmboss['mapped']): number =>
-  Math.max(...mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0]))) -
-  Math.min(...mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0])));
+  maxOf(mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0]))) -
+  minOf(mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0])));
 
 function chartFields(call: EmbossCall, spanU: number): Record<string, unknown> {
   const { session, resolved } = call;

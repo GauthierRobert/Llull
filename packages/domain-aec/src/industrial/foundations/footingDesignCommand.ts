@@ -8,6 +8,7 @@ import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { findFooting } from './foundationCombinations';
 import { defaultThrustTie, reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './foundationThrust';
 import { COVER_MM, type FootingDesignRow } from './footingModel';
+import { maxOf } from '@lib/arrayExtrema';
 import { designFootingRow, isResized } from './footingDesignRow';
 import { sizeText } from './footingSizing';
 import { round } from '../../shared/numeric';
@@ -98,9 +99,9 @@ export const designFootings = defineCommand({
     if (rows.length === 0) return noop(doc, `design_footings failed: no portal frame column with a footing on level '${levelId}'.`);
     const designed = rows.filter((row) => row.status === 'designed');
     const failed = rows.filter((row) => row.status === 'failed');
-    const maxOf = (pick: (row: FootingDesignRow) => number): number => Math.max(0, ...designed.map(pick));
-    const maxShear = maxOf((row) => row.shearUtilisation);
-    const maxPunching = maxOf((row) => row.punchingUtilisation);
+    const largestOf = (pick: (row: FootingDesignRow) => number): number => Math.max(0, maxOf(designed.map(pick)));
+    const maxShear = largestOf((row) => row.shearUtilisation);
+    const maxPunching = largestOf((row) => row.punchingUtilisation);
     const format = (row: FootingDesignRow): string =>
       `${row.mark}${isResized(row.sizeBefore, row.sizeAfter) ? ` ${sizeText(row.sizeBefore)} → ${sizeText(row.sizeAfter)}` : ''} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)}${row.punchingDistance > 0 ? ` at a=${round(row.punchingDistance, 0)} mm` : ''})`;
     const failureText = (row: FootingDesignRow): string =>

@@ -17,6 +17,7 @@ import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/ve
 import { newEntity } from '../entity/newEntity';
 import type { Chain } from './chainCharts';
 import type { ChartRegion } from './sketchProfiles';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface MitreFailure {
   readonly code: string;
@@ -227,8 +228,10 @@ export function mitreFillers(input: {
     const reachOf = (polygon: readonly Vec2[]): number =>
       Math.max(
         0,
-        ...polygon.map((p) =>
-          Math.max(p[0] * dot3(inwardA, b1) + p[1] * dot3(inwardA, b2), p[0] * dot3(inwardB, b1) + p[1] * dot3(inwardB, b2)),
+        maxOf(
+          polygon.map((p) =>
+            Math.max(p[0] * dot3(inwardA, b1) + p[1] * dot3(inwardA, b2), p[0] * dot3(inwardB, b1) + p[1] * dot3(inwardB, b2)),
+          ),
         ),
       );
     const needs = (edge.convexity === 'convex') === (mode === 'emboss');

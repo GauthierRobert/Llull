@@ -22,6 +22,7 @@ import { steelProfileDef, sweptSolids } from '../../../building/exchange/ifcIndu
 import { findProfile } from '../../../steel/profiles';
 import { findGratingType } from '../grating/gratingTypes';
 import { toePlateProfile, railingQuantities } from '../railing/railingMeasure';
+import { appendAll } from '@lib/appendAll';
 
 /** One grating panel: an extruded plate, with its type, bar direction and mass in a property set. */
 export function exportGrating(context: Context, grating: GratingElement, storeyPlacement: string): Exported | null {
@@ -56,7 +57,10 @@ export function exportRailing(context: Context, doc: CadDocument, railing: Raili
   const solids = [...layout.rails, ...layout.gates].flatMap((run) => sweptSolids(context, railProfile, [mm3(run.from), mm3(run.to)]));
   if (railing.toePlate > 0) {
     const toeProfile = steelProfileDef(context, toePlateProfile(toMm(doc, railing.toePlate)));
-    solids.push(...layout.toePlates.flatMap((run) => sweptSolids(context, toeProfile, [mm3(run.from), mm3(run.to)])));
+    appendAll(
+      solids,
+      layout.toePlates.flatMap((run) => sweptSolids(context, toeProfile, [mm3(run.from), mm3(run.to)])),
+    );
   }
   const local = placement(context, storeyPlacement, 0, 0, 0);
   const type = railing.role === 'guardrail' ? '.GUARDRAIL.' : '.HANDRAIL.';

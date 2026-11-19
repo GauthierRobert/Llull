@@ -1,4 +1,5 @@
 import { powInt } from '../powInt';
+import { maxOf } from '../arrayExtrema';
 /**
  * Classical Laminate Theory (06 CMP §5.2, Jones 1999 ch. 2-4, NASA RP-1351). N, mm, MPa; plies bottom to top; engineering shear strain.
  * Pure leaf shared by the composites plugin (`@aero`) and the margin recovery of `@cae`; the lamina record is described structurally
@@ -117,7 +118,7 @@ function assemble6(laminate: Pick<Laminate, 'A' | 'B' | 'D'>): Matrix {
 }
 
 const norm1 = (matrix: Matrix): number =>
-  Math.max(...(matrix[0] ?? []).map((_, j) => matrix.reduce((sum, row) => sum + Math.abs(row[j] as number), 0)));
+  maxOf((matrix[0] ?? []).map((_, j) => matrix.reduce((sum, row) => sum + Math.abs(row[j] as number), 0)));
 
 /** Gauss-Jordan inverse with partial pivoting; null when singular or when the 1-norm condition number exceeds 1e12. */
 export function invert(matrix: Matrix): Matrix | null {

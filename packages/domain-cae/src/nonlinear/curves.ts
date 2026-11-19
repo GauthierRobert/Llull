@@ -3,6 +3,7 @@
 import type { CurveProbe, FeResultsArtifact, NonlinearSettings, AnalysisCase } from '@core/model/analysis';
 import { safeName } from '../decks/context';
 import { loadBaseValue, multiplierAt } from './history';
+import { hypotOf } from '@lib/hypotOf';
 
 export interface CurveData {
   readonly probeId: string;
@@ -33,7 +34,7 @@ const vector = (row: readonly number[]): readonly [number, number, number] => [r
 const COMPONENT = { x: 0, y: 1, z: 2, ux: 0, uy: 1, uz: 2 } as const;
 
 function component(values: readonly [number, number, number], which: 'x' | 'y' | 'z' | 'ux' | 'uy' | 'uz' | 'magnitude'): number {
-  return which === 'magnitude' ? Math.hypot(...values) : (values[COMPONENT[which]] ?? 0);
+  return which === 'magnitude' ? hypotOf(values) : (values[COMPONENT[which]] ?? 0);
 }
 
 /** Load axis of a probe at the stored times: a reaction table, or the multiplied load value. */

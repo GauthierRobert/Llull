@@ -2,6 +2,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import { jacobiRotate } from '@lib/symmetricEigen';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface PlaneFit {
   readonly centroid: Vec3;
@@ -64,7 +65,7 @@ export function fitPlane(points: readonly Vec3[]): PlaneFit | null {
   const { values, vectors } = jacobi(covariance);
   const order = [0, 1, 2].sort((i, j) => (values[i] ?? 0) - (values[j] ?? 0) || i - j);
   const [smallest = 0, middle = 1] = order;
-  if (!((values[middle] ?? 0) > 1e-14 * Math.max(...values.map(Math.abs)))) return null;
+  if (!((values[middle] ?? 0) > 1e-14 * maxOf(values.map(Math.abs)))) return null;
   const column = [vectors[0]?.[smallest] ?? 0, vectors[1]?.[smallest] ?? 0, vectors[2]?.[smallest] ?? 0];
   const dominant = column.reduce((best, c, i) => (Math.abs(c) > Math.abs(column[best] ?? 0) + 1e-12 ? i : best), 0);
   const flip = (column[dominant] ?? 1) < 0 ? -1 : 1;

@@ -11,6 +11,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { codedRejection, report } from '@core/commands/noop';
 import { toSi } from './thermalUnits';
+import { appendAll } from '@lib/appendAll';
+import { maxOf } from '@lib/arrayExtrema';
 
 const RECIPROCITY_WARNING = 1e-3;
 const ROW_SUM_TOLERANCE = 1e-3;
@@ -194,7 +196,7 @@ export const computeViewFactors = defineCommand({
         if (built === undefined) {
           return refuse(doc, 'THM_SURFACE_INVALID', `blockers[${index}] is degenerate`, REMEDIATION_SURFACE, [`blockers[${index}]`]);
         }
-        blockerFacets.push(...built.facets);
+        appendAll(blockerFacets, built.facets);
       }
     }
     if (total + blockerFacets.length > maxFacets) {
@@ -249,7 +251,7 @@ export const computeViewFactors = defineCommand({
     }
     let closedCavity: { readonly ok: boolean; readonly maxDeviation: number } | undefined;
     if (params.closed === true) {
-      const maxDeviation = Math.max(...rowSums.map((sum) => Math.abs(sum - 1)));
+      const maxDeviation = maxOf(rowSums.map((sum) => Math.abs(sum - 1)));
       closedCavity = { ok: maxDeviation <= ROW_SUM_TOLERANCE, maxDeviation };
       if (!closedCavity.ok) {
         findings.push({

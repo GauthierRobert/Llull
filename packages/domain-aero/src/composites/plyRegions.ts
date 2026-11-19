@@ -5,12 +5,13 @@ import type { Vec2 } from '@core/model/types';
 import { pointInPolygon } from '@lib/polygon';
 import { type CutFace, cutFaces } from './cutPieces';
 import { boundaryDistance, insideOrOn, piecesOf } from './geometry2d';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const bounds = (polygon: readonly Vec2[]): readonly [number, number, number, number] => [
-  Math.min(...polygon.map(([x]) => x)),
-  Math.min(...polygon.map(([, y]) => y)),
-  Math.max(...polygon.map(([x]) => x)),
-  Math.max(...polygon.map(([, y]) => y)),
+  minOf(polygon.map(([x]) => x)),
+  minOf(polygon.map(([, y]) => y)),
+  maxOf(polygon.map(([x]) => x)),
+  maxOf(polygon.map(([, y]) => y)),
 ];
 
 const overlaps = (a: readonly Vec2[], b: readonly Vec2[]): boolean => {

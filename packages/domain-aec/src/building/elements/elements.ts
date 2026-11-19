@@ -32,6 +32,7 @@ import { levelIdParam } from '../levelParams';
 import { followAssemblyHosts } from '../assemblyHandlers';
 import { fromMm } from '@core/model/units';
 import { STAIR_HEADROOM_MM, stairSlabCrossings } from '../../industrial/clash/clashSlabs';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * @affects creates the room outline + name/area tags on layer A-AREA
@@ -404,7 +405,7 @@ export const copyLevelElements = defineCommand({
       }
       const copiedSupports = copyPipeSupports(building, next, copiedIds, targetLevelId);
       next = copiedSupports.building;
-      created.push(...copiedSupports.ids);
+      appendAll(created, copiedSupports.ids);
     }
     const issues = openingFitIssues(next, new Set(targetLevelIds));
     if (issues.length > 0) return noop(doc, `copy_level_elements refused: ${issues[0]}.`);

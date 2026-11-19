@@ -27,6 +27,7 @@ import {
 } from './queryParams';
 import { resultStaleness } from './staleness';
 import { cfdSummary } from './summary';
+import { hypotOf } from '@lib/hypotOf';
 
 export type FlowQueryOp = 'probe' | 'slice' | 'streamlines';
 
@@ -153,7 +154,7 @@ function sectionOf(request: FlowQueryRequest, artifact: CfdResultArtifact): Sect
   if (request.op === 'probe') return { section: { probe: { pointsM: request.params.points } }, defaults: [], seeds: [] };
   if (request.op === 'slice') {
     const { params } = request;
-    if (!(Math.hypot(...params.normal) > 1e-12)) return `normal [${params.normal.join(', ')}] is not a direction (length below 1e-12)`;
+    if (!(hypotOf(params.normal) > 1e-12)) return `normal [${params.normal.join(', ')}] is not a direction (length below 1e-12)`;
     const defaults: NamedDefault[] = [
       ...(params.field === undefined ? [{ path: 'field', value: 'speed', source: 'llull default' }] : []),
       ...(params.spacingM === undefined ? [{ path: 'spacingM', value: h, source: 'the solver cell size (TECHNICAL_SPEC §5.5)' }] : []),

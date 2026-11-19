@@ -22,6 +22,7 @@ import {
 import { netConcreteVolumes } from './netConcrete';
 import { routeLength } from '../../industrial/piping/routeSupport';
 import { addAccessTakeoff } from '../../plant/structures/quantities/accessTakeoff';
+import { hypotOf } from '@lib/hypotOf';
 
 /**
  * Bill of quantities grouped by category × material × unit. `net` (default) measures concrete columns and beams once where they
@@ -181,5 +182,5 @@ export function memberMass(doc: CadDocument, member: Extract<BuildingElement, { 
 
 /** True area of a planar 3D panel (half the Newell normal length). */
 export function panelArea(panel: Extract<BuildingElement, { category: 'panel' }>): number {
-  return Math.hypot(...polygonNormal(panel.corners)) / 2;
+  return hypotOf(polygonNormal(panel.corners)) / 2;
 }

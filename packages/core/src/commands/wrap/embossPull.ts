@@ -19,6 +19,7 @@ import { eulerFromAxes } from '../../lib/eulerRotation';
 import type { UvRegion } from '../../model/wrap';
 import { newEntity } from '../entity/newEntity';
 import type { FaceSession } from './faceSession';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface PullFailure {
   readonly code: string;
@@ -89,7 +90,7 @@ export function buildPullRecipe(input: {
   const e0 = normalize3(input.pull);
   const loops = input.pieces.map((pieces) => sampleLoop(chart, pieces));
   const cosines = loops.flatMap((loop) => loop.points.map((p) => dot3(scale3(chart.normalAt(chart.uvOfPoint(p)), orientation), e0)));
-  const cosMin = Math.min(...cosines.map(Math.abs));
+  const cosMin = minOf(cosines.map(Math.abs));
   const folds = cosines.some((c) => c >= MIN_COSINE) && cosines.some((c) => c <= -MIN_COSINE);
   if (folds)
     return {
@@ -109,8 +110,8 @@ export function buildPullRecipe(input: {
   const e2 = cross3(e0, e1);
   // the heights of the surface over the whole parameter box of the region (a dome rises between the points of its outline)
   const uvs = input.pieces.flatMap((pieces) => pieces.flatMap((piece) => sampleSegment(piece, 9)));
-  const [uLow, uHigh] = [Math.min(...uvs.map((p) => p[0])), Math.max(...uvs.map((p) => p[0]))];
-  const [vLow, vHigh] = [Math.min(...uvs.map((p) => p[1])), Math.max(...uvs.map((p) => p[1]))];
+  const [uLow, uHigh] = [minOf(uvs.map((p) => p[0])), maxOf(uvs.map((p) => p[0]))];
+  const [vLow, vHigh] = [minOf(uvs.map((p) => p[1])), maxOf(uvs.map((p) => p[1]))];
   const box = Array.from(
     { length: 121 },
     (_, k): Vec3 => chart.pointAt([uLow + ((uHigh - uLow) * (k % 11)) / 10, vLow + ((vHigh - vLow) * Math.floor(k / 11)) / 10]),
@@ -118,7 +119,7 @@ export function buildPullRecipe(input: {
   const surfaceHeights = [...loops.flatMap((loop) => loop.points), ...box].map((p) => dot3(p, e0));
   const margin = 1e-6 * session.diagonal;
   const extent = depth / cosMin;
-  const [surfaceLow, surfaceHigh] = [Math.min(...surfaceHeights), Math.max(...surfaceHeights)];
+  const [surfaceLow, surfaceHigh] = [minOf(surfaceHeights), maxOf(surfaceHeights)];
   // a draft widens the footprint away from the hinge on the side opposite to the feature axis, where the face is met lower or higher: the window grows with it
   const hingeHeight = dot3(input.anchorOn, e0);
   const growth =
@@ -240,7 +241,7 @@ export function buildPullRecipe(input: {
     recipe,
     axis,
     footprintSize: size,
-    footprintDeviation: Math.max(0, ...outlines.map((outline) => outline.deviation)),
+    footprintDeviation: Math.max(0, maxOf(outlines.map((outline) => outline.deviation))),
     draftFaces: draftedWalls,
     baseGrowth,
   };

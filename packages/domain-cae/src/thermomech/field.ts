@@ -21,6 +21,7 @@ import { temperatureProblem } from '../shared/quantity';
 import { mapNodalField, type MappingReport } from './mapping';
 import { mappingRequest, readMappedField, type MappingRequest } from './mappedField';
 import { affineBetween, metresPer, temperatureIn, type Affine } from './units';
+import { hypotOf } from '@lib/hypotOf';
 
 /** Nodal temperatures aligned with `mesh.nodes` (same order), in the case temperature scale. */
 export interface ResolvedField {
@@ -118,7 +119,7 @@ function modelSize(mesh: FeMeshArtifact): number {
       low[k] = Math.min(low[k] ?? c, c);
       high[k] = Math.max(high[k] ?? c, c);
     });
-  return Math.hypot(...low.map((l, k) => (high[k] ?? l) - l));
+  return hypotOf(low.map((l, k) => (high[k] ?? l) - l));
 }
 
 function tableField(
