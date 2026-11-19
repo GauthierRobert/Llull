@@ -135,7 +135,7 @@ export const modelInputSchema = z.object({
     .record(z.string(), z.union([z.string(), z.number()]))
     .optional()
     .describe(
-      'Condition of the data, any of: temper (e.g. T6), productForm, rrr (residual resistivity ratio, a number), environment, note, opticalKind (hemispherical_total | normal_total), lifeState (BOL | EOL).',
+      'Condition of the data, any of: temper (e.g. T6), productForm, rrr (residual resistivity ratio, a number), environment, note, opticalKind (hemispherical_total | normal_total), lifeState (BOL | EOL), testMethod (standard test method token, e.g. ASTM_E595, ECSS_Q_ST_70_02).',
     ),
   uncertainty: z
     .object({
@@ -157,6 +157,25 @@ export const modelInputSchema = z.object({
   source: provenanceSchema('data').describe('Provenance of the coefficients (required).'),
   fit: z.record(z.string(), z.unknown()).optional().describe('Fit record exactly as returned by fit_property_model (never hand-written).'),
   preferred: z.literal(true).optional().describe('Mark as THE model for its property / direction / basis / condition (one per key).'),
+});
+
+/** The condition fields define_property_model accepts (strict: an unknown key is refused). */
+export const conditionSchema = z.strictObject({
+  temper: z.string().optional(),
+  productForm: z.string().optional(),
+  rrr: z.number().optional(),
+  environment: z.string().optional(),
+  note: z.string().optional(),
+  opticalKind: z.enum(['hemispherical_total', 'normal_total']).optional(),
+  lifeState: z.enum(['BOL', 'EOL']).optional(),
+  testMethod: z.string().optional(),
+});
+
+/** Every `PropertyCondition` field, as written by define_property_model and set_material_property (thickness, e/D, exposure); strict. */
+export const storedConditionSchema = conditionSchema.extend({
+  thickness: z.strictObject({ min: z.number(), max: z.number(), unit: z.string() }).optional(),
+  edOverD: z.number().optional(),
+  exposureHours: z.number().optional(),
 });
 
 /** A property model as stored in a document (load-time validation; `fit` and `reviewedBy` kept as written). */

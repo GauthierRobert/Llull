@@ -10,7 +10,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { codedRejection, changed } from '../noop';
 import { editableMaterial } from './libraryReadonly';
-import { fitRecordSchema, formSchema, modelInputSchema, withoutUndefined } from './propertyModelSchema';
+import { conditionSchema, fitRecordSchema, formSchema, modelInputSchema, withoutUndefined } from './propertyModelSchema';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   MAT_RECORD_NOT_FOUND: 'create the material first with create_material (its name is the material id)',
@@ -44,16 +44,6 @@ export const formHash = (form: PropertyForm): string => sha256Hex(canonicalJson(
 const withModels = (doc: CadDocument, name: string, material: Material, models: readonly PropertyModel[]): CadDocument => ({
   ...doc,
   materials: { ...doc.materials, [name]: { ...material, propertyModels: models } },
-});
-
-const conditionSchema = z.strictObject({
-  temper: z.string().optional(),
-  productForm: z.string().optional(),
-  rrr: z.number().optional(),
-  environment: z.string().optional(),
-  note: z.string().optional(),
-  opticalKind: z.enum(['hemispherical_total', 'normal_total']).optional(),
-  lifeState: z.enum(['BOL', 'EOL']).optional(),
 });
 
 const firstIssuePath = (error: z.ZodError, prefix: string): string => {
@@ -104,7 +94,7 @@ export const definePropertyModel = defineCommand({
         doc,
         name,
         'PROP_FORM_INVALID',
-        'condition fields are temper, productForm, environment, note (text), rrr (number), opticalKind (hemispherical_total | normal_total) and lifeState (BOL | EOL)',
+        'condition fields are temper, productForm, environment, note (text), rrr (number), opticalKind (hemispherical_total | normal_total), lifeState (BOL | EOL) and testMethod (a token, e.g. ASTM_E595)',
         [input.id],
         firstIssuePath(condition.error, 'model.condition'),
       );

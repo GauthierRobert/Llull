@@ -1,0 +1,176 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "box-6.1": {
+        "id": "box-6.1",
+        "kind": "box",
+        "size": [100, 100, 16.6666666667],
+        "position": [50, 50, 8.33333333335],
+        "rotation": [0, 0, 0],
+        "layerId": "layer-default",
+        "color": "#6b8f9c",
+        "materialId": "syn_water"
+      }
+    },
+    "order": ["box-6.1"],
+    "layers": { "layer-default": { "id": "layer-default", "name": "Layer 0", "visible": true, "locked": false } },
+    "layerOrder": ["layer-default"],
+    "selection": [],
+    "camera": { "target": [0, 0, 0], "azimuth": 2.356194490192345, "polar": 1.0471975511965976, "distance": 12 },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      { "id": "step-1", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
+      {
+        "id": "step-2",
+        "name": "create_material",
+        "params": { "name": "syn_water", "density": 0.0012, "color": "#d9a441", "metalness": 0, "roughness": 0.6 },
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "step-3",
+        "name": "set_material_property",
+        "params": {
+          "material": "syn_water",
+          "property": "TML",
+          "value": 1.2,
+          "unit": "%",
+          "basis": "company",
+          "source": { "citation": "synthetic test value (PHY-14 validation pack)" }
+        },
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "step-4",
+        "name": "set_material_property",
+        "params": {
+          "material": "syn_water",
+          "property": "CVCM",
+          "value": 0.02,
+          "unit": "%",
+          "basis": "company",
+          "source": { "citation": "synthetic test value (PHY-14 validation pack)" }
+        },
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "step-5",
+        "name": "set_material_property",
+        "params": {
+          "material": "syn_water",
+          "property": "WVR",
+          "value": 0.4,
+          "unit": "%",
+          "basis": "company",
+          "source": { "citation": "synthetic test value (PHY-14 validation pack)" }
+        },
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "step-6",
+        "name": "add_box",
+        "params": { "size": [100, 100, 16.6666666667], "anchor": "min" },
+        "suppressed": false,
+        "affected": ["box-6.1"]
+      },
+      {
+        "id": "step-7",
+        "name": "assign_material",
+        "params": { "materialName": "syn_water", "entityIds": ["box-6.1"] },
+        "suppressed": false,
+        "affected": ["box-6.1"]
+      },
+      {
+        "id": "step-8",
+        "name": "approve_environment_deviation",
+        "params": {
+          "itemKey": "outgassing:syn_water|TML",
+          "decision": "accepted",
+          "justification": "deviation DEV-17 approved by the contamination board",
+          "profile": "nasa_gsfc_screening",
+          "confirmation": { "verified": true }
+        },
+        "suppressed": false,
+        "affected": ["outgassing:syn_water|TML"]
+      }
+    ],
+    "configurations": {},
+    "materials": {
+      "syn_water": {
+        "name": "syn_water",
+        "density": 0.0012,
+        "color": "#d9a441",
+        "metalness": 0,
+        "roughness": 0.6,
+        "propertyModels": [
+          {
+            "id": "TML.company",
+            "property": "TML",
+            "unit": "%",
+            "variables": [],
+            "form": { "kind": "constant", "value": 1.2 },
+            "validity": [],
+            "basis": "company",
+            "provenance": { "citation": "synthetic test value (PHY-14 validation pack)" },
+            "coefficientsSha256": "5fbdaca5ecda5bbcfb1502b602f652384b41c4aaa63be488d6cd62c173b08909"
+          },
+          {
+            "id": "CVCM.company",
+            "property": "CVCM",
+            "unit": "%",
+            "variables": [],
+            "form": { "kind": "constant", "value": 0.02 },
+            "validity": [],
+            "basis": "company",
+            "provenance": { "citation": "synthetic test value (PHY-14 validation pack)" },
+            "coefficientsSha256": "ac8d926bfe639890ea94ffdbe559c8643ade35b6ab1881a99ab77e7c8f6266e5"
+          },
+          {
+            "id": "WVR.company",
+            "property": "WVR",
+            "unit": "%",
+            "variables": [],
+            "form": { "kind": "constant", "value": 0.4 },
+            "validity": [],
+            "basis": "company",
+            "provenance": { "citation": "synthetic test value (PHY-14 validation pack)" },
+            "coefficientsSha256": "c4a2d44fa2ce44a0b09384aba9e6fbd8bdd828483dda36931895bfc18e90e7d2"
+          }
+        ]
+      }
+    },
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "uid": "96600ecd9cebe657afc5caf87981f09b",
+    "nextStepNumber": 9,
+    "spaceEnvironment": {
+      "deviations": {
+        "outgassing:syn_water|TML": {
+          "itemKey": "outgassing:syn_water|TML",
+          "decision": "accepted",
+          "justification": "deviation DEV-17 approved by the contamination board",
+          "fingerprint": "5097417f00051edb449790d7a7b611a919af37b0a3e4a9104c7da8204359ed56",
+          "signer": "frozen-reviewer",
+          "signatureId": "frozen-sig-1",
+          "signature": { "alg": "test", "key": "frozen-test-key", "nonce": "frozen-nonce-1" },
+          "documentUid": "96600ecd9cebe657afc5caf87981f09b"
+        }
+      }
+    }
+  }
+}

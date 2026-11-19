@@ -46,6 +46,8 @@ interface PropertyEvaluationOk {
   readonly method: string;
   /** Kind of the evaluated form (`constant`, `linearCoefficient`, `table1d`, …): read this, never parse `method`. */
   readonly form: PropertyForm['kind'];
+  /** Test method of the measured value (the model condition), when recorded. */
+  readonly testMethod?: string;
   readonly coefficientsSha256: string;
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
@@ -62,7 +64,14 @@ export interface PropertyEvaluationRefused {
   readonly path?: string;
   readonly validity?: readonly ValidRange[];
   readonly reviewRequired?: boolean;
-  readonly candidates?: readonly { modelId: string; property: string; direction?: string; basis: Basis; validity: readonly ValidRange[] }[];
+  readonly candidates?: readonly {
+    modelId: string;
+    property: string;
+    direction?: string;
+    basis: Basis;
+    validity: readonly ValidRange[];
+    testMethod?: string;
+  }[];
 }
 
 export type PropertyEvaluation = PropertyEvaluationOk | PropertyEvaluationRefused;
@@ -111,6 +120,7 @@ const candidateOf = (model: PropertyModel): NonNullable<PropertyEvaluationRefuse
   ...(model.direction !== undefined ? { direction: model.direction } : {}),
   basis: model.basis,
   validity: model.validity,
+  ...(model.condition?.testMethod !== undefined ? { testMethod: model.condition.testMethod } : {}),
 });
 
 /**
@@ -329,6 +339,7 @@ export function evaluatePropertyModel(
     provenance: model.provenance,
     method: methodOf(model),
     form: model.form.kind,
+    ...(model.condition?.testMethod !== undefined ? { testMethod: model.condition.testMethod } : {}),
     coefficientsSha256: model.coefficientsSha256,
     unverified: reasons.length > 0,
     unverifiedReasons: reasons,

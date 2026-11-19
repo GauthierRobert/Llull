@@ -112,7 +112,12 @@ export interface PropertyCondition {
   readonly opticalKind?: 'hemispherical_total' | 'normal_total';
   /** Beginning or end of life of an `absorptivitySolar` model (PHY-15). */
   readonly lifeState?: 'BOL' | 'EOL';
+  /** Standard test method the value was measured with, as a token (e.g. ASTM_E595, ECSS_Q_ST_70_02; PHY-14 outgassing data). */
+  readonly testMethod?: string;
 }
+
+/** A test-method token: a letter or digit, then letters, digits, `_`, `.` or `-`; at most 64 characters. */
+export const TEST_METHOD_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 
 export interface PropertyUncertainty {
   readonly kind: 'fitErrorVsData' | 'measurement' | 'statistical';

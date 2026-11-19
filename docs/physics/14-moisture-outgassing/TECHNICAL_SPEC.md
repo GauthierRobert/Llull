@@ -271,11 +271,11 @@ See FUNCTIONAL_SPEC §11 [R1]–[R13] and `validation/sources.md` [S1]–[S17]. 
 
 - Material properties are additions to the PHY-01 catalogue (`packages/core/src/model/propertyCatalog.ts`, owner pack PHY-14): `TML`, `CVCM`, `WVR`, `RML` (dimensionless, entered with unit `%`), `moistureDiffusivity` (`m^2/s`), `moistureSaturation` (`%`), `cme` (`1/%` = strain per % moisture), `aoErosionYield` (stored as `m^3`; enter `3e-24` with unit `cm^3`, per incident atom implicit: the unit grammar has no `atom`).
 - Slice key is `CadDocument.spaceEnvironment` (top-level, validated by a zod schema through `sliceSchema`), not `physics.environment`: no `physics` envelope exists. It holds `outgassingProfile` (shipped id or whole custom profile), `humidityExposure`, `aoFluence`. This pack defines its own mission environment; a corrosion-pack environment record is separate, so the two overlap in concept only (humidity / temperature) and a later merge should make one of them reference the other.
-- OQ-ENV-02 / `ENV_TEST_METHOD_MISMATCH` is NOT implemented: `PropertyCondition` has no `testMethod` field (08 owns the shape), so the method of a stored TML is unknown. RML derived from TML - WVR is reported as `ENV_RML_DERIVED`. The test method of a profile is shown in `data.profile.testMethod`; the reviewer must confirm the data was measured with it.
+- (Superseded by MOI-b: see "As built (MOI-b)" below.) OQ-ENV-02 / `ENV_TEST_METHOD_MISMATCH` is NOT implemented: `PropertyCondition` has no `testMethod` field (08 owns the shape), so the method of a stored TML is unknown. RML derived from TML - WVR is reported as `ENV_RML_DERIVED`. The test method of a profile is shown in `data.profile.testMethod`; the reviewer must confirm the data was measured with it.
 - `moisture_uptake` takes M_inf either as a value, as `saturationLaw {a, b, relativeHumidity}` (M_inf[%] = a RH[%]^b), or from the material; RH is not a PHY-01 variable, so there is no `Mm(RH)` property model (a PHY-01 `RH` variable would be the way to add it). D(T) uses the existing T variable and forwards `PROP_OUT_OF_RANGE`.
 - Numerics as specified (TR-ENV-05): series to a 1e-17 term, short-time form below tau 1e-4, inverse closed form below G = 0.0226 and bisection (rel 1e-14 in tau) above. Oracles match `expected_results.json` at rel 1e-9 (the pins have 12 digits).
 - AO: only a Kapton H reference (`reference: "kapton_h"`, 3.0e-24 cm^3/atom, source and exposure-condition caveat in the result) is bundled. No other yield, no density, no fluence, no E595 value is bundled; every other value is user data with a required source (`ENV_SOURCE_MISSING`).
-- `check_space_environment` `data.status` covers the outgassing items only (fail > unknown > pass; no materials -> unknown). AO items have no limit: `info` with a recession figure, or `unknown` (`ENV_PROPERTY_MISSING`). The moisture exposure is not screened in the check (it needs a part thickness): a note points to `moisture_uptake useMissionExposure`.
+- (Moisture part superseded by MOI-b: the check now screens moisture per part, see "As built (MOI-b)" below.) `check_space_environment` `data.status` covers the outgassing items only (fail > unknown > pass; no materials -> unknown). AO items have no limit: `info` with a recession figure, or `unknown` (`ENV_PROPERTY_MISSING`). The moisture exposure is not screened in the check (it needs a part thickness): a note points to `moisture_uptake useMissionExposure`.
 - Budget per part: `maxMassLossG = TML / 100 x massG`, `maxCondensableG = CVCM / 100 x massG` (mass from `mass_properties` through the registry); a part without a measurable mass or TML / CVCM is listed with a note and not counted.
 - The three `*_proposed.json` plans run unchanged (`tests/unit/environment/plans.test.ts`) and are off the blocked-plan list.
 
@@ -287,3 +287,41 @@ See FUNCTIONAL_SPEC §11 [R1]–[R13] and `validation/sources.md` [S1]–[S17]. 
 - M3: `ao_erosion` takes `exposedFaces [{entityId, faces[]}]`; the areas come from `inspect_faces` (exact kernel, otherwise its refusal is forwarded) and a caller `area` overrides. The budget does not use faces (it is mass-based). `exposedFaces` is a call parameter, not stored in the mission.
 - M4 (human gate only): `approve_environment_deviation`, same pattern as `accept_corrosion_item` (signature over the finding fingerprint, re-verified on every `check_space_environment`; foreign / unbound / invalid / no port keeps the item in the status with `unconfirmedDeviation`; replay keeps the records through `replaySeed`). Item key `outgassing:<material>|<quantity>`. The gate is a local copy (`environment/gate.ts`) until the shared signed-gate helper lands. The NASA CSV converter stays blocked on OQ-ENV-03.
 - Corrosion overlap: two slices kept, `ENV_SERVICE_ENVIRONMENT_MISMATCH` warning: `docs/decisions/PHY14-environment-vs-corrosion.md`.
+
+**As built (MOI-b, 2026-11-19).**
+
+- Gate: `environment/gate.ts` now delegates to the shared `@cae/shared/signedGate` (`signedState`, `nonceOf`), the same way as the corrosion and electro-optical gates. The payload (act, item key, decision, justification, fingerprint, document uid, nonce), the uid binding, spend-last and the error codes are unchanged. The tests are unchanged too.
+- `testMethod` (OQ-ENV-02): this is an optional `PropertyCondition.testMethod` token (`/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/`, e.g. `ASTM_E595`, `ECSS_Q_ST_70_02`). It is additive, and old documents are unchanged.
+  - Setting it: `set_material_property testMethod` (the id gains the method, e.g. `TML.company.ASTM_E595`) or `define_property_model condition.testMethod`.
+  - Validation: `modelProblem` checks it, and so on save, load and library import (a hostile stored method -> load refused naming `model.condition.testMethod`).
+  - Output: `evaluate_property` returns `testMethod` when one is recorded.
+  - Check: `check_space_environment` first reads each quantity with `condition {testMethod: <profile method>}`, then without it.
+    - A value of another method is judged anyway, with `methodMismatch` on the item and one `ENV_TEST_METHOD_MISMATCH` warning per material. The derived RML carries the methods of TML and WVR.
+    - A value without a recorded method gets the `ENV_TEST_METHOD_UNRECORDED` info (see the review fixes below).
+    - The method enters the finding fingerprint only when it is recorded, so earlier deviations keep their fingerprints.
+- Moisture per part (FR-ENV-12): when the mission has a `humidityExposure`, `data.moisture.items[]` has one item per part (`partsOf`: solids, and instanced children once per instance) with `entityId`, `rootId`, `material`, `thickness`, `moisturePercent`, `fraction`, `saturationPercent`, `massG` (from the budget), `waterUptakeG` and `saturationWaterG` (saturation x mass, the bound that needs no thickness).
+  - Calculation: each item comes from `moisture_uptake useMissionExposure` through the registry (one call per material and thickness).
+  - Thickness: it comes from the new param `moistureThickness [{entityId, thickness}]`. The id is a part id or an instance id, and a part id wins over its instance id.
+  - Statuses: `info`/`ENV_MOISTURE_STATE`. Without a thickness the item is `unknown`/`ENV_MOISTURE_THICKNESS_UNSET`. A forwarded refusal code, e.g. `ENV_PROPERTY_MISSING`, also gives `unknown`.
+  - Findings: grouped per code and material, they carry `entityIds`.
+  - Moisture never changes `status`. `moistureThickness` without an exposure, or naming no screened part -> `ENV_PARAM_INVALID`. The old note "not screened here" is gone.
+- Golden: `validation/plans/env_mission_end_to_end.plan.json` (two materials, E595-qualified data, moisture / AO properties, mission, `moisture_uptake`, `hygro_strain`, `ao_erosion`, checks under NASA and ECSS) is pinned in `tests/golden/envPlans.test.ts`. The pins are VC-ENV-04 / 05, the 1.9 g budget, the 30 um recession, the mismatch under ECSS only, and replay equality.
+
+**Review fixes (MOI-b, 2026-11-19).**
+
+- Fallback: the unqualified read is used only when the material has no model of the profile's method (`PROP_NO_MODEL_FOR_PROPERTY` and no candidate of that method; candidates now carry `testMethod`). Any other refusal of the method-qualified read is returned as is, with `<method> value: <reason>`: the item is `unknown`, and an RML refused this way is not derived from TML - WVR. Two E595 TML values with neither preferred are therefore unknown (ambiguous) under the NASA profile, even when a preferred ECSS value exists.
+- `ENV_TEST_METHOD_UNRECORDED` (info, one per material): "<quantities>: no test method recorded; confirm it was <profile method>". The item carries `methodUnrecorded`. Neither changes the status or the fingerprint.
+- Fingerprint pin: the unqualified TML item of the test panel has the sha256 computed on the base commit 00eac362a. A frozen saved document with a signed deviation (`tests/corpus/documents/v3-environment-deviation.llull.json`, payload sha256 pinned in `tests/unit/environment/frozenDeviation.test.ts`) loads and re-verifies as `ok`. It also verifies on the base commit.
+- Library conditions: `import_material_library` validates `condition` with a strict schema of every `PropertyCondition` field (`storedConditionSchema`: the define_property_model keys plus thickness, edOverD, exposureHours). An unknown key or a non-token `testMethod` in a library is refused.
+- `moistureThickness`: the uptake cache is keyed by `JSON.stringify([material, value, unit])`. An id given twice is refused with `ENV_PARAM_INVALID`. Ids are top-level only: a solid, an instance, or an expanded child id; an id inside a component definition is refused.
+
+**Left after MOI-b.**
+
+- NASA CSV converter: blocked on OQ-ENV-03 (licence).
+- UI: materials table, uptake curve.
+- M5 equivalent-DeltaT hand-off: not built. `set_temperature_field` has no per-part source, and a uniform field would overwrite the case's thermal load and apply to every part.
+  - Plan: add an `apply_hygro_strain` command (thermomech) that takes `{analysisId, parts[{entityId, deltaT_eq}]}` and records a per-part hygro thermal-strain increment on the thermo_static case. The deck writer would add it to the thermal strain of the elements of those parts. `hygro_strain` would then name that command in `handOff`.
+  - This needs a PHY-04 data-model field and a deck change in the PHY-04 owner's files.
+- `Mm(RH)` property model: not built. RH is not a PHY-01 `PropertyVariable`.
+  - Plan: add `RH` (unit `%`, range 0..100) to the core variable list and catalogue, and let `moistureSaturation` models take `powerLaw` on RH.
+  - Then `boundaryInput` would evaluate the material at `{T, RH}` from the mission exposure before the caller's `saturationLaw`. The core change (variable list, validity, unit `%`) is outside this pack's write scope.
