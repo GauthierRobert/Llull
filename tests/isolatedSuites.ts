@@ -3,7 +3,8 @@
  * `tests/unit` / `tests/golden` suite shares one module graph per worker (`node` project, isolate: false).
  * A suite belongs here when it calls vi.mock / vi.doMock / vi.stubGlobal / vi.stubEnv / vi.resetModules, touches
  * DOM globals (window, localStorage), registers test-only commands (registerCommands, installPlugin), or swaps a module-level law
- * (setEngineLossLaw / setRealismLaw).
+ * (setEngineLossLaw / setRealismLaw), or records facts that are not those of their mesh in a module-level cache keyed by content
+ * (rememberMeshResult: the implicit plugin's mesh facts, which a later file building the same body would read).
  * tests/unit/contract/isolatedSuites.test.ts keeps this list complete.
  */
 export const ISOLATED_SUITES: readonly string[] = [
@@ -16,6 +17,7 @@ export const ISOLATED_SUITES: readonly string[] = [
   'tests/unit/serverConfig.test.ts',
   'tests/unit/serverFiles.test.ts',
   'tests/unit/cae/ports.test.ts',
+  'tests/unit/implicit/meshFacts.test.ts',
   'tests/unit/mesh/fitSubdivisionBudget.test.ts',
   'tests/unit/plant/piping/convertReplaceGuard.test.ts',
   'tests/unit/contract/entityPropertiesPort.test.ts',

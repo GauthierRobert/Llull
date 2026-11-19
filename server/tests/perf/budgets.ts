@@ -57,12 +57,22 @@ export const BUDGETS = {
     27900,
     "the same with obstruction and a baffle, integration='reciprocal' (before: the full rule)",
   ),
+  'implicit.create.gyroid7m': budget(
+    'job',
+    20000,
+    10170,
+    'create_implicit_body, 7.3M-triangle gyroid sheet (124^3 grid, native field engine, mesh asset store)',
+  ),
+  'implicit.check.gyroid7m': budget('job', 4000, 5410, 'check_implicit of that body with wall and overhang limits, same process'),
+  'implicit.properties.gyroid7m': budget('responsive', 1000, 1262, 'implicit_properties of that body, same process'),
   'document.command.draft20k': budget('instant', 100, null, 'draw_polyline + state hash on a 20 000-entity drawing'),
   'document.hash.mesh300k': budget('instant', 100, 780, 'state hash after a 300k-triangle mesh entity changed'),
   'document.save.incremental': budget('instant', 100, null, 'autosave text of a 20 000-entity document after one command'),
   'document.regenerate.late_edit': budget('responsive', 200, 1200, 'edit_step_params on the last of 2 000 steps'),
   'document.export.svg20k': budget('responsive', 400, 2100, 'export_svg of 20 000 2D entities'),
   'document.export.dxf20k': budget('responsive', 600, 3600, 'export_dxf of 20 000 2D entities'),
+  'mesh.import.stl1m': budget('job', 3000, 6300, 'import_mesh_file of a 1M-triangle binary STL through the mesh asset store (fileKey)'),
+  'mesh.import.obj1m': budget('job', 3000, 4400, 'import_mesh_file of a 1M-triangle OBJ through the mesh asset store (fileKey)'),
 } as const satisfies Record<string, Budget>;
 
 export type BudgetId = keyof typeof BUDGETS;

@@ -7,6 +7,7 @@ use crate::eval::Evaluator;
 use crate::files::{f64_bytes, input_error, read_f64, u32_bytes, write_file, JobError};
 use crate::gradient::GradientScratch;
 use crate::measure::{quantiles, volume};
+use crate::mesh_measures::mesh_measures;
 use crate::sampling::{fill_plane, Grid, PlaneStats, Tiles};
 use crate::tape::{Program, ProgramSpec};
 use crate::tetra::{extract, is_closed_manifold, IsoMesh, TriangleBudget};
@@ -140,12 +141,15 @@ fn finish_mesh(folder: &Path, evaluator: &Evaluator, grid: &Grid, meshed: Meshed
         .reduce(|| 0.0, f64::max);
     let vertices = mesh.positions.len() / 3;
     let closed = is_closed_manifold(vertices, &mesh.indices);
+    let (volume, area) = mesh_measures(&mesh.positions, &mesh.indices);
     outputs.push(write_file(folder, "positions.f64", &f64_bytes(&mesh.positions))?);
     outputs.push(write_file(folder, "indices.u32", &u32_bytes(&mesh.indices))?);
     Ok(json!({
         "vertices": vertices,
         "triangles": mesh.indices.len() / 3,
         "closedManifold": closed,
+        "volume": volume,
+        "area": area,
         "samples": total,
         "evaluatedSamples": stats.evaluated,
         "prunedFraction": if total == 0 { 0.0 } else { 1.0 - stats.evaluated as f64 / total as f64 },

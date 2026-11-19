@@ -192,6 +192,7 @@ export function createMeshAssetStore(dir: string = meshCacheDir()): MeshAssetSto
       };
     },
     putMesh,
+    sha256,
     putFile(bytes) {
       const key = sha256(bytes);
       writeOnce(path.join(dir, 'files', key), bytes);

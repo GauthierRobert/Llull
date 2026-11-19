@@ -5,11 +5,12 @@ import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { FieldEngine } from '@core/geometry/field/engineTypes';
 import type { FieldProgram } from '@core/geometry/field/program';
 import type { CadDocument } from '@core/model/types';
-import { meshMeasures } from '@lib/isosurface/measures';
+import type { MeshMeasures } from '@lib/isosurface/measures';
 import { fullBodyMesh } from './bodyMesh';
 import { refuseImplicit } from './codes';
 import type { Compiled } from './compile';
 import { type Box, type VolumeAnswer, resolveTarget, signComponentsOf } from './measure';
+import { bodyMeshMeasuresOf } from './meshFacts';
 import { fieldOf } from './model';
 
 export type Target = NonNullable<ReturnType<typeof resolveTarget>>;
@@ -47,15 +48,13 @@ export function resolveRequest(
   return target;
 }
 
-type MeshMeasure = ReturnType<typeof meshMeasures>;
-
 /** The measures of the full mesh of the body (null for a field), or the refusal when its mesh asset is missing. */
 export function bodyMeshMeasures(
   doc: CadDocument,
   id: string,
   target: Target,
   ctx: ExecutionContext | undefined,
-): MeshMeasure | null | CommandResult {
+): MeshMeasures | null | CommandResult {
   const entity = target.body === undefined ? undefined : doc.entities[target.body.id];
   const full = entity?.kind === 'mesh' ? fullBodyMesh(entity, ctx?.meshAssets) : null;
   if (entity?.kind === 'mesh' && full === null)
@@ -66,7 +65,7 @@ export function bodyMeshMeasures(
       `the full mesh of body '${id}' is not in this machine's mesh asset store`,
       [id],
     );
-  return full === null ? null : meshMeasures(full);
+  return full === null ? null : bodyMeshMeasuresOf(full);
 }
 
 export interface Measured {
@@ -79,7 +78,7 @@ export interface Measured {
   readonly engine: FieldEngine;
   readonly voxel: number;
   readonly quadrature: VolumeAnswer;
-  readonly mesh: MeshMeasure | null;
+  readonly mesh: MeshMeasures | null;
 }
 
 /** The report of a measured body / field: data payload and one-line summary. */

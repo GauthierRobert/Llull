@@ -16,19 +16,20 @@ export function parseBinaryStl(bytes: Uint8Array): ParsedMeshFile | MeshParseFai
   if (!isBinaryStl(bytes)) return parseFailure('MESH_IMPORT_PARSE', 'binary STL: the byte length is not 84 + 50 x the facet count');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = view.getUint32(80, true);
-  const positions: number[] = [];
-  const triangles: number[] = [];
+  // The facet count is known: both arrays are allocated once (growing a 9-million-value array by pushes copies it several times).
+  const positions = new Array<number>(count * 9);
+  const triangles = new Array<number>(count * 3);
+  let write = 0;
   for (let facet = 0; facet < count; facet++) {
     const base = BINARY_HEADER + facet * FACET_BYTES + 12;
-    for (let corner = 0; corner < 3; corner++) {
-      for (let axis = 0; axis < 3; axis++) {
-        const value = view.getFloat32(base + corner * 12 + axis * 4, true);
-        if (!Number.isFinite(value))
-          return parseFailure('MESH_IMPORT_PARSE', `non-finite coordinate in facet ${facet} (byte ${base + corner * 12 + axis * 4})`);
-        positions.push(value);
-      }
-      triangles.push(facet * 3 + corner);
+    for (let offset = base; offset < base + 36; offset += 4) {
+      const value = view.getFloat32(offset, true);
+      if (!Number.isFinite(value)) return parseFailure('MESH_IMPORT_PARSE', `non-finite coordinate in facet ${facet} (byte ${offset})`);
+      positions[write++] = value;
     }
+    triangles[facet * 3] = facet * 3;
+    triangles[facet * 3 + 1] = facet * 3 + 1;
+    triangles[facet * 3 + 2] = facet * 3 + 2;
   }
   return { format: 'stl-binary', bodies: [{ positions, triangles, groups: [] }], dropped: count > 0 ? [`normals: ${count}`] : [] };
 }
