@@ -14,22 +14,24 @@ pub(crate) const WEIGHTS: [f64; 4] = [0.362683783378362, 0.3137066458778873, 0.2
 
 /// Integrand values of the three first panels.
 const LANES: usize = 24;
+/// Integrand values of one panel.
+const PANEL: usize = 8;
 
-/// Abscissas of the three panels in the order `gauss_legendre` evaluates them (`mid - node`, `mid + node` per node), from the same
-/// expressions (`half = 0.5 * (hi - lo)`, `mid = 0.5 * (hi + lo)`).
-const fn abscissas() -> [f64; LANES] {
+/// Abscissas of the first `N / 8` of the three panels in the order `gauss_legendre` evaluates them (`mid - node`, `mid + node` per
+/// node), from the same expressions (`half = 0.5 * (hi - lo)`, `mid = 0.5 * (hi + lo)`).
+const fn abscissas<const N: usize>() -> [f64; N] {
     let bounds = [(0.0, 1.0), (0.0, 0.5), (0.5, 1.0)];
-    let mut out = [0.0; LANES];
+    let mut out = [0.0; N];
     let mut panel = 0;
-    while panel < 3 {
+    while panel < N / PANEL {
         let (lo, hi) = bounds[panel];
         let half = 0.5 * (hi - lo);
         let mid = 0.5 * (hi + lo);
         let mut k = 0;
         while k < 4 {
             let node = NODES[k] * half;
-            out[panel * 8 + 2 * k] = mid - node;
-            out[panel * 8 + 2 * k + 1] = mid + node;
+            out[panel * PANEL + 2 * k] = mid - node;
+            out[panel * PANEL + 2 * k + 1] = mid + node;
             k += 1;
         }
         panel += 1;
@@ -38,6 +40,8 @@ const fn abscissas() -> [f64; LANES] {
 }
 
 const ABSCISSAS: [f64; LANES] = abscissas();
+/// The panel [0, 1] alone: the first eight of `ABSCISSAS`.
+const WHOLE: [f64; PANEL] = abscissas();
 
 /// The common branch of `llull_jsmath::log` (fdlibm `__ieee754_log`); the flag is true when `x` takes another branch there (x not a
 /// positive normal number, or `f` within 2^-20 of 0) and the value must not be used.
@@ -167,17 +171,17 @@ fn panel(values: &[f64], half: f64) -> f64 {
     sum * half
 }
 
-/// `gauss_legendre` of s -> `log_integral((a + s u) - c, v)` over [0, 1], [0, 0.5] and [0.5, 1], bit-identical to the scalar path;
-/// None when a lane leaves the common branches (the caller then runs the scalar path). `v` must not be the zero vector.
+/// s -> `log_integral((a + s u) - c, v)` at every abscissa, bit-identical to the scalar path; None when a lane leaves the common
+/// branches. `v` must not be the zero vector.
 #[inline(always)]
-pub(crate) fn first_panels(a: &Vec3, u: &Vec3, c: &Vec3, v: &Vec3) -> Option<(f64, f64, f64)> {
+fn integrand<const N: usize>(abscissas: &[f64; N], a: &Vec3, u: &Vec3, c: &Vec3, v: &Vec3) -> Option<[f64; N]> {
     let vv = dot(v, v);
-    let (mut q1, mut q0, mut x1, mut x0) = ([0.0; LANES], [0.0; LANES], [0.0; LANES], [0.0; LANES]);
-    let (mut lead, mut atan_scale) = ([0.0; LANES], [0.0; LANES]);
+    let (mut q1, mut q0, mut x1, mut x0) = ([0.0; N], [0.0; N], [0.0; N], [0.0; N]);
+    let (mut lead, mut atan_scale) = ([0.0; N], [0.0; N]);
     let mut common = true;
     // `antiderivative(t)` of `log_integral` at t = 1 and t = 0, written with its own expressions (t kept as a literal)
-    for i in 0..LANES {
-        let w = sub(&add(a, &scale(u, ABSCISSAS[i])), c);
+    for i in 0..N {
+        let w = sub(&add(a, &scale(u, abscissas[i])), c);
         let wv = dot(&w, v);
         let c = cross(&w, v);
         let delta = 4.0 * dot(&c, &c);
@@ -197,24 +201,24 @@ pub(crate) fn first_panels(a: &Vec3, u: &Vec3, c: &Vec3, v: &Vec3) -> Option<(f6
     if !common {
         return None;
     }
-    let (mut log1, mut log0, mut atan1, mut atan0) = ([0.0; LANES], [0.0; LANES], [0.0; LANES], [0.0; LANES]);
-    let mut flags = [false; LANES];
-    for i in 0..LANES {
+    let (mut log1, mut log0, mut atan1, mut atan0) = ([0.0; N], [0.0; N], [0.0; N], [0.0; N]);
+    let mut flags = [false; N];
+    for i in 0..N {
         let (value, flag) = log_lane(q1[i]);
         log1[i] = value;
         flags[i] = flag;
     }
-    for i in 0..LANES {
+    for i in 0..N {
         let (value, flag) = log_lane(q0[i]);
         log0[i] = value;
         flags[i] |= flag;
     }
-    for i in 0..LANES {
+    for i in 0..N {
         let (value, flag) = atan_lane(x1[i]);
         atan1[i] = value;
         flags[i] |= flag;
     }
-    for i in 0..LANES {
+    for i in 0..N {
         let (value, flag) = atan_lane(x0[i]);
         atan0[i] = value;
         flags[i] |= flag;
@@ -222,13 +226,29 @@ pub(crate) fn first_panels(a: &Vec3, u: &Vec3, c: &Vec3, v: &Vec3) -> Option<(f6
     if flags.iter().any(|&flag| flag) {
         return None;
     }
-    let mut values = [0.0; LANES];
-    for i in 0..LANES {
+    let mut values = [0.0; N];
+    for i in 0..N {
         let at1 = (1.0 + lead[i]) * log1[i] - 2.0 * 1.0 + atan_scale[i] * atan1[i];
         let at0 = (0.0 + lead[i]) * log0[i] - 2.0 * 0.0 + atan_scale[i] * atan0[i];
         values[i] = 0.5 * (at1 - at0);
     }
+    Some(values)
+}
+
+/// `gauss_legendre` of s -> `log_integral((a + s u) - c, v)` over [0, 1], [0, 0.5] and [0.5, 1], bit-identical to the scalar path;
+/// None when a lane leaves the common branches (the caller then runs the scalar path). `v` must not be the zero vector.
+#[inline(always)]
+pub(crate) fn first_panels(a: &Vec3, u: &Vec3, c: &Vec3, v: &Vec3) -> Option<(f64, f64, f64)> {
+    let values = integrand(&ABSCISSAS, a, u, c, v)?;
     Some((panel(&values[0..8], 0.5), panel(&values[8..16], 0.25), panel(&values[16..24], 0.25)))
+}
+
+/// The panel [0, 1] alone (`gauss_legendre(inner, 0, 1)`, the `whole` of `first_panels`, same bits) for a third of the values; None as
+/// `first_panels`. `v` must not be the zero vector.
+#[inline(always)]
+pub(crate) fn whole_panel(a: &Vec3, u: &Vec3, c: &Vec3, v: &Vec3) -> Option<f64> {
+    let values = integrand(&WHOLE, a, u, c, v)?;
+    Some(panel(&values, 0.5))
 }
 
 #[cfg(test)]
@@ -321,5 +341,6 @@ mod tests {
             }
         }
         assert_eq!(ABSCISSAS.to_vec(), expected);
+        assert_eq!(WHOLE.to_vec(), expected[0..8]);
     }
 }

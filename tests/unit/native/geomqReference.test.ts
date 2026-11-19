@@ -1,6 +1,6 @@
 /**
  * TypeScript reference of `llull-compute geomq` (RS1 RS-6; VC-FPR-37 and VC-THM-64 at crate level, RS1 §2 rule 4): seeded noisy meshes with
- * placed distance queries and rays (meshBvh), an obstructed cavity's exchange matrix (viewFactorExchangeReference) and V8 Math.atan samples,
+ * placed distance queries and rays (meshBvh), an obstructed cavity's exchange matrix (viewFactorExchangeReference, `full` and `reciprocal`) and V8 Math.atan samples,
  * written to solver/crates/llull-geomq/tests/fixtures/geomq.json. `cargo test -p llull-geomq` must reproduce every number bit for bit.
  * Infinity bounds and misses are written as null. Regenerate with LLULL_WRITE_NATIVE_FIXTURES=1.
  */
@@ -156,6 +156,48 @@ function viewFactorCase(): unknown {
   };
 }
 
+/**
+ * `reciprocal` integration (PERF1 §5 row 4): plates 4 apart (every floor / ceiling pair well separated: one panel) and a low wall on the floor's edge (adaptive), free and with a tilted blocker between the plates (obstruction tested both ways).
+ */
+function reciprocalViewFactorCase(): unknown {
+  const tile = (corners: Vec3[]): readonly Facet[] => planarFacets(corners, false, 0.5)?.facets ?? [];
+  const surfaces: (readonly Facet[])[] = [
+    tile([
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [0, 1, 0],
+    ]),
+    tile([
+      [0, 0, 4],
+      [0, 1, 4],
+      [1, 1, 4],
+      [1, 0, 4],
+    ]),
+    tile([
+      [0, 0, 0],
+      [0, 0, 1],
+      [1, 0, 1],
+      [1, 0, 0],
+    ]),
+  ];
+  const blockers = tile([
+    [0.1, 0.45, 1.7],
+    [0.1, 0.55, 2.3],
+    [0.9, 0.5, 2.3],
+    [0.9, 0.4, 1.7],
+  ]);
+  const flat = (facets: readonly Facet[], surface: number): number[][] =>
+    facets.map((f) => [surface, ...f.corners.flat(), ...f.normal, ...f.centroid, f.area]);
+  const options = { integration: 'reciprocal' } as const;
+  return {
+    surfaces: surfaces.length,
+    facets: [...surfaces.flatMap((facets, surface) => flat(facets, surface)), ...flat(blockers, -1)],
+    open: viewFactorExchangeReference(meshBvhEngine, surfaces, null, options),
+    obstructed: viewFactorExchangeReference(meshBvhEngine, surfaces, blockers, options),
+  };
+}
+
 function atanCases(): number[][] {
   const random = seeded(31);
   const xs = [0, -0, 1e-30, 1e-8, 0.4375, 0.6875, 1.1875, 2.4375, 1e20, 1e300, -1e300, 0.5, 1, -1, Infinity, -Infinity];
@@ -165,7 +207,13 @@ function atanCases(): number[][] {
 
 describe('llull-geomq native reference fixture (TS = oracle)', () => {
   it('placed distances, rays, view-factor exchange and atan for llull-geomq', () => {
-    const fixture = { distance: distanceCases(), ray: rayCases(), viewFactor: viewFactorCase(), atan: atanCases() };
+    const fixture = {
+      distance: distanceCases(),
+      ray: rayCases(),
+      viewFactor: viewFactorCase(),
+      viewFactorReciprocal: reciprocalViewFactorCase(),
+      atan: atanCases(),
+    };
     const text = `${JSON.stringify(fixture)}\n`;
     if (WRITE) writeFileSync(FIXTURE, text);
     expect(readFileSync(FIXTURE, 'utf8') === text, 'geomq.json is out of date: run with LLULL_WRITE_NATIVE_FIXTURES=1').toBe(true);

@@ -45,6 +45,18 @@ export const BUDGETS = {
     'check_motion_clearance, 63 pairs x 361 samples, TypeScript meshBvh (no native engine)',
   ),
   'explicit.run.hex10k': budget('job', 20000, 77000, 'explicit_run, 10 240 hex8, 1 206 cycles (native llull-compute, 4 threads)'),
+  'thermal.viewfactor.reciprocal3k': budget(
+    'job',
+    3000,
+    24300,
+    "compute_view_factors integration='reciprocal', closed 3 072-facet cube cavity, native llull-compute (before: the full rule)",
+  ),
+  'thermal.viewfactor.reciprocal3k_obstructed': budget(
+    'job',
+    5000,
+    27900,
+    "the same with obstruction and a baffle, integration='reciprocal' (before: the full rule)",
+  ),
   'document.command.draft20k': budget('instant', 100, null, 'draw_polyline + state hash on a 20 000-entity drawing'),
   'document.hash.mesh300k': budget('instant', 100, 780, 'state hash after a 300k-triangle mesh entity changed'),
   'document.save.incremental': budget('instant', 100, null, 'autosave text of a 20 000-entity document after one command'),

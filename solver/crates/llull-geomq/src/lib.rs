@@ -2,7 +2,8 @@
 //! Rust CPU, rayon over independent items, every number bit-identical to the TypeScript engine (`meshBvh.ts`, `viewFactorContour.ts`),
 //! so the results are deterministic (`deterministic: true`) and the TS engine stays the oracle (VC-FPR-37, VC-THM-64).
 //!
-//! Job folder: `job.json` = `{ "op": "distance" | "ray" | "viewfactor", "surfaces"?: n, "obstruction"?: bool }` plus little-endian f64
+//! Job folder: `job.json` = `{ "op": "distance" | "ray" | "viewfactor", "surfaces"?: n, "obstruction"?: bool, "integration"?: "full" |
+//! "reciprocal" }` plus little-endian f64
 //! files (`f64` NaN = "none"):
 //! - `distance`: `meshes.f64` = mesh count, then per mesh its triangle count and 9 corners per triangle; `queries.f64` = 16 per query
 //!   (a, b, placed 0/1, rotation 9 row-major, translation 3, maxDistance (may be +Inf)). Out `result.f64` = 7 per query: distance (NaN =
@@ -10,9 +11,11 @@
 //! - `ray`: `mesh.f64` = triangle count + corners; `rays.f64` = 8 per ray (origin 3, direction 3, tMin, maxT). Out `result.f64` = 5 per
 //!   ray: t (NaN = miss), triangle index, point (3).
 //! - `viewfactor`: `facets.f64` = 17 per facet (surface index or -1 for a blocker, corners 9, normal 3, centroid 3, area), owners in
-//!   surface-major order before the blockers. Out `result.f64` = the n × n exchange matrix A_I F_IJ, row-major.
+//!   surface-major order before the blockers. Out `result.f64` = the n × n exchange matrix A_I F_IJ, row-major. `integration` (default
+//!   `full`, the TypeScript reference numbers) = `reciprocal` is the faster rule of `viewfactor::Integration::Reciprocal` (other numbers,
+//!   bit-identical to the TypeScript `reciprocal` reference); any other value is refused.
 //!
-//! Every op also writes `report.json` = `{ op, items, threads, ms }`.
+//! Every op also writes `report.json` = `{ op, items, threads, ms }`, plus `integration` (the rule that ran) for `viewfactor`.
 
 mod occlusion;
 mod panels;
@@ -27,7 +30,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 use tree::{min_distance, ray_cast, MeshTree, Placement};
-use viewfactor::{exchange_matrix, Facet};
+use viewfactor::{exchange_matrix, Facet, Integration};
 
 /// A job failure: stable code + message.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +50,8 @@ struct GeomqJob {
     surfaces: usize,
     #[serde(default)]
     obstruction: bool,
+    #[serde(default)]
+    integration: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -55,6 +60,24 @@ struct Report<'a> {
     items: usize,
     threads: usize,
     ms: u128,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    integration: Option<&'static str>,
+}
+
+/// The `integration` of a view-factor job: absent = `full`.
+pub fn parse_integration(name: Option<&str>) -> Result<Integration, JobError> {
+    match name {
+        None | Some("full") => Ok(Integration::Full),
+        Some("reciprocal") => Ok(Integration::Reciprocal),
+        Some(other) => Err(input_error(format!("unknown view-factor integration '{other}' (full, reciprocal)"))),
+    }
+}
+
+fn integration_name(integration: Integration) -> &'static str {
+    match integration {
+        Integration::Full => "full",
+        Integration::Reciprocal => "reciprocal",
+    }
 }
 
 fn read_f64(folder: &Path, name: &str) -> Result<Vec<f64>, JobError> {
@@ -158,7 +181,7 @@ pub fn ray_batch(mesh: Vec<f64>, rays: &[f64]) -> Result<Vec<f64>, JobError> {
 }
 
 /// `viewfactor`: the exchange matrix of the owners, obstruction by owners + blockers when asked.
-pub fn view_factor_batch(values: &[f64], surfaces: usize, obstruction: bool) -> Result<Vec<f64>, JobError> {
+pub fn view_factor_batch(values: &[f64], surfaces: usize, obstruction: bool, integration: Integration) -> Result<Vec<f64>, JobError> {
     if !values.len().is_multiple_of(17) {
         return Err(input_error("facets.f64 is not 17 numbers per facet"));
     }
@@ -184,7 +207,7 @@ pub fn view_factor_batch(values: &[f64], surfaces: usize, obstruction: bool) -> 
         }
         owners.push((surface, facet));
     }
-    Ok(exchange_matrix(&owners, obstruction.then_some(&blockers[..]), surfaces))
+    Ok(exchange_matrix(&owners, obstruction.then_some(&blockers[..]), surfaces, integration))
 }
 
 /// Runs the job in `folder`; returns the written outputs.
@@ -193,6 +216,7 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
     let text = fs::read_to_string(folder.join("job.json"))
         .map_err(|error| JobError { code: "NATIVE_JOB_IO", message: format!("job.json: {error}") })?;
     let job: GeomqJob = serde_json::from_str(&text).map_err(|error| input_error(format!("job.json: {error}")))?;
+    let mut integration = None;
     let (result, items) = match job.op.as_str() {
         "distance" => {
             let queries = read_f64(folder, "queries.f64")?;
@@ -205,11 +229,13 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
         }
         "viewfactor" => {
             let facets = read_f64(folder, "facets.f64")?;
-            (view_factor_batch(&facets, job.surfaces, job.obstruction)?, facets.len() / 17)
+            let rule = parse_integration(job.integration.as_deref())?;
+            integration = Some(integration_name(rule));
+            (view_factor_batch(&facets, job.surfaces, job.obstruction, rule)?, facets.len() / 17)
         }
         other => return Err(input_error(format!("unknown geomq op '{other}' (distance, ray, viewfactor)"))),
     };
-    let report = Report { op: &job.op, items, threads: rayon::current_num_threads(), ms: started.elapsed().as_millis() };
+    let report = Report { op: &job.op, items, threads: rayon::current_num_threads(), ms: started.elapsed().as_millis(), integration };
     let report_json = serde_json::to_vec(&report).map_err(|error| input_error(error.to_string()))?;
     Ok(vec![write(folder, "result.f64", &f64_bytes(&result))?, write(folder, "report.json", &report_json)?])
 }
