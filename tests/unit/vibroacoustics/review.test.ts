@@ -168,6 +168,31 @@ describe('dispose_acoustic_export: the human gate', () => {
     expect(refusal(dispose(orphan, { confirmation }))).toBe('VAC_SPECTRUM_UNKNOWN');
   });
 
+  it('refuses an exposure on an instance with VAC_EXPOSURE_UNRESOLVED before any signature is spent (the export cannot resolve its faces)', () => {
+    const { doc, box } = exposedDocument();
+    const component = run(doc, 'create_component', { name: 'Unit', entityIds: [box] });
+    const instance = component.affected.find((id) => component.document.entities[id]?.kind === 'instance') ?? '';
+    expect(instance).not.toBe('');
+    const onInstance = run(component.document, 'define_acoustic_exposure', {
+      name: 'on_instance',
+      spectrum: 'flat130',
+      target: { entityId: instance, facesNear: [[150, 100, 100]] },
+      field: 'diffuse',
+    }).document;
+    const spent: string[] = [];
+    const ctx = context({ ...port, spend: (_signature, payload) => (spent.push(payload), true) });
+    const result = execute(
+      onInstance,
+      'dispose_acoustic_export',
+      { exposure: 'on_instance', decision: 'accepted', justification: JUSTIFICATION, confirmation: { nonce: 'n1', signs: 'x' } },
+      ctx,
+    );
+    expect(refusal(result)).toBe('VAC_EXPOSURE_UNRESOLVED');
+    expect(result.summary).toContain('instance');
+    expect(result.document).toBe(onInstance);
+    expect(spent).toEqual([]);
+  });
+
   it('is pure, and a spent signature is not honoured twice', () => {
     const { doc } = exposedDocument();
     const before = structuredClone(doc);
@@ -227,6 +252,26 @@ describe('dispose_acoustic_export: history replay', () => {
     expect(replayed.summary).not.toMatch(/refused|failed/i);
     expect(replayed.document.vibroacoustics?.reviews).toEqual(doc.vibroacoustics?.reviews);
     expect(exported(replayed.document).review.status).toBe('accepted');
+  });
+
+  // KNOWN GAP (shared by every signed gate with a replaySeed; one fix is scheduled for all of them): replaySeed keeps the record whatever the history
+  // says, so suppressing or deleting the dispose step regenerates a document that still holds the accepted review. Pinned so the fix flips it.
+  it.each([
+    ['set_step_suppressed', (stepId: string) => ({ stepId, suppressed: true })],
+    ['delete_step', (stepId: string) => ({ stepId })],
+  ] as const)('%s on the dispose step regenerates, and the review survives it (known gap)', (name, params) => {
+    const { doc } = accepted();
+    const stepId = doc.featureHistory.at(-1)?.id ?? '';
+    const result = execute(doc, name, params(stepId), signing);
+    expect(result.error).toBeUndefined();
+    expect(result.summary).toContain('regenerated');
+    expect(result.document.featureHistory.filter((step) => step.name === 'dispose_acoustic_export' && step.suppressed !== true)).toEqual(
+      [],
+    );
+    expect(result.document.vibroacoustics?.reviews?.[EXPOSURE]?.decision).toBe('accepted');
+    expect(exported(result.document).review.status).toBe('accepted');
+    const again = execute(result.document, 'replay_history', {}, signing);
+    expect(again.document.vibroacoustics?.reviews?.[EXPOSURE]?.decision).toBe('accepted');
   });
 
   it('the plugin replay seed keeps the reviews and nothing else', async () => {

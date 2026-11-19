@@ -23,7 +23,7 @@ export const reviewDetails = (
 
 /**
  * sha256 of what the reviewer judges: the exposure (field, incidence, target points, notes), its spectrum (bands, source, grade), the document units and
- * the target solid without its presentation (layer, colour, name, tags, material, decals, pattern seed).
+ * the target solid without its presentation (layer, colour, name, tags, decals, pattern seed) and without its material (excluded: no package number depends on it).
  * @invariant kernel-free and deterministic; any change of a level, a band, the source, the field, a face point or the solid's geometry / placement changes it
  */
 export function exposureFingerprint(doc: CadDocument, exposure: AcousticExposure, spectrum: AcousticSpectrum, target: Entity): string {
@@ -65,7 +65,7 @@ export interface PackageReview {
 }
 
 const PENDING_REMEDIATION =
-  'a qualified reviewer must confirm the spectrum, the field type and the faces and sign dispose_acoustic_export in the desktop app (an agent cannot)';
+  'a qualified reviewer must confirm the spectrum, the field type and the faces and sign dispose_acoustic_export with the signing port (desktop signing for this act is not built yet; an agent cannot)';
 
 /** The review of the package of `exposure` (current fingerprint `fingerprint`) and its item: none for a confirmed acceptance. */
 export function packageReview(

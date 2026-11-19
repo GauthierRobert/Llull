@@ -22,14 +22,14 @@ const COMMAND = 'dispose_acoustic_export';
  *   (no port, foreign uid, junk signature: VAC_REVIEW_PENDING stays); a replay honours a recorded step only from a review already in the slice (kept by replaySeed) with the same decision, justification,
  *   fingerprint and uid, its signature re-verified when a port is installed
  * @failure no signing port, no signature or one that does not verify (an agent always) -> VAC_HUMAN_GATE; blank justification -> VAC_PARAMS_INVALID; unknown exposure / spectrum -> VAC_EXPOSURE_UNKNOWN / VAC_SPECTRUM_UNKNOWN;
- *   target not a 3D solid -> VAC_EXPOSURE_UNRESOLVED; a document without uid -> VAC_DOCUMENT_UNIDENTIFIED (all refusals, unchanged doc)
+ *   target not a 3D solid (an instance included: the export cannot resolve its faces) -> VAC_EXPOSURE_UNRESOLVED; a document without uid -> VAC_DOCUMENT_UNIDENTIFIED (all refusals, unchanged doc)
  */
 export const disposeAcousticExport = defineCommand({
   name: COMMAND,
   description:
     "Record a qualified reviewer's disposition (accepted | rejected) of the acoustic load package of ONE exposure (export_acoustic_load). HUMAN GATE. " +
     'Only a human-held signature over this exact exposure verifies (09 PLM signing port): an agent has none and always gets VAC_HUMAN_GATE with the document unchanged. Do not retry or work around it: ' +
-    'hand the package to the reviewer, who decides in the desktop app. An accepted, re-verified disposition removes VAC_REVIEW_PENDING from the package; a rejected one adds VAC_REVIEW_REJECTED. ' +
+    'hand the package to the reviewer, who signs with the signing port (desktop signing for this act is not built yet). An accepted, re-verified disposition removes VAC_REVIEW_PENDING from the package; a rejected one adds VAC_REVIEW_REJECTED. ' +
     'It never changes a number of the package; it ends when the exposure, its spectrum or the target solid changes (a different review.fingerprint in the package) and is void in a copy of the document.',
   params: z.object({
     exposure: z.string().describe('Name of the exposure whose package is disposed (define_acoustic_exposure).'),
@@ -65,8 +65,11 @@ export const disposeAcousticExport = defineCommand({
     if (spectrum === undefined) return fail('VAC_SPECTRUM_UNKNOWN', `exposure '${name}' names no spectrum '${exposure.spectrum}'`);
     const entityId = exposure.target.entityId;
     const target = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
-    if (target === undefined || !is3D(target))
-      return fail('VAC_EXPOSURE_UNRESOLVED', `target '${entityId}' is not a 3D solid of the document`);
+    if (target === undefined || !is3D(target) || target.kind === 'instance')
+      return fail(
+        'VAC_EXPOSURE_UNRESOLVED',
+        `target '${entityId}' is not a 3D solid of the document (an instance has no exportable faces)`,
+      );
     const fingerprint = exposureFingerprint(doc, exposure, spectrum, target);
     const uid = documentIdentity(doc);
     const kept = replayed ? reviewOf(doc, name) : undefined;

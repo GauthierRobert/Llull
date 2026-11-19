@@ -231,14 +231,17 @@ Validation: VC-VAC-32 (grade B export: `unverified`, `reviewRequired`, `VAC_SPEC
 `approve_environment_deviation` / `dispose_bond_check` on the shared `shared/signedGate`: the signed payload is sha256 of (act `accept or reject an acoustic load package for qualification use`,
 ids `[exposure]`, `{ decision, justification, fingerprint, documentUid }`, nonce); the signature is verified and spent last (`humanGate`), after every other refusal; `confirmation` never reaches the
 history (`{ verified: true }`). An agent always gets `VAC_HUMAN_GATE`. Order of refusals: gate (no port / no confirmation) -> `VAC_PARAMS_INVALID` (blank justification) -> `VAC_EXPOSURE_UNKNOWN`
--> `VAC_SPECTRUM_UNKNOWN` -> `VAC_EXPOSURE_UNRESOLVED` (target not a 3D solid) -> replay check -> `VAC_DOCUMENT_UNIDENTIFIED` -> signature. Codes added: `VAC_HUMAN_GATE`,
+-> `VAC_SPECTRUM_UNKNOWN` -> `VAC_EXPOSURE_UNRESOLVED` (target not a 3D solid) -> replay check -> `VAC_DOCUMENT_UNIDENTIFIED` -> signature. A target that is an `instance` is `VAC_EXPOSURE_UNRESOLVED` (the export cannot resolve
+its faces, so no signature is spent on it). Signing: the act is verified by the signing port; desktop signing for it (`DISPOSE_ACTS`, a dialog) is not built yet. Codes added: `VAC_HUMAN_GATE`,
 `VAC_DOCUMENT_UNIDENTIFIED`, `VAC_REVIEW_REJECTED` (warning item).
-**Fingerprint (decision).** sha256 of the canonical JSON of the exposure, its spectrum, the document units and the target solid without its presentation keys (layer, colour, name, tags, material,
-decals, pattern seed). It is kernel-free so the gate and its replay need no kernel; it is stale when a level, band, source, field, face point or the solid's geometry / placement changes, and
+**Fingerprint (decision).** sha256 of the canonical JSON of the exposure, its spectrum, the document units and the target solid without its presentation keys (layer, colour, name, tags, decals,
+pattern seed) and without its material (excluded: no package number depends on it). It is kernel-free so the gate and its replay need no kernel; it is stale when a level, band, source, field, face point or the solid's geometry / placement changes, and
 not when the solid is only recoloured. Face areas are not in it: they follow from the solid's geometry.
 **Slice.** `vibroacoustics.reviews?: Record<exposure, { exposure, decision, justification, fingerprint, signer, signatureId, signature, documentUid }>` (zod, key = `exposure`, sha256
 fingerprint). No cross-check against `exposures`: the replay seed (`replaySeed` keeps only the reviews) seeds them before the steps re-create their exposures, and an orphan never matches a
 fingerprint. `delete_acoustic_exposure` drops the exposure's review.
+Known gap (all signed gates with a `replaySeed`; one fix scheduled): `set_step_suppressed` / `delete_step` on the dispose step regenerate a document that still
+holds the accepted review (the seed keeps it whatever the history says); pinned in `review.test.ts`.
 **Export.** `export_acoustic_load` re-verifies the stored review on every call through `ctx.humanSignature` and adds `review { status: none | accepted | rejected | stale | unconfirmed,
 fingerprint, signer?, signatureId?, justification?, unconfirmed? }` (the fingerprint is what the reviewer signs). Items: `none`, `stale`, `unconfirmed` (no port, foreign uid, invalid signature)
 -> `VAC_REVIEW_PENDING`; `rejected` -> `VAC_REVIEW_REJECTED`; a confirmed `accepted` -> no review item. `reviewRequired` stays `true` (the kind of package always needs a review). No number of
@@ -252,7 +255,7 @@ the payload and the fingerprint, so a change of the gate or of what the fingerpr
 `quantity: 'acceleration'`); it has no distributed random pressure input, and its V2 lists "acoustic loads from PHY-20". Plan: (1) PHY-09 adds a `pressure` spectrum quantity (Pa^2/Hz) and
 a `CaseDynamics.pressure { exposure, faces, correlation: 'full' }` input; (2) a VAC command `acoustic_pressure_load { exposure, analysisId }` writes the band PSD of the exposure (`bandRows`
 `psdPa2PerHz`, step-wise per band, converted to MPa^2/Hz in N-mm-t-s) as that spectrum and the exact faces (`facesNearPoints`) as the target, with the named assumption "uniform, fully correlated
-pressure, in phase over all exposed faces" (FUNCTIONAL_SPEC risk table) and `reviewRequired`; (3) the modal force of mode r is `Gamma_r = phi_r^T F` with F the consistent nodal load of a
+pressure, in phase over all exposed faces" (FUNCTIONAL_SPEC risk table) and `reviewRequired`; that load either carries its own review or puts `materialId` in its fingerprint (the package fingerprint excludes the material, which a structural load depends on); (3) the modal force of mode r is `Gamma_r = phi_r^T F` with F the consistent nodal load of a
 unit pressure on those faces, so the response ASD is `sum_rs H_r H_s* Gamma_r Gamma_s G_p(f)`; this needs the mode shapes from a CalculiX `*FREQUENCY` run and the face load vector from the
 05 deck writer, so it cannot be tested without a solve. VC-VAC-34 then compares a flat plate under uniform pressure with the analytic fully correlated SDOF result. The viewport face highlight
 and the band chart (`src/ui`, Lane 2) are not built here.

@@ -23,7 +23,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   KRN_FACE_QUERY_FAILED: 'retry; check the solid is valid with inspect_topology',
   VAC_PARAMS_INVALID: 'follow the command description',
   VAC_HUMAN_GATE:
-    'hand the package to the qualified reviewer, who signs dispose_acoustic_export in the desktop app; an agent cannot, do not retry',
+    'hand the package to the qualified reviewer, who signs dispose_acoustic_export with the signing port (desktop signing for this act is not built yet); an agent cannot, do not retry',
   VAC_DOCUMENT_UNIDENTIFIED: 'run any mutating command first (the document gets its uid), then ask for the review',
 };
 
