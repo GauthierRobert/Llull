@@ -101,8 +101,8 @@ export const computeViewFactors = defineCommand({
         "How facet pairs are integrated. 'full' (default): every ordered pair by the adaptive contour rule, the reference numbers. " +
           "'reciprocal': one integral per unordered pair, used for both directions (A_i F_ij = A_j F_ji), and a single 8-point panel when the " +
           'facet centroids are at least 5 x (r_i + r_j) apart (r = largest centroid-to-corner distance): about 5x less CPU on large meshed ' +
-          'cavities (2.5x with obstruction); other numbers: matrix entries within 1e-12 relative of full, row sums within 2e-13 (tested on ' +
-          'meshed enclosures; measured 7e-14 and 2e-14 at 3 072 facets). ' +
+          'cavities (2.5x with obstruction); on meshed enclosures matrix entries within 1e-12 relative of full, row sums within 2e-13 (measured 7e-14 and 2e-14 at 3 072 ' +
+          'facets); tiny entries between small, distant surfaces agree only to about 1e-9 relative (rounding of the contour sum, both rules). ' +
           'Without obstruction F is then reciprocal by construction, so reciprocityMaxError is 0 and no longer checks the quadrature; ' +
           'obstruction is still tested in both directions.',
       ),
@@ -217,7 +217,7 @@ export const computeViewFactors = defineCommand({
         doc,
         'THM_FACET_LIMIT',
         `the native view-factor run failed and ${total + blockerFacets.length} facets exceed the TypeScript limit of ${TS_REFERENCE_FACETS}`,
-        'Retry (see the llull-compute warning), or increase maxFacetSize to stay within the TypeScript limit.',
+        'Retry (see the llull-compute warning; a binary that does not know integration: reciprocal must be rebuilt), or increase maxFacetSize to stay within the TypeScript limit.',
         ['maxFacetSize'],
       );
     const exchange = native ?? viewFactorExchangeReference(engine, groups, blockers, { integration });

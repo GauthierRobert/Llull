@@ -25,9 +25,9 @@ const MAX_DEPTH = 48;
  * centroid-to-corner distance of a facet. The facets are then at least (SEPARATION - 1)(r_i + r_j) apart and no edge is longer than 2 r,
  * so, mapped to [-1, 1], the outer integrand of an edge pair has no singularity within D = SEPARATION - 1 = 4 of the interval. Error
  * bound of ONE 8-point Gauss-Legendre panel (Trefethen 2008, Thm 4.5, on the Bernstein ellipse at 3/4 of that distance, rho = 3 + sqrt(10)
- * = 6.2): 64 M / (15 (rho^2 - 1) rho^16) / 2 = 1.2e-14 M, M = the deviation of the integrand from a constant there (<= ln 4 + ln 1.5 ~ 2),
- * so about 2.5e-14 absolute per edge-pair integral, the order of the adaptive rule's 1e-13. The contour sum cancels the common ln r of a
- * far pair, so its A_i F_ij is relatively less exact than that (up to ~1e-11 by this bound), but such pairs carry little of a surface's
+ * = 6.2): 64 M / (15 (rho^2 - 1) rho^16) / 2 = 1.33e-14 M, M = the deviation of the integrand from a constant there (<= ln 4 + ln 1.5 ~ 2),
+ * so about 2.7e-14 absolute per edge-pair integral, the order of the adaptive rule's 1e-13. The contour sum cancels the common ln r of a
+ * far pair, so its A_i F_ij is relatively less exact than that (measured up to 7e-10 relative on two slivers just past the threshold; both rules share this rounding), but such pairs carry little of a surface's
  * exchange. Measured: < 5e-14 per edge-pair integral just beyond the threshold; matrix entries of meshed cube cavities within 7.3e-14
  * relative of `full`, row sums 1.9e-14 (3 072 facets); tested at 1e-12 / 2e-13 (tests/unit/physics/thermal/viewFactorIntegration.test.ts,
  * llull-geomq `reciprocal_tests.rs`).
