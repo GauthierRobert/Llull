@@ -1,4 +1,4 @@
-/** A document with every part of the electroOptical slice populated (slice fuzz seed): paths, a coating assignment and a signed disposition. */
+/** A document with every part of the electroOptical slice populated (slice fuzz seed): paths, coating assignments, a lightning zone label and a signed disposition. */
 
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -29,6 +29,7 @@ export function electroOpticalDocument(): CadDocument {
     electrical: 'insulating',
     source: { citation: 'seed' },
   });
+  next = run(next, 'set_lightning_zone', { entityId: aliases['box'], zone: '2A', source: { citation: 'seed zoning' } });
   const disposed = execute(
     next,
     'dispose_bond_check',

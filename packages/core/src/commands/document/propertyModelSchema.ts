@@ -38,6 +38,13 @@ export const formSchema: z.ZodType<PropertyForm> = z.lazy(
       }),
       z.object({ kind: z.literal('polynomial'), variable, coefficients: z.array(z.number()), origin: z.number().optional() }),
       z.object({ kind: z.literal('log10Polynomial'), variable, coefficients: z.array(z.number()) }),
+      z.object({
+        kind: z.literal('linearCoefficient'),
+        variable,
+        referenceValue: z.number(),
+        coefficient: z.number(),
+        reference: z.number(),
+      }),
       z.object({ kind: z.literal('nistRational'), coefficients: z.array(z.number()) }),
       z.object({
         kind: z.literal('arrhenius'),
@@ -110,7 +117,7 @@ export const modelInputSchema = z.object({
     .describe(
       'The law, by kind: constant {value}; table1d {variable, points [[x,y]…] strictly increasing, interpolation linear|loglinear|loglog|step}; ' +
         'table2d {x, y (variable, unit, axis linear|log10), xs, ys, values[i][j], interpolation bilinear}; polynomial {variable, coefficients c0…, origin?} ' +
-        '(y = Σ c_k (x − origin)^k); log10Polynomial {variable, coefficients a…i} (log10 y = Σ c_k (log10 x)^k, NIST); nistRational {coefficients a…i, exactly 9}; ' +
+        '(y = Σ c_k (x − origin)^k); log10Polynomial {variable, coefficients a…i} (log10 y = Σ c_k (log10 x)^k, NIST); linearCoefficient {variable, referenceValue, coefficient, reference} (y = referenceValue (1 + coefficient (x − reference)), e.g. rho(T) = rho20 (1 + alphaR (T − 20 degC)); coefficient per unit of the variable, so with T in degC alphaR is in 1/K); nistRational {coefficients a…i, exactly 9}; ' +
         'arrhenius {preFactor, activationEnergyJPerMol, temperatureExponent?}; powerLaw {variable, coefficient, exponent, reference}; ' +
         'piecewise {variable, segments [{upTo, form}]} (left segment wins at a breakpoint); product {factors}; rateFactor {law johnsonCook, C, referenceRate} | ' +
         '{law cowperSymonds, D, q}; ratioOf {baseModelId, ratio}.',

@@ -21,6 +21,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EOP_NOTHING_TO_DISPOSE: 'only a fail or unknown path can be accepted, rejected or sent back for redesign',
   EOP_BOND_INPUTS_CHANGED: 'the path changed after the check: run check_bonding again',
   EOP_HUMAN_GATE: 'hand the path to the qualified reviewer, who signs the decision in the desktop app; do not retry',
+  EOP_ZONE_SOURCE_REQUIRED:
+    'give source.citation: the zoning drawing or report (SAE ARP5414A zoning by the applicant); llull never zones a part',
+  EOP_ZONE_NOT_FOUND: 'the solid has no lightning zone label (set_lightning_zone)',
   EOP_DOCUMENT_UNIDENTIFIED: 'save the document first so it has a uid',
 };
 

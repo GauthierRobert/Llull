@@ -10,7 +10,7 @@ import { checkedRows } from './checkBonding';
 import { refuseEop } from './codes';
 import { DISPOSE_ACT, dispositionDetails } from './gate';
 import { nonceOf } from '../shared/signedGate';
-import { dispositionOf, electroOpticalOf, withElectroOptical } from './model';
+import { EOP_LIMITS, dispositionOf, electroOpticalOf, withElectroOptical } from './model';
 import { DISPOSITIONS, type BondDisposition } from './types';
 
 const COMMAND = 'dispose_bond_check';
@@ -32,7 +32,10 @@ export const disposeBondCheck = defineCommand({
   params: z.object({
     pathId: z.string().describe('Bond path id from check_bonding.'),
     decision: z.enum(DISPOSITIONS).describe("The reviewer's decision."),
-    justification: z.string().describe('Mandatory engineering justification (non-empty).'),
+    justification: z
+      .string()
+      .max(EOP_LIMITS.justification)
+      .describe(`Mandatory engineering justification (non-empty, at most ${EOP_LIMITS.justification} characters).`),
     confirmation: z
       .unknown()
       .optional()

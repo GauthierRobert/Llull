@@ -60,6 +60,14 @@ export type PropertyForm =
     }
   | { readonly kind: 'polynomial'; readonly variable: PropertyVariable; readonly coefficients: readonly number[]; readonly origin?: number }
   | { readonly kind: 'log10Polynomial'; readonly variable: PropertyVariable; readonly coefficients: readonly number[] }
+  /** y = referenceValue (1 + coefficient (x - reference)): a linear temperature coefficient such as rho(T) = rho0 (1 + alpha (T - T0)); `coefficient` is per unit of the variable's unit. */
+  | {
+      readonly kind: 'linearCoefficient';
+      readonly variable: PropertyVariable;
+      readonly referenceValue: number;
+      readonly coefficient: number;
+      readonly reference: number;
+    }
   | { readonly kind: 'nistRational'; readonly coefficients: readonly number[] }
   | {
       readonly kind: 'arrhenius';
@@ -158,6 +166,7 @@ export function formVariables(form: PropertyForm): PropertyVariable[] {
     case 'table1d':
     case 'polynomial':
     case 'log10Polynomial':
+    case 'linearCoefficient':
     case 'powerLaw':
       return [form.variable];
     case 'piecewise':

@@ -75,7 +75,7 @@ export const definePropertyModel = defineCommand({
     'Attach a property model to a material (create_material first): a law such as thermal conductivity k(T), specific heat cp(T), ' +
     "Young's modulus E(T), thermal strain or a strain-rate factor, with the unit of its output, every variable with its unit, a REQUIRED " +
     'valid range per variable (data range of the measurements and the wider equation range the source allows), a basis and the source ' +
-    'citation. Forms: constant, table1d, table2d, polynomial, log10Polynomial (NIST), nistRational (NIST copper), arrhenius, powerLaw, ' +
+    'citation. Forms: constant, table1d, table2d, polynomial, log10Polynomial (NIST), linearCoefficient (rho0 (1 + alpha (T - T0))), nistRational (NIST copper), arrhenius, powerLaw, ' +
     'piecewise, product, rateFactor (Johnson-Cook / Cowper-Symonds), ratioOf (e.g. % of room temperature). The coefficient hash is ' +
     'recomputed; llull never extrapolates outside the range. Next: evaluate_property / sample_property, then check_property_models.',
   params: z.object({

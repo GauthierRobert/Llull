@@ -4,6 +4,7 @@
  */
 
 import { convertValue, isUnitFailure, parseUnit, sameDimension } from '../lib/quantity';
+import { linearBoundsProblem } from './propertyLinearBounds';
 import { catalogEntry } from './propertyCatalog';
 import { formVariables, type PropertyForm, type PropertyModel } from './propertyModel';
 
@@ -101,6 +102,10 @@ function formProblem(form: PropertyForm, path: string, knownModelIds: ReadonlySe
       return Number.isFinite(form.preFactor) && Number.isFinite(form.activationEnergyJPerMol)
         ? null
         : invalid('preFactor', 'must be finite');
+    case 'linearCoefficient':
+      return finite([form.referenceValue, form.coefficient, form.reference])
+        ? null
+        : invalid('coefficient', 'referenceValue, coefficient and reference must be finite');
     case 'powerLaw':
       return form.reference > 0 && finite([form.coefficient, form.exponent]) ? null : invalid('reference', 'reference must be > 0');
     case 'rateFactor':
@@ -201,7 +206,7 @@ export function modelProblem(model: PropertyModel, otherModelIds: ReadonlySet<st
   }
   const coverage = coverageProblem(model);
   if (coverage !== null) return coverage;
-  return null;
+  return linearBoundsProblem(model, entry);
 }
 
 /** Forms that read T as an absolute temperature (logarithms, powers, exp(−Q/RT)). */

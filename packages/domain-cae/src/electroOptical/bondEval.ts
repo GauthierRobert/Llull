@@ -66,6 +66,11 @@ const FAIL_ORDER = ['EOP_COATING_INSULATES', 'EOP_BOND_RESISTANCE_EXCEEDED'];
 
 /** A composite material cannot replace a metallic bond path: its record names a composite product form or designation (a heuristic on the record text, stated in the warning). */
 const COMPOSITE_TEXT = /cfrp|carbon|composite|laminate|prepreg|fabric|gfrp|kevlar/i;
+/** Metals whose names hold a composite word ("carbon steel", "AISI 1020 carbon steel"). */
+const METAL_TEXT = /carbon[\s-]+steel/gi;
+
+/** True when a material record's text names a composite (carbon steel excluded). */
+export const isCompositeText = (text: string): boolean => COMPOSITE_TEXT.test(text.replace(METAL_TEXT, ' '));
 
 interface Evaluated {
   readonly row: BondElementRow;
@@ -108,9 +113,9 @@ function evaluateElement(
   if ('code' in rho)
     return { row: strap(null, element.material), finding: { code: rho.code, message: `strap ${rho.message}` }, unverified: [] };
   const record = Object.hasOwn(doc.materials, element.material) ? doc.materials[element.material]?.record : undefined;
-  const composite = COMPOSITE_TEXT.test(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
+  const composite = isCompositeText(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
   return {
-    row: strap(bulkResistance(rho.rho, length.value, area.value), `${rho.provenance}; R = rho L / A`),
+    row: strap(bulkResistance(rho.rho, length.value, area.value), `${rho.provenance}; ${rho.temperatureModel}; R = rho L / A`),
     ...(composite
       ? {
           warning: {

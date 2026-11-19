@@ -11,6 +11,8 @@ export interface Resistivity {
   readonly unverified: boolean;
   readonly reasons: readonly string[];
   readonly provenance: string;
+  /** How rho depends on T, named for the result (TR-EOP-11: `none` for a constant model). */
+  readonly temperatureModel: string;
 }
 
 export interface Unavailable {
@@ -48,10 +50,20 @@ export function resistivityOf(
   const reasons = Array.isArray(data['unverifiedReasons'])
     ? data['unverifiedReasons'].filter((reason): reason is string => typeof reason === 'string')
     : [];
+  const kind = typeof data['form'] === 'string' ? data['form'] : 'unknown';
   return {
     rho: data['value'],
+    temperatureModel: temperatureModelOf(kind, temperature),
     unverified: data['unverified'] === true,
     reasons,
     provenance: `${material}: ${provenance} (${String(data['method'] ?? 'model')})`,
   };
+}
+
+/** Plain name of a resistivity model's temperature dependence. */
+function temperatureModelOf(kind: string, temperature: { readonly value: number; readonly unit: string } | undefined): string {
+  if (kind === 'constant') return 'none (constant model)';
+  const at = temperature === undefined ? '' : ` at ${temperature.value} ${temperature.unit}`;
+  if (kind === 'linearCoefficient') return `linear temperature coefficient rho0 (1 + alpha (T - T0))${at}`;
+  return `PHY-01 ${kind} model${at}`;
 }
