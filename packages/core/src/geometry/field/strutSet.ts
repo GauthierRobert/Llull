@@ -8,7 +8,6 @@ import type { Vec3 } from '../../model/types';
 import type { StrutSet } from './program';
 import { BVH_MIN_SEGMENTS, buildStrutBvh } from './strutBvh';
 import { maxOf, minOf } from '../../lib/arrayExtrema';
-import { hypotOf } from '../../lib/hypotOf';
 
 export interface StrutEvaluator {
   /** Signed distance at (x, y, z); `radius` >= 0 replaces every beam radius (spherical caps), -1 keeps the beam radii. */
@@ -138,12 +137,8 @@ function pointSegmentDistance(seg: Segment, x: number, y: number, z: number): nu
 
 /** Gap between the bounding box of seg and the box [lo, hi] (0 when they overlap): a lower bound of the segment-box distance. */
 function boxGap(seg: Segment, lo: Vec3, hi: Vec3): number {
-  const ends: ReadonlyArray<readonly [number, number]> = [
-    [seg.ax, seg.ax + seg.dx],
-    [seg.ay, seg.ay + seg.dy],
-    [seg.az, seg.az + seg.dz],
-  ];
-  return hypotOf(ends.map(([a, b], axis) => Math.max(Math.min(a, b) - (hi[axis] as number), (lo[axis] as number) - Math.max(a, b), 0)));
+  const gap = (a: number, b: number, axis: 0 | 1 | 2): number => Math.max(Math.min(a, b) - hi[axis], lo[axis] - Math.max(a, b), 0);
+  return Math.hypot(gap(seg.ax, seg.ax + seg.dx, 0), gap(seg.ay, seg.ay + seg.dy, 1), gap(seg.az, seg.az + seg.dz, 2));
 }
 
 /**

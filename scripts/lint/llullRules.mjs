@@ -6,7 +6,7 @@
  * - `no-spread-call`: no spread argument list (`f(...xs)`, `f.apply(t, xs)`, `f.call(t, ...xs)`, `Reflect.apply(f, t, xs)`) into
  *   Math.max / min / hypot, `.push` / `.unshift` / `.splice`, String.fromCharCode / fromCodePoint: it passes every element as a call
  *   argument and throws RangeError above ~1.5e5 items (PERF1 row 12). Use maxOf / minOf (@lib/arrayExtrema), hypotOf (@lib/hypotOf),
- *   appendAll (@lib/appendAll), spliceAll (@lib/spliceAll), or decode char codes in chunks.
+ *   appendAll (@lib/appendAll), spliceAll (@lib/spliceAll), or stringFromCharCodes (@lib/charCodes).
  */
 const noImportMeta = {
   meta: { type: 'problem', docs: { description: 'Disallow import.meta in CommonJS-bundled sources' } },
@@ -110,7 +110,7 @@ const noSpreadCall = {
   },
   create(context) {
     const message =
-      'A spread (or apply) argument list throws RangeError above ~1.5e5 items: use maxOf / minOf from @lib/arrayExtrema, hypotOf from @lib/hypotOf, appendAll from @lib/appendAll, spliceAll from @lib/spliceAll, a chunked String.fromCharCode, or name the components of a small tuple.';
+      'A spread (or apply) argument list throws RangeError above ~1.5e5 items: use maxOf / minOf from @lib/arrayExtrema, hypotOf from @lib/hypotOf, appendAll from @lib/appendAll, spliceAll from @lib/spliceAll, stringFromCharCodes from @lib/charCodes, or name the components of a small tuple.';
     return {
       CallExpression(node) {
         const callee = unwrap(node.callee);

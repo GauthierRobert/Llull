@@ -90,6 +90,7 @@ describe('llull/no-spread-call', () => {
       'declare const xs: number[]; declare const out: number[]; declare const v: [number, number, number];',
       'declare function fn(...v: number[]): number;',
       'fn(...xs);',
+      'fn.call(null, ...xs);',
       'new Set([...xs]);',
       'fn.apply(null, xs);',
       'Math.hypot(v[0], v[1], v[2]);',
