@@ -16,8 +16,22 @@ export const batterySchema = z.strictObject({
     .max(200),
   cutoffVoltPerCell: z.number().positive(),
   initialSoc: z.number().min(0).max(1),
+  peukertExponent: z.number().min(1).max(2).optional(),
+  peukertRatedHours: z.number().positive().max(1000).optional(),
   source: text,
   defaulted: z.array(z.string()),
+});
+
+/** Largest axis of an ESC efficiency map. */
+const MAP_AXIS_POINTS = 64;
+
+const escEfficiencyMapSchema = z.strictObject({
+  throttle: z.array(z.number().min(0)).min(2).max(MAP_AXIS_POINTS),
+  currentA: z.array(z.number().min(0)).min(2).max(MAP_AXIS_POINTS),
+  efficiency: z
+    .array(z.array(z.number().gt(0).max(1)).max(MAP_AXIS_POINTS))
+    .min(2)
+    .max(MAP_AXIS_POINTS),
 });
 
 export const powertrainSchema = z.strictObject({
@@ -27,6 +41,8 @@ export const powertrainSchema = z.strictObject({
   motor: datasheetSchema,
   motorSource: text,
   escEfficiency: z.number().gt(0).max(1),
+  escEfficiencyMap: escEfficiencyMapSchema.optional(),
+  motorAmbientC: z.number().min(-100).max(200).optional(),
   auxiliaryPowerW: z.number().min(0),
   defaulted: z.array(z.string()),
 });
@@ -41,6 +57,17 @@ export function ocvProblem(ocv: readonly (readonly [number, number])[], cutoffVo
   if (ocv.some((point, i) => i > 0 && point[1] < (ocv[i - 1]?.[1] ?? Infinity)))
     return 'ocv voltage must not decrease with state of charge';
   if (cutoffVoltPerCell >= last[1]) return 'cutoffVoltPerCell must be below the full-charge open-circuit voltage';
+  return null;
+}
+
+/** Why an ESC efficiency map is unusable (axes not strictly increasing, a row count or length that does not match the axes), or null. */
+export function escMapProblem(map: z.infer<typeof escEfficiencyMapSchema>): string | null {
+  const increasing = (axis: readonly number[]): boolean => axis.every((value, i) => i === 0 || value > (axis[i - 1] ?? Infinity));
+  if (!increasing(map.throttle)) return 'escEfficiencyMap.throttle must strictly increase';
+  if (!increasing(map.currentA)) return 'escEfficiencyMap.currentA must strictly increase';
+  if (map.efficiency.length !== map.throttle.length) return 'escEfficiencyMap.efficiency needs one row per throttle point';
+  if (map.efficiency.some((row) => row.length !== map.currentA.length))
+    return 'escEfficiencyMap.efficiency rows need one value per currentA point';
   return null;
 }
 
@@ -68,6 +95,8 @@ export function powerErrors(slice: PowerSlice, dynamicsIds: ReadonlySet<string>)
     if (Object.hasOwn(powertrains, key)) errors.push(`${at}: id '${key}' is also a powertrain`);
     const problem = ocvProblem(entry.ocv, entry.cutoffVoltPerCell);
     if (problem !== null) errors.push(`${at}: ${problem}`);
+    if (entry.peukertRatedHours !== undefined && entry.peukertExponent === undefined)
+      errors.push(`${at}.peukertRatedHours: only with peukertExponent`);
   }
   const usedBatteries = new Set<string>();
   const usedRotors = new Set<string>();
@@ -79,6 +108,8 @@ export function powerErrors(slice: PowerSlice, dynamicsIds: ReadonlySet<string>)
     else if (usedBatteries.has(entry.batteryId)) errors.push(`${at}.batteryId: battery '${entry.batteryId}' feeds another powertrain`);
     usedBatteries.add(entry.batteryId);
     if (new Set(entry.rotorIds).size !== entry.rotorIds.length) errors.push(`${at}.rotorIds: a rotor is listed twice`);
+    const mapProblem = entry.escEfficiencyMap === undefined ? null : escMapProblem(entry.escEfficiencyMap);
+    if (mapProblem !== null) errors.push(`${at}.${mapProblem}`);
     for (const rotorId of entry.rotorIds) {
       if (!Object.hasOwn(slice.rotors, rotorId)) errors.push(`${at}.rotorIds: '${rotorId}' is not a rotor`);
       else if (usedRotors.has(rotorId)) errors.push(`${at}.rotorIds: rotor '${rotorId}' is on another powertrain`);

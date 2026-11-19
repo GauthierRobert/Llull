@@ -9,13 +9,14 @@ import { compilePower, type MotorLoad } from '../flight/powerBlock';
 import { motorPoint } from '../flight/powerChain';
 import { compileRotor, rotorOutput, staticCoefficients } from '../flight/rotorLaw';
 import { pow } from '@lib/pow';
+import { continuousCurrentAtLimit, steadyWindingC } from '../sim/actuators/thermal';
 
 const format = (value: number): string => (Number.isFinite(value) ? value.toPrecision(4) : String(value));
 
 const AT_REST = { position: [0, 0, 0], orientation: [1, 0, 0, 0], linearVelocity: [0, 0, 0], angularVelocity: [0, 0, 0] } as const;
 
 /**
- * @affects nothing — read-only; data { rotors[], bus, hover, endurance, capacityOverCurrentS }
+ * @affects nothing — read-only; data { rotors[], bus, hover, endurance, capacityOverCurrentS, motorThermal? }
  * @invariant deterministic; the same pack and motor laws as run_flight (flight/powerChain); rotors at J = 0 (static / hover), speeds fixed over the discharge
  * @failure unknown powertrain, both `rpm` and `totalThrustN`, a rotor without static thrust under `totalThrustN` -> no-op with the reason
  */
@@ -30,7 +31,9 @@ export const estimateEnduranceCommand = defineCommand({
     "shared equally over the powertrain's rotors with their static thrust coefficient, else each rotor's own rpm. data: rotors[] { id, rpm, thrustN, " +
     'shaftPowerW, torqueNm, motorCurrentA, motorVoltageV }; bus { electricalPowerW, currentA, terminalV, throttle (motor V / pack V) }; hover { shaftPowerW, ' +
     'idealPowerW = Σ T^1.5/sqrt(2ρA) (momentum theory), figureOfMerit }; endurance { timeS, timeMin, limitedBy, usedMah, energyWh, finalSoc }; ' +
-    'capacityOverCurrentS = initial charge / initial current (the constant-current endurance: the upper bound that ignores sag and the SoC floor). ' +
+    'capacityOverCurrentS = initial charge / initial current (the constant-current endurance: the upper bound that ignores sag and the SoC floor; with a Peukert exponent the drain current I·(I/I_rated)^(k-1)). ' +
+    'With a motor thermal datasheet, motorThermal { ambientC, maxWindingC, continuousCurrentA, motors[] { id, steadyWindingC (null = thermal runaway) } } ' +
+    'gives the steady winding temperature at the hover current (FLT_MOTOR_OVERTEMP in the summary when above the limit). ' +
     'Read-only; flight_report / run_flight give the same chain in a real flight.',
   params: z.object({
     powertrain: z.string().describe('Id of the powertrain (add_flight_powertrain).'),
@@ -82,6 +85,21 @@ export const estimateEnduranceCommand = defineCommand({
         sum + pow(output.thrust, 1.5) / Math.sqrt(2 * rotor.rotor.airDensity * Math.PI * (rotor.rotor.diameter / 2) ** 2),
       0,
     );
+    const network = feed.thermal;
+    const thermal =
+      network === null
+        ? null
+        : {
+            ambientC: feed.ambientC,
+            maxWindingC: network.maxWindingC,
+            continuousCurrentA: continuousCurrentAtLimit(network, feed.ambientC),
+            motors: rows.map(({ rotor, motor }) => ({
+              id: rotor.rotor.id,
+              steadyWindingC: steadyWindingC(network, motor.currentA, feed.ambientC),
+            })),
+          };
+    const overheated =
+      thermal === null ? [] : thermal.motors.filter((motor) => motor.steadyWindingC === null || motor.steadyWindingC > thermal.maxWindingC);
     const data = {
       powertrain: powertrain.id,
       battery: battery.id,
@@ -110,6 +128,7 @@ export const estimateEnduranceCommand = defineCommand({
         finalSoc: result.finalSoc,
       },
       capacityOverCurrentS: result.capacityOverCurrentS,
+      ...(thermal === null ? {} : { motorThermal: thermal }),
       unverified: [...battery.defaulted, ...powertrain.defaulted].length > 0,
       defaulted: [
         ...battery.defaulted.map((name) => `battery.${battery.id}.${name}`),
@@ -117,9 +136,12 @@ export const estimateEnduranceCommand = defineCommand({
       ],
     };
     const warning =
-      result.limitedBy === 'motor_voltage' || result.limitedBy === 'pack_power'
+      (result.limitedBy === 'motor_voltage' || result.limitedBy === 'pack_power'
         ? `; the pack cannot hold this load (${result.limitedBy})`
-        : '';
+        : '') +
+      (thermal === null || overheated.length === 0
+        ? ''
+        : `; FLT_MOTOR_OVERTEMP: the steady winding of ${overheated.map((motor) => `'${motor.id}'`).join(', ')} exceeds ${format(thermal.maxWindingC)} C at this current (continuous limit ${format(thermal.continuousCurrentA)} A)`);
     return report(
       doc,
       `estimate_endurance: '${powertrain.id}' on '${battery.id}' — ${rows.length} rotor(s), shaft ${format(shaft)} W (ideal ${format(ideal)} W), electrical ${format(result.initial.busPowerW)} W, ` +

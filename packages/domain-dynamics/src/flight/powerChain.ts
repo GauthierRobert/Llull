@@ -1,10 +1,13 @@
 /**
  * Battery / ESC / motor laws of the power chain (13 FLT M3, TR-FLT-06), pure functions shared by the flight block and estimate_endurance.
- * Motor: the DC law of the datasheet (ke = kt, i = Q / kt + I0, V = kt·ω + R·i). ESC: constant efficiency, throttle = V_motor / V_pack.
- * Pack: V = OCV(SoC) - R_int·I with P_bus = V·I, so I = (OCV - sqrt(OCV² - 4·R_int·P)) / (2·R_int).
+ * Motor: the DC law of the datasheet (ke = kt, i = Q / kt + I0, V = kt·ω + R·i). ESC: constant efficiency or a map η(throttle, current),
+ * throttle = V_motor / V_pack. Pack: V = OCV(SoC) - R_int·I with P_bus = V·I, so I = (OCV - sqrt(OCV² - 4·R_int·P)) / (2·R_int); the state of
+ * charge drains at the Peukert rate I·(I / I_rated)^(k-1) (Peukert 1897; Linden's Handbook of Batteries, 4th ed., §3.2), I itself for k = 1.
  */
 
 import type { DcMotorDatasheet } from '@core/model/drives';
+import { interp1 } from '@lib/interp1';
+import { pow } from '@lib/pow';
 import type { FlightBattery, FlightPowertrain } from './powerModel';
 
 /** A pack ready for the loop: pack-level voltages, charge in coulombs. */
@@ -13,15 +16,34 @@ export interface PackLaw {
   readonly resistanceOhm: number;
   readonly cutoffV: number;
   readonly points: readonly (readonly [number, number])[];
+  /** Peukert exponent and rated current (A); absent for k = 1. */
+  readonly peukert?: { readonly exponent: number; readonly ratedCurrentA: number };
 }
 
+/** Rated discharge time of the Peukert law unless the battery gives one, h (the 1C rating of LiPo datasheets). */
+export const DEFAULT_PEUKERT_RATED_HOURS = 1;
+
 export function packLaw(battery: FlightBattery): PackLaw {
-  return {
+  const law: PackLaw = {
     capacityAs: battery.capacityMah * 3.6,
     resistanceOhm: battery.internalResistanceOhm,
     cutoffV: battery.cutoffVoltPerCell * battery.cellsSeries,
     points: battery.ocv.map(([soc, volts]) => [soc, volts * battery.cellsSeries] as const),
   };
+  const exponent = battery.peukertExponent;
+  if (exponent === undefined || exponent === 1) return law;
+  const hours = battery.peukertRatedHours ?? DEFAULT_PEUKERT_RATED_HOURS;
+  return { ...law, peukert: { exponent, ratedCurrentA: battery.capacityMah / 1000 / hours } };
+}
+
+/**
+ * Current (A) at which `currentA` drains the rated charge (Peukert): I·(I / I_rated)^(k-1), so a constant I empties the pack in
+ * C·(I_rated / I)^(k-1) / I; `currentA` itself without an exponent or without a current.
+ */
+export function drainCurrentA(pack: PackLaw, currentA: number): number {
+  const law = pack.peukert;
+  if (law === undefined || !(currentA > 0)) return currentA;
+  return currentA * pow(currentA / law.ratedCurrentA, law.exponent - 1);
 }
 
 /** Open-circuit voltage of the pack at state of charge `soc` (linear between the table points, held flat outside). */
@@ -115,10 +137,53 @@ export function maxOmega(law: MotorLaw, torqueRef: number, omegaRef: number, vol
   return a > 0 ? (2 * free) / (law.kt + Math.sqrt(law.kt * law.kt + 4 * a * free)) : free / law.kt;
 }
 
-/** Electrical power into the ESCs for motors at (voltage, current) pairs: Σ V·i / η plus the auxiliary load, W. */
-export function busPower(
+/** ESC efficiency of `powertrain` at a throttle and motor current: the map (bilinear, end values held) or the constant. */
+export function escEfficiencyAt(powertrain: FlightPowertrain, throttle: number, currentA: number): number {
+  const map = powertrain.escEfficiencyMap;
+  if (map === undefined) return powertrain.escEfficiency;
+  const rows = map.efficiency.map((row) => interp1(map.currentA, row, currentA));
+  return interp1(map.throttle, rows, throttle);
+}
+
+type MotorPoint = { readonly currentA: number; readonly voltageV: number };
+
+/**
+ * Electrical power into the ESCs for motors at (voltage, current) pairs: Σ V·i / η plus the auxiliary load, W. `packVolts` is the pack voltage the
+ * throttle V / V_pack of a map is read at (unused with a constant efficiency).
+ */
+export function busPower(powertrain: FlightPowertrain, motors: readonly MotorPoint[], packVolts: number): number {
+  if (powertrain.escEfficiencyMap === undefined)
+    return motors.reduce((sum, m) => sum + (m.voltageV * m.currentA) / powertrain.escEfficiency, 0) + powertrain.auxiliaryPowerW;
+  const throttleOf = (m: MotorPoint): number => (packVolts > 0 ? m.voltageV / packVolts : 1);
+  return (
+    motors.reduce((sum, m) => sum + (m.voltageV * m.currentA) / escEfficiencyAt(powertrain, throttleOf(m), m.currentA), 0) +
+    powertrain.auxiliaryPowerW
+  );
+}
+
+/** Fixed-point sweeps of the map's throttle against the terminal voltage it gives (the map depends weakly on it: a few sweeps converge). */
+const MAP_SWEEPS = 30;
+const MAP_TOLERANCE = 1e-12;
+
+/**
+ * Bus power and pack solution for motors at `motors` at open-circuit voltage `ocv`: with a constant efficiency the power is fixed; with a map the
+ * throttle is read at the terminal voltage, which depends on the power, so the two are iterated to a fixed point (relative 1e-12).
+ */
+export function solveChain(
+  pack: PackLaw,
   powertrain: FlightPowertrain,
-  motors: readonly { readonly currentA: number; readonly voltageV: number }[],
-): number {
-  return motors.reduce((sum, m) => sum + (m.voltageV * m.currentA) / powertrain.escEfficiency, 0) + powertrain.auxiliaryPowerW;
+  ocv: number,
+  motors: readonly MotorPoint[],
+): { readonly powerW: number; readonly solved: { readonly currentA: number; readonly terminalV: number } | null } {
+  let volts = ocv;
+  let powerW = busPower(powertrain, motors, volts);
+  let solved = solveBus(pack, ocv, powerW);
+  if (powertrain.escEfficiencyMap === undefined) return { powerW, solved };
+  for (let sweep = 0; sweep < MAP_SWEEPS && solved !== null; sweep++) {
+    if (Math.abs(solved.terminalV - volts) <= MAP_TOLERANCE * ocv) break;
+    volts = solved.terminalV;
+    powerW = busPower(powertrain, motors, volts);
+    solved = solveBus(pack, ocv, powerW);
+  }
+  return { powerW, solved };
 }

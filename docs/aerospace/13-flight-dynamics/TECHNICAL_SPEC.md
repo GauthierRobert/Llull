@@ -405,6 +405,38 @@ verified against closed forms, not against a measured pack.
 **Not in M3 / remainder.** Motor thermal limits and ESC efficiency maps, Peukert / temperature dependence of the cell, the bench measurement of
 VC-FLT-11, a minimum-endurance limit in `flight_report`, a viewport trace of SoC, and non-dc motors (PMSM / stepper data cannot yet feed the chain).
 
+### 15.1 As built (FLT-M3b, 2026-11-19)
+
+**Built.** New optional fields only; absent = the M3 results bit-identical (the six `sc-flt-*` goldens are unchanged, no new command).
+
+| Item | Where |
+| --- | --- |
+| Peukert drain: `add_battery` `peukertExponent` k in [1, 2] and `peukertRatedHours` H (default 1 h, flagged); the SoC drains at I·(I / I_rated)^(k−1), I_rated = C / H, so a constant I gives C_eff = C·(I_rated / I)^(k−1); the charge drawn (mAh, Wh) stays ∫I dt; one law (`drainCurrentA`) for run_flight, `remainingS` and estimate_endurance | `flight/{powerModel,powerChain,powerBlock,endurance}.ts`, `commands/flightPower.ts` |
+| ESC efficiency map: `add_flight_powertrain` `escEfficiencyMap` { throttle[], currentA[], efficiency[throttle][current] } in place of the constant (one or the other), bilinear (`interp1` per axis), end values held; the throttle V_motor / V_terminal depends on the bus power, so `solveChain` iterates power and terminal voltage to a fixed point (relative 1e-12, at most 30 sweeps); run_flight, trim_flight and estimate_endurance call the same `solveChain`; FLT_ESC_MAP_INVALID | `flight/powerChain.ts`, `flight/{powerBlock,endurance,trimPower}.ts` |
+| Motor winding temperature: a datasheet with `thermal` (add_motor / inline, already stored) and `motorAmbientC` (default 25 C, flagged when thermal is given): run_flight steps the drives' two-node network (`sim/actuators/thermal.ts`, DRV-M4, REUSED: `stepThermal`, `resistanceAt`) every physics step per motor with i²·R(T) at the start-of-step winding temperature; `data.battery[pt].motorThermal` (peak / final winding and housing per rotor, first time over `maxWindingC`, share of steps over it), warning FLT_MOTOR_OVERTEMP, flight_report check `motor_winding_c` (only with thermal data), series `windingC`; estimate_endurance `motorThermal` (steady winding at the hover current, `steadyWindingC`; continuous current at the limit) | `flight/motorThermal.ts`, `flight/{flightBlock,flightMetrics,batteryMetrics,flightVerdict}.ts`, `commands/flightEndurance.ts` |
+| Minimum endurance: `flight_report` `limits.minEnduranceS` (no default; in `limits` only when given, `limitsDefaulted` unchanged): check `battery_endurance_s` = the shortest pack `enduranceS` (note says when it is the extrapolated estimate), FAIL below with FLT_ENDURANCE_SHORT, MARGINAL within 10 %, `not_applicable` without a loaded pack | `flight/flightVerdict.ts`, `commands/flightRun.ts` |
+| Load validation of the new fields (ranges, map axes strictly increasing, one row per throttle and one value per current, a rated time only with an exponent); hostile-input entry for the flight power tables | `flight/powerDocument.ts`, `tests/helpers/hostile/flightReaders.ts` |
+
+**Evidence** (`tests/unit/flight/flightPowerM3b{Laws,Run}.test.ts`).
+
+- Peukert, textbook case (Peukert 1897; Linden & Reddy, Handbook of Batteries, 4th ed., §3.2 t = H (C / (I H))^k): 100 Ah at the C/20 rate, k = 1.2, 20 A on an ideal flat pack: t = 20·0.25^1.2 h = 3.7893 h (13 641.4 s) to 1e-6 s, C_eff = 75.79 Ah; at I = I_rated the rated 20 h. k = 1 (or absent) is deep-equal to the M3 results (pack law, endurance, 50 run-block steps bit for bit). Flown on a flat pack with k = 1.05: identical currents and mAh, the SoC drained by (I / I_rated)^0.05 (1e-3).
+- ESC map: a bilinear η = 0.7 + 0.2 throttle + 0.004 I is reproduced to 1e-12; a map constant at the scalar gives the scalar's results exactly (endurance and a flown run); the fixed point satisfies P = V_m i / η(V_m / V_t, i) + P_aux and V_t·I = P to 1e-9; run block, trim and endurance return the same bus power for the same load; a lossy map flies within 1 % of estimate_endurance with the same map.
+- Thermal: the in-loop step equals `windingTemperatureSeries` of the drives code at a constant current (1e-9) and, with α → 0, the closed-form network rise; flown at hover the final winding matches the network at the estimate_endurance motor current within 3 % of the rise; maxWindingC 25.05 C warns FLT_MOTOR_OVERTEMP and fails `motor_winding_c`; after a battery cut-off the windings cool (final < peak).
+
+**Decisions.**
+
+- **FLT-D45 (Peukert as a drain rate)**: the integrated form dSoC/dt = −I (I / I_rated)^(k−1) / C is the one that reduces to Peukert's constant-current law; the charge counted stays ∫I dt (what a coulomb counter shows), so a Peukert pack shows the same mAh but a lower SoC. Below I_rated the law gives more than the rated capacity (Peukert's known optimism at low rates), not capped. k in [1, 2].
+- **FLT-D46 (no cell temperature)**: §15 specifies no temperature dependence of the cell, so none is added: capacity, R_int and OCV stay at their stated temperature. Left (an Arrhenius R_int(T) and a capacity derating need a cell thermal model and data).
+- **FLT-D47 (ESC map axes)**: throttle = V_motor / V_terminal (the duty cycle of an ideal ESC) and the motor current (the ESC phase current); one map for every ESC of the powertrain. The fixed point is needed because the terminal voltage depends on the power the map sets; it converges in 2-3 sweeps (η varies slowly with V).
+- **FLT-D48 (winding temperature warns, does not limit)**: like the peak current (FLT-D44), the over-temperature is counted and judged (FLT_MOTOR_OVERTEMP, `motor_winding_c` FAIL), not enforced: an ESC thermal derate is controller policy. The electrical law keeps the datasheet R (no R(T) feedback into the motor voltage); the copper loss uses R(T) as the drives code does. Thermal slots exist only for thermal motors, after the aero slots: a run without one keeps its aux layout.
+- **FLT-D49 (endurance limit opt-in)**: unlike `minFinalSoc` (FLT-D28), `minEnduranceS` has no default, so no existing report gains a check or a limit (no golden change).
+
+**Left / plans.**
+
+- VC-FLT-11 bench measurement (grade C stays) and the viewport SoC trace (src/ui): not done (out of this lane).
+- PMSM / stepper feeding the chain (plan, not a small adapter): a PMSM powertrain needs `motor` as a union (dc | pmsm datasheet) in the record, schema and load validation; the motor point under FOC with i_d = 0 is i_q = (Q + T_f) / K_t, v_q = R i_q + ω_e λ, v_d = −ω_e L i_q, motor power 1.5 v_q i_q and the bus requirement √3·|v| (SVPWM, the drives' `PmsmDatasheet.busVoltageV` convention); `maxOmega` then has no closed form (the L term): a bracketed root on |v(ω)| = V_bus / √3; thermal r25 = 1.5 R (as `thermalNetwork`). Field weakening is out. Test: a PMSM with L = 0 must equal the dc datasheet with kt = K_t, R = 1.5 R_phase. A stepper is an open-loop position drive (pull-out torque, no speed governor at a propeller load): no flight use, `add_flight_powertrain` keeps refusing it.
+- Cell temperature (FLT-D46), an ESC map per rotor, thermal derating policy.
+
 ## 16. Implementation status — FLT-M4 (2026-11-09)
 
 **Built (TR-FLT-03 aero surfaces, TR-FLT-04 Dryden turbulence, FR-FLT-03 / 04 / 12 / 08 for aero tables).**

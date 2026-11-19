@@ -26,8 +26,22 @@ export interface FlightBattery {
   readonly cutoffVoltPerCell: number;
   /** State of charge at the start of every run, 0..1. */
   readonly initialSoc: number;
+  /** Peukert exponent k (>= 1): at a constant current I the usable charge is C·(I_rated / I)^(k-1). Absent = 1 (no rate dependence). */
+  readonly peukertExponent?: number;
+  /** Discharge time of the rated capacity, h (I_rated = C / H; 1 = the 1C rating, 20 = the lead-acid C/20 rating); only with peukertExponent. */
+  readonly peukertRatedHours?: number;
   readonly source: string;
   readonly defaulted: readonly string[];
+}
+
+/**
+ * ESC efficiency against throttle (motor voltage / pack voltage) and motor current, bilinear between the points, end values held outside.
+ * @invariant throttle and currentA: >= 2 points, strictly increasing, >= 0; efficiency[i][j] at (throttle[i], currentA[j]) in (0, 1]
+ */
+interface EscEfficiencyMap {
+  readonly throttle: readonly number[];
+  readonly currentA: readonly number[];
+  readonly efficiency: readonly (readonly number[])[];
 }
 
 /**
@@ -47,6 +61,10 @@ export interface FlightPowertrain {
   readonly motorSource: string;
   /** Share of the electrical power into the ESC that reaches the motor terminals. */
   readonly escEfficiency: number;
+  /** Efficiency map of the ESC; when present it replaces `escEfficiency`. */
+  readonly escEfficiencyMap?: EscEfficiencyMap;
+  /** Air temperature around the motors, C: the ambient of the winding thermal network (only read when `motor.thermal` is given). */
+  readonly motorAmbientC?: number;
   /** Constant load on the pack besides the motors (avionics, payload), W. */
   readonly auxiliaryPowerW: number;
   readonly defaulted: readonly string[];

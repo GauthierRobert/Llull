@@ -8,7 +8,7 @@
  */
 
 import type { PowerRuntime } from './powerBlock';
-import { busPower, motorPoint, openCircuitVolts, packCutOff, solveBus } from './powerChain';
+import { motorPoint, openCircuitVolts, packCutOff, solveChain } from './powerChain';
 
 type PowerLimit = 'motor_voltage' | 'pack_power' | 'cutoff_voltage' | 'empty_pack';
 
@@ -52,8 +52,7 @@ export function trimPowertrains(
       const point = motorPoint(feed.motor, load.torqueNm, (load.rpm * 2 * Math.PI) / 60);
       return { rotorId, rpm: load.rpm, torqueNm: load.torqueNm, ...point, overPeakCurrent: point.currentA > feed.motor.peakCurrentA };
     });
-    const busPowerW = busPower(feed.powertrain, motors);
-    const solved = solveBus(feed.pack, ocv, busPowerW);
+    const { powerW: busPowerW, solved } = solveChain(feed.pack, feed.powertrain, ocv, motors);
     const throttle =
       solved === null || solved.terminalV <= 0
         ? null

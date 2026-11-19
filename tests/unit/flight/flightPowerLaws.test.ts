@@ -96,7 +96,7 @@ describe('DC motor and ESC', () => {
     expect(motorPoint(law, 0.1, 0)).toEqual({ currentA: 0, voltageV: 0 });
   });
   it('the ESC divides the motor power by its efficiency and the auxiliary load is added', () => {
-    expect(busPower(powertrain, [{ currentA: 5, voltageV: 9 }])).toBeCloseTo(45 / 0.9 + 2, 12);
+    expect(busPower(powertrain, [{ currentA: 5, voltageV: 9 }], 16)).toBeCloseTo(45 / 0.9 + 2, 12);
   });
   it('maxOmega returns the speed whose voltage is the available one, for a quadratic and a torque-free load', () => {
     const omega = maxOmega(law, 0.1, 100, 8);

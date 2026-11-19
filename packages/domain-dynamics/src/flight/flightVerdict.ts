@@ -5,6 +5,7 @@
 
 import type { FlightMetrics } from './flightMetrics';
 import { minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 export interface FlightLimits {
   /** Least share of the maximum thrust left at hover. */
@@ -19,6 +20,8 @@ export interface FlightLimits {
   readonly maxRecoveryTimeS: number;
   /** Least state of charge left at the end of the run (the reserve), 0..1. */
   readonly minFinalSoc: number;
+  /** Least battery endurance (cut-off time, or its estimate at the final current), s; no default: checked only when given (13 FLT M3b). */
+  readonly minEnduranceS?: number;
 }
 
 /** Default limits (TECHNICAL_SPEC §4: thrust margin >= 30 %, saturation < 5 %). */
@@ -51,6 +54,49 @@ function check(name: string, value: number | null, limit: number, comparison: '>
   const band = Math.abs(limit) * MARGINAL_SHARE;
   const close = comparison === '>=' ? value < limit + band : value > limit - band;
   return { name, value, limit, comparison, status: !passes ? 'FAIL' : close ? 'MARGINAL' : 'PASS', note };
+}
+
+type Pack = FlightMetrics['battery'][string];
+
+/** The opt-in endurance check (only with `limits.minEnduranceS`) and the winding check (only when a motor tracks its temperature). */
+function powerLimitChecks(packs: readonly Pack[], limits: FlightLimits): FlightCheck[] {
+  const checks: FlightCheck[] = [];
+  const minimum = limits.minEnduranceS;
+  if (minimum !== undefined) {
+    const timed = packs.flatMap((pack) => (pack.enduranceS === null ? [] : [{ pack, enduranceS: pack.enduranceS }]));
+    const shortest = timed.reduce<(typeof timed)[number] | null>(
+      (least, entry) => (least === null || entry.enduranceS < least.enduranceS ? entry : least),
+      null,
+    );
+    const found = check(
+      'battery_endurance_s',
+      shortest?.enduranceS ?? null,
+      minimum,
+      '>=',
+      shortest === null
+        ? packs.length === 0
+          ? 'no powertrain: no battery is drawn'
+          : 'no pack carries a load: no endurance'
+        : `shortest endurance over the packs: battery '${shortest.pack.batteryId}' (${shortest.pack.enduranceBasis === 'cutoff_reached' ? 'cut-off reached in the run' : 'ESTIMATE: run time + the final current down to the cut-off floor; estimate_endurance integrates it'})`,
+    );
+    checks.push(found.status === 'FAIL' ? { ...found, note: `FLT_ENDURANCE_SHORT: ${found.note}` } : found);
+  }
+  const heated = packs.flatMap((pack) => (pack.motorThermal === undefined ? [] : [pack.motorThermal]));
+  const hottest = heated.reduce<(typeof heated)[number] | null>(
+    (most, entry) => (most === null || entry.peakWindingC - entry.maxWindingC > most.peakWindingC - most.maxWindingC ? entry : most),
+    null,
+  );
+  if (hottest !== null)
+    checks.push(
+      check(
+        'motor_winding_c',
+        hottest.peakWindingC,
+        hottest.maxWindingC,
+        '<=',
+        `hottest motor winding of the run (rotor '${hottest.hottestRotorId}', ambient ${hottest.ambientC} C)${hottest.overLimitAtS === null ? '' : `: FLT_MOTOR_OVERTEMP from t = ${hottest.overLimitAtS.toFixed(3)} s`}`,
+      ),
+    );
+  return checks;
 }
 
 /** Checks and verdict of `metrics` under `limits`. */
@@ -116,6 +162,7 @@ export function flightVerdict(
       note: `battery '${cutoff.pack.batteryId}' reached its cut-off at t = ${at.toFixed(3)} s: the motors stopped (FLT_BATTERY_CUTOFF)`,
     });
   }
+  appendAll(checks, powerLimitChecks(packs, limits));
   if (metrics.divergedAtS !== null)
     checks.push({
       name: 'diverged',

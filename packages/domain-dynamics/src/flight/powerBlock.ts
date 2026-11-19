@@ -5,6 +5,7 @@
  */
 
 import {
+  drainCurrentA,
   maxOmega,
   motorLaw,
   motorPoint,
@@ -12,13 +13,13 @@ import {
   packCutOff,
   packLaw,
   socAtOpenCircuit,
-  solveBus,
-  busPower,
+  solveChain,
   type MotorLaw,
   type PackLaw,
 } from './powerChain';
 import type { FlightBattery, FlightPowertrain } from './powerModel';
 import { maxOf } from '@lib/arrayExtrema';
+import { thermalParams, type ThermalParams } from '../sim/actuators/thermal';
 
 /** A powertrain compiled for one run. */
 export interface PowerRuntime {
@@ -28,7 +29,14 @@ export interface PowerRuntime {
   readonly motor: MotorLaw;
   /** Indexes into the loop's rotors of the rotors this powertrain feeds. */
   readonly rotorIndexes: readonly number[];
+  /** Winding thermal network of the motor (its datasheet's `thermal`), or null: no temperature is tracked. */
+  readonly thermal: ThermalParams | null;
+  /** Ambient of the network, C. */
+  readonly ambientC: number;
 }
+
+/** Ambient of the motor thermal network unless the powertrain gives one, C (the datasheet reference temperature). */
+export const DEFAULT_MOTOR_AMBIENT_C = 25;
 
 /** Per powertrain: state of charge, charge drawn C, energy drawn at the terminals J, terminal V, current A, lowest V, peak A, cut-off time s (-1 = none), steps limited by the pack voltage, steps over the motor's peak current, peak motor current A, peak throttle. */
 export const POWER = {
@@ -54,6 +62,8 @@ export function compilePower(powertrain: FlightPowertrain, battery: FlightBatter
     pack: packLaw(battery),
     motor: motorLaw(powertrain.motor),
     rotorIndexes: powertrain.rotorIds.map((id) => rotorIds.indexOf(id)).filter((index) => index >= 0),
+    thermal: thermalParams(powertrain.motor),
+    ambientC: powertrain.motorAmbientC ?? DEFAULT_MOTOR_AMBIENT_C,
   };
 }
 
@@ -106,11 +116,11 @@ export function stepPower(
   const soc = aux[base + POWER.soc] as number;
   const ocv = openCircuitVolts(runtime.pack, soc);
   const motors = loads.map((load) => motorPoint(runtime.motor, load.torqueNm, (load.rpm * 2 * Math.PI) / 60));
-  const solved = solveBus(runtime.pack, ocv, busPower(runtime.powertrain, motors));
+  const { solved } = solveChain(runtime.pack, runtime.powertrain, ocv, motors);
   const currentA = solved === null ? 0 : solved.currentA;
   const volts = solved === null ? 0 : solved.terminalV;
-  // charge and energy stop at an empty pack: only what is left of the SoC can be drawn in the last step
-  const drawnAs = Math.min(currentA * dt, soc * runtime.pack.capacityAs);
+  // the state of charge stops at an empty pack: only what is left of it can be drained in the last step (at the Peukert rate)
+  const drawnAs = Math.min(drainCurrentA(runtime.pack, currentA) * dt, soc * runtime.pack.capacityAs);
   const next = soc - drawnAs / runtime.pack.capacityAs;
   aux[base + POWER.soc] = Math.max(0, next);
   aux[base + POWER.chargeAs] = (aux[base + POWER.chargeAs] as number) + currentA * dt;
@@ -129,10 +139,10 @@ export function stepPower(
 
 /**
  * Time (s) the pack still delivers `currentA` constant from state of charge `soc` before its terminal voltage reaches the cut-off:
- * the SoC where OCV = cut-off + R·I is the floor, so t = (soc - floor) · C / I; null without a current.
+ * the SoC where OCV = cut-off + R·I is the floor, so t = (soc - floor) · C / I_drain (I_drain = I without a Peukert exponent); null without a current.
  */
 export function remainingS(runtime: PowerRuntime, soc: number, currentA: number): number | null {
   if (!(currentA > 0)) return null;
   const floor = socAtOpenCircuit(runtime.pack, runtime.pack.cutoffV + runtime.pack.resistanceOhm * currentA);
-  return (Math.max(0, soc - floor) * runtime.pack.capacityAs) / currentA;
+  return (Math.max(0, soc - floor) * runtime.pack.capacityAs) / drainCurrentA(runtime.pack, currentA);
 }

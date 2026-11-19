@@ -8,7 +8,8 @@ import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { dot3, len3, sub3, map3 } from '@lib/vec3';
 import { aeroMetrics, type AeroSurfaceMetrics } from './aeroMetrics';
 import { batteryMetrics, batteryWarnings, type BatteryMetrics } from './batteryMetrics';
-import { mixerRow, NOT_CONTROLLED, powerBase, ROTOR, rotorSlot, setpointAt, SLOT, tiltOf } from './flightBlock';
+import { mixerRow, NOT_CONTROLLED, powerBase, ROTOR, rotorSlot, setpointAt, SLOT, thermalBase, tiltOf } from './flightBlock';
+import { motorThermalMetrics, thermalOffset } from './motorThermal';
 import { POWER } from './powerBlock';
 import { offsetAt, type FlightRun } from './flightRun';
 import { rotateInverse } from './frames';
@@ -195,8 +196,13 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
         `FLT_OUTSIDE_VALIDATED_RANGE: rotor '${rotor.rotor.id}' ran at J ${final(rotorSlot(i, ROTOR.minJ)).toPrecision(3)} to ${final(rotorSlot(i, ROTOR.maxJ)).toPrecision(3)}, outside its validated range [${range.map((value) => value.toPrecision(3)).join(', ')}] for ${((100 * outside) / physicsSteps).toPrecision(3)} % of the steps`,
       );
   });
+  const rotorIds = loop.rotors.map((rotor) => rotor.rotor.id);
   const battery = Object.fromEntries(
-    loop.power.map((feed, index) => [feed.powertrain.id, batteryMetrics(feed, index, loop.rotors.length, final, duration, physicsSteps)]),
+    loop.power.map((feed, index) => {
+      const metrics = batteryMetrics(feed, index, loop.rotors.length, final, duration, physicsSteps);
+      const thermal = motorThermalMetrics(loop.power, index, thermalBase(loop), rotorIds, final, physicsSteps);
+      return [feed.powertrain.id, thermal === null ? metrics : { ...metrics, motorThermal: thermal }];
+    }),
   );
   for (const [id, entry] of Object.entries(battery)) appendAll(warnings, batteryWarnings(id, entry));
   const aero = aeroMetrics(loop, final, physicsSteps, run.staleAero);
@@ -311,6 +317,17 @@ export function flightSeries(run: FlightRun): Record<string, unknown> {
             soc: ks.map((k) => at(POWER.soc, k)),
             voltageV: ks.map((k) => at(POWER.voltage, k)),
             currentA: ks.map((k) => at(POWER.current, k)),
+            ...(feed.thermal === null
+              ? {}
+              : {
+                  windingC: Object.fromEntries(
+                    feed.rotorIndexes.map((index, m) => {
+                      // the winding rise is the first slot of a motor
+                      const slot = thermalBase(run.loop) + thermalOffset(run.loop.power, p, m);
+                      return [run.loop.rotors[index]?.rotor.id ?? '', ks.map((k) => round(feed.ambientC + samples.aux(slot, k)))];
+                    }),
+                  ),
+                }),
           },
         ];
       }),
