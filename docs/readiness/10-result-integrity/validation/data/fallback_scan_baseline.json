@@ -1812,11 +1812,6 @@
       "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
     },
     {
-      "file": "domain-cae/src/thermomech/mapping.ts",
-      "hits": 3,
-      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
-    },
-    {
       "file": "domain-cae/src/thermomech/plane.ts",
       "hits": 5,
       "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"

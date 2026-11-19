@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import { mapNodalField } from '@cae/thermomech/mapping';
 import { createFeArtifactStore } from '../../src/fea/artifactStore';
 import { caeHooks } from '../../src/fea/caeHooks';
 import { runFeaSolve } from '../../src/fea/feaSolve';
@@ -50,6 +51,14 @@ describe('FEA performance budgets (PERF1)', () => {
     expect(solved.isError, solved.summary).not.toBe(true);
     expect(solved.summary).toContain('1 load case(s)');
     expectWithinBudget('fea.solve.overhead', elapsed);
+  });
+
+  it('fea.map.nodal68k: the TypeScript temperature mapping of the 68k-node mesh onto itself', async () => {
+    const values = new Map(feaCase.mesh.nodes.map(([id, x, y, z]) => [id, 20 + 0.5 * x - 0.25 * y + 0.125 * z]));
+    const run = (): ReturnType<typeof mapNodalField> => mapNodalField(feaCase.mesh, values, feaCase.mesh);
+    const mapped = run();
+    expect(mapped.ok && mapped.report.coincidentNodes).toBe(68121);
+    expectWithinBudget('fea.map.nodal68k', await medianMs(run, 3));
   });
 
   it('fea.query.cold: the first read of a new process', () => {
