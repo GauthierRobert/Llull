@@ -212,9 +212,22 @@ function buildNode(tree: TreeBuilder, input: SplitInput, lists: readonly [Int32A
   return node;
 }
 
+/** The search structure of `elements`; with no element it is empty and `locateElement` finds nothing. */
 export function buildLocator(elements: readonly LocatorElement[]): ElementLocator {
   const tree: TreeBuilder = { boxes: [], leaf: [], lowest: [], left: [], right: [] };
   const count = elements.length;
+  if (count === 0) {
+    const none = new Int32Array(0);
+    return {
+      corners: new Float64Array(0),
+      terms: new Float64Array(0),
+      boxes: new Float64Array(0),
+      leaf: none,
+      lowest: none,
+      left: none,
+      right: none,
+    };
+  }
   const centres = new Float64Array(3 * count);
   const bounds = new Float64Array(6 * count);
   for (const [index, element] of elements.entries()) {
@@ -377,10 +390,13 @@ function push(depth: number, node: number, distance: number): number {
 /**
  * The lowest-index element containing p (distance 0), else the nearest element (ties within 1e-15: lowest index). Once the best so far is
  * within the tie distance, a box whose elements all have a higher index can never replace it (their distance is >= 0) and is skipped: the
- * search it replaces visited such boxes without effect.
+ * search it replaces visited such boxes without effect. The child order copies what the original got from V8's `Array.prototype.sort`
+ * on two items (binary insertion: the right child b goes first iff the comparator `dB - dA` is < 0, so a tie or a NaN keeps a before b):
+ * engine behaviour the frozen copy pins, not a language rule.
  */
 export function locateElement(locator: ElementLocator, p: Vec3): LocatedHit | null {
   const { boxes, leaf, lowest, left, right } = locator;
+  if (leaf.length === 0) return null;
   const [px, py, pz] = p;
   let bestElement = -1;
   let bestDistance = Number.NaN;

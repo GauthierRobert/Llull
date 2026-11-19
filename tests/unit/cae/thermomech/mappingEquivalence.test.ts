@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { FeMeshArtifact } from '@core/model/analysis';
+import { buildLocator, locateElement } from '@cae/thermomech/elementLocator';
 import { mapNodalField } from '@cae/thermomech/mapping';
 import { gridMesh, seeded } from '../gridMesh';
 import { legacyMapNodalField } from './legacyMapNodalField';
@@ -157,5 +158,66 @@ describe('mapNodalField matches the frozen recursive search bit for bit', () => 
     expectSame(artifact(linear.nodes, [...linear.elements, [1, 2, 3, 4, 5]]), values, target);
     expectSame(artifact(linear.nodes, [[1, 2, 3, 99_999]]), values, target);
     expectSame({ ...artifact(linear.nodes, [[1, 2, 3, 4]]), blocks: [] }, values, target);
+  });
+
+  it('agrees with an infinite box centre and no NaN (the presorted path) and with -Infinity and +Infinity in one element (NaN centre)', () => {
+    const centres = (nodes: Nodes, elements: readonly (readonly number[])[]): number[] => {
+      const position = new Map(nodes.map(([id, x, y, z]) => [id, [x, y, z]]));
+      return elements.flatMap((element) =>
+        [0, 1, 2].map((axis) => {
+          const values = element.map((id) => position.get(id)?.[axis] ?? 0);
+          return (Math.min(...values) + Math.max(...values)) / 2;
+        }),
+      );
+    };
+    const tall: Nodes = linear.nodes.map(([id, x, y, z]) => (id === 9 ? [id, x, Infinity, z] : [id, x, y, z]));
+    const doubled = [...linear.elements, ...[...linear.elements].reverse()];
+    expect(centres(tall, doubled).some(Number.isNaN)).toBe(false);
+    expect(centres(tall, doubled)).toContain(Infinity);
+    expectSame(artifact(tall, doubled), field(linear.nodes), artifact(randomPoints(150, 53, -1, 11), [[1, 2, 3, 4]]));
+    const split: Nodes = linear.nodes.map(([id, x, y, z]) =>
+      id === 1 ? [id, -Infinity, y, z] : id === 2 ? [id, Infinity, y, z] : [id, x, y, z],
+    );
+    const elements = shuffled(linear.elements, 59);
+    expect(centres(split, elements).some(Number.isNaN)).toBe(true);
+    expectSame(artifact(split, elements), field(linear.nodes), artifact(randomPoints(150, 61, -1, 11), [[1, 2, 3, 4]]));
+  });
+
+  it('agrees where the skip of higher-index boxes applies: a best inside the tie band against a sliver at 0.9e-15', () => {
+    const nodes: Nodes = [
+      [1, 0, 0, 0],
+      [2, 1, 0, 0],
+      [3, 0, 1, 0],
+      [4, 0, 0, 1],
+      [5, 0.9e-15, 0, 0],
+      [6, 5, 5, 5],
+      [7, 6, 5, 5],
+      [8, 5, 6, 5],
+      [9, 5, 5, 6],
+    ];
+    const a = [5, 2, 3, 4];
+    const b = [1, 2, 3, 4];
+    const x = [6, 7, 8, 9];
+    const targets = artifact(
+      [
+        [1, 0, 0.1, 0.1],
+        [2, 1e-16, 0.1, 0.1],
+        [3, 0.45e-15, 0.1, 0.1],
+        [4, -0.5e-15, 0.1, 0.1],
+      ],
+      [[1, 2, 3, 4]],
+    );
+    for (const order of [
+      [a, b],
+      [b, a],
+      [x, a, b],
+    ])
+      expectSame(artifact(nodes, order), field(nodes), targets);
+  });
+});
+
+describe('buildLocator', () => {
+  it('builds an empty locator for no element, which finds nothing', () => {
+    expect(locateElement(buildLocator([]), [0, 0, 0])).toBeNull();
   });
 });
