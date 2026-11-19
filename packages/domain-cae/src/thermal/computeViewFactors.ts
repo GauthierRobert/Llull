@@ -16,6 +16,7 @@ const RECIPROCITY_WARNING = 1e-3;
 const ROW_SUM_TOLERANCE = 1e-3;
 const PLANARITY_RELATIVE = 1e-6;
 const TS_REFERENCE_FACETS = meshBvhEngine.limits.maxViewFactorFacets;
+const RECIPROCAL_METHOD = '; reciprocal: one integral per unordered facet pair, a single panel for well-separated facets';
 
 interface Finding {
   readonly code: string;
@@ -45,8 +46,9 @@ const scaled = (vertices: readonly Vec3[], factor: number): Vec3[] =>
   vertices.map((v): Vec3 => [v[0] * factor, v[1] * factor, v[2] * factor]);
 
 /**
- * @affects nothing — read-only; data { surfaces[], matrix[][], rowSums[], method, facetCounts[], reciprocityMaxError, findings[], closedCavity?, obstruction, geometryQueries? (engine provenance, obstruction only) }
+ * @affects nothing — read-only; data { surfaces[], matrix[][], rowSums[], method, integration, facetCounts[], reciprocityMaxError, findings[], closedCavity?, obstruction, geometryQueries? (engine provenance, obstruction only) }
  * @invariant F[I][J] = sum_i sum_j A_i F_ij / A_I over facets that face each other (centroid test); the diagonal of planar surfaces is 0; no document change
+ * @invariant integration 'full' (default) is the reference; 'reciprocal' is only ever run when asked, by the TS reference and the native engine alike (same bits), and data.integration + the summary name it
  * @failure bad length unit / maxFacetSize -> THM_UNITS_MISMATCH; < 2 surfaces, duplicate names, non-planar or degenerate polygons -> THM_SURFACE_INVALID;
  *   more than the engine's facet limit (400 on TS; surfaces + blockers), or a failed native run above the TS limit -> THM_FACET_LIMIT (rejections, document unchanged); reciprocity error > 1e-3 -> warning THM_VIEW_FACTOR_RECIPROCITY
  */
@@ -61,6 +63,7 @@ export const computeViewFactors = defineCommand({
     'J, rowSums, reciprocityMaxError (max |A_I F_IJ − A_J F_JI| / max), facetCounts, method, findings[] }. With obstruction=true a facet pair is ' +
     'skipped when the segment between centroids crosses another facet (of any surface or blockers). closed=true checks that every row sums to ' +
     '1 ± 1e-3. Warns THM_VIEW_FACTOR_RECIPROCITY above 1e-3 (refine maxFacetSize). Read-only; surfaces are given explicitly (entity faces are not read). ' +
+    "integration='reciprocal' is a faster rule with slightly different numbers (see the parameter); data.integration and the summary record which rule ran. " +
     'Next: use the matrix for a radiation network, or compare with thermal_analytic_check view_factor.',
   params: z.object({
     lengthUnit: z.string().describe("Length unit of every vertex and of maxFacetSize, e.g. 'm' or 'mm'."),
@@ -91,6 +94,18 @@ export const computeViewFactors = defineCommand({
       .max(16)
       .optional()
       .describe('Extra opaque polygons (at most 16) used only when obstruction is true.'),
+    integration: z
+      .enum(['full', 'reciprocal'])
+      .optional()
+      .describe(
+        "How facet pairs are integrated. 'full' (default): every ordered pair by the adaptive contour rule, the reference numbers. " +
+          "'reciprocal': one integral per unordered pair, used for both directions (A_i F_ij = A_j F_ji), and a single 8-point panel when the " +
+          'facet centroids are at least 5 x (r_i + r_j) apart (r = largest centroid-to-corner distance): about 5x less CPU on large meshed ' +
+          'cavities (2.5x with obstruction); on meshed enclosures matrix entries within 1e-12 relative of full, row sums within 2e-13 (measured 7e-14 and 2e-14 at 3 072 ' +
+          'facets); tiny entries between small, distant surfaces agree only to about 1e-9 relative (rounding of the contour sum, both rules). ' +
+          'Without obstruction F is then reciprocal by construction, so reciprocityMaxError is 0 and no longer checks the quadrature; ' +
+          'obstruction is still tested in both directions.',
+      ),
     closed: z
       .boolean()
       .optional()
@@ -194,17 +209,18 @@ export const computeViewFactors = defineCommand({
     const count = prepared.length;
     const groups = prepared.map((p) => p.facets);
     const blockers = params.obstruction === true ? blockerFacets : null;
-    const native = engine.viewFactorExchange?.(groups, blockers) ?? null;
+    const integration = params.integration ?? 'full';
+    const native = engine.viewFactorExchange?.(groups, blockers, { integration }) ?? null;
     // a native engine that could not answer: its TS reference only runs within the TS cap (above it, hours of brute force)
     if (native === null && total + blockerFacets.length > TS_REFERENCE_FACETS)
       return refuse(
         doc,
         'THM_FACET_LIMIT',
         `the native view-factor run failed and ${total + blockerFacets.length} facets exceed the TypeScript limit of ${TS_REFERENCE_FACETS}`,
-        'Retry (see the llull-compute warning), or increase maxFacetSize to stay within the TypeScript limit.',
+        'Retry (see the llull-compute warning; a binary that does not know integration: reciprocal must be rebuilt), or increase maxFacetSize to stay within the TypeScript limit.',
         ['maxFacetSize'],
       );
-    const exchange = native ?? viewFactorExchangeReference(engine, groups, blockers);
+    const exchange = native ?? viewFactorExchangeReference(engine, groups, blockers, { integration });
     const areas = prepared.map((p) => p.area);
     const matrix = exchange.map((row, i) => row.map((value) => value / (areas[i] ?? 1)));
     const rowSums = matrix.map((row) => row.reduce((a, b) => a + b, 0));
@@ -248,7 +264,8 @@ export const computeViewFactors = defineCommand({
       surfaces: prepared.map((p, i) => ({ name: names[i], areaM2: p.area, facets: p.facets.length, normal: p.normal })),
       matrix,
       rowSums,
-      method: 'contour-integral, 8-point Gauss-Legendre, adaptive along edges, closed-form antiderivative of ln r',
+      method: `contour-integral, 8-point Gauss-Legendre, adaptive along edges, closed-form antiderivative of ln r${integration === 'reciprocal' ? RECIPROCAL_METHOD : ''}`,
+      integration,
       facetCounts,
       reciprocityMaxError,
       obstruction: params.obstruction === true,
@@ -259,7 +276,7 @@ export const computeViewFactors = defineCommand({
     const warned = findings.length > 0 ? ` WARNING ${findings.map((f) => f.code).join(', ')}.` : '';
     return report(
       doc,
-      `compute_view_factors: ${count} surfaces, ${total} facets; row sums ${rowSums.map((s) => s.toPrecision(5)).join(', ')}; reciprocity error ${reciprocityMaxError.toExponential(2)}.${warned}`,
+      `compute_view_factors: ${count} surfaces, ${total} facets; row sums ${rowSums.map((s) => s.toPrecision(5)).join(', ')}; reciprocity error ${reciprocityMaxError.toExponential(2)}${integration === 'reciprocal' ? '; integration reciprocal (one integral per facet pair)' : ''}.${warned}`,
       data,
     );
   },

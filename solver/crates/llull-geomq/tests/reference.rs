@@ -3,6 +3,7 @@
 //! Numbers are compared with `==` (exact, except that JSON drops the sign of -0).
 
 use llull_geomq::tree::{min_distance, ray_cast, MeshTree, Placement};
+use llull_geomq::viewfactor::Integration;
 use llull_geomq::{distance_batch, ray_batch, view_factor_batch};
 use serde_json::Value;
 
@@ -111,9 +112,23 @@ fn view_factor_exchange_matches_the_reference_bit_for_bit() {
     let surfaces = case["surfaces"].as_u64().unwrap() as usize;
     let facets: Vec<f64> = case["facets"].as_array().unwrap().iter().flat_map(numbers).collect();
     for (key, obstruction) in [("open", false), ("obstructed", true)] {
-        let exchange = view_factor_batch(&facets, surfaces, obstruction).unwrap();
+        let exchange = view_factor_batch(&facets, surfaces, obstruction, Integration::Full).unwrap();
         let expected: Vec<f64> = case[key].as_array().unwrap().iter().flat_map(numbers).collect();
         assert_eq!(exchange, expected, "{key}");
+    }
+}
+
+#[test]
+fn reciprocal_view_factor_exchange_matches_the_reference_bit_for_bit() {
+    let all = fixture();
+    let case = &all["viewFactorReciprocal"];
+    let surfaces = case["surfaces"].as_u64().unwrap() as usize;
+    let facets: Vec<f64> = case["facets"].as_array().unwrap().iter().flat_map(numbers).collect();
+    for (key, obstruction) in [("open", false), ("obstructed", true)] {
+        let exchange = view_factor_batch(&facets, surfaces, obstruction, Integration::Reciprocal).unwrap();
+        let expected: Vec<f64> = case[key].as_array().unwrap().iter().flat_map(numbers).collect();
+        assert_eq!(exchange, expected, "{key}");
+        assert_ne!(exchange, view_factor_batch(&facets, surfaces, obstruction, Integration::Full).unwrap(), "{key}");
     }
 }
 
@@ -135,12 +150,15 @@ fn bad_inputs_are_named_refusals() {
     assert!(distance_batch(vec![vec![0.0; 9]], &out_of_range).unwrap_err().message.contains("out of range"));
     assert_eq!(ray_batch(vec![], &[0.0; 7]).unwrap_err().code, "NATIVE_JOB_INPUT");
     let blocker_first = [[-1.0].as_slice(), &[0.0; 16], &[0.0], &[0.0; 16]].concat();
-    assert!(view_factor_batch(&blocker_first, 1, true).unwrap_err().message.contains("before the blockers"));
+    assert!(view_factor_batch(&blocker_first, 1, true, Integration::Full).unwrap_err().message.contains("before the blockers"));
     assert!(llull_geomq::parse_meshes(&[2.0, 1.0]).is_err());
     assert!(llull_geomq::parse_meshes(&[1.0, 1e30]).is_err());
     let nan_mesh = [[1.0, 1.0].as_slice(), &[f64::NAN], &[0.0; 8]].concat();
     assert!(llull_geomq::parse_meshes(&nan_mesh).unwrap_err().message.contains("non-finite"));
-    assert!(view_factor_batch(&[[0.0].as_slice(), &[f64::INFINITY; 16]].concat(), 1, false).is_err());
+    assert!(view_factor_batch(&[[0.0].as_slice(), &[f64::INFINITY; 16]].concat(), 1, false, Integration::Full).is_err());
+    assert_eq!(llull_geomq::parse_integration(None), Ok(Integration::Full));
+    assert_eq!(llull_geomq::parse_integration(Some("reciprocal")), Ok(Integration::Reciprocal));
+    assert!(llull_geomq::parse_integration(Some("fast")).unwrap_err().message.contains("unknown view-factor integration 'fast'"));
 }
 
 #[test]

@@ -55,6 +55,20 @@ export interface ViewFacet {
   readonly area: number;
 }
 
+/**
+ * How `viewFactorExchange` integrates the facet pairs. `full` (default) = every ordered pair by the adaptive contour rule, the reference
+ * numbers. `reciprocal` = one integral per unordered pair, used for both directions (A_i F_ij = A_j F_ji), by a single 8-point panel
+ * per edge pair when the centroids are at least 5 x (r_i + r_j) apart (r = largest centroid-to-corner distance): several times less
+ * work on a fine mesh, other numbers (entries within 1e-12 relative of `full` on meshed cavities; criterion and error bound in cae
+ * `viewFactorContour.ts`). Obstruction is still decided per direction.
+ */
+export type ViewFactorIntegration = 'full' | 'reciprocal';
+
+export interface ViewFactorExchangeOptions {
+  /** Default `full`. An engine must honour it or return null: never the numbers of another integration. */
+  readonly integration?: ViewFactorIntegration;
+}
+
 /** Closest points of mesh `a` and mesh `b` placed by `placement` in a's frame (null = same frame), when within `maxDistance` (may be Infinity). */
 export interface PlacedDistanceQuery {
   readonly a: number;
@@ -88,9 +102,13 @@ export interface GeometryQueryEngine {
    * TR-THM-20), every facing pair of facets of different surfaces by contour integral. `blockers` non-null = obstruction on: a pair is
    * dropped when the open segment between its centroids crosses another facet (of any surface, or a blocker). Absent, or null returned
    * (not answered, e.g. a failed native run), = the caller runs its TypeScript reference (cae `viewFactorExchangeReference`, which uses
-   * `segmentOcclusionBatch`); a matrix returned = the same numbers.
+   * `segmentOcclusionBatch`); a matrix returned = the same numbers as that reference for the same `options.integration`.
    */
-  viewFactorExchange?(surfaces: readonly (readonly ViewFacet[])[], blockers: readonly ViewFacet[] | null): number[][] | null;
+  viewFactorExchange?(
+    surfaces: readonly (readonly ViewFacet[])[],
+    blockers: readonly ViewFacet[] | null,
+    options?: ViewFactorExchangeOptions,
+  ): number[][] | null;
 }
 
 type Mat3 = RigidTransform['rotation'];
