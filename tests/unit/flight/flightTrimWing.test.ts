@@ -46,7 +46,7 @@ const lin = (doc: CadDocument, params: Record<string, unknown> = {}): Linear => 
 
 describe('glider trim and modes (FLT-M5)', () => {
   const linear = lin(glider());
-  const lumped = lin(glider(), { rateDamping: 'none' });
+  const lumped = linear;
 
   it('trims a glide: weight balanced by lift and drag along the path, tail pivot inside its travel', () => {
     const flightPath = linear.trim.condition.flightPathDeg;
@@ -73,7 +73,7 @@ describe('glider trim and modes (FLT-M5)', () => {
     expect(Math.abs(pathXu / expected - 1)).toBeLessThan(0.01);
   });
 
-  it('the lumped tables alone (rateDamping none): the phugoid period is Lanchester sqrt(2) pi V / g within 10 % and the short period is much faster', () => {
+  it('the default linearisation (the lumped tables run_flight integrates, rateDamping none): the phugoid period is Lanchester sqrt(2) pi V / g within 10 % and the short period is much faster', () => {
     const lanchester = (Math.SQRT2 * Math.PI * SPEED) / G;
     const phugoid = lumped.modes.find((mode) => mode.label === 'phugoid');
     const shortPeriod = lumped.modes.find((mode) => mode.label === 'short_period');
@@ -100,7 +100,11 @@ describe('glider trim and modes (FLT-M5)', () => {
       states.reduce((sum, state) => sum + (linear.modes.find((mode) => mode.label === label)?.participation?.[state] ?? 0), 0);
     expect(share('phugoid', ['u', 'pitch'])).toBeGreaterThan(0.8);
     expect(share('short_period', ['w', 'q'])).toBeGreaterThan(0.9);
-    expect(lumped.modes.map((mode) => mode.label).sort()).toEqual(labels.sort());
+    expect(
+      lin(glider(), { rateDamping: 'tail_arm' })
+        .modes.map((mode) => mode.label)
+        .sort(),
+    ).toEqual(labels.sort());
     expect(linear.warnings.join(' ')).toContain('FLT-D30');
   });
 });
@@ -114,11 +118,20 @@ describe('glider refusals (FLT-M5)', () => {
     expectNoOp(result, doc);
   });
 
-  it('a singular inertia from a loaded file (add_rigid_body refuses it, the file reader only checks 6 finite numbers) is FLT_MODEL_INVALID', () => {
+  it('a singular inertia: the file reader refuses it by name; built in memory (no command makes one) trim refuses FLT_MODEL_INVALID', () => {
     const json = JSON.parse(serializeDocument(glider())) as { document: { dynamics: { bodies: { frame: { inertiaKgM2: number[] } } } } };
     json.document.dynamics.bodies.frame.inertiaKgM2 = [0, 0, 0, 0, 0, 0];
-    const doc = deserializeDocument(JSON.stringify(json));
-    expect(doc.dynamics?.bodies['frame']?.inertiaKgM2).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(() => deserializeDocument(JSON.stringify(json))).toThrow(/inertiaKgM2 is not positive definite/);
+    const loaded = glider();
+    const frame = loaded.dynamics?.bodies['frame'];
+    if (loaded.dynamics === undefined || frame === undefined) throw new Error('no body');
+    const doc = {
+      ...loaded,
+      dynamics: {
+        ...loaded.dynamics,
+        bodies: { ...loaded.dynamics.bodies, frame: { ...frame, inertiaKgM2: [0, 0, 0, 0, 0, 0] as const } },
+      },
+    } as CadDocument;
     for (const command of ['trim_flight', 'linearize_flight']) {
       const result = execute(doc, command, { scenario: 's', airspeedMps: SPEED, freeFlightPath: true });
       expect(result.error?.code).toBe('FLT_MODEL_INVALID');

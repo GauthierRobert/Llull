@@ -83,7 +83,8 @@ describe('trim_flight: powertrain at the trimmed point (FLT-M5b)', () => {
     expect(result.error?.code).toBe('FLT_TRIM_SATURATED');
     expect(result.summary).toContain("powertrain 'pt'");
     expect(result.summary).toContain('throttle');
-    const detail = result.error?.detail as { powertrains: Powertrain[] } | undefined;
+    const detail = result.error?.detail as { reason: string; powertrains: Powertrain[] } | undefined;
+    expect(detail?.reason).toBe('powertrain');
     expect(detail?.powertrains[0]?.limit).toBe('motor_voltage');
     expect(detail?.powertrains[0]?.throttle).toBeGreaterThan(1);
     expectNoOp(result, doc);
@@ -99,6 +100,26 @@ describe('trim_flight: powertrain at the trimmed point (FLT-M5b)', () => {
     expect(sagging.error?.code).toBe('FLT_TRIM_SATURATED');
     expect((sagging.error?.detail as { powertrains: Powertrain[] }).powertrains[0]?.limit).toBe('cutoff_voltage');
     expect(sagging.summary).toContain('cut-off');
+  });
+
+  it('an empty pack (initialSoc 0): run_flight cuts off at t = 0, so the trim is FLT_TRIM_SATURATED (empty_pack, reason powertrain)', () => {
+    const doc = poweredQuad({ initialSoc: 0 });
+    const result = execute(doc, 'trim_flight', { scenario: 's' });
+    expect(result.error?.code).toBe('FLT_TRIM_SATURATED');
+    const detail = result.error?.detail as { reason: string; powertrains: Powertrain[] };
+    expect(detail.reason).toBe('powertrain');
+    expect(detail.powertrains[0]?.limit).toBe('empty_pack');
+    expect(result.summary).toContain('is empty');
+    expectNoOp(result, doc);
+  });
+
+  it('a control at its limit keeps reason controls in the detail', () => {
+    const doc = poweredQuad();
+    const weak = execute(doc, 'add_flight_controller', { body: 'frame', maxRpm: 3000, id: 'fc2' }).document;
+    const scenario = execute(weak, 'define_flight_scenario', { body: 'frame', controller: 'fc2', id: 's2', durationS: 1 }).document;
+    const result = execute(scenario, 'trim_flight', { scenario: 's2' });
+    expect(result.error?.code).toBe('FLT_TRIM_SATURATED');
+    expect((result.error?.detail as { reason: string }).reason).toBe('controls');
   });
 
   it('a motor over its peak current is a warning, not a refusal (run_flight counts it, it does not limit it)', () => {

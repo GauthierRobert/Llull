@@ -2,7 +2,8 @@
  * Eigenvalues of a linearised flight and their mode labels (13 FLT M5, M5b).
  *   fixed wing: each eigenvalue of the full A is labelled from the PARTICIPATION of the states in its mode (modeVectors.ts; scale-free):
  *     longitudinal (u, w, q, pitch share >= 80 %): an oscillatory mode dominated by speed and attitude (u + pitch) is the phugoid, by
- *     incidence and rate (w + q) the short period; real roots are `longitudinal_real`.
+ *     incidence and rate (w + q) the short period; a real root (an overdamped mode split in two) is `phugoid_real` / `short_period_real` by
+ *     the same leading states.
  *     lateral (share <= 20 %): an oscillatory mode dominated by sideslip and yaw rate (v + r) is the Dutch roll (else `lateral_oscillatory`);
  *     a real root dominated by the roll rate p is the roll subsidence, by the roll angle the spiral (else `lateral_real`); a neutral real or
  *     defective lateral root is `lateral_neutral` (the lateral modes of an aero vehicle whose tables carry no sideslip or rate dependence).
@@ -102,8 +103,9 @@ function fixedWingLabel(value: ComplexValue, weights: readonly number[], longitu
   const at = (i: number): number => elementAt(weights, i);
   const [u, v, w, p, q, r, roll, pitch] = [at(0), at(1), at(2), at(3), at(4), at(5), at(6), at(7)];
   if (longitudinal >= GROUP_SHARE) {
-    if (value.im === 0) return 'longitudinal_real';
-    return u + pitch >= w + q ? 'phugoid' : 'short_period';
+    const speedAttitude = u + pitch >= w + q;
+    if (value.im === 0) return speedAttitude ? 'phugoid_real' : 'short_period_real';
+    return speedAttitude ? 'phugoid' : 'short_period';
   }
   if (longitudinal > 1 - GROUP_SHARE) return 'coupled';
   const neutral = Math.abs(value.re) <= NEUTRAL_RATE;

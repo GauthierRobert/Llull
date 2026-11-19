@@ -102,6 +102,18 @@ describe('fixed-wing labels from participation factors (FLT-M5b)', () => {
     expect(byLabel(modes)['dutch_roll']).toBeDefined();
   });
 
+  it('an overdamped short period (Navion with Mq x 20) splits into two short_period_real roots led by w + q; the phugoid stays', () => {
+    const modes = analyseModes(stateMatrix(navionLongitudinal(-41), navionLateral()), 'fixed_wing')?.modes ?? [];
+    const split = modes.filter((mode) => mode.label === 'short_period_real');
+    expect(split).toHaveLength(2);
+    for (const mode of split) {
+      expect(mode.kind).toBe('real');
+      expect((mode.participation?.w ?? 0) + (mode.participation?.q ?? 0)).toBeGreaterThan(0.8);
+    }
+    expect(modes.filter((mode) => mode.label === 'phugoid')).toHaveLength(1);
+    expect(modes.some((mode) => mode.label === 'short_period')).toBe(false);
+  });
+
   it('lateral_neutral: no sideslip or rate derivatives leaves the lateral block nilpotent (v-dot = g roll, roll-dot = p), its defective zeros are not a spiral', () => {
     const glider = [
       [0, 0, 0, -9.80665],
@@ -134,7 +146,9 @@ describe('fixed-wing labels from participation factors (FLT-M5b)', () => {
       [0, 1, 0, 0],
     ];
     const modes = analyseModes(stateMatrix(longitudinal, lateral), 'fixed_wing')?.modes ?? [];
-    expect(modes.filter((mode) => mode.label === 'longitudinal_real')).toHaveLength(4);
+    // u and pitch lead two of the real longitudinal roots, w and q the other two
+    expect(modes.filter((mode) => mode.label === 'phugoid_real')).toHaveLength(2);
+    expect(modes.filter((mode) => mode.label === 'short_period_real')).toHaveLength(2);
     expect(modes.filter((mode) => mode.label === 'lateral_real')).toHaveLength(2);
     const oscillation = modes.find((mode) => mode.label === 'lateral_oscillatory');
     expect(oscillation?.im).toBeCloseTo(Math.sqrt(4 - 0.04), 9);

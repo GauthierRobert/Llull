@@ -1,15 +1,16 @@
 /**
  * Powertrain operating point of a trim (13 FLT M5b): the battery / ESC / motor laws run_flight integrates (powerChain.ts) evaluated at the trimmed
  * rotor speeds and shaft torques, the pack at its initial state of charge. A point the run could not hold is a limit: a motor voltage above the
- * pack's terminal voltage (run_flight caps the speed there, packRpm), a power the pack cannot deliver, or a terminal voltage under the cut-off.
+ * pack's terminal voltage (run_flight caps the speed there, packRpm), or the cut-off run_flight latches (packCutOff: a power the pack cannot
+ * deliver, a terminal voltage under the cut-off, an empty pack).
  * A motor current above the datasheet peak is reported (run_flight counts it, it does not limit it). A CHECK of the trimmed point, not a
  * constrained solve: with more controls than equations another speed split might still fit (a symmetric vehicle has one).
  */
 
 import type { PowerRuntime } from './powerBlock';
-import { busPower, motorPoint, openCircuitVolts, solveBus } from './powerChain';
+import { busPower, motorPoint, openCircuitVolts, packCutOff, solveBus } from './powerChain';
 
-type PowerLimit = 'motor_voltage' | 'pack_power' | 'cutoff_voltage';
+type PowerLimit = 'motor_voltage' | 'pack_power' | 'cutoff_voltage' | 'empty_pack';
 
 interface TrimPowertrain {
   readonly id: string;
@@ -57,14 +58,17 @@ export function trimPowertrains(
       solved === null || solved.terminalV <= 0
         ? null
         : motors.reduce((most, motor) => Math.max(most, motor.voltageV / solved.terminalV), 0);
-    const limit: PowerLimit | null =
-      solved === null
+    // a trim draws no charge: the state of charge after the point is the initial one (the run cuts off at t = 0 on an empty pack)
+    const cutOff = packCutOff(feed.pack, solved, soc);
+    const limit: PowerLimit | null = cutOff
+      ? solved === null
         ? 'pack_power'
-        : solved.currentA > 0 && solved.terminalV < feed.pack.cutoffV
-          ? 'cutoff_voltage'
-          : throttle !== null && throttle > 1
-            ? 'motor_voltage'
-            : null;
+        : soc <= 0
+          ? 'empty_pack'
+          : 'cutoff_voltage'
+      : throttle !== null && throttle > 1
+        ? 'motor_voltage'
+        : null;
     return {
       id: feed.powertrain.id,
       batteryId: feed.battery.id,
@@ -87,6 +91,8 @@ export function powerLimitText(powertrain: TrimPowertrain): string {
   const volts = (value: number | null): string => (value === null ? 'none' : `${value.toPrecision(4)} V`);
   if (powertrain.limit === 'pack_power')
     return `powertrain '${powertrain.id}': pack '${powertrain.batteryId}' cannot deliver ${powertrain.busPowerW.toPrecision(4)} W (more than OCV² / 4R at SoC ${powertrain.stateOfCharge})`;
+  if (powertrain.limit === 'empty_pack')
+    return `powertrain '${powertrain.id}': pack '${powertrain.batteryId}' is empty (SoC ${powertrain.stateOfCharge})`;
   if (powertrain.limit === 'cutoff_voltage')
     return `powertrain '${powertrain.id}': the pack sags to ${volts(powertrain.terminalV)}, under its cut-off ${volts(powertrain.cutoffV)}`;
   const highest = powertrain.motors.reduce((most, motor) => Math.max(most, motor.voltageV), 0);

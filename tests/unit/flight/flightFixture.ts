@@ -83,12 +83,13 @@ export function flightData(
 /**
  * A 50 kg glider (13 FLT M4 + M5): body `frame` (inertia [20, 70, 85] kg·m²) with ONE aero table `w` of a 6 m x 1 m vortex-lattice wing (leading edge
  * x = 100 mm) and a 2.5 m x 0.5 m all-moving tail (leading edge x = -2800 mm) solved together at the moment centre [0, 0, 0], the tail pivoting
- * ±8° about x = -2675 mm with a servo; scenario `s`.
+ * ±8° about x = -2675 mm with a servo; scenario `s`. `pivoting: 'wing'` pivots the wing about its quarter chord (x = -150 mm) instead, the tail fixed.
  */
-export function glider(forward = '+x'): CadDocument {
+export function glider(forward = '+x', pivoting: 'tail' | 'wing' = 'tail'): CadDocument {
   const doc = airframe(50, [20, 70, 85], [0, 0, -G]);
   const wing = {
     name: 'wing',
+    pivots: pivoting === 'wing',
     sections: [
       { leadingEdge: [100, 0, 0], chord: 1000 },
       { leadingEdge: [100, 3000, 0], chord: 1000 },
@@ -98,7 +99,7 @@ export function glider(forward = '+x'): CadDocument {
   };
   const tail = {
     name: 'tail',
-    pivots: true,
+    pivots: pivoting === 'tail',
     sections: [
       { leadingEdge: [-2800, 0, 0], chord: 500 },
       { leadingEdge: [-2800, 1250, 0], chord: 500 },
@@ -113,7 +114,7 @@ export function glider(forward = '+x'): CadDocument {
     id: 'w',
     forward,
     pivotsDeg: [-8, 0, 8],
-    pivotPoint: [-2675, 0, 0],
+    pivotPoint: pivoting === 'tail' ? [-2675, 0, 0] : [-150, 0, 0],
     servo: { rateDegS: 60 },
     profileDrag: { cd0: 0.01, source: 'test polar' },
   }).doc;

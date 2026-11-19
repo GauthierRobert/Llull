@@ -43,7 +43,7 @@ interface Linear {
   a: number[][];
   modes: { label: string; re: number; im: number; periodS: number | null; dampingRatio: number | null; stability: string }[];
   warnings: string[];
-  rateDamping: { method: string; terms: RateDampingTerm[] };
+  rateDamping: { requested: string; method: string; terms: RateDampingTerm[]; skipped: { surfaceId: string; reason: string }[] };
   trim: Record<string, unknown> & { angleOfAttackDeg: number };
 }
 
@@ -91,8 +91,8 @@ function residualisedPhugoidPeriod(a: number[][]): number {
 
 describe('tail-arm rate damping: exact derivatives of a linear table (FLT-M5b)', () => {
   const doc = withTable(linearTable());
-  const damped = lin(doc);
-  const lumped = lin(doc, { rateDamping: 'none' });
+  const damped = lin(doc, { rateDamping: 'tail_arm' });
+  const lumped = lin(doc);
   const [term] = damped.rateDamping.terms;
 
   it('recovers the tail arm and lift slope from the pivot derivatives; C_mq is Nelson -2 η a_t V_H l_t / c̄', () => {
@@ -127,17 +127,37 @@ describe('tail-arm rate damping: exact derivatives of a linear table (FLT-M5b)',
     expect(Math.abs(deltaW / ((Math.cos(alpha) * liftPerQ) / 50) - 1)).toBeLessThan(1e-6);
     expect(deltaQ).toBeLessThan(0);
     expect(damped.warnings.join(' ')).toContain('tail-arm estimate');
+    expect(damped.warnings.join(' ')).toContain('pending owner decision');
   });
 
-  it('rateDamping none linearises the lumped table alone and says the damping is absent', () => {
-    expect(lumped.rateDamping).toEqual({ method: 'none', terms: [] });
+  it('the M_ẇ substitution columns: ΔA[q][w] and ΔA[q][u] follow α̇ = (w u-dot − u w-dot) / V² of the base A to 1e-6', () => {
+    const alpha = damped.trim.angleOfAttackDeg * RAD;
+    const [u, w] = [SPEED * Math.cos(alpha), -SPEED * Math.sin(alpha)];
+    const base = lumped.a;
+    const at = (matrix: number[][], i: number, j: number): number => matrix[i]?.[j] ?? Number.NaN;
+    const qs = 0.5 * 1.225 * SPEED * SPEED * 6;
+    const downwash = term?.downwashSlope ?? Number.NaN;
+    for (const column of [0, 2]) {
+      // the trim has u-dot = w-dot = 0, so only the base Jacobian enters: dα̇/dx_j = (w A[u][j] − u A[w][j]) / V²
+      const alphaDot = (w * at(base, 0, column) - u * at(base, 2, column)) / (SPEED * SPEED);
+      const lift = qs * B_SLOPE * (ARM_CHORDS / SPEED) * downwash * alphaDot;
+      const deltaQ = at(damped.a, 4, column) - at(base, 4, column);
+      const deltaW = at(damped.a, 2, column) - at(base, 2, column);
+      expect(Math.abs(deltaQ / ((ARM_CHORDS * Math.cos(alpha) * lift) / 70) - 1)).toBeLessThan(1e-6);
+      expect(Math.abs(deltaW / ((Math.cos(alpha) * lift) / 50) - 1)).toBeLessThan(1e-6);
+    }
+  });
+
+  it('the default (rateDamping none) linearises the lumped table alone and says neither the damping nor the periods are results', () => {
+    expect(lumped.rateDamping).toEqual({ requested: 'none', method: 'none', terms: [], skipped: [] });
     expect(lumped.warnings.join(' ')).toContain('rate damping (Mq, Zq, Malpha-dot) is absent');
+    expect(lumped.warnings.join(' ')).toContain('PERIODS');
   });
 });
 
 describe('tail-arm rate damping: the vortex-lattice glider (FLT-M5b)', () => {
-  const damped = lin(glider());
-  const lumped = lin(glider(), { rateDamping: 'none' });
+  const damped = lin(glider(), { rateDamping: 'tail_arm' });
+  const lumped = lin(glider());
   const [term] = damped.rateDamping.terms;
 
   it('the tail arm and lift slope from the lattice table match the geometry: quarter chord 2.925 m, Helmbold a_t S_t / S', () => {
@@ -160,14 +180,25 @@ describe('tail-arm rate damping: the vortex-lattice glider (FLT-M5b)', () => {
     expect(mode(damped, 'phugoid')?.periodS ?? 0).toBeGreaterThan((1.2 * Math.SQRT2 * Math.PI * SPEED) / G);
   });
 
+  it('a servo-pivoted wing (tail fixed) is no tail: no term, the reason in data.rateDamping.skipped, the damping-absent warning', () => {
+    const wing = lin(glider('+x', 'wing'), { rateDamping: 'tail_arm' });
+    expect(wing.rateDamping.method).toBe('none');
+    expect(wing.rateDamping.terms).toEqual([]);
+    expect(wing.rateDamping.skipped).toHaveLength(1);
+    expect(wing.rateDamping.skipped[0]?.reason).toContain('does not look like a tail');
+    const warnings = wing.warnings.join(' ');
+    expect(warnings).toContain('rate damping (Mq, Zq, Malpha-dot) is absent');
+    expect(warnings).toContain("tail-arm estimate not applied to 'w'");
+  });
+
   it('is pure; the hover quad has no aero table, so no damping and no aero warning', () => {
     const doc = glider();
-    const result = execute(doc, 'linearize_flight', { scenario: 's', airspeedMps: SPEED, freeFlightPath: true });
+    const result = execute(doc, 'linearize_flight', { scenario: 's', airspeedMps: SPEED, freeFlightPath: true, rateDamping: 'tail_arm' });
     expect(result.document).toBe(doc);
     const quad = step(quadDrone(), 'add_flight_controller', { body: 'frame', maxRpm: 8000, id: 'fc' }).doc;
     const flyable = step(quad, 'define_flight_scenario', { body: 'frame', controller: 'fc', id: 's', durationS: 1 }).doc;
     const hover = execute(flyable, 'linearize_flight', { scenario: 's' });
-    expect((hover.data as Linear).rateDamping).toEqual({ method: 'none', terms: [] });
+    expect((hover.data as Linear).rateDamping).toEqual({ requested: 'none', method: 'none', terms: [], skipped: [] });
     const bad = execute(doc, 'linearize_flight', { scenario: 's', rateDamping: 'vlm' });
     expect(bad.summary).toContain('invalid params');
     expectNoOp(bad, doc);
@@ -181,21 +212,27 @@ describe('rate damping helpers (FLT-M5b)', () => {
     const runtime = vehicle.aero[0];
     if (runtime === undefined) throw new Error('no surface');
     const withSurface = (surface: AeroSurface): TrimVehicle => ({ ...vehicle, aero: [{ ...runtime, surface }] });
-    expect(rateDampingTerms(withSurface({ ...runtime.surface, servo: null }), [4], [0])).toEqual([]);
+    expect(rateDampingTerms(withSurface({ ...runtime.surface, servo: null }), [4], [0])).toEqual({ terms: [], skipped: [] });
     // a pivot that carries no lift: no tail to estimate from
-    expect(rateDampingTerms(withSurface({ ...runtime.surface, table: linearTable(0, 0) }), [4], [0])).toEqual([]);
-    const [canard] = rateDampingTerms(withSurface({ ...runtime.surface, table: linearTable(B_SLOPE, -2) }), [4], [0]);
+    const flat = rateDampingTerms(withSurface({ ...runtime.surface, table: linearTable(0, 0) }), [4], [0]);
+    expect(flat.terms).toEqual([]);
+    expect(flat.skipped[0]?.reason).toContain('carries no lift');
+    // a pivot carrying most of the lift slope at a short arm is a pivoting wing
+    const pivotingWing = rateDampingTerms(withSurface({ ...runtime.surface, table: linearTable(4, 0.2) }), [4], [0]);
+    expect(pivotingWing.terms).toEqual([]);
+    expect(pivotingWing.skipped[0]?.reason).toContain('does not look like a tail');
+    const [canard] = rateDampingTerms(withSurface({ ...runtime.surface, table: linearTable(B_SLOPE, -2) }), [4], [0]).terms;
     expect(canard?.tailArmM).toBeCloseTo(-2, 9);
     expect(canard?.downwashSlope).toBe(0);
     expect(canard?.cmq).toBeLessThan(0);
-    const [edge] = rateDampingTerms(vehicle, [4], [8]);
+    const [edge] = rateDampingTerms(vehicle, [4], [8]).terms;
     expect(edge?.tailLiftSlopePerRad).toBeCloseTo(B_SLOPE, 9);
   });
 
   it('without terms the damped derivative is the airframe one; flow from behind adds nothing', () => {
     const x = [SPEED, 0, -1, 0, 0.1, 0, 0, 0.05];
     expect(dampedDerivative(vehicle, [], x, [0])).toEqual(stateDerivative(vehicle, x, [0]));
-    const terms = rateDampingTerms(vehicle, [4], [0]);
+    const { terms } = rateDampingTerms(vehicle, [4], [0]);
     const reversed = [-SPEED, 0, 0, 0, 0.1, 0, 0, 0];
     expect(dampedDerivative(vehicle, terms, reversed, [0])).toEqual(stateDerivative(vehicle, reversed, [0]));
     expect(dampedDerivative(vehicle, terms, x, [0])).not.toEqual(stateDerivative(vehicle, x, [0]));

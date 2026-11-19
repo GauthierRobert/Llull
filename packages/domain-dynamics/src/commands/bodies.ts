@@ -12,7 +12,7 @@ import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import { formatLength } from '@core/model/units';
 import { toMetres } from '@core/model/units';
 import { convertValue, isUnitFailure } from '@lib/quantity';
-import { symmetricEigen, type Symmetric3 } from '@lib/symmetricEigen';
+import { inertiaProblem } from '@lib/inertiaProblem';
 import { flightIdTaken, flightRecordCount, flightWithout, idTakenInDynamicsOrFlight } from '../flight/model';
 
 /** The document's dynamics model (empty when absent). */
@@ -22,21 +22,6 @@ export function dynamicsOf(doc: CadDocument): DynamicsModel {
 
 export function withDynamics(doc: CadDocument, dynamics: DynamicsModel): CadDocument {
   return { ...doc, dynamics };
-}
-
-/** Relative slack on the triangle inequality of the principal moments (a thin rod or plate sits on the bound). */
-const TRIANGLE_SLACK = 1e-9;
-
-/** Why an inertia tensor is not one a rigid body can have (principal moments > 0, each at most the sum of the other two), or null. */
-function inertiaProblem(tensor: Symmetric3): string | null {
-  const principal = symmetricEigen(tensor);
-  if (principal === null) return 'inertiaKgM2 has a non-finite component';
-  const [a, b, c] = principal.moments;
-  if (!(a > 0))
-    return `inertiaKgM2 is not positive definite (principal moments ${principal.moments.map((m) => m.toPrecision(4)).join(', ')} kg·m²)`;
-  if (c > (a + b) * (1 + TRIANGLE_SLACK))
-    return `inertiaKgM2 breaks the triangle inequality: principal moment ${c.toPrecision(4)} > ${a.toPrecision(4)} + ${b.toPrecision(4)} kg·m² (no mass distribution has it)`;
-  return null;
 }
 
 /**

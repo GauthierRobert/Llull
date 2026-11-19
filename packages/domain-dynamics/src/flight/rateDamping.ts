@@ -5,6 +5,7 @@
  * Stability and Automatic Control, 2nd ed., ch. 3, the tail pitch-rate and α̇ derivatives: C_mq = −2 η a_t V_H l_t / c̄, C_Lq = 2 η a_t V_H,
  * C_mα̇ = C_mq dε/dα; Etkin & Reid, Dynamics of Flight, 3rd ed., ch. 5, the same tail-arm estimate), applied as a tail lift Q S CL_δ Δα_t at the tail. The downwash slope is the elliptic-wing estimate
  * dε/dα = 2 CL_αw / (π A) with A = b² / S of the table reference (the wing by default) and the wing lift slope CL_αw backed out of the table's CL_α.
+ * Applied only when the pivot looks like a tail (MAX_TAIL_LIFT_SHARE, MIN_TAIL_ARM_CHORDS): a servo-pivoted wing is skipped with the reason.
  * Validity: a pivoting tail (an elevator flap gives τ CL_δ), attached flow (α inside the table's valid range), quasi-steady (reduced frequency
  * ω c̄ / 2V well below 1), the wing's and fuselage's own rate terms neglected (Nelson adds about 10 % to the tail C_mq for them; not done here).
  */
@@ -23,6 +24,18 @@ const SLOPE_STEP_DEG = 0.5;
 const MIN_PIVOT_SLOPE = 1e-6;
 /** Upper bound of the downwash slope (the estimate exceeds 1 only for a very low aspect ratio, where it does not hold). */
 const MAX_DOWNWASH_SLOPE = 0.9;
+/**
+ * Plausibility gate of "the pivot is a tail" (the table does not record which lattice surface pivots): a tail carries a small share of the lift
+ * slope at an arm of chords; a pivoting wing gives CL_δ ≈ CL_α at an arm of a fraction of a chord.
+ */
+const MAX_TAIL_LIFT_SHARE = 0.5;
+const MIN_TAIL_ARM_CHORDS = 1;
+
+/** A servo table the estimate was not applied to, and why. */
+export interface RateDampingSkip {
+  readonly surfaceId: string;
+  readonly reason: string;
+}
 
 /** The rate-damping estimate of one pivoting surface at the trim. */
 export interface RateDampingTerm {
@@ -50,19 +63,25 @@ function slope(f: (x: number) => number, x: number, lo: number, hi: number): num
   return above > below ? (f(above) - f(below)) / ((above - below) * RAD) : 0;
 }
 
-/** The term of `runtime` at the trim angle of attack and pivot, deg; null without a pivot servo or when the pivot carries no lift. */
-function termOf(runtime: AeroRuntime, index: number, alphaDeg: number, pivotDeg: number): RateDampingTerm | null {
+/** The term of `runtime` at the trim angle of attack and pivot, deg, or why the table gets none (null: no pivot servo, nothing to say). */
+function termOf(runtime: AeroRuntime, index: number, alphaDeg: number, pivotDeg: number): RateDampingTerm | RateDampingSkip | null {
   const { surface } = runtime;
   const { table } = surface;
   if (surface.servo === null || table.pivotDeg.length < 2) return null;
+  const skip = (reason: string): RateDampingSkip => ({ surfaceId: surface.id, reason });
   const pivots = [elementAt(table.pivotDeg, 0), elementAt(table.pivotDeg, table.pivotDeg.length - 1)] as const;
   const alphas = [elementAt(table.alphaDeg, 0), elementAt(table.alphaDeg, table.alphaDeg.length - 1)] as const;
   const clDelta = slope((deg) => lookupAero(table, alphaDeg, deg).cl, pivotDeg, ...pivots);
-  if (!(Math.abs(clDelta) > MIN_PIVOT_SLOPE)) return null;
+  if (!(Math.abs(clDelta) > MIN_PIVOT_SLOPE)) return skip('the pivot carries no lift (no tail to estimate from)');
   const cmDelta = slope((deg) => lookupAero(table, alphaDeg, deg).cm, pivotDeg, ...pivots);
   const clAlpha = slope((deg) => lookupAero(table, deg, pivotDeg).cl, alphaDeg, ...alphas);
   const chord = surface.refChordM;
   const arm = (-chord * cmDelta) / clDelta;
+  const share = Math.abs(clDelta / clAlpha);
+  if (!(share <= MAX_TAIL_LIFT_SHARE) || !(Math.abs(arm) >= MIN_TAIL_ARM_CHORDS * chord))
+    return skip(
+      `the pivot does not look like a tail: CL_delta / CL_alpha ${share.toPrecision(3)} (a tail <= ${MAX_TAIL_LIFT_SHARE}), arm ${(arm / chord).toPrecision(3)} chords (a tail >= ${MIN_TAIL_ARM_CHORDS}); a pivoting wing has no tail-arm estimate`,
+    );
   const aspect = (surface.refSpanM * surface.refSpanM) / surface.refAreaM2;
   // CL_α = CL_αw + CL_δ (1 − dε/dα) with dε/dα = 2 CL_αw / (π A): solved for the wing's own slope
   const denominator = 1 - (2 * clDelta) / (Math.PI * aspect);
@@ -82,12 +101,21 @@ function termOf(runtime: AeroRuntime, index: number, alphaDeg: number, pivotDeg:
   };
 }
 
-/** The terms of every pivoting surface of `vehicle` at the trim angles of attack `alphasDeg` and pivots `pivotsDeg` (per surface). */
-export function rateDampingTerms(vehicle: TrimVehicle, alphasDeg: readonly number[], pivotsDeg: readonly number[]): RateDampingTerm[] {
-  return vehicle.aero.flatMap((runtime, i) => {
-    const term = termOf(runtime, i, elementAt(alphasDeg, i), elementAt(pivotsDeg, i));
-    return term === null ? [] : [term];
+/** The terms of every pivoting-tail surface of `vehicle` at the trim angles of attack `alphasDeg` and pivots `pivotsDeg` (per surface), and the servo tables skipped. */
+export function rateDampingTerms(
+  vehicle: TrimVehicle,
+  alphasDeg: readonly number[],
+  pivotsDeg: readonly number[],
+): { terms: RateDampingTerm[]; skipped: RateDampingSkip[] } {
+  const terms: RateDampingTerm[] = [];
+  const skipped: RateDampingSkip[] = [];
+  vehicle.aero.forEach((runtime, i) => {
+    const outcome = termOf(runtime, i, elementAt(alphasDeg, i), elementAt(pivotsDeg, i));
+    if (outcome === null) return;
+    if ('reason' in outcome) skipped.push(outcome);
+    else terms.push(outcome);
   });
+  return { terms, skipped };
 }
 
 /**
