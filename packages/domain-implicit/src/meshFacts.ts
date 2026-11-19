@@ -15,21 +15,38 @@ interface Facts {
   closedManifold: boolean | null;
 }
 
-/** Asset keys remembered (a key is the sha256 of the mesh, so its facts never change); the oldest leaves first. */
+/** Asset keys remembered (a key identifies the content of its mesh, so its facts never change); the least recently used leaves first. */
 const MAX_KEYS = 64;
 
 const byMesh = new WeakMap<MeshData, Facts>();
 const byKey = new Map<string, Facts>();
 
-function factsOf(mesh: MeshData, assetKey?: string): Facts {
-  const known = byMesh.get(mesh) ?? (assetKey === undefined ? undefined : byKey.get(assetKey));
-  const facts = known ?? { measures: null, closedManifold: null };
-  byMesh.set(mesh, facts);
-  if (assetKey !== undefined && !byKey.has(assetKey)) {
-    const oldest = byKey.size >= MAX_KEYS ? byKey.keys().next().value : undefined;
+/** Fill what `into` does not know from `from` (both describe the same content). */
+function fill(into: Facts, from: Facts): void {
+  into.measures ??= from.measures;
+  into.closedManifold ??= from.closedManifold;
+}
+
+/** Make `assetKey` the most recently used key (Map order is insertion order), evicting the least recently used beyond MAX_KEYS. */
+function touchKey(assetKey: string, facts: Facts): void {
+  byKey.delete(assetKey);
+  byKey.set(assetKey, facts);
+  if (byKey.size > MAX_KEYS) {
+    const oldest = byKey.keys().next().value;
     if (oldest !== undefined) byKey.delete(oldest);
-    byKey.set(assetKey, facts);
   }
+}
+
+function factsOf(mesh: MeshData, assetKey?: string): Facts {
+  const ofMesh = byMesh.get(mesh);
+  const ofKey = assetKey === undefined ? undefined : byKey.get(assetKey);
+  const facts = ofKey ?? ofMesh ?? { measures: null, closedManifold: null };
+  if (ofMesh !== undefined && ofMesh !== facts) {
+    fill(facts, ofMesh);
+    fill(ofMesh, facts);
+  }
+  byMesh.set(mesh, facts);
+  if (assetKey !== undefined) touchKey(assetKey, facts);
   return facts;
 }
 

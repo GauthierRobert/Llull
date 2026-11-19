@@ -211,7 +211,7 @@ describe('the memory of mesh facts', () => {
     expect(bodyMeshMeasuresOf(bare).volume).toBeCloseTo(1 / 6, 12);
   });
 
-  it('forgets the oldest asset key beyond 64 keys; the mesh is then measured again', () => {
+  it('forgets the least recently used asset key beyond 64 keys; the mesh is then measured again', () => {
     const first = tetrahedron();
     rememberMeshResult(fakeResult(first, { measures: MARK }));
     bindMeshAsset(first, 'facts-test-evict-0');
@@ -222,5 +222,36 @@ describe('the memory of mesh facts', () => {
     const late = tetrahedron();
     bindMeshAsset(late, 'facts-test-evict-0');
     expect(bodyMeshMeasuresOf(late).volume).toBeCloseTo(1 / 6, 12);
+  });
+
+  it('merges what the mesh object and the asset key each know when both are known: each fills the other, the key wins a conflict', () => {
+    const mesh = tetrahedron();
+    rememberMeshResult(fakeResult(mesh, { measures: MARK, closedManifold: false }));
+    const stored = tetrahedron();
+    const measured = bodyMeshMeasuresOf(stored);
+    bindMeshAsset(stored, 'facts-test-merge');
+    bindMeshAsset(mesh, 'facts-test-merge');
+    expect(bodyMeshMeasuresOf(mesh)).toBe(measured);
+    expect(bodyMeshIsClosedManifold(stored)).toBe(false);
+    const later = tetrahedron();
+    bindMeshAsset(later, 'facts-test-merge');
+    expect([bodyMeshMeasuresOf(later), bodyMeshIsClosedManifold(later)]).toEqual([measured, false]);
+  });
+
+  it('keeps a key that was used again: the least recently used key leaves, not the oldest inserted', () => {
+    for (let n = 0; n < 64; n += 1) bindMeshAsset(tetrahedron(), `facts-test-lru-fill-${n}`);
+    for (const key of ['facts-test-lru-a', 'facts-test-lru-b']) {
+      const marked = tetrahedron();
+      rememberMeshResult(fakeResult(marked, { measures: MARK }));
+      bindMeshAsset(marked, key);
+    }
+    bindMeshAsset(tetrahedron(), 'facts-test-lru-a');
+    for (let n = 0; n < 63; n += 1) bindMeshAsset(tetrahedron(), `facts-test-lru-more-${n}`);
+    const a = tetrahedron();
+    bindMeshAsset(a, 'facts-test-lru-a');
+    expect(bodyMeshMeasuresOf(a).volume).toBe(MARK.volume);
+    const b = tetrahedron();
+    bindMeshAsset(b, 'facts-test-lru-b');
+    expect(bodyMeshMeasuresOf(b).volume).toBeCloseTo(1 / 6, 12);
   });
 });

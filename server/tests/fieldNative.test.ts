@@ -95,6 +95,8 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
     });
   }
 
+  // CONTRACT TEST of `FieldEngine.mesh` (@invariant in packages/core/src/geometry/field/engineTypes.ts): any new field engine must pass it, since
+  // the implicit plugin answers from `measures` / `closedManifold` instead of the mesh (packages/domain-implicit/src/meshFacts.ts).
   native('the mesh job returns the volume, area and closed-manifold answer TypeScript computes from the returned mesh, bit for bit', () => {
     if (engine === null) return;
     for (const [name, field] of Object.entries(SCENE.fields)) {

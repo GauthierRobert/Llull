@@ -48,15 +48,13 @@ export function resolveRequest(
   return target;
 }
 
-type MeshMeasure = MeshMeasures;
-
 /** The measures of the full mesh of the body (null for a field), or the refusal when its mesh asset is missing. */
 export function bodyMeshMeasures(
   doc: CadDocument,
   id: string,
   target: Target,
   ctx: ExecutionContext | undefined,
-): MeshMeasure | null | CommandResult {
+): MeshMeasures | null | CommandResult {
   const entity = target.body === undefined ? undefined : doc.entities[target.body.id];
   const full = entity?.kind === 'mesh' ? fullBodyMesh(entity, ctx?.meshAssets) : null;
   if (entity?.kind === 'mesh' && full === null)
@@ -80,7 +78,7 @@ export interface Measured {
   readonly engine: FieldEngine;
   readonly voxel: number;
   readonly quadrature: VolumeAnswer;
-  readonly mesh: MeshMeasure | null;
+  readonly mesh: MeshMeasures | null;
 }
 
 /** The report of a measured body / field: data payload and one-line summary. */

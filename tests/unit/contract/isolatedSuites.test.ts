@@ -26,9 +26,9 @@ const uiSources: Record<string, string> = Object.fromEntries(
     .map((file) => [`/${relative(ROOT, file).replace(/\\/g, '/')}`, readFileSync(file, 'utf8')]),
 );
 
-// A shared (isolate: false) module graph must not see module mocks, stubbed globals, DOM state or test-only commands.
+// A shared (isolate: false) module graph must not see module mocks, stubbed globals, DOM state, test-only commands or false mesh facts.
 const NEEDS_ISOLATION =
-  /\bvi\.(mock|doMock|stubGlobal|stubEnv|resetModules)\(|\blocalStorage\b|\bwindow\.(location|history|addEventListener)|\bregisterCommands\(|\binstallPlugin\(|\bset(?:EngineLoss|Realism)Law\(/;
+  /\bvi\.(mock|doMock|stubGlobal|stubEnv|resetModules)\(|\blocalStorage\b|\bwindow\.(location|history|addEventListener)|\bregisterCommands\(|\binstallPlugin\(|\bset(?:EngineLoss|Realism)Law\(|\brememberMeshResult\(/;
 // The shared jsdom graph resets renders, stores and storage between tests (tests/setupDom.ts); module mocks, stubs and test-only commands still leak.
 const DOM_NEEDS_ISOLATION =
   /\bvi\.(mock|doMock|stubGlobal|stubEnv|resetModules)\(|\bregisterCommands\(|\binstallPlugin\(|\bset(?:EngineLoss|Realism)Law\(/;
