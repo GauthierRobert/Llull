@@ -469,10 +469,13 @@ parameters and imperfection amplitudes come from the owner or a company rule (as
    Arc-length (Riks) does not exist in CalculiX (NLS_ARC_LENGTH_UNSUPPORTED): use displacement control, or \`beam_large_deflection\` for frames (limit points and snap-back).
 4. \`check_nonlinear\` before \`llull fea_mesh\` and \`llull fea_solve\` (errors stop the deck: NLS_NLGEOM_UNSET, NLS_NO_STEPS, NLS_MATERIAL_MODEL_MISSING ...). A run that stops
    (NLS_NOT_CONVERGED, NLS_INCREMENT_TOO_SMALL, NLS_MAX_INCREMENTS) records nothing: smaller initial increment or displacement control, never raise a tolerance silently.
-5. Read: \`nonlinear_report\` (steps, increments, cutbacks, curves with units, max PEEQ, permanentSet; \`increments=all\` pages 1000 points, pass nextCursor as cursor) and \`limit_load\`
+5. Read: \`nonlinear_report\` (steps, increments, cutbacks, curves with units, max PEEQ, permanentSet, plasticVolume fraction; \`increments=all\` pages 1000 points, pass nextCursor as cursor) and \`limit_load\`
    (method peak, or plateau with the slopeFraction + window you were given; a curve that never peaks gives only a lowerBound and NLS_LIMIT_NOT_REACHED: say "at least"). Stale results are
    refused (NLS_CURVE_STALE): run fea_mesh and fea_solve again. \`compute_margins\` criterion=limit_load turns the limit load into a margin; FAIL rows stay with a human (FEA_HUMAN_GATE).
-6. Finish with \`check_nonlinear\`: report NLS_SNAP_BACK_DETECTED, NLS_MATERIAL_MODEL_UNVERIFIED, NLS_THRESHOLD_UNSET and NLS_PERMANENT_SET_THRESHOLD_UNSET to the user and ask for the missing
+   The results summary names one load case per step, by position: \`step 1\`, \`step 2\` ... (not the step names, so a rename keeps results current); give that
+   name as loadCase wherever a load case is asked, e.g. \`llull run_convergence_study analysisId=ID quantity='{"kind":"field_max","field":"von_mises","loadCase":"step 2"}'\`.
+6. Finish with \`check_nonlinear\`: report NLS_SNAP_BACK_DETECTED, NLS_STRAIN_BEYOND_CURVE (PEEQ past the hardening data), NLS_STRAIN_EXCEEDS_ELONGATION (error: past the
+   elongation at break), NLS_MESH_PLASTIC_ADEQUACY (plastic zone < 2 elements across: refine), NLS_MATERIAL_MODEL_UNVERIFIED, NLS_THRESHOLD_UNSET and NLS_PERMANENT_SET_THRESHOLD_UNSET to the user and ask for the missing
    limits instead of inventing them; once given, state them with set_nonlinear_controls thresholds (each with its source) so check_nonlinear can judge NLS_PERMANENT_SET_EXCEEDED and NLS_NLGEOM_RECOMMENDED. A limit load without a mesh convergence study carries VNV_NO_CONVERGENCE_STUDY (\`llull run_convergence_study\`, section 18).
 
 ## 20. Acoustic environments: hand-off only (toolset analysis, PHY-20)

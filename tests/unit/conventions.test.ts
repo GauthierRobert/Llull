@@ -262,8 +262,21 @@ describe('CONVENTIONS_GUIDE nonlinear static section (PHY-05 M4, AF-03)', () => 
     ])
       expect(section).toContain(command);
     expect(section).toContain('not approved');
-    for (const code of ['NLS_ARC_LENGTH_UNSUPPORTED', 'NLS_CURVE_STALE', 'NLS_LIMIT_NOT_REACHED', 'FEA_HUMAN_GATE'])
+    for (const code of [
+      'NLS_ARC_LENGTH_UNSUPPORTED',
+      'NLS_CURVE_STALE',
+      'NLS_LIMIT_NOT_REACHED',
+      'FEA_HUMAN_GATE',
+      'NLS_STRAIN_BEYOND_CURVE',
+      'NLS_STRAIN_EXCEEDS_ELONGATION',
+      'NLS_MESH_PLASTIC_ADEQUACY',
+    ])
       expect(section).toContain(code);
+  });
+
+  it('states that nonlinear summary load cases are named step <n> (by position)', () => {
+    expect(section).toMatch(/`step 1`, `step 2`/);
+    expect(section).toContain('loadCase":"step 2"');
   });
 });
 

@@ -50,6 +50,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'use a verified, sourced material model and verified E / nu (PHY-02 / 08); every number computed from it is flagged',
   NLS_SNAP_BACK_DETECTED:
     'the probe displacement reverses while the load falls although the controlled displacement grows: trace it with beam_large_deflection (frames) or an arc-length solver',
+  NLS_STRAIN_BEYOND_CURVE:
+    'the plastic strain left the measured hardening data and CalculiX extends the last row flat: extend the PHY-02 curve (or its validity) with test data, or reduce the load',
+  NLS_STRAIN_EXCEEDS_ELONGATION:
+    'the plastic strain exceeds the elongation at break of the material record: the part may rupture; redesign, a qualified reviewer decides',
+  NLS_MESH_PLASTIC_ADEQUACY:
+    'the plastic zone is less than 2 elements across: refine the mesh there (05 refinement, fea_mesh) and solve again before reading PEEQ or a collapse load',
   FEA_RESULTS_MISSING: 'run fea_mesh and fea_solve on the analysis so the results artifact exists in the store',
   FEA_ANALYSIS_NOT_FOUND: 'list the analyses with describe_analysis (no analysisId), or create one with create_analysis',
   FEA_PART_NOT_IN_ANALYSIS: 'add the entity first with set_part_idealization',

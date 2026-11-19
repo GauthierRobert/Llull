@@ -20,6 +20,7 @@ import { snapBackDetected, unloadingStep } from './curveRules';
 import { extractCurves } from './curves';
 import { unverifiedReasons } from './limitLoadQuery';
 import { isRefusal, nonlinearCase } from './settings';
+import { plasticItems } from './plasticChecks';
 import { appendAll } from '@lib/appendAll';
 
 const item = (code: string, message: string, ids: readonly string[], severity: 'error' | 'warning' = 'warning'): NonlinearCheckItem => ({
@@ -106,7 +107,8 @@ function thresholdItems(doc: CadDocument, analysis: AnalysisCase, mesh: FeMeshAr
  * @affects nothing (read-only query; data = status, state, items, notes, reviewRequired)
  * @invariant the check_analysis items first (they include the nonlinear set-up items NLS_NLGEOM_UNSET, NLS_NO_STEPS, NLS_ARC_LENGTH_UNSUPPORTED,
  *   NLS_MATERIAL_MODEL_MISSING, NLS_PROBE_REFERENCE_UNKNOWN, NLS_IMPERFECTION_MISSING ...), then warnings (NLS_MATERIAL_MODEL_UNVERIFIED,
- *   NLS_THRESHOLD_UNSET, NLS_PERMANENT_SET_THRESHOLD_UNSET) and, on verified results, NLS_SNAP_BACK_DETECTED;
+ *   NLS_THRESHOLD_UNSET, NLS_PERMANENT_SET_THRESHOLD_UNSET) and, on verified results, NLS_SNAP_BACK_DETECTED, NLS_PERMANENT_SET_EXCEEDED,
+ *   NLS_NLGEOM_RECOMMENDED and the plastic-zone items (NLS_STRAIN_BEYOND_CURVE, NLS_STRAIN_EXCEEDS_ELONGATION, NLS_MESH_PLASTIC_ADEQUACY, one per part);
  *   status fail on any error, warn on warnings only; reviewRequired always
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not nonlinear_static -> NLS_CASE_NOT_NONLINEAR (refusals, unchanged doc)
  */
@@ -120,7 +122,11 @@ export const checkNonlinear = defineCommand({
     '(NLS_CONTROL_INVALID), an NLGEOM case without imperfection next to a solved buckling case of the same part (NLS_IMPERFECTION_MISSING, warning), ' +
     'unverified material data (NLS_MATERIAL_MODEL_UNVERIFIED, warning, not suppressible), nlgeom false without a threshold (NLS_THRESHOLD_UNSET, ' +
     'warning), an unloading step without a permanent-set limit (NLS_PERMANENT_SET_THRESHOLD_UNSET, warning), and, on verified results, the residual state beyond a stated permanent-set limit (NLS_PERMANENT_SET_EXCEEDED, error), nlgeom false beyond a stated small-rotation / strain limit (NLS_NLGEOM_RECOMMENDED, warning) and a snap-back ' +
-    'indicator on a displacement-controlled curve (NLS_SNAP_BACK_DETECTED, warning). No threshold is invented: the owner or a company rule supplies ' +
+    'indicator on a displacement-controlled curve (NLS_SNAP_BACK_DETECTED, warning); per part with positive PEEQ: ' +
+    'PEEQ beyond the last point of the hardening curve, or beyond the equivalentPlasticStrain validity of an analytic law (NLS_STRAIN_BEYOND_CURVE, warning), ' +
+    'PEEQ above ln(1 + elongation at break), the smallest elongation of the material record at the case reference temperature (default 293.15 K), when the record has one (NLS_STRAIN_EXCEEDS_ELONGATION, ' +
+    'error), and fewer than 2 elements across the plastic zone (elements with PEEQ > 0 at every corner; slab-equivalent thickness 2 x volume / boundary area over the element size; ' +
+    'NLS_MESH_PLASTIC_ADEQUACY, warning). No permanent-set / small-deformation threshold is invented: the owner or a company rule supplies ' +
     'them. Run it before fea_mesh / fea_solve and at the end of every job. Always reviewRequired: computed by llull, not approved.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema }),
@@ -140,7 +146,9 @@ export const checkNonlinear = defineCommand({
             item('NLS_SNAP_BACK_DETECTED', `curve '${curve.name}' turns back on a displacement-controlled step`, [curve.probeId]),
           );
       appendAll(resultItems, thresholdItems(doc, analysis, trust.meshArtifact, trust.resultsArtifact));
-      notes.push('strain-beyond-hardening-curve, elongation and plastic-mesh-adequacy guardrails are not evaluated by this version');
+      const plastic = plasticItems(doc, analysis, trust.meshArtifact, trust.resultsArtifact);
+      appendAll(resultItems, plastic.items);
+      appendAll(notes, plastic.notes);
     }
     const items = [...baseItems(doc, analysisId, ctx), ...setupWarnings(doc, analysis), ...resultItems];
     const errors = items.filter((entry) => entry.severity === 'error').length;

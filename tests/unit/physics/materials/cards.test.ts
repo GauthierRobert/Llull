@@ -75,6 +75,19 @@ describe('CalculiX cards (VC-MATL-13)', () => {
     expectCase(PACK, 'VC-MATL-13/ccx/engineeringConstants', lines);
   });
 
+  it('reads a plastic-strain validity given in % in strain units when it tabulates a linear law', () => {
+    let doc = withMaterial(createEmptyDocument(), 'pct');
+    doc = addModel(doc, 'pct', 'elastic', NL1_ELASTIC, { validity: T293 });
+    doc = addModel(doc, 'pct', 'iso_h', NL1_HARDENING, {
+      validity: [...T293, { variable: 'equivalentPlasticStrain', unit: '%', data: [0, 0.1] }],
+    });
+    doc = defineSet(doc, 'pct', { id: 's', elastic: 'elastic', plastic: 'iso_h' }, true);
+    const percent = cards(doc, { material: 'pct', target: 'calculix', name: 'P' }).lines;
+    const strain = cards(nl1Document(), { material: 'nl1_steel', set: 'iso_hardening', target: 'calculix', name: 'P' }).lines;
+    expect(percent.slice(3)).toEqual(strain.slice(3));
+    expect(percent.at(-1)).toMatch(/,0\.001$/);
+  });
+
   it('tabulates linear isotropic hardening up to the declared plastic-strain validity', () => {
     const data = cards(nl1Document(), { material: 'nl1_steel', set: 'iso_hardening', target: 'calculix', name: 'NL1_ISO' });
     expectCase(PACK, 'VC-MATL-13/ccx/plasticLinearIsotropic', data.lines);
