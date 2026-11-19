@@ -8,10 +8,10 @@ import type { FieldEngine } from '@core/geometry/field/engineTypes';
 import type { FieldNode } from '@implicit/model';
 import { tsFieldEngine } from '@core/geometry/field/tsEngine';
 import { type MeshAssetPort, setMeshAssetPort } from '@core/geometry/mesh/assets';
-import type { MeshAssetRef } from '@core/model/meshProvenance';
-import type { CadDocument, MeshData, MeshSolidEntity } from '@core/model/types';
+import type { CadDocument, MeshSolidEntity } from '@core/model/types';
 import { implicitDocument } from '@implicit/document';
 import { expectPure } from '../../helpers/expectNoOp';
+import { memoryMeshAssets } from '../../helpers/memoryMeshAssets';
 import { empty, expectRefused, ok, run } from './helpers';
 
 afterEach(() => {
@@ -262,31 +262,16 @@ describe('regenerate_implicit_bodies', () => {
   });
 });
 
-/** An in-memory mesh asset store keyed by a hash of the mesh (the host store is content addressed). */
+/** The in-memory mesh asset store (content addressed: sha256 of the mesh, as the host store), counting its writes. */
 function memoryStore(): { port: MeshAssetPort; writes: () => number } {
-  const meshes = new Map<string, MeshData>();
-  const refs = new Map<string, MeshAssetRef>();
+  const assets = memoryMeshAssets();
   let writes = 0;
   const port: MeshAssetPort = {
-    manifest: (key) => refs.get(key) ?? null,
-    readMesh: (key) => meshes.get(key) ?? null,
-    writeMesh: (mesh): MeshAssetRef => {
+    ...assets,
+    writeMesh: (mesh) => {
       writes += 1;
-      let hash = 7;
-      for (const v of [mesh.positions.length, mesh.indices.length, ...mesh.positions.slice(0, 30), ...mesh.indices.slice(-30)])
-        hash = (hash * 31 + Math.round(v * 1000)) >>> 0;
-      const key = hash.toString(16).padStart(64, '0');
-      meshes.set(key, mesh);
-      const ref: MeshAssetRef = {
-        key,
-        triangles: mesh.indices.length / 3,
-        vertices: mesh.positions.length / 3,
-        bounds: { min: [0, 0, 0], max: [1, 1, 1] },
-      };
-      refs.set(key, ref);
-      return ref;
+      return assets.writeMesh(mesh);
     },
-    readFile: () => null,
   };
   return { port, writes: () => writes };
 }

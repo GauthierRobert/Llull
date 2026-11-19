@@ -13,10 +13,11 @@ import { FieldBuilder } from '@core/geometry/field/build';
 import type { FieldOp } from '@core/geometry/field/program';
 import type { GridSamples, TetSamples } from '@core/geometry/field/sampled';
 import { getFieldEngine, setFieldEngine } from '@core/geometry/field/engine';
-import type { FieldEngine } from '@core/geometry/field/engineTypes';
+import type { FieldEngine, FieldGrid } from '@core/geometry/field/engineTypes';
 import { compileField } from '@implicit/compile';
 import { tsFieldEngine } from '@core/geometry/field/tsEngine';
 import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
+import { isClosedManifold, meshMeasures } from '@lib/isosurface/measures';
 import {
   NATIVE_DUAL_CONTOURING_MAX_SAMPLES,
   NATIVE_FIELD_LIMITS,
@@ -93,6 +94,31 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
       expect(nat.data['contentHash']).toBe(ts.data['contentHash']);
     });
   }
+
+  // CONTRACT TEST of `FieldEngine.mesh` (@invariant in packages/core/src/geometry/field/engineTypes.ts): any new field engine must pass it, since
+  // the implicit plugin answers from `measures` / `closedManifold` instead of the mesh (packages/domain-implicit/src/meshFacts.ts).
+  native('the mesh job returns the volume, area and closed-manifold answer TypeScript computes from the returned mesh, bit for bit', () => {
+    if (engine === null) return;
+    for (const [name, field] of Object.entries(SCENE.fields)) {
+      const compiled = compileField(SCENE.doc, field);
+      if (!compiled.ok || compiled.program.bounds === null) throw new Error(`${name} does not compile to a bounded program`);
+      const voxel = VOXEL[name] as number;
+      const { min, max } = compiled.program.bounds;
+      const pad = 2 * voxel;
+      const grid: FieldGrid = { min: [min[0] - pad, min[1] - pad, min[2] - pad], max: [max[0] + pad, max[1] + pad, max[2] + pad], voxel };
+      for (const mesher of ['tetra', 'dual_contouring'] as const) {
+        const result = engine.mesh(compiled.program, grid, { mesher, maxTriangles: 5_000_000 });
+        if (!result.ok) throw new Error(`${name} ${mesher}: ${result.message}`);
+        const expected = meshMeasures(result.mesh);
+        expect(result.mesh.indices.length, `${name} ${mesher}`).toBeGreaterThan(0);
+        expect(result.measures, `${name} ${mesher}`).toBeDefined();
+        expect(Object.is(result.measures?.volume, expected.volume), `${name} ${mesher} volume`).toBe(true);
+        expect(Object.is(result.measures?.area, expected.area), `${name} ${mesher} area`).toBe(true);
+        expect(result.closedManifold, `${name} ${mesher} closed`).toBe(isClosedManifold(result.mesh));
+        expect(tsFieldEngine.mesh(compiled.program, grid, { mesher, maxTriangles: 5_000_000 })).not.toHaveProperty('measures');
+      }
+    }
+  });
 
   native('evaluate_field: values and distance quality are bit-identical for every field', () => {
     if (engine === null) return;

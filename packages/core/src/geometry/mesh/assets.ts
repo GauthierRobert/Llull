@@ -25,7 +25,11 @@ export interface MeshAssetPort {
   manifest(key: string): MeshAssetManifest | null;
   /** Full-resolution canonical mesh (indexed, first-use vertex order), or null when missing. */
   readMesh(key: string): MeshData | null;
-  /** Store `mesh` (canonical bytes -> sha256 key); writing the same mesh twice is a no-op. */
+  /**
+   * Store `mesh` (canonical bytes -> sha256 key); writing the same mesh twice is a no-op.
+   * @invariant the returned key MUST identify the content (equal keys <=> equal meshes): callers remember facts of a mesh by its key (the implicit
+   * plugin's mesh-facts cache), so a key shared by two different meshes would make one answer with the other's volume.
+   */
   writeMesh(mesh: MeshData): MeshAssetRef;
   /** Raw bytes of an imported file stored by its sha256 (`import_mesh_file fileKey`), or null when missing. */
   readFile(key: string): Uint8Array | null;

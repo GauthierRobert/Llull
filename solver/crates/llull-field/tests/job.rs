@@ -57,6 +57,10 @@ fn meshes_a_sphere_into_a_closed_manifold_and_streams_progress() {
     assert_eq!(fs::read(dir.join("positions.f64")).unwrap().len() as u64, r["vertices"].as_u64().unwrap() * 24);
     assert_eq!(fs::read(dir.join("indices.u32")).unwrap().len() as u64, r["triangles"].as_u64().unwrap() * 12);
     assert!(r["maxVertexResidual"].as_f64().unwrap() < 0.05);
+    let (volume, area) = (r["volume"].as_f64().unwrap(), r["area"].as_f64().unwrap());
+    let sphere = 4.0 / 3.0 * std::f64::consts::PI * 64.0;
+    assert!((volume - sphere).abs() < 0.02 * sphere, "mesh volume {volume} of a radius-4 sphere ({sphere})");
+    assert!((area - 4.0 * std::f64::consts::PI * 16.0).abs() < 0.03 * area, "mesh area {area}");
     assert!(r["prunedFraction"].as_f64().unwrap() > 0.0, "tiles far from the surface are pruned");
     assert!(events.contains("\"type\":\"progress\""), "progress events: {events}");
     fs::remove_dir_all(&dir).unwrap();
