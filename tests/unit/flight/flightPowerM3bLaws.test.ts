@@ -87,7 +87,8 @@ describe('Peukert drain (FLT-M3b item 1)', () => {
   });
 
   it('the run block drains the SoC at the Peukert rate and counts the real charge; remainingS uses the drain current', () => {
-    const pack = battery({ peukertExponent: 1.1 });
+    const pack = battery({ peukertExponent: 1.1, peukertRatedHours: 1 });
+    expect(packLaw(battery({ peukertExponent: 1.1 })).peukert).toBeUndefined();
     const feed = compilePower(powertrain(), pack, ['r']);
     expect(feed.pack.peukert).toEqual({ exponent: 1.1, ratedCurrentA: 1 });
     const aux = new Float64Array(POWER_SLOTS);

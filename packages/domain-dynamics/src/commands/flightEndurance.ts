@@ -5,7 +5,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { failer, report } from '@core/commands/noop';
 import { constantLoadEndurance } from '../flight/endurance';
 import { flightOf } from '../flight/model';
-import { compilePower, type MotorLoad } from '../flight/powerBlock';
+import { compilePower, powertrainDefaulted, type MotorLoad } from '../flight/powerBlock';
 import { motorPoint } from '../flight/powerChain';
 import { compileRotor, rotorOutput, staticCoefficients } from '../flight/rotorLaw';
 import { pow } from '@lib/pow';
@@ -129,16 +129,20 @@ export const estimateEnduranceCommand = defineCommand({
       },
       capacityOverCurrentS: result.capacityOverCurrentS,
       ...(thermal === null ? {} : { motorThermal: thermal }),
-      unverified: [...battery.defaulted, ...powertrain.defaulted].length > 0,
+      unverified: [...battery.defaulted, ...powertrainDefaulted(powertrain)].length > 0,
+      ...(result.escMapUnsolvedSteps === undefined ? {} : { escMapUnsolvedSteps: result.escMapUnsolvedSteps }),
       defaulted: [
         ...battery.defaulted.map((name) => `battery.${battery.id}.${name}`),
-        ...powertrain.defaulted.map((name) => `powertrain.${powertrain.id}.${name}`),
+        ...powertrainDefaulted(powertrain).map((name) => `powertrain.${powertrain.id}.${name}`),
       ],
     };
     const warning =
       (result.limitedBy === 'motor_voltage' || result.limitedBy === 'pack_power'
         ? `; the pack cannot hold this load (${result.limitedBy})`
         : '') +
+      (result.escMapUnsolvedSteps === undefined
+        ? ''
+        : `; FLT_ESC_MAP_NO_FIXED_POINT: the ESC map's fixed point was not met on ${result.escMapUnsolvedSteps} step(s)`) +
       (thermal === null || overheated.length === 0
         ? ''
         : `; FLT_MOTOR_OVERTEMP: the steady winding of ${overheated.map((motor) => `'${motor.id}'`).join(', ')} exceeds ${format(thermal.maxWindingC)} C at this current (continuous limit ${format(thermal.continuousCurrentA)} A)`);

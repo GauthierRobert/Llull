@@ -8,7 +8,6 @@ import type { DcMotorDatasheet } from '@core/model/drives';
 import { idOrNext } from '@lib/explicitId';
 import { checkMotorData } from '../sim/actuators/motorData';
 import { escMapProblem, ocvProblem } from '../flight/powerDocument';
-import { DEFAULT_PEUKERT_RATED_HOURS } from '../flight/powerChain';
 import { DEFAULT_MOTOR_AMBIENT_C } from '../flight/powerBlock';
 import { flightOf, idTakenInDynamicsOrFlight } from '../flight/model';
 import type { FlightBattery, FlightPowertrain } from '../flight/powerModel';
@@ -52,7 +51,7 @@ function nominalEnergyWh(battery: FlightBattery): number {
 /**
  * @affects adds 1 battery to doc.flight.batteries (affected: [batteryId])
  * @invariant cellsSeries integer >= 1; capacityMah > 0; internalResistanceOhm >= 0; ocv from state of charge 0 to 1, strictly increasing soc, non-decreasing voltage; cutoff below the full-charge voltage
- * @failure missing source, unusable ocv or cut-off -> FLT_ECM_INVALID / no-op; taken id, peukertRatedHours without peukertExponent -> no-op
+ * @failure missing source, unusable ocv or cut-off -> FLT_ECM_INVALID / no-op; taken id, peukertRatedHours without peukertExponent -> no-op; peukertExponent != 1 without peukertRatedHours -> FLT_PEUKERT_RATING_MISSING / no-op
  */
 export const addBattery = defineCommand({
   name: 'add_battery',
@@ -105,7 +104,7 @@ export const addBattery = defineCommand({
       .max(1000)
       .optional()
       .describe(
-        'Discharge time of the rated capacity, h: I_rated = capacity / this (1 = the 1C rating of LiPo sheets, 20 = the lead-acid C/20 rating). Only with peukertExponent. Default 1 (flagged unverified).',
+        'Discharge time of the rated capacity, h: I_rated = capacity / this (1 = the 1C rating of LiPo sheets, 20 = the lead-acid C/20 rating). Required with a peukertExponent other than 1 (FLT_PEUKERT_RATING_MISSING): no default, because sheets rate at different times (LiPo often 1C, IEC 61960 cells 0.2C = 5 h) and a wrong H shifts I_rated by that factor.',
       ),
     source: z.string().describe('Where the numbers come from (cell datasheet, bench test); required, non-empty.'),
     id: z.string().optional().describe('Optional explicit battery id (shares the id space of the dynamics records).'),
@@ -119,7 +118,14 @@ export const addBattery = defineCommand({
     if (params.ocv === undefined) defaulted.push('ocv');
     if (params.cutoffVoltPerCell === undefined) defaulted.push('cutoffVoltPerCell');
     const peukert = params.peukertExponent !== undefined && params.peukertExponent !== 1;
-    if (peukert && params.peukertRatedHours === undefined) defaulted.push('peukertRatedHours');
+    if (peukert && params.peukertRatedHours === undefined)
+      return codedRejection(
+        doc,
+        'add_battery',
+        'FLT_PEUKERT_RATING_MISSING',
+        `peukertExponent ${params.peukertExponent ?? 1} needs peukertRatedHours (the discharge time of the rated capacity)`,
+        'Give peukertRatedHours from the cell datasheet: 1 for a 1C rating, 5 for 0.2C (IEC 61960), 20 for the lead-acid C/20 rating.',
+      );
     const ocv = params.ocv ?? LIPO_OCV;
     const cutoffVoltPerCell = params.cutoffVoltPerCell ?? DEFAULT_CUTOFF_VOLT_PER_CELL;
     const problem = ocvProblem(ocv, cutoffVoltPerCell);
@@ -146,14 +152,19 @@ export const addBattery = defineCommand({
       source: params.source.trim(),
       defaulted,
     };
-    const hours = params.peukertRatedHours ?? DEFAULT_PEUKERT_RATED_HOURS;
+    const hours = params.peukertRatedHours;
+    const exponent = params.peukertExponent;
+    const rating =
+      exponent !== undefined && exponent !== 1 && hours !== undefined
+        ? `, Peukert k ${format(exponent)} at I_rated ${format(battery.capacityMah / 1000 / hours)} A (${format(hours)} h rate)`
+        : '';
     const flight = flightOf(doc);
     const nominalWh = nominalEnergyWh(battery);
     return changed(
       { ...doc, flight: { ...flight, batteries: { ...flight.batteries, [id]: battery } } },
       `add_battery: '${id}' — ${battery.cellsSeries}S, ${format(battery.capacityMah)} mAh (${format(nominalWh)} Wh, mean-OCV nominal), R_int ${format(battery.internalResistanceOhm)} Ω, ` +
         `full ${format(battery.cellsSeries * (ocv[ocv.length - 1]?.[1] ?? 0))} V, cut-off ${format(cutoffVoltPerCell * battery.cellsSeries)} V, start SoC ${format(battery.initialSoc)}` +
-        `${peukert ? `, Peukert k ${format(params.peukertExponent ?? 1)} at I_rated ${format(battery.capacityMah / 1000 / hours)} A (${format(hours)} h rate)` : ''} (${battery.source})` +
+        `${rating} (${battery.source})` +
         `${defaulted.length > 0 ? `; defaulted: ${defaulted.join(', ')} (results unverified)` : ''}.`,
       [id],
     );

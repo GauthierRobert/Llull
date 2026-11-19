@@ -48,10 +48,17 @@ export interface FlightCheck {
   readonly note: string;
 }
 
-function check(name: string, value: number | null, limit: number, comparison: '>=' | '<=', note: string): FlightCheck {
+/** `band`: the MARGINAL width, default MARGINAL_SHARE of |limit| (a temperature limit passes its own band: a share of the allowed rise). */
+function check(
+  name: string,
+  value: number | null,
+  limit: number,
+  comparison: '>=' | '<=',
+  note: string,
+  band = Math.abs(limit) * MARGINAL_SHARE,
+): FlightCheck {
   if (value === null) return { name, value, limit, comparison, status: 'not_applicable', note };
   const passes = comparison === '>=' ? value >= limit : value <= limit;
-  const band = Math.abs(limit) * MARGINAL_SHARE;
   const close = comparison === '>=' ? value < limit + band : value > limit - band;
   return { name, value, limit, comparison, status: !passes ? 'FAIL' : close ? 'MARGINAL' : 'PASS', note };
 }
@@ -93,7 +100,8 @@ function powerLimitChecks(packs: readonly Pack[], limits: FlightLimits): FlightC
         hottest.peakWindingC,
         hottest.maxWindingC,
         '<=',
-        `hottest motor winding of the run (rotor '${hottest.hottestRotorId}', ambient ${hottest.ambientC} C)${hottest.overLimitAtS === null ? '' : `: FLT_MOTOR_OVERTEMP from t = ${hottest.overLimitAtS.toFixed(3)} s`}`,
+        `hottest motor winding of the run (rotor '${hottest.hottestRotorId}', ambient ${hottest.ambientC} C; MARGINAL within 10 % of the allowed rise maxWindingC - ambient)${hottest.overLimitAtS === null ? '' : `: FLT_MOTOR_OVERTEMP from t = ${hottest.overLimitAtS.toFixed(3)} s`}`,
+        Math.abs(hottest.maxWindingC - hottest.ambientC) * MARGINAL_SHARE,
       ),
     );
   return checks;

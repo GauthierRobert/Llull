@@ -35,6 +35,8 @@ interface TrimPowertrain {
   readonly peakCurrentA: number;
   /** What makes the point unholdable in run_flight, or null. */
   readonly limit: PowerLimit | null;
+  /** Present (true) only when the ESC map's fixed point was not met (FLT_ESC_MAP_NO_FIXED_POINT). */
+  readonly escMapNoFixedPoint?: true;
 }
 
 /** The operating point of every powertrain; `rotorIds` are the run's rotors (`PowerRuntime.rotorIndexes` index them), `loads` per rotor id. */
@@ -52,7 +54,7 @@ export function trimPowertrains(
       const point = motorPoint(feed.motor, load.torqueNm, (load.rpm * 2 * Math.PI) / 60);
       return { rotorId, rpm: load.rpm, torqueNm: load.torqueNm, ...point, overPeakCurrent: point.currentA > feed.motor.peakCurrentA };
     });
-    const { powerW: busPowerW, solved } = solveChain(feed.pack, feed.powertrain, ocv, motors);
+    const { powerW: busPowerW, solved, converged } = solveChain(feed.pack, feed.powertrain, ocv, motors);
     const throttle =
       solved === null || solved.terminalV <= 0
         ? null
@@ -81,6 +83,7 @@ export function trimPowertrains(
       motors,
       peakCurrentA: feed.motor.peakCurrentA,
       limit,
+      ...(converged ? {} : { escMapNoFixedPoint: true as const }),
     };
   });
 }

@@ -97,6 +97,8 @@ export function powerErrors(slice: PowerSlice, dynamicsIds: ReadonlySet<string>)
     if (problem !== null) errors.push(`${at}: ${problem}`);
     if (entry.peukertRatedHours !== undefined && entry.peukertExponent === undefined)
       errors.push(`${at}.peukertRatedHours: only with peukertExponent`);
+    if (entry.peukertExponent !== undefined && entry.peukertExponent !== 1 && entry.peukertRatedHours === undefined)
+      errors.push(`${at}.peukertExponent: needs peukertRatedHours`);
   }
   const usedBatteries = new Set<string>();
   const usedRotors = new Set<string>();

@@ -19,6 +19,8 @@ export interface Endurance {
   readonly finalSoc: number;
   /** Initial charge / initial drain current (the current itself without a Peukert exponent): the constant-current endurance, s (the sag-free upper bound); null with no load. */
   readonly capacityOverCurrentS: number | null;
+  /** Chain solves (the start and each integration step) whose ESC map fixed point was not met (FLT_ESC_MAP_NO_FIXED_POINT); present only when > 0. */
+  readonly escMapUnsolvedSteps?: number;
   readonly initial: {
     readonly busPowerW: number;
     readonly currentA: number;
@@ -48,7 +50,9 @@ export function constantLoadEndurance(feed: PowerRuntime, loads: readonly MotorL
     motors,
     throttle: first === null || first.terminalV <= 0 ? Infinity : maxMotorV / first.terminalV,
   };
+  let unsolved = start.converged ? 0 : 1;
   const outcome = (timeS: number | null, limitedBy: EnduranceLimit, soc: number, chargeAs: number, energyJ: number): Endurance => ({
+    ...(unsolved > 0 ? { escMapUnsolvedSteps: unsolved } : {}),
     timeS,
     limitedBy,
     usedMah: chargeAs / 3.6,
@@ -66,7 +70,8 @@ export function constantLoadEndurance(feed: PowerRuntime, loads: readonly MotorL
   let energyJ = 0;
   let previous = first.terminalV;
   for (let step = 0; step < MAX_STEPS; step++) {
-    const { solved } = solveChain(pack, powertrain, openCircuitVolts(pack, soc), motors);
+    const { solved, converged } = solveChain(pack, powertrain, openCircuitVolts(pack, soc), motors);
+    if (!converged) unsolved++;
     if (solved === null) return outcome(time, 'pack_power', soc, chargeAs, energyJ);
     if (solved.terminalV < pack.cutoffV) {
       const share = previous > solved.terminalV ? (previous - pack.cutoffV) / (previous - solved.terminalV) : 0;

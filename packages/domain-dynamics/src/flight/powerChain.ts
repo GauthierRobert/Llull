@@ -1,7 +1,7 @@
 /**
  * Battery / ESC / motor laws of the power chain (13 FLT M3, TR-FLT-06), pure functions shared by the flight block and estimate_endurance.
  * Motor: the DC law of the datasheet (ke = kt, i = Q / kt + I0, V = kt·ω + R·i). ESC: constant efficiency or a map η(throttle, current),
- * throttle = V_motor / V_pack. Pack: V = OCV(SoC) - R_int·I with P_bus = V·I, so I = (OCV - sqrt(OCV² - 4·R_int·P)) / (2·R_int); the state of
+ * throttle = V_motor / V_pack (a map: at the fixed point of the terminal voltage it produces). Pack: V = OCV(SoC) - R_int·I with P_bus = V·I, so I = (OCV - sqrt(OCV² - 4·R_int·P)) / (2·R_int); the state of
  * charge drains at the Peukert rate I·(I / I_rated)^(k-1) (Peukert 1897; Linden's Handbook of Batteries, 4th ed., §3.2), I itself for k = 1.
  */
 
@@ -20,9 +20,7 @@ export interface PackLaw {
   readonly peukert?: { readonly exponent: number; readonly ratedCurrentA: number };
 }
 
-/** Rated discharge time of the Peukert law unless the battery gives one, h (the 1C rating of LiPo datasheets). */
-export const DEFAULT_PEUKERT_RATED_HOURS = 1;
-
+/** @invariant a battery with peukertExponent != 1 carries peukertRatedHours (add_battery and the load check refuse it otherwise) */
 export function packLaw(battery: FlightBattery): PackLaw {
   const law: PackLaw = {
     capacityAs: battery.capacityMah * 3.6,
@@ -31,8 +29,8 @@ export function packLaw(battery: FlightBattery): PackLaw {
     points: battery.ocv.map(([soc, volts]) => [soc, volts * battery.cellsSeries] as const),
   };
   const exponent = battery.peukertExponent;
-  if (exponent === undefined || exponent === 1) return law;
-  const hours = battery.peukertRatedHours ?? DEFAULT_PEUKERT_RATED_HOURS;
+  const hours = battery.peukertRatedHours;
+  if (exponent === undefined || exponent === 1 || hours === undefined) return law;
   return { ...law, peukert: { exponent, ratedCurrentA: battery.capacityMah / 1000 / hours } };
 }
 
@@ -161,29 +159,70 @@ export function busPower(powertrain: FlightPowertrain, motors: readonly MotorPoi
   );
 }
 
-/** Fixed-point sweeps of the map's throttle against the terminal voltage it gives (the map depends weakly on it: a few sweeps converge). */
-const MAP_SWEEPS = 30;
-const MAP_TOLERANCE = 1e-12;
+/** Grid cells of the root bracket search on [OCV/2, OCV]; largest bisections (float exhaustion comes first); accepted residual |g| (V per V of OCV). */
+const MAP_GRID = 16;
+const MAP_BISECTIONS = 200;
+const MAP_RESIDUAL = 1e-9;
+
+type BusSolution = { readonly currentA: number; readonly terminalV: number };
+
+/** A chain solution: the bus power, the pack (null = it cannot deliver), and whether the map's fixed point was met (always true without a map). */
+export interface ChainSolution {
+  readonly powerW: number;
+  readonly solved: BusSolution | null;
+  /** Pack voltage the throttle V_motor / V_pack was read at (the fixed point with a map; the OCV without). */
+  readonly throttleVolts: number;
+  readonly converged: boolean;
+}
 
 /**
- * Bus power and pack solution for motors at `motors` at open-circuit voltage `ocv`: with a constant efficiency the power is fixed; with a map the
- * throttle is read at the terminal voltage, which depends on the power, so the two are iterated to a fixed point (relative 1e-12).
+ * The map's fixed point V = V_t(P(V)): P(V) is the bus power with the throttle read at pack voltage V, V_t(P) = (OCV + sqrt(OCV² - 4RP)) / 2 the
+ * pack's terminal voltage, extended by OCV / 2 past the largest power OCV² / 4R. g(V) = V - V_t(P(V)) is continuous (bilinear map), g(OCV) >= 0 and
+ * g(OCV / 2) <= 0, so a root exists in [OCV / 2, OCV]; the highest one (the operating point an ESC ramping up from idle reaches) is bracketed on a
+ * grid from the top and bisected to float exhaustion. A root at the collapse (P(V*) > OCV² / 4R) is a pack that cannot deliver: solved null.
  */
-export function solveChain(
-  pack: PackLaw,
-  powertrain: FlightPowertrain,
-  ocv: number,
-  motors: readonly MotorPoint[],
-): { readonly powerW: number; readonly solved: { readonly currentA: number; readonly terminalV: number } | null } {
-  let volts = ocv;
-  let powerW = busPower(powertrain, motors, volts);
-  let solved = solveBus(pack, ocv, powerW);
-  if (powertrain.escEfficiencyMap === undefined) return { powerW, solved };
-  for (let sweep = 0; sweep < MAP_SWEEPS && solved !== null; sweep++) {
-    if (Math.abs(solved.terminalV - volts) <= MAP_TOLERANCE * ocv) break;
-    volts = solved.terminalV;
-    powerW = busPower(powertrain, motors, volts);
-    solved = solveBus(pack, ocv, powerW);
+function mapFixedPoint(pack: PackLaw, powertrain: FlightPowertrain, ocv: number, motors: readonly MotorPoint[]): ChainSolution {
+  const r = pack.resistanceOhm;
+  const g = (volts: number): number => {
+    const power = busPower(powertrain, motors, volts);
+    const terminal = r > 0 && power > 0 ? (ocv + Math.sqrt(Math.max(0, ocv * ocv - 4 * r * power))) / 2 : ocv;
+    return volts - terminal;
+  };
+  let hi = ocv;
+  let lo = ocv;
+  let gLo = g(lo);
+  for (let k = 1; k <= MAP_GRID && gLo > 0; k++) {
+    hi = lo;
+    lo = ocv - (k * ocv) / (2 * MAP_GRID);
+    gLo = g(lo);
   }
-  return { powerW, solved };
+  let root = lo;
+  if (gLo < 0) {
+    for (let step = 0; step < MAP_BISECTIONS; step++) {
+      const mid = (lo + hi) / 2;
+      if (mid <= lo || mid >= hi) break;
+      if (g(mid) > 0) hi = mid;
+      else lo = mid;
+    }
+    root = Math.abs(g(lo)) <= Math.abs(g(hi)) ? lo : hi;
+  }
+  const powerW = busPower(powertrain, motors, root);
+  return {
+    powerW,
+    solved: solveBus(pack, ocv, powerW),
+    throttleVolts: root,
+    converged: Math.abs(g(root)) <= MAP_RESIDUAL * Math.max(1, ocv),
+  };
+}
+
+/**
+ * Bus power and pack solution for motors at `motors` at open-circuit voltage `ocv`: with a constant efficiency the power is fixed (one solve); with a
+ * map the throttle is read at the terminal voltage, which depends on the power: the fixed point `mapFixedPoint` (bracketed root, not iteration).
+ */
+export function solveChain(pack: PackLaw, powertrain: FlightPowertrain, ocv: number, motors: readonly MotorPoint[]): ChainSolution {
+  if (powertrain.escEfficiencyMap === undefined || ocv <= 0) {
+    const powerW = busPower(powertrain, motors, ocv);
+    return { powerW, solved: solveBus(pack, ocv, powerW), throttleVolts: ocv, converged: true };
+  }
+  return mapFixedPoint(pack, powertrain, ocv, motors);
 }

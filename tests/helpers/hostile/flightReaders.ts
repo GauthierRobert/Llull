@@ -94,6 +94,7 @@ export const FLIGHT_READERS: readonly HostileReader[] = [
       { name: 'Peukert exponent below 1', input: () => flightPower(3, (pack) => void (pack['peukertExponent'] = 0.5)) },
       { name: 'Peukert exponent as a string', input: () => flightPower(3, (pack) => void (pack['peukertExponent'] = '1.1')) },
       { name: 'a rated time without an exponent', input: () => flightPower(3, (pack) => void delete pack['peukertExponent']) },
+      { name: 'an exponent without a rated time', input: () => flightPower(3, (pack) => void delete pack['peukertRatedHours']) },
       { name: 'ESC map that is not an object', input: () => flightPower(3, (_, train) => void (train['escEfficiencyMap'] = 'abc')) },
       { name: 'ESC map throttle decreasing', input: () => flightPower(3, (_, train) => void (map(train)['throttle'] = [1, 0])) },
       {

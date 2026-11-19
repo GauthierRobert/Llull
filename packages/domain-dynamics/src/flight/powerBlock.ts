@@ -38,6 +38,15 @@ export interface PowerRuntime {
 /** Ambient of the motor thermal network unless the powertrain gives one, C (the datasheet reference temperature). */
 export const DEFAULT_MOTOR_AMBIENT_C = 25;
 
+/**
+ * The defaulted inputs of a powertrain as a run reads them: its stored `defaulted`, plus `motorAmbientC` when the motor carries thermal data and no
+ * ambient is stored (a powertrain saved before FLT-M3b, whose `thermal` datasheet was stored but not read, has no such flag).
+ */
+export function powertrainDefaulted(powertrain: FlightPowertrain): readonly string[] {
+  const implicit = powertrain.motor.thermal !== undefined && powertrain.motorAmbientC === undefined;
+  return implicit && !powertrain.defaulted.includes('motorAmbientC') ? [...powertrain.defaulted, 'motorAmbientC'] : powertrain.defaulted;
+}
+
 /** Per powertrain: state of charge, charge drawn C, energy drawn at the terminals J, terminal V, current A, lowest V, peak A, cut-off time s (-1 = none), steps limited by the pack voltage, steps over the motor's peak current, peak motor current A, peak throttle. */
 export const POWER = {
   soc: 0,
@@ -52,8 +61,10 @@ export const POWER = {
   overCurrentSteps: 9,
   peakMotorCurrent: 10,
   peakThrottle: 11,
+  /** Steps whose ESC map fixed point was not met to its residual (FLT_ESC_MAP_NO_FIXED_POINT). */
+  mapUnsolvedSteps: 12,
 } as const;
-export const POWER_SLOTS = 12;
+export const POWER_SLOTS = 13;
 
 export function compilePower(powertrain: FlightPowertrain, battery: FlightBattery, rotorIds: readonly string[]): PowerRuntime {
   return {
@@ -116,7 +127,8 @@ export function stepPower(
   const soc = aux[base + POWER.soc] as number;
   const ocv = openCircuitVolts(runtime.pack, soc);
   const motors = loads.map((load) => motorPoint(runtime.motor, load.torqueNm, (load.rpm * 2 * Math.PI) / 60));
-  const { solved } = solveChain(runtime.pack, runtime.powertrain, ocv, motors);
+  const { solved, converged } = solveChain(runtime.pack, runtime.powertrain, ocv, motors);
+  if (!converged) aux[base + POWER.mapUnsolvedSteps] = (aux[base + POWER.mapUnsolvedSteps] as number) + 1;
   const currentA = solved === null ? 0 : solved.currentA;
   const volts = solved === null ? 0 : solved.terminalV;
   // the state of charge stops at an empty pack: only what is left of it can be drained in the last step (at the Peukert rate)

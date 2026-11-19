@@ -205,6 +205,13 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
     }),
   );
   for (const [id, entry] of Object.entries(battery)) appendAll(warnings, batteryWarnings(id, entry));
+  loop.power.forEach((feed, index) => {
+    const unsolved = final(powerBase(loop.rotors.length, index) + POWER.mapUnsolvedSteps);
+    if (unsolved > 0)
+      warnings.push(
+        `FLT_ESC_MAP_NO_FIXED_POINT: powertrain '${feed.powertrain.id}': the ESC map's throttle / terminal-voltage fixed point was not met to its residual on ${unsolved} step(s) (a map too steep in throttle for the float resolution); those steps used the nearest bisection point`,
+      );
+  });
   const aero = aeroMetrics(loop, final, physicsSteps, run.staleAero);
   appendAll(warnings, aero.warnings);
   const runtime = loop.control?.runtime ?? null;

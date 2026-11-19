@@ -76,14 +76,21 @@ const estimate = (doc: CadDocument): Record<string, unknown> & { summary: string
 };
 
 describe('add_battery / add_flight_powertrain M3b fields', () => {
-  it('stores the Peukert fields only when given and flags the defaulted rated time', () => {
-    const doc = quad({ peukertExponent: 1.1 });
-    expect(doc.flight?.batteries?.['pack']).toMatchObject({ peukertExponent: 1.1, defaulted: ['peukertRatedHours'] });
+  it('stores the Peukert fields only when given and refuses an exponent without its rated time (FLT_PEUKERT_RATING_MISSING)', () => {
     expect(quad().flight?.batteries?.['pack']).not.toHaveProperty('peukertExponent');
+    expect(quad({ peukertExponent: 1 }).flight?.batteries?.['pack']).toMatchObject({ peukertExponent: 1, defaulted: [] });
     const rated = quad({ peukertExponent: 1.2, peukertRatedHours: 20 });
     expect(rated.flight?.batteries?.['pack']).toMatchObject({ peukertRatedHours: 20, defaulted: [] });
     const base = quadDrone(MASS);
-    const params = { cellsSeries: 4, capacityMah: 5600, internalResistanceOhm: 0.04, ocv: FLAT, source: 't', peukertExponent: 1.2 };
+    const params = {
+      cellsSeries: 4,
+      capacityMah: 5600,
+      internalResistanceOhm: 0.04,
+      ocv: FLAT,
+      source: 't',
+      peukertExponent: 1.2,
+      peukertRatedHours: 1,
+    };
     expectPure(base, () => execute(base, 'add_battery', params));
     expect(execute(base, 'add_battery', params).summary).toContain('Peukert k 1.200 at I_rated 5.600 A (1.000 h rate)');
     expectNoOp(
@@ -92,6 +99,7 @@ describe('add_battery / add_flight_powertrain M3b fields', () => {
       'needs peukertExponent',
     );
     expectNoOp(execute(base, 'add_battery', { ...params, peukertExponent: 3 }), base, 'invalid params');
+    expectNoOp(execute(base, 'add_battery', { ...params, peukertRatedHours: undefined }), base, 'FLT_PEUKERT_RATING_MISSING');
   });
 
   it('stores an ESC map in place of the constant, refuses both or a malformed map, and flags a defaulted motor ambient', () => {
@@ -151,7 +159,7 @@ describe('add_battery / add_flight_powertrain M3b fields', () => {
 
   it('load validation names a rated time without an exponent, a malformed map and out-of-range values', () => {
     const doc = quad(
-      { peukertExponent: 1.1 },
+      { peukertExponent: 1.1, peukertRatedHours: 5 },
       {
         escEfficiencyMap: {
           throttle: [0, 1],
@@ -177,6 +185,7 @@ describe('add_battery / add_flight_powertrain M3b fields', () => {
       stored['peukertRatedHours'] = 2;
     };
     expect(errors(ratedOnly)).toContain('only with peukertExponent');
+    expect(errors((c) => delete c.flight.batteries['pack']!['peukertRatedHours'])).toContain('peukertExponent: needs peukertRatedHours');
     expect(errors((c) => (c.flight.batteries['pack']!['peukertExponent'] = 0.5))).toContain('peukertExponent');
     expect(errors((c) => ((c.flight.powertrains['pt']!['escEfficiencyMap'] as { throttle: number[] }).throttle = [1, 0]))).toContain(
       'throttle must strictly increase',
@@ -191,7 +200,7 @@ describe('add_battery / add_flight_powertrain M3b fields', () => {
 describe('the M3b laws in run_flight / flight_report / estimate_endurance', () => {
   it('Peukert on a flat pack: identical currents, the SoC drained faster by (I / I_rated)^(k - 1)', () => {
     const plain = pack(run(quad()));
-    const peukert = pack(run(quad({ peukertExponent: 1.05 })));
+    const peukert = pack(run(quad({ peukertExponent: 1.05, peukertRatedHours: 1 })));
     expect(peukert.usedChargeMah).toBe(plain.usedChargeMah);
     expect(peukert.meanCurrentA).toBe(plain.meanCurrentA);
     const ratio = (1 - peukert.finalSoc) / (1 - plain.finalSoc);

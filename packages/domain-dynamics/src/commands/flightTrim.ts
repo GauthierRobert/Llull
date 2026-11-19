@@ -214,6 +214,12 @@ function trimmed(
       ...(vehicle.controls.length === 0
         ? [`no controls: the scenario has no controller with rotors and no aero surface has a pivot servo, so only the attitude was solved`]
         : []),
+      ...powertrains
+        .filter((powertrain) => powertrain.escMapNoFixedPoint === true)
+        .map(
+          (powertrain) =>
+            `FLT_ESC_MAP_NO_FIXED_POINT: powertrain '${powertrain.id}': the ESC map's throttle / terminal-voltage fixed point was not met to its residual at the trim (the nearest bisection point is reported)`,
+        ),
     ],
     scenarioId: scenario.id,
     bodyId: scenario.bodyId,
