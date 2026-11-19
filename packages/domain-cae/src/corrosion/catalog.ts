@@ -4,14 +4,16 @@ import { commandCatalog } from '@core/commands/schema';
 import { acceptCorrosionItem } from './acceptCommand';
 import { checkMaterialCompatibility } from './checkCommand';
 import { listSurfaceSystems } from './listSurfaceSystems';
-import { assignSurfaceSystem, declareIsolation, removeIsolation } from './protectionCommands';
+import { assignSurfaceSystem, declareIsolation, removeIsolation, removeSurfaceSystem } from './protectionCommands';
 import { listCompatibilityRules } from './rulesCommand';
-import { setGalvanicGroup, setServiceEnvironment } from './settingsCommands';
+import { removeGalvanicGroup, setGalvanicGroup, setServiceEnvironment } from './settingsCommands';
 
 export const corrosionCommands = commandCatalog(
   setServiceEnvironment,
   setGalvanicGroup,
+  removeGalvanicGroup,
   assignSurfaceSystem,
+  removeSurfaceSystem,
   listSurfaceSystems,
   declareIsolation,
   removeIsolation,

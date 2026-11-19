@@ -1,0 +1,741 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > contact, fail, isolated pass and the cadmium small-anode warning; document and queries pinned > check_material_compatibility 1`] = `
+[
+  {
+    "contacts": 1,
+    "counts": {
+      "accepted": 0,
+      "fail": 1,
+    },
+    "environment": "normal",
+    "items": [
+      {
+        "code": "COR_GALVANIC_INCOMPATIBLE",
+        "contact": {
+          "approximate": false,
+          "kind": "face",
+          "source": "closed_form",
+        },
+        "fingerprint": "1ba8ff94127b96a9026f9d44bb28021c280de0c2ccfc93f87ff7e715d6989b2e",
+        "ids": [
+          "box-4.1",
+          "box-5.1",
+        ],
+        "inputs": {
+          "anode": "box-4.1",
+          "cathode": "box-5.1",
+          "differenceV": 0.6,
+          "environment": "normal",
+          "isolations": [],
+          "limitV": 0.25,
+          "parts": [
+            {
+              "anodicIndexV": 0.9,
+              "group": "aluminium_wrought_other",
+              "groupFrom": "material",
+              "id": "box-4.1",
+              "indexFrom": "table",
+              "material": "aa7075_t6",
+              "surfaceAreaMm2": 13000,
+              "surfaceSystem": null,
+            },
+            {
+              "anodicIndexV": 0.3,
+              "group": "nickel_titanium_group",
+              "groupFrom": "material",
+              "id": "box-5.1",
+              "indexFrom": "table",
+              "material": "ti6al4v_annealed",
+              "surfaceAreaMm2": 4500,
+              "surfaceSystem": null,
+            },
+          ],
+          "scheme": "anodic_index",
+        },
+        "key": "galvanic:box-4.1|box-5.1",
+        "remedies": [
+          {
+            "id": "sealant_faying",
+            "source": "S16",
+            "spec": "MIL-PRF-81733 Type IV (faying surface)",
+          },
+          {
+            "id": "sealant_wet_install",
+            "source": "S16",
+            "spec": "MIL-PRF-81733 Type II (extrusion) / wet installation of fasteners",
+          },
+          {
+            "id": "primer",
+            "source": "S17",
+            "spec": "MIL-PRF-23377 epoxy primer",
+          },
+          {
+            "id": "conversion_coating",
+            "source": "S17",
+            "spec": "MIL-DTL-81706",
+          },
+          {
+            "id": "glass_isolation_ply",
+            "source": "S10",
+            "spec": "company practice",
+          },
+          {
+            "id": "isolating_washer_or_tape",
+            "source": "S9",
+            "spec": "company practice",
+          },
+        ],
+        "reviewReason": "corrosion protection supports 14 CFR 25.609 compliance: a qualified person reviews every item",
+        "reviewRequired": true,
+        "rule": "anodic_index (non-889 rule of thumb)",
+        "ruleGrade": "B",
+        "ruleId": "COR-R-02",
+        "status": "fail",
+        "unverified": true,
+        "unverifiedReasons": [
+          "COR_VALUE_UNVERIFIED: the rule values are grade B (secondary sources); verify against the primary standard",
+        ],
+        "warnings": [
+          "COR_SCREENING_RULE_ONLY",
+        ],
+      },
+    ],
+    "kernelContacts": {
+      "kernel": null,
+      "resolved": 0,
+      "separated": 0,
+      "unresolved": 0,
+    },
+    "notes": [
+      "stress-corrosion (SCC) and hydrogen-embrittlement (HE) rules are not evaluated: their tables are not shipped",
+    ],
+    "orphans": [],
+    "scheme": "anodic_index",
+    "status": "fail",
+    "tolerance": {
+      "defaulted": false,
+      "source": "caller",
+      "unit": "mm",
+      "value": 0.1,
+    },
+  },
+  {
+    "contacts": 1,
+    "counts": {
+      "accepted": 0,
+      "pass_isolated": 1,
+    },
+    "environment": "normal",
+    "items": [
+      {
+        "code": "COR_GALVANIC_INCOMPATIBLE",
+        "contact": {
+          "approximate": false,
+          "kind": "face",
+          "source": "closed_form",
+        },
+        "fingerprint": "e5d4f669906d888bb5eadabb8111499190c099f490ec1ddaa34f3515a1c4f776",
+        "ids": [
+          "box-4.1",
+          "box-5.1",
+        ],
+        "inputs": {
+          "anode": "box-4.1",
+          "cathode": "box-5.1",
+          "differenceV": 0.6,
+          "environment": "normal",
+          "isolations": [
+            {
+              "id": "iso-11.1",
+              "method": "sealant_faying",
+              "spec": "MIL-PRF-81733 Type IV",
+            },
+          ],
+          "limitV": 0.25,
+          "parts": [
+            {
+              "anodicIndexV": 0.9,
+              "group": "aluminium_wrought_other",
+              "groupFrom": "material",
+              "id": "box-4.1",
+              "indexFrom": "table",
+              "material": "aa7075_t6",
+              "surfaceAreaMm2": 13000,
+              "surfaceSystem": null,
+            },
+            {
+              "anodicIndexV": 0.3,
+              "group": "nickel_titanium_group",
+              "groupFrom": "material",
+              "id": "box-5.1",
+              "indexFrom": "table",
+              "material": "ti6al4v_annealed",
+              "surfaceAreaMm2": 4500,
+              "surfaceSystem": null,
+            },
+          ],
+          "scheme": "anodic_index",
+        },
+        "key": "galvanic:box-4.1|box-5.1",
+        "remedies": [],
+        "reviewReason": "corrosion protection supports 14 CFR 25.609 compliance: a qualified person reviews every item",
+        "reviewRequired": true,
+        "rule": "anodic_index (non-889 rule of thumb)",
+        "ruleGrade": "B",
+        "ruleId": "COR-R-02",
+        "status": "pass_isolated",
+        "unverified": true,
+        "unverifiedReasons": [
+          "COR_VALUE_UNVERIFIED: the rule values are grade B (secondary sources); verify against the primary standard",
+        ],
+        "warnings": [
+          "COR_SCREENING_RULE_ONLY",
+        ],
+      },
+    ],
+    "kernelContacts": {
+      "kernel": null,
+      "resolved": 0,
+      "separated": 0,
+      "unresolved": 0,
+    },
+    "notes": [
+      "stress-corrosion (SCC) and hydrogen-embrittlement (HE) rules are not evaluated: their tables are not shipped",
+    ],
+    "orphans": [],
+    "scheme": "anodic_index",
+    "status": "pass_isolated",
+    "tolerance": {
+      "defaulted": false,
+      "source": "caller",
+      "unit": "mm",
+      "value": 0.1,
+    },
+  },
+  {
+    "contacts": 1,
+    "counts": {
+      "accepted": 0,
+      "warn": 1,
+    },
+    "environment": "normal",
+    "fileName": "corrosion.csv",
+    "items": [
+      {
+        "code": "COR_SMALL_ANODE",
+        "contact": {
+          "approximate": false,
+          "kind": "face",
+          "source": "closed_form",
+        },
+        "fingerprint": "617e37d36eb86686eb5f5fdd0dde6d97701092f1810630c53b3f8d640813bca7",
+        "ids": [
+          "box-4.1",
+          "box-5.1",
+        ],
+        "inputs": {
+          "anode": "box-5.1",
+          "anodeAreaMm2": 4500,
+          "areaBasis": "box total surface area (MVP closed form; the spec V1 basis, total minus contact area, needs the kernel)",
+          "areaRatio": 0.346153846154,
+          "cathode": "box-4.1",
+          "cathodeAreaMm2": 13000,
+          "differenceV": 0.05,
+          "environment": "normal",
+          "isolations": [],
+          "limitV": 0.25,
+          "parts": [
+            {
+              "anodicIndexV": 0.9,
+              "group": "aluminium_wrought_other",
+              "groupFrom": "material",
+              "id": "box-4.1",
+              "indexFrom": "table",
+              "material": "aa7075_t6",
+              "surfaceAreaMm2": 13000,
+              "surfaceSystem": null,
+            },
+            {
+              "anodicIndexV": 0.95,
+              "group": "cadmium_plate",
+              "groupFrom": "surface_system",
+              "id": "box-5.1",
+              "indexFrom": "table",
+              "material": "ti6al4v_annealed",
+              "surfaceAreaMm2": 4500,
+              "surfaceSystem": "ss-13.1",
+            },
+          ],
+          "scheme": "anodic_index",
+        },
+        "key": "galvanic:box-4.1|box-5.1",
+        "remedies": [
+          {
+            "id": "sealant_faying",
+            "source": "S16",
+            "spec": "MIL-PRF-81733 Type IV (faying surface)",
+          },
+          {
+            "id": "sealant_wet_install",
+            "source": "S16",
+            "spec": "MIL-PRF-81733 Type II (extrusion) / wet installation of fasteners",
+          },
+          {
+            "id": "primer",
+            "source": "S17",
+            "spec": "MIL-PRF-23377 epoxy primer",
+          },
+          {
+            "id": "conversion_coating",
+            "source": "S17",
+            "spec": "MIL-DTL-81706",
+          },
+          {
+            "id": "glass_isolation_ply",
+            "source": "S10",
+            "spec": "company practice",
+          },
+          {
+            "id": "isolating_washer_or_tape",
+            "source": "S9",
+            "spec": "company practice",
+          },
+        ],
+        "reviewReason": "corrosion protection supports 14 CFR 25.609 compliance: a qualified person reviews every item",
+        "reviewRequired": true,
+        "rule": "anodic_index (non-889 rule of thumb)",
+        "ruleGrade": "B",
+        "ruleId": "COR-R-03",
+        "status": "warn",
+        "unverified": true,
+        "unverifiedReasons": [
+          "COR_VALUE_UNVERIFIED: the rule values are grade B (secondary sources); verify against the primary standard",
+        ],
+        "warnings": [
+          "COR_SCREENING_RULE_ONLY",
+        ],
+      },
+    ],
+    "kernelContacts": {
+      "kernel": null,
+      "resolved": 0,
+      "separated": 0,
+      "unresolved": 0,
+    },
+    "notes": [
+      "stress-corrosion (SCC) and hydrogen-embrittlement (HE) rules are not evaluated: their tables are not shipped",
+    ],
+    "orphans": [],
+    "scheme": "anodic_index",
+    "status": "warn",
+    "text": "key,status,code,a,b,materials,surfaceSystems,rule,grade,delta,remedies,acceptance
+galvanic:box-4.1|box-5.1,warn,COR_SMALL_ANODE,box-4.1,box-5.1,aa7075_t6 | ti6al4v_annealed, | ss-13.1,COR-R-03,B,0.05,sealant_faying | sealant_wet_install | primer | conversion_coating | glass_isolation_ply | isolating_washer_or_tape,
+",
+    "tolerance": {
+      "defaulted": false,
+      "source": "caller",
+      "unit": "mm",
+      "value": 0.1,
+    },
+  },
+]
+`;
+
+exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > contact, fail, isolated pass and the cadmium small-anode warning; document and queries pinned > document 1`] = `
+{
+  "document": {
+    "animations": {},
+    "camera": {
+      "azimuth": 2.35619449,
+      "distance": 12,
+      "polar": 1.04719755,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+    },
+    "components": {},
+    "configurations": {},
+    "constraintOrder": [],
+    "constraints": {},
+    "corrosion": {
+      "acceptances": {},
+      "environment": {
+        "scheme": "anodic_index",
+        "value": "normal",
+      },
+      "isolations": {},
+      "materials": {
+        "aa7075_t6": {
+          "galvanicGroup": "aluminium_wrought_other",
+          "source": {
+            "citation": "llull PHY-13 galvanic_anodic_index.csv (B)",
+          },
+        },
+        "ti6al4v_annealed": {
+          "galvanicGroup": "nickel_titanium_group",
+          "source": {
+            "citation": "llull PHY-13 galvanic_anodic_index.csv (B)",
+          },
+        },
+      },
+      "surfaceSystems": {
+        "#18": {
+          "entityIds": [
+            "#3",
+          ],
+          "id": "#18",
+          "layers": [
+            {
+              "class": "metallic_plating",
+              "galvanicGroup": "cadmium_plate",
+            },
+          ],
+        },
+      },
+    },
+    "displayPrecision": 3,
+    "driveRelationOrder": [],
+    "driveRelations": {},
+    "entities": {
+      "#1": {
+        "color": "#6b8f9c",
+        "id": "#1",
+        "kind": "box",
+        "layerId": "#2",
+        "materialId": "aa7075_t6",
+        "position": [
+          50,
+          25,
+          5,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          100,
+          50,
+          10,
+        ],
+      },
+      "#3": {
+        "color": "#6b8f9c",
+        "id": "#3",
+        "kind": "box",
+        "layerId": "#2",
+        "materialId": "ti6al4v_annealed",
+        "position": [
+          50,
+          25,
+          12.5,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          60,
+          30,
+          5,
+        ],
+      },
+    },
+    "featureHistory": [
+      {
+        "affected": [],
+        "id": "#4",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#5",
+        "name": "create_material",
+        "params": {
+          "color": "#b8bcc2",
+          "density": 0.00281,
+          "metalness": 1,
+          "name": "aa7075_t6",
+          "roughness": 0.35,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#6",
+        "name": "create_material",
+        "params": {
+          "color": "#8a8f96",
+          "density": 0.00443,
+          "metalness": 1,
+          "name": "ti6al4v_annealed",
+          "roughness": 0.4,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#7",
+        "name": "add_box",
+        "params": {
+          "anchor": "min",
+          "size": [
+            100,
+            50,
+            10,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#3",
+        ],
+        "id": "#8",
+        "name": "add_box",
+        "params": {
+          "anchor": "min",
+          "position": [
+            20,
+            10,
+            10,
+          ],
+          "size": [
+            60,
+            30,
+            5,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#9",
+        "name": "assign_material",
+        "params": {
+          "entityIds": [
+            "#1",
+          ],
+          "materialName": "aa7075_t6",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#3",
+        ],
+        "id": "#10",
+        "name": "assign_material",
+        "params": {
+          "entityIds": [
+            "#3",
+          ],
+          "materialName": "ti6al4v_annealed",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "aa7075_t6",
+        ],
+        "id": "#11",
+        "name": "set_galvanic_group",
+        "params": {
+          "galvanicGroup": "aluminium_wrought_other",
+          "material": "aa7075_t6",
+          "source": {
+            "citation": "llull PHY-13 galvanic_anodic_index.csv (B)",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "ti6al4v_annealed",
+        ],
+        "id": "#12",
+        "name": "set_galvanic_group",
+        "params": {
+          "galvanicGroup": "nickel_titanium_group",
+          "material": "ti6al4v_annealed",
+          "source": {
+            "citation": "llull PHY-13 galvanic_anodic_index.csv (B)",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#13",
+        "name": "set_service_environment",
+        "params": {
+          "environment": "normal",
+          "scheme": "anodic_index",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#15",
+        ],
+        "id": "#14",
+        "name": "declare_isolation",
+        "params": {
+          "method": "sealant_faying",
+          "pair": [
+            "#1",
+            "#3",
+          ],
+          "spec": "MIL-PRF-81733 Type IV",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#15",
+        ],
+        "id": "#16",
+        "name": "remove_isolation",
+        "params": {
+          "id": "#15",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#18",
+        ],
+        "id": "#17",
+        "name": "assign_surface_system",
+        "params": {
+          "entityIds": [
+            "#3",
+          ],
+          "layers": [
+            {
+              "class": "metallic_plating",
+              "galvanicGroup": "cadmium_plate",
+            },
+          ],
+        },
+        "suppressed": false,
+      },
+    ],
+    "groups": {},
+    "jointOrder": [],
+    "joints": {},
+    "layerOrder": [
+      "#2",
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "locked": false,
+        "name": "Layer 0",
+        "visible": true,
+      },
+    },
+    "materials": {
+      "aa7075_t6": {
+        "color": "#b8bcc2",
+        "density": 0.00281,
+        "metalness": 1,
+        "name": "aa7075_t6",
+        "roughness": 0.35,
+      },
+      "ti6al4v_annealed": {
+        "color": "#8a8f96",
+        "density": 0.00443,
+        "metalness": 1,
+        "name": "ti6al4v_annealed",
+        "roughness": 0.4,
+      },
+    },
+    "nextStepNumber": 14,
+    "order": [
+      "#1",
+      "#3",
+    ],
+    "parameters": {},
+    "recipes": {},
+    "selection": [],
+    "units": "mm",
+  },
+  "format": "llull-document",
+  "version": 3,
+}
+`;
+
+exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > contact, fail, isolated pass and the cadmium small-anode warning; document and queries pinned > find_contacts 1`] = `
+[
+  {
+    "counts": {
+      "face": 1,
+    },
+    "nearMisses": [],
+    "pairs": [
+      {
+        "a": "box-4.1",
+        "approximate": false,
+        "area": 1800,
+        "b": "box-5.1",
+        "gap": 0,
+        "kind": "face",
+        "materials": [
+          "aa7075_t6",
+          "ti6al4v_annealed",
+        ],
+        "normal": [
+          0,
+          0,
+          1,
+        ],
+        "source": "closed_form",
+        "volume": 0,
+      },
+    ],
+    "skipped": [],
+    "tolerance": {
+      "defaulted": false,
+      "source": "caller",
+      "unit": "mm",
+      "value": 0.1,
+    },
+    "unit": "mm",
+  },
+]
+`;
+
+exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > contact, fail, isolated pass and the cadmium small-anode warning; document and queries pinned > list_surface_systems 1`] = `
+[
+  {
+    "count": 1,
+    "systems": [
+      {
+        "entityIds": [
+          "box-5.1",
+        ],
+        "id": "ss-13.1",
+        "layers": [
+          {
+            "class": "metallic_plating",
+            "galvanicGroup": "cadmium_plate",
+          },
+        ],
+      },
+    ],
+  },
+]
+`;

@@ -23,9 +23,16 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   COR_PARAMS_INVALID: 'follow the command description',
   COR_HUMAN_GATE: 'hand the item to the qualified reviewer, who signs the decision in the desktop app; do not retry',
   COR_DOCUMENT_UNIDENTIFIED: 'save the document first so it has a uid',
+  COR_REFERENCE_IN_USE:
+    'clear the corrosion entry that names it first (remove_isolation, remove_surface_system or assign_surface_system layers [none], remove_galvanic_group), then delete',
+  COR_SURFACE_SYSTEM_NOT_FOUND: 'list the surface systems with list_surface_systems',
+  COR_GROUP_NOT_SET: 'the material has no galvanic group entry (check_material_compatibility lists the parts and their groups)',
 };
 
 export const refuseCor = tableRejection(REMEDIATION);
+
+/** The remediation of a COR_* code (guard refusals carry it too). */
+export const remediationOfCor = (code: string): string => REMEDIATION[code] ?? 'follow the command description';
 
 /** The unverified-value reason carried by every item that rests on a grade B rule or table value (not suppressible). */
 export const UNVERIFIED_REASON =

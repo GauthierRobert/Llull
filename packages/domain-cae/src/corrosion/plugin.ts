@@ -2,6 +2,7 @@
 
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { corrosionCommands } from './catalog';
+import { corrosionReferenceGuard } from './guard';
 import { corrosionErrors } from './model';
 
 /** Definition data: nothing is derived, nothing is restored; a replay keeps the human acceptances (their steps carry no signature). */
@@ -19,5 +20,6 @@ export const corrosionPlugin: CadPlugin = {
   name: 'physics-corrosion',
   toolset: 'materials',
   commands: corrosionCommands,
+  guards: [corrosionReferenceGuard],
   document: corrosionDocument,
 };
