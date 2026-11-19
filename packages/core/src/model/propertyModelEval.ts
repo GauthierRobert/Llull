@@ -61,7 +61,14 @@ export interface PropertyEvaluationRefused {
   readonly path?: string;
   readonly validity?: readonly ValidRange[];
   readonly reviewRequired?: boolean;
-  readonly candidates?: readonly { modelId: string; property: string; direction?: string; basis: Basis; validity: readonly ValidRange[] }[];
+  readonly candidates?: readonly {
+    modelId: string;
+    property: string;
+    direction?: string;
+    basis: Basis;
+    validity: readonly ValidRange[];
+    testMethod?: string;
+  }[];
 }
 
 export type PropertyEvaluation = PropertyEvaluationOk | PropertyEvaluationRefused;
@@ -110,6 +117,7 @@ const candidateOf = (model: PropertyModel): NonNullable<PropertyEvaluationRefuse
   ...(model.direction !== undefined ? { direction: model.direction } : {}),
   basis: model.basis,
   validity: model.validity,
+  ...(model.condition?.testMethod !== undefined ? { testMethod: model.condition.testMethod } : {}),
 });
 
 /**

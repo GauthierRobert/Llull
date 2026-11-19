@@ -24,6 +24,8 @@ export interface OutgassingItem {
   readonly unverified: boolean;
   /** Test method(s) recorded on the value(s) used; absent when none is recorded. */
   readonly testMethod?: string;
+  /** A value used has no recorded test method (ENV_TEST_METHOD_UNRECORDED: the reviewer confirms it). */
+  readonly methodUnrecorded?: true;
   /** A value used was measured with another test method than the profile assumes (ENV_TEST_METHOD_MISMATCH; computed anyway, OQ-ENV-02). */
   readonly methodMismatch?: true;
   /** Where the value comes from (record provenance), or why there is none. */
@@ -42,7 +44,8 @@ export interface MaterialOutgassing {
 
 /**
  * The four E595 / ECSS quantities of a material, in percent: the value measured with `testMethod` (the profile's) when the material has one,
- * else the value the material resolves to without a method (which may carry another method: the screening flags it).
+ * else the value the material resolves to without a method (which may carry another method: the screening flags it). The fallback applies
+ * only when no model of that method exists: an ambiguous, out-of-range or otherwise refused read of the profile's method is returned as is.
  */
 export function outgassingOf(
   doc: CadDocument,
@@ -54,6 +57,9 @@ export function outgassingOf(
     if (testMethod !== undefined) {
       const matched = materialProperty(doc, ctx, material, property, '%', {}, undefined, { testMethod });
       if (!isMissing(matched)) return matched;
+      const noneOfMethod =
+        matched.code === 'PROP_NO_MODEL_FOR_PROPERTY' && !(matched.candidateMethods ?? []).some((method) => method === testMethod);
+      if (!noneOfMethod) return { code: matched.code, reason: `${testMethod} value: ${matched.reason}`, blocking: true };
     }
     return materialProperty(doc, ctx, material, property, '%');
   };
@@ -73,7 +79,7 @@ function resolveQuantity(data: MaterialOutgassing, quantity: OutgassingLimit['qu
   const direct = data[quantity];
   if (!isMissing(direct))
     return { value: direct.value, derived: false, unverified: direct.unverified, source: direct.source, methods: [direct.testMethod] };
-  if (quantity !== 'RML') return `no ${quantity} value on the material (${direct.code}: ${direct.reason})`;
+  if (quantity !== 'RML' || direct.blocking === true) return `no ${quantity} value on the material (${direct.code}: ${direct.reason})`;
   const { TML, WVR } = data;
   if (isMissing(TML) || isMissing(WVR))
     return `no RML, and it cannot be derived as TML - WVR (TML ${isMissing(TML) ? 'missing' : 'present'}, WVR ${isMissing(WVR) ? 'missing' : 'present'})`;
@@ -125,6 +131,7 @@ export function screenMaterial(
       ...(pass ? {} : { code: 'ENV_OUTGASSING_FAIL' }),
       ...(methods.length > 0 ? { testMethod: methods.join(' + ') } : {}),
       ...(methods.some((method) => method !== profile.testMethod) ? { methodMismatch: true as const } : {}),
+      ...(resolved.methods.some((method) => method === undefined) ? { methodUnrecorded: true as const } : {}),
       derived: resolved.derived,
       unverified: resolved.unverified,
       valueSource: resolved.source,

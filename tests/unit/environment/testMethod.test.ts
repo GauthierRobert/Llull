@@ -4,6 +4,7 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import type { CadDocument } from '@core/model/types';
 import { emptyMm, run, withPanel } from './fixtures';
+import { libraryFile } from '../materials/support';
 
 interface Item {
   material: string;
@@ -175,11 +176,84 @@ describe('check_space_environment: ENV_TEST_METHOD_MISMATCH (OQ-ENV-02)', () => 
     expect(item(ecss, 'CVCM')?.methodMismatch).toBeUndefined();
   });
 
-  it('the method is part of the finding fingerprint only when recorded (earlier deviations keep their fingerprint)', () => {
-    const recorded = item(check(e595Panel('ASTM_E595'), 'nasa_gsfc_screening'), 'TML')?.fingerprint;
-    const plain = item(check(e595Panel(), 'nasa_gsfc_screening'), 'TML')?.fingerprint;
-    expect(recorded).toBeDefined();
-    expect(recorded).not.toBe(plain);
-    expect(plain).toBe(item(check(e595Panel(), 'nasa_gsfc_screening'), 'TML')?.fingerprint);
+  it('the method is part of the finding fingerprint only when recorded: an unqualified item keeps the fingerprint of the base build', () => {
+    /** sha256 computed on the commit before MOI-b (00eac362a) for the same panel: earlier deviations keep applying. */
+    const BASE_TML_FINGERPRINT = '7880c036bf5a052cccd70bf1aadeec82196a055dea4e9f24f13217118bc4382f';
+    expect(item(check(e595Panel(), 'nasa_gsfc_screening'), 'TML')?.fingerprint).toBe(BASE_TML_FINGERPRINT);
+    expect(item(check(e595Panel('ASTM_E595'), 'nasa_gsfc_screening'), 'TML')?.fingerprint).not.toBe(BASE_TML_FINGERPRINT);
+  });
+
+  it('an ambiguous read of the profile method is unknown with the reason, never replaced by a preferred value of another method', () => {
+    let doc = withMethodMaterial(emptyMm(), 'adhesive', { CVCM: 0.05 }, 'ASTM_E595');
+    const tml = (value: number, testMethod: string, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+      material: 'adhesive',
+      property: 'TML',
+      value,
+      unit: '%',
+      basis: 'company',
+      source,
+      testMethod,
+      ...extra,
+    });
+    doc = run(doc, 'set_material_property', tml(0.5, 'ASTM_E595')).document;
+    doc = run(doc, 'set_material_property', tml(0.7, 'ASTM_E595')).document;
+    doc = run(doc, 'set_material_property', tml(0.3, 'ECSS_Q_ST_70_02', { preferred: true })).document;
+    doc = withPanel(doc, 'adhesive').document;
+    const data = check(doc, 'nasa_gsfc_screening');
+    const tmlItem = data.items.find((entry) => entry.quantity === 'TML') as (Item & { code?: string; valueSource?: string }) | undefined;
+    expect(tmlItem).toMatchObject({ status: 'unknown', value: null, code: 'ENV_OUTGASSING_DATA_MISSING' });
+    expect((tmlItem as { valueSource?: string } | undefined)?.valueSource).toContain('ASTM_E595 value');
+    expect((tmlItem as { valueSource?: string } | undefined)?.valueSource).toContain('none is preferred');
+    expect(data.findings.some((finding) => finding.code === 'ENV_TEST_METHOD_MISMATCH')).toBe(false);
+    expect(data.status).toBe('unknown');
+  });
+
+  it('an ambiguous profile-method RML is not derived from TML - WVR', () => {
+    let doc = withMethodMaterial(emptyMm(), 'adhesive', { TML: 0.9, CVCM: 0.05, WVR: 0.3 }, 'ECSS_Q_ST_70_02');
+    for (const value of [0.5, 0.6])
+      doc = run(doc, 'set_material_property', {
+        material: 'adhesive',
+        property: 'RML',
+        value,
+        unit: '%',
+        basis: 'company',
+        source,
+        testMethod: 'ECSS_Q_ST_70_02',
+      }).document;
+    const data = check(withPanel(doc, 'adhesive').document, 'ecss_q_st_70_02');
+    expect(item(data, 'RML')).toMatchObject({ status: 'unknown', derived: false, value: null });
+  });
+
+  it('values without a recorded method give one ENV_TEST_METHOD_UNRECORDED info per material, outside the status and the fingerprint', () => {
+    const data = check(e595Panel(), 'nasa_gsfc_screening');
+    const unrecorded = data.findings.filter((finding) => finding.code === 'ENV_TEST_METHOD_UNRECORDED');
+    expect(unrecorded).toHaveLength(1);
+    expect(unrecorded[0]?.severity).toBe('info');
+    expect(unrecorded[0]?.message).toBe('adhesive: TML, CVCM: no test method recorded; confirm it was ASTM_E595');
+    expect(data.status).toBe('pass');
+    expect(check(e595Panel('ASTM_E595'), 'nasa_gsfc_screening').findings.some((f) => f.code === 'ENV_TEST_METHOD_UNRECORDED')).toBe(false);
+  });
+});
+
+describe('material library conditions (import_material_library)', () => {
+  const withCondition = (condition: Record<string, unknown>): Record<string, unknown> => {
+    const file = libraryFile();
+    const [material] = file['materials'] as Record<string, unknown>[];
+    const [first, ...rest] = (material?.['propertyModels'] ?? []) as Record<string, unknown>[];
+    return { ...file, materials: [{ ...material, propertyModels: [{ ...first, condition }, ...rest] }] };
+  };
+
+  it('accepts every PropertyCondition field, testMethod included', () => {
+    const condition = { testMethod: 'ASTM_E595', thickness: { min: 0.5, max: 1, unit: 'mm' }, edOverD: 2, exposureHours: 10, rrr: 50 };
+    expect(execute(emptyMm(), 'import_material_library', { library: withCondition(condition) }).error).toBeUndefined();
+  });
+
+  it('refuses an unknown condition key and a non-token testMethod (document unchanged)', () => {
+    const doc = emptyMm();
+    for (const condition of [{ freeText: 'x' }, { testMethod: 'two words' }, { testMethod: 5 }]) {
+      const result = execute(doc, 'import_material_library', { library: withCondition(condition) });
+      expect(result.error).toBeDefined();
+      expect(result.document).toBe(doc);
+    }
   });
 });

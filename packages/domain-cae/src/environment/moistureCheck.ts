@@ -63,13 +63,11 @@ interface Refused {
 const numberAt = (record: unknown, key: string): number | null =>
   isRecord(record) && typeof record[key] === 'number' && Number.isFinite(record[key]) ? record[key] : null;
 
-function uptakeOf(doc: CadDocument, ctx: ExecutionContext | undefined, material: string, thickness: Quantity): Uptake | Refused {
-  const result = execute(doc, 'moisture_uptake', { thickness, material, useMissionExposure: true }, ctx);
-  if (result.error !== undefined) return { code: result.error.code, reason: result.summary };
-  const data: unknown = result.data;
+/** The uptake a successful moisture_uptake reported in `data`; a malformed result (no finite content or fraction) is a refusal, never a number. */
+export function uptakeFromData(data: unknown, summary: string): Uptake | Refused {
   const moisturePercent = numberAt(data, 'moisturePercent');
   const fraction = numberAt(data, 'fraction');
-  if (moisturePercent === null || fraction === null) return { code: 'ENV_PROPERTY_MISSING', reason: result.summary };
+  if (moisturePercent === null || fraction === null) return { code: 'ENV_PROPERTY_MISSING', reason: summary };
   const inputs = isRecord(data) ? data['inputs'] : undefined;
   return {
     moisturePercent,
@@ -79,10 +77,15 @@ function uptakeOf(doc: CadDocument, ctx: ExecutionContext | undefined, material:
   };
 }
 
+function uptakeOf(doc: CadDocument, ctx: ExecutionContext | undefined, material: string, thickness: Quantity): Uptake | Refused {
+  const result = execute(doc, 'moisture_uptake', { thickness, material, useMissionExposure: true }, ctx);
+  return result.error !== undefined ? { code: result.error.code, reason: result.summary } : uptakeFromData(result.data, result.summary);
+}
+
 const thicknessOf = (part: Part, given: ReadonlyMap<string, Quantity>): Quantity | undefined =>
   given.get(part.entityId) ?? given.get(part.rootId);
 
-/** Why `thicknesses` cannot be used (no mission humidity exposure, or an id that is no screened part nor its root), or null. */
+/** Why `thicknesses` cannot be used (no mission humidity exposure, an id given twice, or an id that is no screened part nor its top-level root), or null. */
 export function thicknessProblem(
   parts: readonly Part[],
   thicknesses: readonly PartThickness[],
@@ -90,6 +93,15 @@ export function thicknessProblem(
 ): { readonly message: string; readonly ids: readonly string[] } | null {
   if (thicknesses.length === 0) return null;
   if (exposure === undefined) return { message: 'moistureThickness needs a mission humidityExposure (set_mission_environment)', ids: [] };
+  const seen = new Set<string>();
+  const repeatedIds = new Set<string>();
+  for (const { entityId } of thicknesses) {
+    if (seen.has(entityId)) repeatedIds.add(entityId);
+    seen.add(entityId);
+  }
+  const repeated = [...repeatedIds];
+  if (repeated.length > 0)
+    return { message: `moistureThickness gives ${repeated.slice(0, 10).join(', ')} more than once`, ids: repeated.slice(0, 10) };
   const screened = new Set(parts.flatMap((part) => [part.entityId, part.rootId]));
   const stray = thicknesses.filter((entry) => !screened.has(entry.entityId)).map((entry) => entry.entityId);
   return stray.length === 0
@@ -164,7 +176,7 @@ export function moistureSection(
         unverified: true,
         message: `${part.entityId}: no thickness, so no moisture state; saturation bound ${saturationWaterG === null ? 'unknown' : `${saturationWaterG.toPrecision(6)} g`}`,
       };
-    const key = `${part.material}|${thickness.value}|${thickness.unit}`;
+    const key = JSON.stringify([part.material, thickness.value, thickness.unit]);
     const uptake = uptakes.get(key) ?? uptakeOf(doc, ctx, part.material, thickness);
     uptakes.set(key, uptake);
     if ('code' in uptake)

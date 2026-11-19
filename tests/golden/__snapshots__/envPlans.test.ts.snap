@@ -76,6 +76,11 @@ exports[`PHY-14 env_mission_end_to_end plan, golden > screens outgassing, moistu
       "severity": "warning",
     },
     {
+      "code": "ENV_TEST_METHOD_UNRECORDED",
+      "message": "syn_metal: CVCM: no test method recorded; confirm it was ECSS_Q_ST_70_02",
+      "severity": "info",
+    },
+    {
       "code": "ENV_MOISTURE_THICKNESS_UNSET",
       "entityIds": [
         "box-13.1",
@@ -168,6 +173,7 @@ exports[`PHY-14 env_mission_end_to_end plan, golden > screens outgassing, moistu
       "limit": 0.1,
       "material": "syn_metal",
       "message": "syn_metal: CVCM 0.00000 % meets < 0.1 %",
+      "methodUnrecorded": true,
       "op": "<",
       "quantity": "CVCM",
       "reviewRequired": true,
@@ -325,6 +331,11 @@ exports[`PHY-14 env_mission_end_to_end plan, golden > screens outgassing, moistu
   },
   "findings": [
     {
+      "code": "ENV_TEST_METHOD_UNRECORDED",
+      "message": "syn_metal: TML, CVCM: no test method recorded; confirm it was ASTM_E595",
+      "severity": "info",
+    },
+    {
       "code": "ENV_MOISTURE_THICKNESS_UNSET",
       "entityIds": [
         "box-15.1",
@@ -386,6 +397,7 @@ exports[`PHY-14 env_mission_end_to_end plan, golden > screens outgassing, moistu
       "limit": 1,
       "material": "syn_metal",
       "message": "syn_metal: TML 0.0100000 % meets <= 1 %",
+      "methodUnrecorded": true,
       "op": "<=",
       "quantity": "TML",
       "reviewRequired": true,
@@ -406,6 +418,7 @@ exports[`PHY-14 env_mission_end_to_end plan, golden > screens outgassing, moistu
       "limit": 0.1,
       "material": "syn_metal",
       "message": "syn_metal: CVCM 0.00000 % meets <= 0.1 %",
+      "methodUnrecorded": true,
       "op": "<=",
       "quantity": "CVCM",
       "reviewRequired": true,

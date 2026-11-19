@@ -20,7 +20,18 @@ export interface MaterialValue {
 export interface MaterialMissing {
   readonly code: string;
   readonly reason: string;
+  /** Test methods of the candidate models a PROP_NO_MODEL_FOR_PROPERTY refusal lists (undefined = none recorded). */
+  readonly candidateMethods?: readonly (string | undefined)[];
+  /** The read of the profile's test method was refused for a reason other than "no such model": nothing may stand in for it (no fallback, no RML derivation). */
+  readonly blocking?: true;
 }
+
+const candidateMethodsOf = (candidates: unknown): (string | undefined)[] =>
+  Array.isArray(candidates)
+    ? candidates.map((candidate: unknown) =>
+        isRecord(candidate) && typeof candidate['testMethod'] === 'string' ? candidate['testMethod'] : undefined,
+      )
+    : [];
 
 export const isMissing = (value: MaterialValue | MaterialMissing): value is MaterialMissing => 'reason' in value;
 
@@ -59,7 +70,11 @@ export function materialProperty(
   const data: unknown = evaluated.data;
   if (!isRecord(data)) return { code: 'ENV_PROPERTY_MISSING', reason: evaluated.summary };
   if (data['available'] === false || typeof data['value'] !== 'number')
-    return { code: String(data['code'] ?? 'ENV_PROPERTY_MISSING'), reason: String(data['reason'] ?? evaluated.summary) };
+    return {
+      code: String(data['code'] ?? 'ENV_PROPERTY_MISSING'),
+      reason: String(data['reason'] ?? evaluated.summary),
+      candidateMethods: candidateMethodsOf(data['candidates']),
+    };
   return {
     value: data['value'],
     unit: String(data['unit'] ?? outputUnit),

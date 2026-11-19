@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
+import { uptakeFromData } from '@cae/environment/moistureCheck';
 import { close, emptyMm, run, withMaterial, withPanel } from './fixtures';
 
 interface MoistureItem {
@@ -173,5 +174,67 @@ describe('check_space_environment per-part moisture state', () => {
     const panel = withPanel(moistMaterial(emptyMm(), 'composite'), 'composite');
     const data = dataOf(withMission(panel.document), { moistureThickness: [{ entityId: panel.id, thickness: { value: -1, unit: 'mm' } }] });
     expect(data.moisture?.items[0]).toMatchObject({ status: 'unknown', code: 'ENV_PARAM_INVALID', moisturePercent: null });
+  });
+
+  it('accepts only top-level ids: an id inside a component definition is refused', () => {
+    const panel = withPanel(moistMaterial(emptyMm(), 'composite'), 'composite');
+    const doc = withMission(
+      run(panel.document, 'create_component', { name: 'panel', entityIds: [panel.id], componentId: 'panel' }).document,
+    );
+    expect(Object.hasOwn(doc.entities, panel.id)).toBe(false);
+    const refused = check(doc, { moistureThickness: [{ entityId: panel.id, thickness: THICKNESS }] });
+    expect(refused.error?.code).toBe('ENV_PARAM_INVALID');
+    expect(refused.document).toBe(doc);
+  });
+
+  it('refuses an id given twice (document unchanged)', () => {
+    const panel = withPanel(moistMaterial(emptyMm(), 'composite'), 'composite');
+    const doc = withMission(panel.document);
+    const refused = check(doc, {
+      moistureThickness: [
+        { entityId: panel.id, thickness: THICKNESS },
+        { entityId: panel.id, thickness: { value: 1, unit: 'mm' } },
+      ],
+    });
+    expect(refused.error?.code).toBe('ENV_PARAM_INVALID');
+    expect(refused.error?.ids).toEqual([panel.id]);
+    expect(refused.summary).toContain('more than once');
+    expect(refused.document).toBe(doc);
+  });
+
+  it('keeps the uptake cache per (material, value, unit): no key built from a material name can collide', () => {
+    const first = withPanel(moistMaterial(emptyMm(), 'a|1'), 'a|1');
+    const second = withPanel(moistMaterial(first.document, 'a'), 'a');
+    const data = dataOf(withMission(second.document), {
+      moistureThickness: [
+        { entityId: first.id, thickness: { value: 1, unit: 'mm' } },
+        { entityId: second.id, thickness: { value: 1, unit: '1|mm' } },
+      ],
+    });
+    const byId = new Map((data.moisture?.items ?? []).map((item) => [item.entityId, item]));
+    expect(byId.get(first.id)?.status).toBe('info');
+    expect(byId.get(second.id)).toMatchObject({ status: 'unknown', code: 'ENV_PARAM_INVALID' });
+  });
+});
+
+describe('uptakeFromData (the moisture_uptake result reader)', () => {
+  it('reads content, fraction, saturation and the unverified flag', () => {
+    expect(uptakeFromData({ moisturePercent: 1, fraction: 0.5, inputs: { saturation: { value: 2 } }, unverified: false }, 's')).toEqual({
+      moisturePercent: 1,
+      fraction: 0.5,
+      saturationPercent: 2,
+      unverified: false,
+    });
+  });
+
+  it('a malformed result is a refusal (never a number); missing inputs leave the saturation unknown and the value unverified', () => {
+    expect(uptakeFromData(null, 'summary')).toEqual({ code: 'ENV_PROPERTY_MISSING', reason: 'summary' });
+    expect(uptakeFromData({ moisturePercent: Number.NaN, fraction: 0.5 }, 'nan')).toEqual({ code: 'ENV_PROPERTY_MISSING', reason: 'nan' });
+    expect(uptakeFromData({ moisturePercent: 1, fraction: 0.5 }, 's')).toEqual({
+      moisturePercent: 1,
+      fraction: 0.5,
+      saturationPercent: null,
+      unverified: true,
+    });
   });
 });

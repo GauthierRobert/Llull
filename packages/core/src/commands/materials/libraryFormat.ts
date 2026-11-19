@@ -13,7 +13,7 @@ import { BASES, PROPERTY_DIRECTIONS, PROPERTY_VARIABLES, type PropertyModel } fr
 import { modelProblem } from '../../model/propertyModelValidate';
 import { z } from '../schema';
 import { formHash } from '../document/propertyModels';
-import { formSchema, withoutUndefined } from '../document/propertyModelSchema';
+import { formSchema, storedConditionSchema, withoutUndefined } from '../document/propertyModelSchema';
 import { preferredConflicts } from './propertyKey';
 
 const pair = z.tuple([z.number(), z.number()]);
@@ -27,7 +27,7 @@ const modelSchema = z.looseObject({
   validity: z.array(z.looseObject({ variable: z.enum(PROPERTY_VARIABLES), unit: z.string(), data: pair, equation: pair.optional() })),
   basis: z.enum(BASES),
   direction: z.enum(PROPERTY_DIRECTIONS).optional(),
-  condition: z.record(z.string(), z.unknown()).optional(),
+  condition: storedConditionSchema.optional(),
   provenance: z.looseObject({}),
   coefficientsSha256: z.string().optional(),
   preferred: z.literal(true).optional(),

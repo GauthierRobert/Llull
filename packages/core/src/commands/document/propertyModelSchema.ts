@@ -152,6 +152,25 @@ export const modelInputSchema = z.object({
   preferred: z.literal(true).optional().describe('Mark as THE model for its property / direction / basis / condition (one per key).'),
 });
 
+/** The condition fields define_property_model accepts (strict: an unknown key is refused). */
+export const conditionSchema = z.strictObject({
+  temper: z.string().optional(),
+  productForm: z.string().optional(),
+  rrr: z.number().optional(),
+  environment: z.string().optional(),
+  note: z.string().optional(),
+  opticalKind: z.enum(['hemispherical_total', 'normal_total']).optional(),
+  lifeState: z.enum(['BOL', 'EOL']).optional(),
+  testMethod: z.string().optional(),
+});
+
+/** Every `PropertyCondition` field, as written by define_property_model and set_material_property (thickness, e/D, exposure); strict. */
+export const storedConditionSchema = conditionSchema.extend({
+  thickness: z.strictObject({ min: z.number(), max: z.number(), unit: z.string() }).optional(),
+  edOverD: z.number().optional(),
+  exposureHours: z.number().optional(),
+});
+
 /** A property model as stored in a document (load-time validation; `fit` and `reviewedBy` kept as written). */
 const storedModelSchema = z.looseObject({
   id: z.string().min(1),

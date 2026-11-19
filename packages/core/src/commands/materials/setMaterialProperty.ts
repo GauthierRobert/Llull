@@ -93,7 +93,7 @@ export const setMaterialProperty = defineCommand({
     preferred: z
       .literal(true)
       .optional()
-      .describe('Mark as THE value for its key (at most one preferred per property, direction, basis, thickness, e/D).'),
+      .describe('Mark as THE value for its key (at most one preferred per property, direction, basis, thickness, e/D, test method).'),
     testMethod: z
       .string()
       .optional()
