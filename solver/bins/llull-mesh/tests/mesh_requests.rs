@@ -304,9 +304,21 @@ fn tets(response: &Value) -> Vec<[u64; 4]> {
     elements(response, 0).iter().map(|row| [1, 2, 3, 4].map(|k| row[k].as_u64().unwrap())).collect()
 }
 
-/// The mesh is ONE conformal model across every cut: no coincident nodes, every node on a cut plane x = c used by tets on both sides, and the
-/// tets joined through shared nodes into a single component. `cuts` = the x coordinates of the imprinted planes (empty: only the generic checks).
-fn assert_conformal(response: &Value, cuts: &[f64]) {
+/// A cut plane: a point and a unit normal.
+type Cut = ([f64; 3], [f64; 3]);
+
+fn x_cut(at: f64) -> Cut {
+    ([at, 0.0, 0.0], [1.0, 0.0, 0.0])
+}
+
+/// Signed distance of `p` to the plane `cut`.
+fn signed(cut: &Cut, p: &[f64; 3]) -> f64 {
+    (0..3).map(|k| (p[k] - cut.0[k]) * cut.1[k]).sum()
+}
+
+/// The mesh is ONE conformal model across every cut: no coincident nodes, every node on a cut plane (any orientation) used by tets on both
+/// sides, and the tets joined through shared nodes into a single component. `cuts` = the imprinted planes (empty: only the generic checks).
+fn assert_conformal(response: &Value, cuts: &[Cut]) {
     let xyz = coords(response);
     let mut seen: HashMap<[i64; 3], u64> = HashMap::new();
     for (id, p) in &xyz {
@@ -316,18 +328,21 @@ fn assert_conformal(response: &Value, cuts: &[f64]) {
         }
     }
     let cells = tets(response);
-    let centre_x = |cell: &[u64; 4]| cell.iter().map(|n| xyz[n][0]).sum::<f64>() / 4.0;
-    for &cut in cuts {
+    let centre = |cell: &[u64; 4]| [0, 1, 2].map(|k| cell.iter().map(|n| xyz[n][k]).sum::<f64>() / 4.0);
+    for cut in cuts {
         let corners: HashSet<u64> = cells.iter().flatten().copied().collect();
-        let on_cut: HashSet<u64> = corners.iter().filter(|id| (xyz[id][0] - cut).abs() < 1e-9).copied().collect();
-        assert!(!on_cut.is_empty(), "no node on the cut x = {cut}");
+        let on_cut: HashSet<u64> = corners.iter().filter(|id| signed(cut, &xyz[id]).abs() < 1e-9).copied().collect();
+        assert!(!on_cut.is_empty(), "no node on the plane cut {cut:?}");
         let (mut below, mut above): (HashSet<u64>, HashSet<u64>) = (HashSet::new(), HashSet::new());
         for cell in &cells {
-            let side = if centre_x(cell) < cut { &mut below } else { &mut above };
+            let side = if signed(cut, &centre(cell)) < 0.0 { &mut below } else { &mut above };
             side.extend(cell.iter().filter(|n| on_cut.contains(n)));
         }
         for node in &on_cut {
-            assert!(below.contains(node) && above.contains(node), "cut node {node} at x = {cut} is not shared by tets on both sides");
+            assert!(
+                below.contains(node) && above.contains(node),
+                "node {node} of the plane cut {cut:?} is not shared by tets on both sides"
+            );
         }
     }
     let mut parent: HashMap<u64, u64> = xyz.keys().map(|n| (*n, *n)).collect();
@@ -351,7 +366,7 @@ fn assert_conformal(response: &Value, cuts: &[f64]) {
     assert_eq!(components.len(), 1, "the tets form {} disconnected pieces", components.len());
 }
 
-fn volumes_are_positive(response: &Value, cuts: &[f64]) {
+fn volumes_are_positive(response: &Value, cuts: &[Cut]) {
     let xyz = coords(response);
     assert!(!elements(response, 0).is_empty());
     for cell in tets(response) {
@@ -378,7 +393,7 @@ fn the_conformity_check_catches_a_mesh_split_along_the_cut() {
         copies.push(json!([last + 1 + k as u64, xyz[id][0], xyz[id][1], xyz[id][2]]));
     }
     response["nodes"].as_array_mut().unwrap().extend(copies);
-    assert_conformal(&response, &[10.0]);
+    assert_conformal(&response, &[x_cut(10.0)]);
 }
 
 fn plane_x(at: f64) -> Value {
@@ -398,7 +413,7 @@ fn a_box_top_face_cut_by_the_mid_plane_targets_the_nodes_on_the_section_line() {
         let (low, high) = set.iter().fold((f64::MAX, f64::MIN), |(lo, hi), n| (lo.min(xyz[n][1]), hi.max(xyz[n][1])));
         assert!(low.abs() < 1e-9 && (high - 10.0).abs() < 1e-9, "the whole section line [0, 10] is covered: {low}..{high}");
         assert!(response["faceSets"].get("C_mid").is_none(), "a plane target has no faces of its own");
-        volumes_are_positive(&response, &[10.0]);
+        volumes_are_positive(&response, &[x_cut(10.0)]);
     }
 }
 
@@ -421,6 +436,36 @@ fn an_off_centre_plane_gives_a_line_of_nodes_not_the_whole_face() {
 }
 
 #[test]
+fn an_oblique_plane_cuts_the_part_into_one_conformal_model() {
+    // through the centre (10, 5, 5), normal (1, 0.5, 1) / 1.5: the top face z = 10 is cut along x = 7.5 - y / 2
+    let normal = [1.0 / 1.5, 0.5 / 1.5, 1.0 / 1.5];
+    let plane = json!({ "point": [10.0, 5.0, 5.0], "normal": [1.0, 0.5, 1.0] });
+    let cut: Cut = ([10.0, 5.0, 5.0], normal);
+    for order in [1, 2] {
+        let target = json!({ "key": "C", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]], "intersectPlane": plane });
+        let response = run(&plane_request("box_20x10x10.step", target, order));
+        assert_eq!(response["ok"], true, "{response}");
+        let xyz = coords(&response);
+        let set = ids(&response["nodeSets"]["C"]);
+        assert!(set.len() >= 3, "{}", set.len());
+        assert!(set.iter().all(|n| signed(&cut, &xyz[n]).abs() < 1e-9 && (xyz[n][2] - 10.0).abs() < 1e-9), "on the plane AND the top face");
+        let (low, high) = set.iter().fold((f64::MAX, f64::MIN), |(lo, hi), n| (lo.min(xyz[n][1]), hi.max(xyz[n][1])));
+        assert!(low.abs() < 1e-9 && (high - 10.0).abs() < 1e-9, "the whole section line is covered: y {low}..{high}");
+        volumes_are_positive(&response, &[cut]);
+    }
+}
+
+/// The oblique check is not vacuous: the same plane checked on a mesh it was NOT imprinted on fails.
+#[test]
+#[should_panic(expected = "plane cut")]
+fn the_conformity_check_catches_an_oblique_plane_that_was_not_imprinted() {
+    let target = json!({ "key": "C", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]] });
+    let response = run(&plane_request("box_20x10x10.step", target, 1));
+    assert_eq!(response["ok"], true, "{response}");
+    assert_conformal(&response, &[([10.0, 5.0, 5.0], [1.0 / 1.5, 0.5 / 1.5, 1.0 / 1.5])]);
+}
+
+#[test]
 fn a_cylinder_cut_by_a_plane_through_its_axis_targets_the_two_seam_lines() {
     let target = json!({ "key": "S", "entityId": "b", "facesNear": [[7.0, 10.0, 1.0]], "intersectPlane": plane_x(10.0) });
     let response = run(&plane_request("plate_hole.step", target, 1));
@@ -434,7 +479,7 @@ fn a_cylinder_cut_by_a_plane_through_its_axis_targets_the_two_seam_lines() {
         assert!(((y - 10.0).abs() - 3.0).abs() < 1e-6, "on the hole wall: y = {y}");
     }
     assert!(set.iter().any(|n| xyz[n][1] < 10.0) && set.iter().any(|n| xyz[n][1] > 10.0), "both seams");
-    volumes_are_positive(&response, &[10.0]);
+    volumes_are_positive(&response, &[x_cut(10.0)]);
 }
 
 #[test]
@@ -531,7 +576,7 @@ fn a_pressure_face_cut_by_a_plane_keeps_its_whole_area_and_the_mesh_stays_one_mo
         assert_eq!(response["ok"], true, "{response}");
         let area = face_set_area(&response, "T");
         assert!((area - 200.0).abs() < 1e-6, "order {order}: the cut top face totals {area}, not 200 mm2");
-        volumes_are_positive(&response, &[10.0]);
+        volumes_are_positive(&response, &[x_cut(10.0)]);
         let xyz = coords(&response);
         let edge = ids(&response["nodeSets"]["E"]);
         assert!(edge.iter().any(|n| xyz[n][0] < 9.0) && edge.iter().any(|n| xyz[n][0] > 11.0), "the split edge keeps both halves");
@@ -573,7 +618,7 @@ fn two_distinct_planes_split_one_part_into_one_model() {
         assert!(set.len() >= 3 && set.iter().all(|n| (xyz[n][0] - at).abs() < 1e-9 && (xyz[n][2] - 10.0).abs() < 1e-9), "{key}");
     }
     assert!((face_set_area(&response, "T") - 200.0).abs() < 1e-6, "the top face is cut in three and keeps its area");
-    volumes_are_positive(&response, &[5.0, 15.0]);
+    volumes_are_positive(&response, &[x_cut(5.0), x_cut(15.0)]);
 }
 
 #[test]
@@ -597,7 +642,7 @@ fn the_same_plane_written_with_different_rounding_or_normal_is_imprinted_once() 
         let response = run(&request(second));
         assert_eq!(response["ok"], true, "{response}");
         assert_eq!(response["nodeSets"]["A"], response["nodeSets"]["B"], "one imprint: both targets are the same nodes");
-        volumes_are_positive(&response, &[10.0]);
+        volumes_are_positive(&response, &[x_cut(10.0)]);
     }
 }
 

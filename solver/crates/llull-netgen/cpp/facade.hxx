@@ -63,6 +63,8 @@ class Shape {
   // Distance from (x, y, z) to the TRIMMED face, then the closest point on it: [d, cx, cy, cz].
   rust::Vec<double> face_distance(int32_t face, double x, double y, double z) const;
   double edge_distance(int32_t edge, double x, double y, double z) const;
+  // min xyz, max xyz of a box holding the whole edge (OCCT Bnd_Box, enlarged by the edge tolerance); empty for a degenerated edge.
+  rust::Vec<double> edge_bounds(int32_t edge) const;
   // Radius of a cylinder face, minor radius of a torus face, 0 for every other surface.
   double face_radius(int32_t face) const;
   // Points over a face / along an edge no further apart than `spacing` (x, y, z triples): where a local size applies.

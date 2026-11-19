@@ -189,6 +189,19 @@ double Shape::edge_distance(int32_t edge, double x, double y, double z) const {
   return nearest(item(geometry->emap, edge, "edge"), x, y, z).Value();
 }
 
+rust::Vec<double> Shape::edge_bounds(int32_t edge) const {
+  const TopoDS_Edge &shape_edge = TopoDS::Edge(item(geometry->emap, edge, "edge"));
+  rust::Vec<double> out;
+  if (BRep_Tool::Degenerated(shape_edge)) return out;
+  Bnd_Box box;
+  BRepBndLib::Add(shape_edge, box, false);
+  if (box.IsVoid()) return out;
+  double values[6];
+  box.Get(values[0], values[1], values[2], values[3], values[4], values[5]);
+  for (double value : values) out.push_back(value);
+  return out;
+}
+
 double Shape::face_radius(int32_t face) const {
   BRepAdaptor_Surface surface(TopoDS::Face(item(geometry->fmap, face, "face")));
   switch (surface.GetType()) {
