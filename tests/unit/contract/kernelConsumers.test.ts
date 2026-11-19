@@ -27,6 +27,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'evaluateRecipe',
   'operandRecipe',
   'collectParts', // geometry/assemblyParts
+  'kernelContacts', // domain-cae corrosion/exactContacts: AABB contacts resolved through the kernel distance
   'openSolid', // geometry/pmiFeatures
   'createSolidLookup', // pmi/refresh
   'kernelStampOf', // persistence/kernelStamp

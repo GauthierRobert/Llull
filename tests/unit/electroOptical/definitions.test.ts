@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
 import type { CommandResult } from '@core/commands/types';
 import { electroOpticalErrors } from '@cae/electroOptical/model';
 import { run, runPlan } from './fixtures';
@@ -107,6 +108,17 @@ describe('assign_surface_coating / remove_surface_coating', () => {
     const deleted = execute(assigned, 'delete_entities', { ids: [box] });
     expect(deleted.summary).toContain('is used by');
     expect(deleted.document).toBe(assigned);
+  });
+
+  it('replay_history of a history recorded before the guard (assign, then delete the coated solid) gives the saved model', () => {
+    const { doc, box } = withBox();
+    const assigned = run(doc, 'assign_surface_coating', { entityId: box, coating: 'paint' });
+    const preGuard = execute(assigned, 'delete_entities', { ids: [box] }, { ...defaultContext(), replaying: true });
+    expect(preGuard.error).toBeUndefined();
+    const replayed = execute(preGuard.document, 'replay_history', {});
+    expect(replayed.error).toBeUndefined();
+    expect(replayed.document.entities[box]).toBeUndefined();
+    expect(replayed.document.electroOptical).toEqual(preGuard.document.electroOptical);
   });
 });
 

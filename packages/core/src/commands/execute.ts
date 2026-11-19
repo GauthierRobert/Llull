@@ -124,7 +124,7 @@ function executeCommand(doc: CadDocument, commandName: string, params: unknown, 
   };
   // The recorded step is itself a change of the definition: guards see the final document (a release lock must not be bypassed by a
   // command whose own result equals its input).
-  const violation = derivationViolation(pluginGuards(), commandName, doc, recorded);
+  const violation = derivationViolation(pluginGuards(), commandName, doc, recorded, { replaying: ctx?.replaying === true });
   if (violation !== null)
     return rejection(
       doc,

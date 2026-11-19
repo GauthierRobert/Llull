@@ -200,7 +200,7 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
       commandError('CMD_THREW', 'An internal error; simplify the input or report the summary as a bug.'),
     );
   }
-  const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
+  const violation = derivationViolation(pluginGuards(), def.name, doc, result.document, { replaying: ctx?.replaying === true });
   if (violation !== null)
     return rejection(
       doc,

@@ -11,6 +11,10 @@
  {"command": "set_service_environment", "params": {"scheme": "anodic_index", "environment": "normal"}},
  {"command": "find_contacts", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}}},
  {"command": "check_material_compatibility", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}}},
- {"command": "declare_isolation", "params": {"pair": ["$plate", "$block"], "method": "sealant_faying", "spec": "MIL-PRF-81733 Type IV"}},
- {"command": "check_material_compatibility", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}}}
+ {"command": "declare_isolation", "params": {"pair": ["$plate", "$block"], "method": "sealant_faying", "spec": "MIL-PRF-81733 Type IV"}, "as": "seal"},
+ {"command": "check_material_compatibility", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}}},
+ {"command": "remove_isolation", "params": {"id": "$seal"}},
+ {"command": "assign_surface_system", "params": {"entityIds": ["$block"], "layers": [{"class": "metallic_plating", "galvanicGroup": "cadmium_plate"}]}, "as": "cd"},
+ {"command": "list_surface_systems", "params": {}},
+ {"command": "check_material_compatibility", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}, "report": true}}
 ]

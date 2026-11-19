@@ -1,14 +1,11 @@
 /** The release lock (FR-PLM-05, §5.2): a derivation guard that refuses any change of the definition while its revision is not open. */
 
 import type { CadDocument } from '@core/model/types';
-import type { DerivationGuard, GuardRefusal } from '@core/commands/derivation';
+import { type DerivationGuard, type GuardRefusal, WHOLE_DOCUMENT_REPLACEMENTS } from '@core/commands/derivation';
 import { commandError } from '@core/commands/noop';
 import type { Revision } from '@plm/types';
 import { getCommand } from '@core/commands/registry';
 import { remediationOf } from './refusal';
-
-/** Commands that replace the document wholesale (integrity is checked on load) or restore a released snapshot (checked by the command). */
-const EXEMPT = new Set(['load_document', 'clear_document', 'restore_revision_snapshot']);
 
 /** Top-level keys outside the release scope: view state and the PLM record itself. */
 const OUTSIDE_SCOPE = new Set(['selection', 'camera', 'plm']);
@@ -50,7 +47,8 @@ const FROZEN = new Set(['released', 'superseded', 'obsolete']);
 export const releaseLockGuard: DerivationGuard = {
   domain: 'plm',
   check(previous, next, commandName) {
-    if (EXEMPT.has(commandName)) return commandName === 'restore_revision_snapshot' ? historyRefusal(previous, next) : null;
+    if (WHOLE_DOCUMENT_REPLACEMENTS.has(commandName))
+      return commandName === 'restore_revision_snapshot' ? historyRefusal(previous, next) : null;
     const before = previous.plm;
     if (before === undefined) return null;
     const after = next.plm;

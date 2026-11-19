@@ -6,10 +6,13 @@ import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
 import type { Acceptance } from './types';
 import type { ContactPair } from '@core/geometry/contacts';
+import { MM_PER_UNIT, fromMm } from '@core/model/units';
 import { refuseCor } from './codes';
 import { type AcceptanceState, acceptanceState } from './gate';
 import { type CompatibilityItem, type ItemStatus, galvanicItem, skippedItem } from './items';
+import { kernelContacts } from './exactContacts';
 import { corrosionOf } from './model';
+import { orphanedEntries } from './orphans';
 import { rootOf } from './resolve';
 import { reportCsv } from './reportCsv';
 import { stackContacts } from './stacks';
@@ -19,7 +22,7 @@ const RANK: Readonly<Record<ItemStatus, number>> = { pass: 0, pass_isolated: 1, 
 
 interface ContactsData {
   readonly pairs: readonly ContactPair[];
-  readonly tolerance: Record<string, unknown>;
+  readonly tolerance: { readonly value: number; readonly unit: keyof typeof MM_PER_UNIT } & Record<string, unknown>;
   readonly skipped: readonly { readonly id: string; readonly reason: string }[];
 }
 
@@ -32,13 +35,13 @@ function overall(items: readonly CompatibilityItem[]): ItemStatus {
 
 /**
  * @affects nothing; read-only, document returned unchanged, affected: []
- * @invariant data = { status, scheme, environment, items, counts, tolerance, contacts, notes }; one galvanic item per contacting pair (geometric contacts of find_contacts merged with
+ * @invariant data = { status, scheme, environment, items, counts, tolerance, contacts, kernelContacts, notes, orphans }; kernel-optional: possible pairs are resolved through ctx.kernel distance when present (exactContacts), else stay AABB; orphans (COR_REFERENCE_ORPHANED, document-wide, never a status change) = entries or acceptances naming a solid / material that is gone; one galvanic item per contacting pair (geometric contacts of find_contacts merged with
  *   fastener-stack pairs by instance); every item reviewRequired and unverified (grade B rules); an unresolved material, group, index or table is `unknown`, never pass; SCC / HE rules are not evaluated (M5)
  * @failure no environment -> COR_ENVIRONMENT_UNSET; a find_contacts refusal (unknown id, bad tolerance) is returned as is (document unchanged)
  */
 export const checkMaterialCompatibility = defineCommand({
   name: COMMAND,
-  annotations: { readOnly: true, idempotent: true, readsMeshTriangles: true },
+  annotations: { readOnly: true, idempotent: true, readsMeshTriangles: true, kernelOptional: true },
   description:
     'Check the galvanic compatibility of every pair of parts in contact (find_contacts, plus the pairs that touch by construction in placed fastener stacks) against the document ' +
     'service environment (set_service_environment: REQUIRED) and the galvanic group of each part (set_galvanic_group per material; a plated part uses its plating group, assign_surface_system). ' +
@@ -47,6 +50,10 @@ export const checkMaterialCompatibility = defineCommand({
     'A pair covered by declare_isolation reports pass_isolated. A part with no material, group or index is `unknown` (COR_MATERIAL_MISSING, COR_GROUP_MISSING, COR_GROUP_VALUE_MISSING), never pass. ' +
     'Scheme mil_std_889d reports COR_889_TABLE_MISSING (the matrix is not shipped). Every item has reviewRequired true: a human decides; stress-corrosion and hydrogen-embrittlement rules are not evaluated. ' +
     'Returns data { status: pass | pass_isolated | warn | unknown | fail (worst item without a CONFIRMED human acceptance: an acceptance counts only when its signature re-verifies through the signing port for this document, so without a port nothing is accepted), scheme, environment, items: [{ key, status, code, ruleId, ruleGrade, ids, inputs, warnings, remedies, unverified, reviewRequired, acceptance? }], counts, tolerance, contacts }. ' +
+    'With a kernel that answers distance (ctx kernel), AABB-only `possible` pairs of non-box solids are resolved: kind contact or interference, source kernel ' +
+    '(approximate unless the exact occt kernel); only the exact occt kernel drops a pair it measures separated (a mesh kernel keeps it possible); at most 2000 pairs go to the kernel; ' +
+    'data.kernelContacts { kernel, resolved, separated, unresolved, capped } counts them. ' +
+    'data.orphans [{ kind: surface_system | isolation | galvanic_group | acceptance, id, code COR_REFERENCE_ORPHANED, missing, remedy }] lists entries that name a deleted solid or material (never changes the status). ' +
     'Malformed fastener stacks cannot be scope-filtered (their layers are unknown) and always yield an unknown item. report: true adds data.text (CSV, `--save corrosion.csv`). Next: declare_isolation, accept_corrosion_item (human only).',
   params: z.object({
     entityIds: z
@@ -78,8 +85,14 @@ export const checkMaterialCompatibility = defineCommand({
     const stackAnswer = includeStacks === false ? { pairs: [], skipped: [] } : stackContacts(doc);
     const stacks = stackAnswer.pairs.filter(([a, b]) => scope === null || (scope.has(a) && scope.has(b)));
     const stackKeys = new Set(stacks.map(([a, b]) => pairKey(a, b)));
-    const geometricKeys = new Set(contacts.pairs.map((pair) => pairKey(pair.a, pair.b)));
-    const geometric = contacts.pairs.map((pair) => ({ ...pair, stack: stackKeys.has(pairKey(pair.a, pair.b)) }));
+    const exact = kernelContacts(
+      doc,
+      contacts.pairs.map((pair) => ({ ...pair, stack: stackKeys.has(pairKey(pair.a, pair.b)) })),
+      fromMm(doc, contacts.tolerance.value * MM_PER_UNIT[contacts.tolerance.unit]),
+      ctx?.kernel,
+    );
+    const geometric = exact.pairs;
+    const geometricKeys = new Set(geometric.map((pair) => pairKey(pair.a, pair.b)));
     const fromStacks = stacks
       .filter(([a, b]) => !geometricKeys.has(pairKey(a, b)))
       .map(([a, b]) => ({
@@ -101,6 +114,7 @@ export const checkMaterialCompatibility = defineCommand({
     const counts: Record<string, number> = { accepted: items.filter((item) => item.acceptance?.decision === 'accepted').length };
     for (const item of items) counts[item.status] = (counts[item.status] ?? 0) + 1;
     const notes = ['stress-corrosion (SCC) and hydrogen-embrittlement (HE) rules are not evaluated: their tables are not shipped'];
+    const orphans = orphanedEntries(doc);
     const worst = items
       .filter((item) => RANK[item.status] >= RANK.warn)
       .slice(0, 8)
@@ -109,7 +123,8 @@ export const checkMaterialCompatibility = defineCommand({
       `${COMMAND}: ${status} - ${items.length} contacting pair(s) under ${scheme}/${environment} (${Object.entries(counts)
         .map(([name, n]) => `${name} ${n}`)
         .join(', ')}); ` +
-      `every item needs human review and rests on grade B screening values${worst.length > 0 ? `; ${worst.join('; ')}` : ''}.`;
+      `every item needs human review and rests on grade B screening values${worst.length > 0 ? `; ${worst.join('; ')}` : ''}` +
+      `${orphans.length > 0 ? `; ${orphans.length} orphaned entr${orphans.length === 1 ? 'y' : 'ies'} (COR_REFERENCE_ORPHANED: ${orphans.map((orphan) => `${orphan.kind} ${orphan.id}`).join(', ')})` : ''}.`;
     return report(doc, summary, {
       status,
       scheme,
@@ -117,8 +132,16 @@ export const checkMaterialCompatibility = defineCommand({
       items,
       counts,
       tolerance: contacts.tolerance,
-      contacts: contacts.pairs.length,
+      contacts: geometric.length,
+      kernelContacts: {
+        kernel: exact.kernel,
+        resolved: exact.resolved,
+        separated: exact.separated,
+        unresolved: exact.unresolved,
+        capped: exact.capped,
+      },
       notes,
+      orphans,
       ...(wantsReport === true ? { text: reportCsv(items), fileName: 'corrosion.csv' } : {}),
     });
   },
