@@ -227,7 +227,9 @@ export function weldMesh(mesh: MeshData, tolerance: number): WeldedMesh {
     let mapped = remap[corner] ?? -1;
     if (mapped < 0) {
       referenced++;
-      const [x, y, z] = [positions[corner * 3] as number, positions[corner * 3 + 1] as number, positions[corner * 3 + 2] as number];
+      const x = positions[corner * 3] as number;
+      const y = positions[corner * 3 + 1] as number;
+      const z = positions[corner * 3 + 2] as number;
       const twin = resolved === null ? -1 : resolved.find(x, y, z);
       mapped = twin >= 0 ? (remap[twin] as number) : cell === 0 ? lookupExact(x, y, z) : lookupNear(x, y, z);
       if (twin < 0 && resolved !== null) resolved.add(corner);

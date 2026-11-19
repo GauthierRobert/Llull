@@ -33,7 +33,7 @@ export function parseMeshFile(bytes: Uint8Array, kind?: MeshFileKind, limits: Pa
         ? parseBinaryStl(bytes)
         : parseAsciiStl(text())
       : format === 'obj'
-        ? parseObj(text())
+        ? parseObj(bytes)
         : format === 'ply'
           ? parsePly(bytes)
           : parse3mf(bytes, limits);

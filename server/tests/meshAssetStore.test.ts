@@ -11,6 +11,7 @@ import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
+import { sha256Hex } from '@lib/sha256';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { installGeometryKernel } from '../src/geometryKernel';
 import { runMeshHostTool } from '../src/meshAssets/meshTools';
@@ -84,6 +85,14 @@ describe('the store', () => {
     expect(isMeshAssetKey(ref.key)).toBe(true);
     expect(isMeshAssetKey('ABC')).toBe(false);
     expect(createMeshAssetStore(path.join(dir, 'empty')).list()).toEqual([]);
+  });
+
+  it('offers the native sha256 with the digest of the TypeScript one (what import_mesh_file records)', () => {
+    for (const length of [0, 1, 55, 56, 64, 1000, 70_001]) {
+      const bytes = Uint8Array.from({ length }, (_, index) => (index * 31 + length) & 0xff);
+      expect(store.sha256?.(bytes)).toBe(sha256Hex(bytes));
+    }
+    expect(store.sha256?.(readFileSync(STL))).toBe(STL_SHA);
   });
 
   it('defaults to the LLULL_MESH_CACHE directory', () => {
