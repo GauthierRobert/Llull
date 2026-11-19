@@ -11,7 +11,7 @@ import type { Deviation } from './types';
 /** The item key an agent passes to approve_environment_deviation. */
 const itemKeyOf = (item: Pick<OutgassingItem, 'material' | 'quantity'>): string => `outgassing:${item.material}|${item.quantity}`;
 
-/** Hash of the finding (key, profile, status, code, value, limit): a deviation applies only while it matches. */
+/** Hash of the finding (key, profile, status, code, value, limit, test method when recorded): a deviation applies only while it matches. */
 const fingerprintOf = (item: OutgassingItem, profileId: string): string =>
   sha256Hex(
     jcsJson({
@@ -22,6 +22,7 @@ const fingerprintOf = (item: OutgassingItem, profileId: string): string =>
       value: item.value,
       op: item.op,
       limit: item.limit,
+      ...(item.testMethod === undefined ? {} : { testMethod: item.testMethod }),
     }),
   );
 

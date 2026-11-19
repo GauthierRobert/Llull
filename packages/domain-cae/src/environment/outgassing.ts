@@ -22,6 +22,10 @@ export interface OutgassingItem {
   readonly code?: string;
   readonly derived: boolean;
   readonly unverified: boolean;
+  /** Test method(s) recorded on the value(s) used; absent when none is recorded. */
+  readonly testMethod?: string;
+  /** A value used was measured with another test method than the profile assumes (ENV_TEST_METHOD_MISMATCH; computed anyway, OQ-ENV-02). */
+  readonly methodMismatch?: true;
   /** Where the value comes from (record provenance), or why there is none. */
   readonly valueSource: string;
   readonly ruleSource: string;
@@ -36,9 +40,23 @@ export interface MaterialOutgassing {
   readonly RML: MaterialValue | MaterialMissing;
 }
 
-/** The four E595 / ECSS quantities of a material, in percent. */
-export function outgassingOf(doc: CadDocument, ctx: ExecutionContext | undefined, material: string): MaterialOutgassing {
-  const read = (property: string): MaterialValue | MaterialMissing => materialProperty(doc, ctx, material, property, '%');
+/**
+ * The four E595 / ECSS quantities of a material, in percent: the value measured with `testMethod` (the profile's) when the material has one,
+ * else the value the material resolves to without a method (which may carry another method: the screening flags it).
+ */
+export function outgassingOf(
+  doc: CadDocument,
+  ctx: ExecutionContext | undefined,
+  material: string,
+  testMethod?: string,
+): MaterialOutgassing {
+  const read = (property: string): MaterialValue | MaterialMissing => {
+    if (testMethod !== undefined) {
+      const matched = materialProperty(doc, ctx, material, property, '%', {}, undefined, { testMethod });
+      if (!isMissing(matched)) return matched;
+    }
+    return materialProperty(doc, ctx, material, property, '%');
+  };
   return { TML: read('TML'), CVCM: read('CVCM'), WVR: read('WVR'), RML: read('RML') };
 }
 
@@ -47,12 +65,14 @@ interface Resolved {
   readonly derived: boolean;
   readonly unverified: boolean;
   readonly source: string;
+  readonly methods: readonly (string | undefined)[];
 }
 
 /** The value a limit on `quantity` judges: the measured one, RML derived as TML - WVR (TR-ENV-03), or why there is none. */
 function resolveQuantity(data: MaterialOutgassing, quantity: OutgassingLimit['quantity']): Resolved | string {
   const direct = data[quantity];
-  if (!isMissing(direct)) return { value: direct.value, derived: false, unverified: direct.unverified, source: direct.source };
+  if (!isMissing(direct))
+    return { value: direct.value, derived: false, unverified: direct.unverified, source: direct.source, methods: [direct.testMethod] };
   if (quantity !== 'RML') return `no ${quantity} value on the material (${direct.code}: ${direct.reason})`;
   const { TML, WVR } = data;
   if (isMissing(TML) || isMissing(WVR))
@@ -62,6 +82,7 @@ function resolveQuantity(data: MaterialOutgassing, quantity: OutgassingLimit['qu
     derived: true,
     unverified: TML.unverified || WVR.unverified,
     source: `TML - WVR (${TML.source}; ${WVR.source})`,
+    methods: [TML.testMethod, WVR.testMethod],
   };
 }
 
@@ -96,11 +117,14 @@ export function screenMaterial(
         message: `${material}: ${limit.quantity} ${resolved}; status unknown (never a pass)`,
       };
     const pass = meetsLimit(resolved.value, limit);
+    const methods = [...new Set(resolved.methods.filter((method): method is string => method !== undefined))];
     return {
       ...base,
       value: resolved.value,
       status: pass ? 'pass' : 'fail',
       ...(pass ? {} : { code: 'ENV_OUTGASSING_FAIL' }),
+      ...(methods.length > 0 ? { testMethod: methods.join(' + ') } : {}),
+      ...(methods.some((method) => method !== profile.testMethod) ? { methodMismatch: true as const } : {}),
       derived: resolved.derived,
       unverified: resolved.unverified,
       valueSource: resolved.source,

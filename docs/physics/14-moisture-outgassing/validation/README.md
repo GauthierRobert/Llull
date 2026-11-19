@@ -15,6 +15,7 @@ External facts: [sources.md](sources.md). Derived numbers:
 | `plans/outgassing_check_proposed.json` | 200 g panel in synthetic `syn_low`, NASA profile, check | proposed |
 | `plans/moisture_uptake_proposed.json` | VC-ENV-04/05 as a plan | proposed |
 | `plans/ao_erosion_proposed.json` | VC-ENV-08/10 as a plan | proposed |
+| `plans/env_mission_end_to_end.plan.json` | End to end: E595-qualified data, per-part moisture, AO, NASA and ECSS checks (ENV_TEST_METHOD_MISMATCH); golden `tests/golden/envPlans.test.ts` | pinned |
 
 No real material outgassing row is included: the NASA database host was unreachable from this session, and
 synthetic values (labelled) exercise the logic instead.

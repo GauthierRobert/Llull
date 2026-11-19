@@ -28,6 +28,8 @@ export interface EnvItem {
   readonly code: string;
   readonly severity: 'error' | 'warning' | 'info';
   readonly message: string;
+  /** The parts the finding is about (per-part findings). */
+  readonly entityIds?: readonly string[];
 }
 
 /** Warning carried by every result computed from a value that is user supplied without a source, typical or otherwise not a verified record. Not suppressible. */

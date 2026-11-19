@@ -13,15 +13,18 @@ import { spaceEnvironmentOf } from './model';
 import { outgassingOf, screenMaterial, type MaterialOutgassing, type OutgassingItem } from './outgassing';
 import { resolveProfile, shippedProfile, SHIPPED_PROFILE_IDS } from './profiles';
 import { appendAll } from '@lib/appendAll';
+import { moistureSection, thicknessProblem } from './moistureCheck';
+import { quantitySchema } from './units';
 
 const COMMAND = 'check_space_environment';
 const NOTE =
   'Screening against test-method limits (ASTM E595 / ECSS-Q-ST-70-02); not a contamination analysis. A qualified materials and processes reviewer must approve the result.';
 
 /**
- * @affects nothing; read-only, data { status, profile, items[], findings[], materials[], budget, ao?, notes[], reviewRequired }
+ * @affects nothing; read-only, data { status, profile, items[], findings[], materials[], budget, ao?, moisture?, notes[], reviewRequired }
  * @invariant a material without the data a limit needs is `unknown`, never `pass`; overall status = fail if any item fails, else unknown if any is unknown, else pass; the budget never changes the status; operators `<` / `<=` as stored, guard 1e-12 %
- * @failure no profile in params or mission -> ENV_PROFILE_UNSET; unknown profile id -> ENV_PROFILE_UNKNOWN; an entity id not in the document -> ENV_PARAM_INVALID (rejections, document unchanged)
+ * @invariant a value measured with another test method than the profile's is judged anyway and flagged ENV_TEST_METHOD_MISMATCH (OQ-ENV-02); moisture items (per part, mission humidity exposure) are info / unknown and never change the status
+ * @failure no profile in params or mission -> ENV_PROFILE_UNSET; unknown profile id -> ENV_PROFILE_UNKNOWN; an entity id not in the document, a moistureThickness entity that is no screened part, or moistureThickness without a mission humidity exposure -> ENV_PARAM_INVALID (rejections, document unchanged)
  */
 export const checkSpaceEnvironment = defineCommand({
   name: COMMAND,
@@ -34,7 +37,10 @@ export const checkSpaceEnvironment = defineCommand({
     'Returns data { status (outgassing), profile, items[{material, entityIds, quantity, op, limit, value, status, code, derived, unverified, valueSource, ruleSource, reviewRequired}], findings[], ' +
     'materials[], budget { perPart[{entityId, material, massG, maxMassLossG, maxCondensableG}], totalMassLossG, totalCondensableG } (screening quantities, mass from mass_properties), ao?{items[]} }. ' +
     'Every item is reviewRequired; values without a verified basis carry the ENV_VALUE_UNVERIFIED finding. No E595 data is bundled: the values are yours (a test report) or an imported library. ' +
-    'Example: a 200 g part, TML 0.95 %, CVCM 0.05 %: pass under nasa_gsfc_screening, maxMassLossG 1.9, maxCondensableG 0.1. Moisture exposure is not screened here: use moisture_uptake.',
+    'Test method: a value stored with set_material_property testMethod equal to the profile method (ASTM_E595 / ECSS_Q_ST_70_02) is preferred; a value of another method is judged anyway with ENV_TEST_METHOD_MISMATCH (warning). ' +
+    'Moisture: when the mission has a humidityExposure, data.moisture.items[] gives per part {entityId, rootId, material, status, code, thickness, moisturePercent, fraction, saturationPercent, massG, waterUptakeG, saturationWaterG} ' +
+    'from moisture_uptake (material moistureDiffusivity / moistureSaturation) with the plate thickness from `moistureThickness`; a part without one is unknown (ENV_MOISTURE_THICKNESS_UNSET) with only the saturation bound. Moisture never changes the status. ' +
+    'Example: a 200 g part, TML 0.95 %, CVCM 0.05 %: pass under nasa_gsfc_screening, maxMassLossG 1.9, maxCondensableG 0.1.',
   params: z.object({
     entityIds: z.array(z.string()).max(100000).optional().describe('Entities to screen (default: every entity with an assigned material).'),
     profile: z
@@ -42,6 +48,22 @@ export const checkSpaceEnvironment = defineCommand({
       .optional()
       .describe(
         'Shipped profile id (nasa_gsfc_screening, ecss_q_st_70_02) or the id of the mission custom profile; default: the mission profile.',
+      ),
+    moistureThickness: z
+      .array(
+        z.object({
+          entityId: z
+            .string()
+            .describe(
+              'A screened part: a solid id, an instanced child id (expanded::<instance>::<source>) or an instance id (all its children).',
+            ),
+          thickness: quantitySchema.describe('Plate thickness through which moisture diffuses, a length (e.g. {value: 2, unit: "mm"}).'),
+        }),
+      )
+      .max(100000)
+      .optional()
+      .describe(
+        'Part thicknesses for the per-part moisture state (needs the mission humidityExposure); a part id wins over its instance id.',
       ),
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -80,11 +102,14 @@ export const checkSpaceEnvironment = defineCommand({
       );
 
     const { parts, skipped } = partsOf(doc, params.entityIds);
+    const thicknesses = params.moistureThickness ?? [];
+    const unusable = thicknessProblem(parts, thicknesses, mission.humidityExposure);
+    if (unusable !== null) return refuseEnv(doc, COMMAND, 'ENV_PARAM_INVALID', unusable.message, unusable.ids, ['moistureThickness']);
     const users = usersOf(parts);
     const data = new Map<string, MaterialOutgassing>();
     const screened: OutgassingItem[] = [];
     for (const [material, entityIds] of users) {
-      const read = outgassingOf(doc, ctx, material);
+      const read = outgassingOf(doc, ctx, material, profile.testMethod);
       data.set(material, read);
       appendAll(screened, screenMaterial(material, entityIds, read, profile));
     }
@@ -100,6 +125,13 @@ export const checkSpaceEnvironment = defineCommand({
       const own = items.filter((item) => item.material === material);
       if (own.some((item) => item.derived))
         findings.push({ code: 'ENV_RML_DERIVED', severity: 'info', message: `${material}: RML derived as TML - WVR (no measured RML)` });
+      const mismatched = own.filter((item) => item.methodMismatch === true);
+      if (mismatched.length > 0)
+        findings.push({
+          code: 'ENV_TEST_METHOD_MISMATCH',
+          severity: 'warning',
+          message: `${material}: ${mismatched.map((item) => `${item.quantity} (${item.testMethod ?? ''})`).join(', ')} measured with another test method than the profile's ${profile.testMethod}: computed anyway; use data from the profile's method`,
+        });
       if (own.some((item) => item.unverified && item.value !== null))
         findings.push({
           code: 'ENV_VALUE_UNVERIFIED',
@@ -118,12 +150,10 @@ export const checkSpaceEnvironment = defineCommand({
     const budget = budgetOf(ctx, parts, data, skipped);
     const ao =
       mission.aoFluence === undefined ? undefined : { fluence: mission.aoFluence, items: aoItems(doc, ctx, users, mission.aoFluence) };
-    const notes = [
-      NOTE,
-      ...(mission.humidityExposure === undefined
-        ? []
-        : ['humidity exposure recorded: not screened here (needs the part thickness): run moisture_uptake with useMissionExposure']),
-    ];
+    const moisture =
+      mission.humidityExposure === undefined ? undefined : moistureSection(doc, ctx, mission.humidityExposure, parts, thicknesses, budget);
+    if (moisture !== undefined) appendAll(findings, moisture.findings);
+    const notes = [NOTE];
     const materials = [...users].map(([material, entityIds]) => {
       const own = open.filter((item) => item.material === material);
       return {
@@ -147,6 +177,7 @@ export const checkSpaceEnvironment = defineCommand({
       materials,
       budget,
       ...(ao === undefined ? {} : { ao }),
+      ...(moisture === undefined ? {} : { moisture: { exposure: moisture.exposure, items: moisture.items } }),
       notes,
       counts: { accepted },
       reviewRequired: true,
@@ -160,7 +191,7 @@ export const checkSpaceEnvironment = defineCommand({
       doc,
       `${COMMAND}: profile ${profile.id}${shippedProfile(profile.id) === undefined ? ' (custom)' : ''}: ${status.toUpperCase()} over ${users.size} material(s), ${items.length} limit check(s): ${open.length - failed.length - unknown.length} pass, ${failed.length} fail, ${unknown.length} unknown${accepted > 0 ? `, ${accepted} covered by a confirmed human deviation` : ''}.${failing}${dataMissing}${noneNote} ` +
         `Screening budget (not a contamination prediction): max mass loss ${budget.totalMassLossG.toPrecision(6)} g, max condensables ${budget.totalCondensableG.toPrecision(6)} g over ${budget.counted} part(s)` +
-        `${budget.uncounted > 0 ? `, ${budget.uncounted} part(s) without a figure` : ''}.${ao === undefined ? '' : ` AO fluence ${ao.fluence.value} ${ao.fluence.unit}: ${ao.items.filter((item) => item.status === 'info').length} material(s) with a recession figure.`} Review required.`,
+        `${budget.uncounted > 0 ? `, ${budget.uncounted} part(s) without a figure` : ''}.${ao === undefined ? '' : ` AO fluence ${ao.fluence.value} ${ao.fluence.unit}: ${ao.items.filter((item) => item.status === 'info').length} material(s) with a recession figure.`}${moisture === undefined ? '' : ` Moisture over ${moisture.exposure.duration.value} ${moisture.exposure.duration.unit} at ${moisture.exposure.relativeHumidity} % RH: ${moisture.items.filter((item) => item.status === 'info').length} of ${moisture.items.length} part(s) with a moisture state.`} Review required.`,
       result,
     );
   },

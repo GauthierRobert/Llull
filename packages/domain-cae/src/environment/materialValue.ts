@@ -12,6 +12,8 @@ export interface MaterialValue {
   readonly unverified: boolean;
   readonly source: string;
   readonly modelId: string;
+  /** Test method recorded on the model condition (set_material_property testMethod), when any. */
+  readonly testMethod?: string;
 }
 
 /** The property could not be read: `code` is the PHY-01 / MAT refusal (PROP_NO_MODEL_FOR_PROPERTY, PROP_OUT_OF_RANGE, MAT_RECORD_NOT_FOUND ...). */
@@ -39,11 +41,19 @@ export function materialProperty(
   outputUnit: string,
   at: Readonly<Record<string, Quantity>> = {},
   direction?: string,
+  condition?: Readonly<Record<string, string>>,
 ): MaterialValue | MaterialMissing {
   const evaluated = execute(
     doc,
     'evaluate_property',
-    { material, property, at, outputUnit, ...(direction === undefined ? {} : { direction }) },
+    {
+      material,
+      property,
+      at,
+      outputUnit,
+      ...(direction === undefined ? {} : { direction }),
+      ...(condition === undefined ? {} : { condition }),
+    },
     ctx,
   );
   const data: unknown = evaluated.data;
@@ -56,5 +66,6 @@ export function materialProperty(
     unverified: data['unverified'] !== false,
     source: sourceText(data['provenance']),
     modelId: String(data['modelId'] ?? ''),
+    ...(typeof data['testMethod'] === 'string' ? { testMethod: data['testMethod'] } : {}),
   };
 }

@@ -22,6 +22,7 @@ interface Check {
   }[];
   findings: { code: string; material?: string; message: string }[];
   materials: { material: string; status: string }[];
+  moisture?: { items: { code: string }[] };
   budget: {
     perPart: { entityId: string; massG: number | null; maxMassLossG: number | null; maxCondensableG: number | null; note?: string }[];
     totalMassLossG: number;
@@ -399,7 +400,7 @@ describe('check_space_environment (FR-ENV-03..05, 12, 13; VC-ENV-06, 07, 11, 12)
       code: 'ENV_PROPERTY_MISSING',
       recessionUm: null,
     });
-    expect(data.notes.some((note) => note.includes('moisture_uptake'))).toBe(true);
+    expect(data.moisture?.items.map((item) => item.code)).toEqual(['ENV_MOISTURE_THICKNESS_UNSET', 'ENV_MOISTURE_THICKNESS_UNSET']);
     expect(data.status).toBe('pass');
   });
 });

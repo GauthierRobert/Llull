@@ -43,6 +43,8 @@ interface PropertyEvaluationOk {
   readonly basis: Basis;
   readonly provenance: Provenance;
   readonly method: string;
+  /** Test method of the measured value (the model condition), when recorded. */
+  readonly testMethod?: string;
   readonly coefficientsSha256: string;
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
@@ -325,6 +327,7 @@ export function evaluatePropertyModel(
     basis: model.basis,
     provenance: model.provenance,
     method: methodOf(model),
+    ...(model.condition?.testMethod !== undefined ? { testMethod: model.condition.testMethod } : {}),
     coefficientsSha256: model.coefficientsSha256,
     unverified: reasons.length > 0,
     unverifiedReasons: reasons,
