@@ -1,7 +1,9 @@
 /**
  * Post-solve cross-check of a free-body (inertial-relief) case (14 FLL-M2b): with a 3-2-1 support the solved reactions must be near zero,
  * since they carry only the residual of the loads. CalculiX prints RF = reaction + the external load of the node, so the deck's own nodal
- * loads at the support nodes (concentrated forces, the consistent share of the body force) are subtracted before the comparison.
+ * loads at the support nodes (concentrated forces, the consistent share of the body force: integral N_i det J over the real element,
+ * `tetShares.ts`) are subtracted before the comparison. The RF convention and the totals layout are not yet confirmed on a CalculiX run
+ * (ccxFlightRelief), so check_analysis reports a failure as a warning.
  */
 
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
@@ -10,6 +12,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { buildDeckContext, loadCasesOf, type DeckContext } from '../decks/context';
 import { caseLoads, supportReactionSet, type LoadAccumulator } from '../decks/mechanical';
 import { densityToAnalysis } from '../decks/units';
+import { bodyForceShares } from './tetShares';
 
 /**
  * Solved reaction (force and moment about the centre of mass) above which a free-body case is flagged, relative to the applied load of the
@@ -20,13 +23,7 @@ export const SOLVED_RELIEF_TOLERANCE = 1e-3;
 
 const FLOAT_FLOOR = 1e-12;
 const DOF_AXIS: Readonly<Record<string, number>> = { ux: 0, uy: 1, uz: 2 };
-/** Consistent nodal share of a uniform body force: linear tetrahedron V/4 per corner; quadratic: -V/20 per corner, V/5 per mid-edge node. */
-const SHARES: Readonly<Record<string, readonly number[]>> = {
-  C3D4: [0.25, 0.25, 0.25, 0.25],
-  C3D10: [-0.05, -0.05, -0.05, -0.05, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-};
-
-export interface AppliedScale {
+interface AppliedScale {
   readonly appliedForce: number;
   readonly appliedMoment: number;
 }
@@ -117,16 +114,15 @@ function bodyLoadAt(
 ): Vec3 | string {
   let total: Vec3 = ZERO;
   for (const { entityId, type, element } of touching.filter((entry) => entry.element.indexOf(node, 1) > 0)) {
-    const share = SHARES[type]?.[element.indexOf(node, 1) - 1];
+    const nodes = element.slice(1).map((id) => coordinates.get(id) ?? ZERO);
+    const share = bodyForceShares(type, nodes)?.[element.indexOf(node, 1) - 1];
     if (share === undefined) return `element type ${type} at a support node has no consistent body-force share here`;
     const material = ctx.materialOf(entityId);
     if (material === null) return `part '${entityId}' has no material`;
-    const corner = (index: number): Vec3 => coordinates.get(element[index] ?? 0) ?? ZERO;
-    const [a, b, c, d] = [corner(1), corner(2), corner(3), corner(4)];
-    const volume = Math.abs(dot(sub(b, a), cross(sub(c, a), sub(d, a)))) / 6;
-    const centroid = scale(add(add(a, b), add(c, d)), 1 / 4);
+    // the deck's per-element field is taken at the mean of the element nodes (inertialBodyForce elementCentroids)
+    const centroid = scale(nodes.reduce<Vec3>(add, ZERO), 1 / nodes.length);
     const density = densityToAnalysis(material.density, ctx.doc.units, ctx.unitSystem);
-    total = add(total, scale(fieldAt(acc, centroid), density * volume * share));
+    total = add(total, scale(fieldAt(acc, centroid), density * share));
   }
   return total;
 }

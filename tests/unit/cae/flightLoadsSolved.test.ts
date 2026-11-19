@@ -176,7 +176,7 @@ describe('post-solve reaction check (FLL_RELIEF_REACTION)', () => {
         [0, 0, 0.01 * applied],
       ]),
     );
-    expect(flagged.map((entry) => [entry.code, entry.severity])).toEqual([['FLL_RELIEF_REACTION', 'error']]);
+    expect(flagged.map((entry) => [entry.code, entry.severity])).toEqual([['FLL_RELIEF_REACTION', 'warning']]);
     expect(flagged[0]?.message).toMatch(/net force 0\.00000154 \(1 % of the applied 0\.000154\)/);
     expect(solvedItems(doc, resultsOf(doc, [[0.0005 * applied, 0, 0]]))).toEqual([]);
     expect(SOLVED_RELIEF_TOLERANCE).toBe(1e-3);

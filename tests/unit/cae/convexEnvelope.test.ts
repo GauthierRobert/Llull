@@ -152,12 +152,20 @@ describe('chooseInstants convex_envelope', () => {
       [2, 'hull_2'],
       [4, 'hull_3'],
     ]);
-    // the default tolerance (2 % of the diagonal) keeps them; a loose one merges to the diameter
+    // a flat cloud is hulled with eps / sqrt 2 in its plane: at tolerance 0.5 (eps 3.2, in-plane 2.26) the third vertex, 3.12 off the
+    // diameter, is still kept; at 0.7 (in-plane 3.17) it is merged
     expect(
       chooseInstants(
         accels.map((a, index) => instant(index, a)),
         'convex_envelope',
         0.5,
+      ),
+    ).toHaveLength(3);
+    expect(
+      chooseInstants(
+        accels.map((a, index) => instant(index, a)),
+        'convex_envelope',
+        0.7,
       ),
     ).toHaveLength(2);
   });

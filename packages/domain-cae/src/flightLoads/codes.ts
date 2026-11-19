@@ -20,7 +20,7 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_RELIEF_RESIDUAL:
     'balance the load case: the mounts must carry the rigid-body inertia of the part (sum of mount forces = mass x (a - g) ...) or the supports will take the difference',
   FLL_RELIEF_REACTION:
-    'the solver did not see a balanced body: check FLL_RELIEF_RESIDUAL first; with rotation terms refine the mesh (the body force is lumped at element centroids, FLL-D2), then re-solve',
+    'the solver did not see a balanced body: check FLL_RELIEF_RESIDUAL first; with rotation terms, or a coarse mesh of curved quadratic tets, refine the mesh (the body force is lumped at element centroids, FLL-D2), then re-solve. A warning, not an error, until the CalculiX RF convention (RF = reaction + the external load of the node) and the totals table layout are confirmed on a real solve (ccxFlightRelief)',
   FLL_RELIEF_REACTION_UNREAD:
     'solve again with the current deck (it prints the RF totals of the free-body supports); a pressure in a free-body case is not checked after the solve',
   FLL_RELIEF_UNASSESSED:

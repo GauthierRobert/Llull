@@ -36,7 +36,7 @@ interface SolvedArtifacts {
 }
 
 /**
- * FLL_RELIEF_REACTION (error): a solved free-body case whose 3-2-1 reactions exceed SOLVED_RELIEF_TOLERANCE of the applied load;
+ * FLL_RELIEF_REACTION (warning until ccxFlightRelief has confirmed the RF convention on a CalculiX run): a solved free-body case whose 3-2-1 reactions exceed SOLVED_RELIEF_TOLERANCE of the applied load;
  * FLL_RELIEF_REACTION_UNREAD (warning): a case whose solved reactions could not be read.
  */
 function solvedReliefItems(doc: CadDocument, analysis: AnalysisCase, relief: ReliefAssessment, solved: SolvedArtifacts): FlightLoadItem[] {
@@ -50,7 +50,7 @@ function solvedReliefItems(doc: CadDocument, analysis: AnalysisCase, relief: Rel
       .map((entry) =>
         item(
           'FLL_RELIEF_REACTION',
-          'error',
+          'warning',
           `load case '${entry.loadCase}': the solved 3-2-1 reactions are not near zero: net force ${number(entry.reactionForce)} (${percent(entry.reactionForce, entry.appliedForce)} % of the applied ${number(entry.appliedForce)}) and moment ${number(entry.reactionMoment)} (${percent(entry.reactionMoment, entry.momentScale)} % of ${number(entry.momentScale)}, the larger of the applied moment and the applied force x the support spread) about the centre of mass, above ${SOLVED_RELIEF_TOLERANCE * 100} % (printed RF minus the nodal loads of the support nodes)`,
           [analysis.id],
         ),

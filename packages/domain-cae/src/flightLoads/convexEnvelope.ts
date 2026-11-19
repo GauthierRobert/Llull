@@ -2,7 +2,8 @@
  * Convex envelope of a flight run (14 FLL-M2b, `at: "convex_envelope"`): the instants whose specific force a - g (body axes, the load factor
  * vector, which the mounts balance: sum F = m (a - g)) are the vertices of the convex hull of the specific forces of all sampled instants,
  * within a tolerance. Every sampled specific force lies inside the hull of the chosen instants or within `tolerance` x the diagonal of their
- * bounding box of it, so a response linear in the specific force is bounded by the chosen load cases to that tolerance.
+ * bounding box of it (Euclidean, also for a flat cloud hulled in its plane or on its line), so a response linear in the specific force is
+ * bounded by the chosen load cases to that tolerance.
  */
 
 import type { Vec3 } from '@core/model/vectors';
@@ -23,27 +24,72 @@ interface Face {
   readonly offset: number;
 }
 
-/** 2D hull (monotone chain) of points that lie within `eps` of a plane through `origin` spanned by e1, e2: the vertex indices. */
-function planarHull(points: readonly Vec3[], origin: Vec3, e1: Vec3, e2: Vec3, eps: number): number[] {
-  const flat = points.map((p, index) => ({ index, x: dot(sub(p, origin), e1), y: dot(sub(p, origin), e2) }));
-  flat.sort((a, b) => a.x - b.x || a.y - b.y || a.index - b.index);
-  type Flat = (typeof flat)[number];
-  const turn = (o: Flat, a: Flat, b: Flat): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const chain = (ordered: readonly Flat[]): Flat[] => {
-    const out: Flat[] = [];
-    for (const point of ordered) {
-      for (;;) {
-        const b = out[out.length - 1];
-        const a = out[out.length - 2];
-        // b is dropped when it lies within eps of the segment a -> point (or right of it)
-        if (a === undefined || b === undefined || turn(a, b, point) > eps * Math.hypot(point.x - a.x, point.y - a.y)) break;
-        out.pop();
-      }
-      out.push(point);
-    }
-    return out.slice(0, -1);
-  };
-  return [...chain(flat), ...chain([...flat].reverse())].map((point) => point.index);
+interface Flat {
+  readonly index: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+const turn = (o: Flat, a: Flat, b: Flat): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+/** Distance from p to the segment a b in the plane. */
+function segmentDistance2(p: Flat, a: Flat, b: Flat): number {
+  const [ex, ey] = [b.x - a.x, b.y - a.y];
+  const length2 = ex * ex + ey * ey;
+  const t = length2 > 0 ? Math.min(1, Math.max(0, ((p.x - a.x) * ex + (p.y - a.y) * ey) / length2)) : 0;
+  return Math.hypot(p.x - a.x - t * ex, p.y - a.y - t * ey);
+}
+
+/** Distance from p to the counter-clockwise convex polygon `ring` (0 inside): the nearest edge it lies outside of. */
+function ringDistance(ring: readonly Flat[], p: Flat): number {
+  let distance = Infinity;
+  ring.forEach((a, k) => {
+    const b = ring[(k + 1) % ring.length] ?? a;
+    if (turn(a, b, p) < 0) distance = Math.min(distance, segmentDistance2(p, a, b));
+  });
+  return Number.isFinite(distance) ? distance : 0;
+}
+
+/** `ring` with `p` (outside it) inserted: the vertices strictly inside the chain of edges p sees are removed. */
+function ringWith(ring: readonly Flat[], p: Flat): Flat[] {
+  const n = ring.length;
+  const sees = (k: number): boolean => turn(ring[k % n] ?? p, ring[(k + 1) % n] ?? p, p) < 0;
+  let start = 0;
+  while (start < n && !(sees(start) && !sees(start + n - 1))) start++;
+  let stop = start;
+  while (stop + 1 < start + n && sees(stop + 1)) stop++;
+  // edges start..stop are visible: keep vertex `start`, drop start + 1 .. stop, insert p, continue with stop + 1
+  const kept = Array.from({ length: n - (stop - start) }, (_, k) => ring[(stop + 1 + k) % n] ?? p);
+  return [...kept, p];
+}
+
+/**
+ * Incremental 2D hull of points lying within eps of the plane through `origin` spanned by e1, e2 (farthest from the seed triangle first): a
+ * point farther than `eps` from the current polygon is added, a nearer one skipped (it stays within eps: the polygon only grows); vertices left
+ * within 1e-9 x `scale` of the polygon of the others (collinear ones) are dropped.
+ */
+function planarHull(
+  points: readonly Vec3[],
+  seed: readonly [number, number, number],
+  frame: readonly [Vec3, Vec3, Vec3],
+  eps: number,
+  scale: number,
+): number[] {
+  const [origin, e1, e2] = frame;
+  const flat = points.map((p, index): Flat => ({ index, x: dot(sub(p, origin), e1), y: dot(sub(p, origin), e2) }));
+  const of = (index: number): Flat => flat[index] ?? { index, x: 0, y: 0 };
+  const [a, b, c] = [of(seed[0]), of(seed[1]), of(seed[2])];
+  // e2 = normal x e1 is the part of (seed 3 - seed 1) across e1, so the seed triangle is counter-clockwise in (e1, e2)
+  let ring: Flat[] = [a, b, c];
+  const [cx, cy] = [(a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3];
+  const order = [...flat].sort((p, q) => Math.hypot(q.x - cx, q.y - cy) - Math.hypot(p.x - cx, p.y - cy) || p.index - q.index);
+  for (const point of order) if (ringDistance(ring, point) > eps) ring = ringWith(ring, point);
+  const floor = 1e-9 * scale;
+  for (const vertex of [...ring]) {
+    const others = ring.filter((entry) => entry !== vertex);
+    if (others.length >= 3 && !(ringDistance(others, vertex) > floor)) ring = others;
+  }
+  return ring.map((point) => point.index);
 }
 
 /** Face through the points a, b, c (indices) with the normal (b - a) x (c - a), unit. */
@@ -165,9 +211,18 @@ export function convexEnvelopeIndices(points: readonly Vec3[], tolerance: number
   const diagonal = Math.hypot(axis(0), axis(1), axis(2));
   const eps = tolerance * diagonal;
   const all = points.map((_, index) => index);
-  const seed = seedOf(at, all, eps);
+  // a flat cloud is hulled in its plane / on its line with eps / sqrt 2 there: with the off-plane offset (also below eps / sqrt 2) the
+  // Euclidean distance of a sample to the hull stays below eps
+  const flatEps = eps / Math.SQRT2;
+  const seed = seedOf(at, all, flatEps);
   if ('seed' in seed) return pruned(at, spatialHull(at, all, seed.seed, eps), 1e-9 * diagonal);
-  if (seed.flat.length < 3) return [...seed.flat].sort((p, q) => p - q);
-  const origin = at(seed.flat[0] ?? 0);
-  return [...new Set(planarHull(points, origin, seed.u, cross(seed.normal, seed.u), eps))].sort((p, q) => p - q);
+  if (seed.flat.length === 1) return [...seed.flat];
+  if (seed.flat.length === 2) {
+    const along = (index: number): number => dot(at(index), seed.u);
+    return [farthest(all, (index) => -along(index)), farthest(all, along)].sort((p, q) => p - q);
+  }
+  const spanning = (k: number): number => seed.flat[k] ?? 0;
+  const [i0, i1, i2] = [spanning(0), spanning(1), spanning(2)];
+  const frame: [Vec3, Vec3, Vec3] = [at(i0), seed.u, cross(seed.normal, seed.u)];
+  return [...new Set(planarHull(points, [i0, i1, i2], frame, flatEps, diagonal))].sort((p, q) => p - q);
 }

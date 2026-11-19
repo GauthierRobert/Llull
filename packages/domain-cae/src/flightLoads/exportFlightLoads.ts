@@ -116,7 +116,8 @@ function mountLoads(
 interface MountUnits {
   readonly forceUnit: number;
   readonly momentUnit: number;
-  readonly spins: Readonly<Record<string, RotorSpin>> | null;
+  /** Spins of the flight rotors, the reason they could not be read, or null when no mount asks for a rotor torque. */
+  readonly spins: Readonly<Record<string, RotorSpin>> | string | null;
 }
 
 /** The rotor torque moment of a `reactionTorque` mount in analysis units, or a refusal text. */
@@ -125,8 +126,10 @@ function rotorTorqueLoad(mount: Mount, instant: FlightInstant | null, units: Mou
   if (rotorId === undefined || direction === undefined) return 'reactionTorque needs a rotorId and its direction';
   if (countOf(target.facesNear) === 0 && countOf(target.edgesNear) === 0 && countOf(target.pointsNear) < 3)
     return 'a rotor torque needs a face, an edge or at least three points in its target';
+  if (instant === null) return 'a rotor torque needs a flight instant (scenario), not an explicit state';
+  if (typeof units.spins === 'string') return `the rotor spins could not be read: ${units.spins}`;
   const spin = units.spins?.[rotorId];
-  if (spin === undefined || instant === null) return `the flight model has no spin sense of rotor '${rotorId}'`;
+  if (spin === undefined) return `the flight model has no spin sense of rotor '${rotorId}'`;
   const length = Math.hypot(direction[0], direction[1], direction[2]);
   const moment = rotorMountMoment(
     instant,
@@ -137,10 +140,22 @@ function rotorTorqueLoad(mount: Mount, instant: FlightInstant | null, units: Mou
   return typeof moment === 'string' ? moment : map3(moment, (c) => c * units.momentUnit);
 }
 
-/** Existing loads of the analysis without those exported earlier into `cases` (re-exporting replaces them); a case with other loads is a refusal text. */
-function withoutPrevious(analysis: AnalysisCase, cases: readonly string[]): { loads: Record<string, FeaLoad>; order: string[] } | string {
+/**
+ * Existing loads of the analysis without those exported earlier into `cases` (re-exporting replaces them) and without the earlier flight loads of
+ * the same scenario in a case of the same multi-case family (`<base>_hull_*`, `<base>_peak_*`), so a coarser envelope leaves no orphan case;
+ * a case with hand-made loads among `cases` is a refusal text.
+ */
+function withoutPrevious(
+  analysis: AnalysisCase,
+  cases: readonly string[],
+  family: { readonly scenario: string | null; readonly prefixes: readonly string[] },
+): { loads: Record<string, FeaLoad>; order: string[] } | string {
   const loads: Record<string, FeaLoad> = {};
   const order: string[] = [];
+  const sameFamily = (load: FeaLoad): boolean =>
+    family.scenario !== null &&
+    load.flightSource?.scenario === family.scenario &&
+    family.prefixes.some((prefix) => load.loadCase.startsWith(prefix));
   for (const id of analysis.loadOrder) {
     const load = analysis.loads[id];
     if (load === undefined) continue;
@@ -148,6 +163,7 @@ function withoutPrevious(analysis: AnalysisCase, cases: readonly string[]): { lo
       if (load.flightSource === undefined) return `load case '${load.loadCase}' already has hand-made loads: choose another loadCase name`;
       continue;
     }
+    if (sameFamily(load)) continue;
     loads[id] = load;
     order.push(id);
   }
@@ -318,7 +334,10 @@ export const exportFlightLoads = defineCommand({
       const problem = loadCaseNameProblem(name);
       if (problem !== null) return fail('FEA_LOAD_INVALID', problem, [analysisId], ['loadCase']);
     }
-    const previous = withoutPrevious(analysis, names);
+    const prefixes = [
+      ...new Set(chosen.flatMap((pick) => (pick.label.includes('_') ? [`${base}_${pick.label.split('_')[0] ?? ''}_`] : []))),
+    ];
+    const previous = withoutPrevious(analysis, names, { scenario: fromRun ? (params.scenario ?? null) : null, prefixes });
     if (typeof previous === 'string') return fail('FEA_LOAD_INVALID', previous, [analysisId], ['loadCase']);
     const reference = ((): Vec3 | null => {
       if (params.referencePoint !== undefined) return params.referencePoint;
@@ -333,7 +352,7 @@ export const exportFlightLoads = defineCommand({
         ['referencePoint'],
       );
     const spins = (params.mounts ?? []).some((mount) => mount.reactionTorque === true) ? rotorSpins(doc, ctx) : null;
-    const units: MountUnits = { forceUnit, momentUnit: forceUnit * accelUnit, spins: typeof spins === 'string' ? null : spins };
+    const units: MountUnits = { forceUnit, momentUnit: forceUnit * accelUnit, spins };
     const added: FeaLoad[] = [];
     const summaries: string[] = [];
     const data: Record<string, unknown>[] = [];
