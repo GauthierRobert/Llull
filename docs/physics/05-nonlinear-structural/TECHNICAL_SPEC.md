@@ -619,7 +619,36 @@ Decisions:
   & Drucker 1945 (elastica); Hill, The Mathematical Theory of Plasticity (thick cylinder); Timoshenko & Gere (imperfect column).
 - Test fixtures: `limitFixtures.ts` gained optional probe displacements (`solvedPull(loads, displacements)`) and STRESS / PE fields in `solvedPressure()`.
 
-Not evaluated by `check_nonlinear` yet: `NLS_STRAIN_BEYOND_CURVE`, `NLS_STRAIN_EXCEEDS_ELONGATION`, `NLS_MESH_PLASTIC_ADEQUACY`; `nonlinear_report` does not read the plastic volume fraction (`provenance.notRead`).
+Not evaluated by `check_nonlinear` yet: `NLS_STRAIN_BEYOND_CURVE`, `NLS_STRAIN_EXCEEDS_ELONGATION`, `NLS_MESH_PLASTIC_ADEQUACY`; `nonlinear_report` does not read the plastic volume fraction (`provenance.notRead`). All built in 13.3c.
+
+### 13.3c As built (NLS-M2c, 2026-11-19): plastic-zone guardrails
+
+| Item | File | What it does |
+| ---- | ---- | ------------ |
+| plastic zone | `nonlinear/plasticZone.ts` | Per part with tetrahedra: nodal PEEQ = largest PE[0] over every stored increment; an element is plastic when the mean PEEQ of its corner nodes is > 0 (`PLASTIC_PEEQ`); plastic volume, element count, elements across, largest nodal PEEQ |
+| `check_nonlinear` items | `nonlinear/plasticChecks.ts` (called from `checkCommand.ts` on verified results) | One item per code and part, `ids [entityId]`, the message names the peak node and up to 10 element ids |
+| `nonlinear_report` `plasticVolume` | `nonlinear/reportCommand.ts` | `{ fraction, plasticVolume, totalVolume, volumeUnit, threshold: 0, definition, parts [{ entityId, fraction, plasticElements, elements, elementsAcross }] }`; null without the mesh artifact; `provenance.notRead` dropped |
+| guide | `packages/protocol/src/conventions.ts` §19 | Summary load cases are named `step <n>` by position (example: a convergence study `field_max` on `loadCase "step 2"`); the three new codes |
+
+Thresholds (§7.1 gives the severities and the 2-element count; the rest chosen conservative, stated in the command description):
+
+- `NLS_STRAIN_BEYOND_CURVE` (warning): largest PEEQ of the part > the end of the hardening data. Multilinear: the last point (the smallest over the
+  temperature curves), capped by the model's `equivalentPlasticStrain` validity; any other law (perfect, linear, Voce, Johnson-Cook, Ramberg-Osgood):
+  that validity bound (the deck tabulates analytic laws up to it, CalculiX extends the last row flat). Neither stated: a note, no item.
+- `NLS_STRAIN_EXCEEDS_ELONGATION` (error, status fail): largest PEEQ > ln(1 + A), A = the smallest `elongation` property model of the record (08
+  `set_material_property`, any direction / basis) at 293.15 K [A itself: ln(1 + A) < A, the true-strain equivalent is the stricter]. A model that cannot
+  be read at 293.15 K (temperature table outside it) gives a note; no elongation model: no item.
+- `NLS_MESH_PLASTIC_ADEQUACY` (warning): elements across < 2, elements across = slab-equivalent zone thickness 2 V / S (S = faces of plastic elements not
+  shared with another plastic element) over h = (6 V / n)^(1/3) [cube root of the zone volume: blind to a thin layer]. Exact for a layer, an
+  under-estimate for a compact zone (a cube reads a third of its side): conservative. A Kuhn grid reads 0.83 for one plastic layer of a 10 x 10 x 4
+  plate and 2.22 for the whole plate.
+
+Tests: `tests/unit/cae/nonlinear/plasticChecks.test.ts` (pure zone on a Kuhn grid, curve end, elongation, each code happy + failure on the solved
+pressure bar, findings unique by code + ids, `plasticVolume`, a V&V `field_max` quantity read on `step 1` / `step 2` and refused on the step name).
+Fixture: `solvedPressure(loadKind, { peeq, prepare })` in `limitFixtures.ts`.
+
+Left: the NonlinearCurves panel desktop check (VIS-HUMAN, owner: needs a display); the real CalculiX plastic run that exercises the three items on a
+Netgen mesh (ccx not installed in agent lanes); PEEQ is nodal (extrapolated), not read at integration points.
 
 ### 13.4 Not built yet
 

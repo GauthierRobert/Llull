@@ -80,8 +80,17 @@ export function solvedPull(loads: readonly number[], displacements?: readonly nu
   return { ...recorded(bar.doc, bar.analysisId, mesh, results), analysisId: bar.analysisId, probeId: bar.probeId, mesh, results };
 }
 
-/** The pressure bar (load probe on pressure p = 1 x LC1; LC1 ramps to 50 then back to 0) solved with the bore opening then closing. */
-export function solvedPressure(loadKind?: 'inertial'): SolvedCurve {
+/** Plastic state of `solvedPressure`: PEEQ per node reached at the last increment (it grows linearly over the 4 increments), and a document edit made before the solve. */
+export interface PlasticOptions {
+  readonly peeq: Readonly<Record<string, number>>;
+  readonly prepare?: (doc: CadDocument, analysisId: string, boxId: string) => CadDocument;
+}
+
+/**
+ * The pressure bar (load probe on pressure p = 1 x LC1; LC1 ramps to 50 then back to 0) solved with the bore opening then closing. Default PE: 0.01 x
+ * residual at node 2 only; with `plastic`, the given nodal PEEQ (x k / 4 at increment k) after `plastic.prepare` edited the set-up.
+ */
+export function solvedPressure(loadKind?: 'inertial', plastic?: PlasticOptions): SolvedCurve {
   const plain = pressureBar();
   const analysis = plain.doc.analysis?.cases[plain.analysisId];
   const retyped =
@@ -100,7 +109,12 @@ export function solvedPressure(loadKind?: 'inertial'): SolvedCurve {
             },
           },
         } as CadDocument);
-  const bar = { ...plain, doc: retyped };
+  const prepared = plastic?.prepare === undefined ? retyped : plastic.prepare(retyped, plain.analysisId, plain.boxId);
+  const bar = { ...plain, doc: prepared, mesh: { ...plain.mesh, inputHash: analysisInputHash(prepared, plain.analysisId, 'mesh') } };
+  const peeqAt = (index: number): Record<string, number[]> =>
+    plastic === undefined
+      ? { '2': [(residual[index] ?? 0) * 0.01] }
+      : Object.fromEntries(Object.entries(plastic.peeq).map(([node, value]) => [node, [(value * (index + 1)) / times.length]]));
   const times = [0.5, 1, 1.5, 2];
   const ux = [0.001, 0.002, 0.0015, 0.0005];
   const residual = [1, 2, 1.5, 0.5];
@@ -117,7 +131,7 @@ export function solvedPressure(loadKind?: 'inertial'): SolvedCurve {
       fields: {
         DISP: { components: ['D1', 'D2', 'D3'], values: { '2': [ux[index] ?? 0, 0, 0] } },
         STRESS: { components: STRESS_COMPONENTS, values: { '2': [(residual[index] ?? 0) * 100, 0, 0, 0, 0, 0] } },
-        PE: { components: ['PEEQ'], values: { '2': [(residual[index] ?? 0) * 0.01] } },
+        PE: { components: ['PEEQ'], values: peeqAt(index) },
       },
     })),
     dat: parseDat(text),

@@ -18,6 +18,7 @@ import { snapBackDetected } from './curveRules';
 import { extractCurves, type CurveData } from './curves';
 import { loadUnitOf, probeOf, unverifiedReasons } from './limitLoadQuery';
 import { permanentSetOf, permanentSetVerdict } from './permanentSet';
+import { PLASTIC_PEEQ, plasticZones } from './plasticZone';
 
 const NAME = 'nonlinear_report';
 /** Samples of a curve in the default `summary` view (first and last kept) and the page size of `increments: all` (AF-12). */
@@ -90,6 +91,33 @@ function permanentSetRecord(
   return { ...set, ...permanentSetVerdict(set, nonlinear.thresholds, lengthToAnalysis) };
 }
 
+/** plasticVolume of the data: volume of the plastic elements over the volume of the tetrahedra, overall and per part (null without the mesh artifact). */
+function plasticVolumeRecord(
+  analysis: AnalysisCase,
+  results: FeResultsArtifact,
+  mesh: FeMeshArtifact | null,
+): Record<string, unknown> | null {
+  if (mesh === null) return null;
+  const zones = plasticZones(mesh, results);
+  const total = zones.reduce((sum, zone) => sum + zone.volume, 0);
+  const plastic = zones.reduce((sum, zone) => sum + zone.plasticVolume, 0);
+  return {
+    fraction: total > 0 ? plastic / total : null,
+    plasticVolume: plastic,
+    totalVolume: total,
+    volumeUnit: `${lengthUnitName(analysis.unitSystem)}^3`,
+    threshold: PLASTIC_PEEQ,
+    definition: `an element is plastic when the mean equivalent plastic strain of its corner nodes (largest over the stored increments) is > ${PLASTIC_PEEQ}; tetrahedra only`,
+    parts: zones.map((zone) => ({
+      entityId: zone.entityId,
+      fraction: zone.volume > 0 ? zone.plasticVolume / zone.volume : null,
+      plasticElements: zone.plasticElements,
+      elements: zone.elements,
+      elementsAcross: zone.elementsAcross,
+    })),
+  };
+}
+
 function curveRecord(
   analysis: AnalysisCase,
   nonlinear: NonlinearSettings,
@@ -125,7 +153,7 @@ function curveRecord(
 }
 
 /**
- * @affects nothing (read-only query; data = controls, steps, curves, max PEEQ, permanent set, provenance)
+ * @affects nothing (read-only query; data = controls, steps, curves, max PEEQ, permanent set, plastic volume fraction, provenance)
  * @invariant every number is recomputed from the results artifact re-verified by trustedRecord; reviewRequired always true; unverified = OR of the
  *   material flags (AF-32); curves are paged beyond 1000 points with increments all + cursor (AF-12); summary view keeps at most 100 samples
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not nonlinear_static -> NLS_CASE_NOT_NONLINEAR; unknown probe -> NLS_PROBE_REFERENCE_UNKNOWN;
@@ -138,7 +166,9 @@ export const nonlinearReport = defineCommand({
     'unitSystem, controls (convergence preset, outputIncrements, per step the increments as { value, source, defaulted }), steps [{ stepId, ' +
     'increments, cutbacks, iterations, lastLoadFactor, completed }], curves [{ probeId, name, loadUnit, displacementUnit, points, maxLoad, ' +
     'displacementRange, snapBack, curveHash, time[], load[], displacement[] }], maxPeeq { value, at, step } (equivalent plastic strain), permanentSet ' +
-    '(after a step that returns every load to zero), provenance, unverified, reviewRequired }. increments "summary" (default) gives at most 100 ' +
+    '(after a step that returns every load to zero), plasticVolume { fraction, plasticVolume, totalVolume, volumeUnit, threshold, parts [{ entityId, ' +
+    'fraction, plasticElements, elements, elementsAcross }] } (volume of the elements whose corner-node mean PEEQ is > 0 over the volume of the ' +
+    'tetrahedra), loadCases (one per step, named step 1, step 2 ...), provenance, unverified, reviewRequired }. increments "summary" (default) gives at most 100 ' +
     'samples per curve (first and last kept); "all" pages the curve points 1000 at a time: pass the returned nextCursor as cursor for the next page. ' +
     'probe limits the curves to one probe (id or unique name). Refuses stale results (NLS_CURVE_STALE: run fea_mesh and fea_solve again). Always ' +
     'reviewRequired: computed by llull, not approved. Next: limit_load for the collapse load, check_nonlinear.',
@@ -220,6 +250,7 @@ export const nonlinearReport = defineCommand({
         nextCursor,
         maxPeeq: solved.maxPeeq ?? null,
         permanentSet: permanentSetRecord(doc, analysis, nonlinear, results, trust.meshArtifact),
+        plasticVolume: plasticVolumeRecord(analysis, results, trust.meshArtifact),
         thresholds: nonlinear.thresholds ?? null,
         loadCases: summary.loadCases,
         provenance: {
@@ -229,7 +260,6 @@ export const nonlinearReport = defineCommand({
           resultsHash: analysis.results?.resultsHash ?? null,
           limitPointRule:
             'a load-controlled run that stops at a limit point is a solver failure and is never recorded (use displacement control)',
-          notRead: ['plasticVolumeFraction'],
         },
         unverified: reasons.length > 0,
         unverifiedReasons: reasons,
