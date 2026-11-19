@@ -122,10 +122,10 @@ export const checkNonlinear = defineCommand({
     '(NLS_CONTROL_INVALID), an NLGEOM case without imperfection next to a solved buckling case of the same part (NLS_IMPERFECTION_MISSING, warning), ' +
     'unverified material data (NLS_MATERIAL_MODEL_UNVERIFIED, warning, not suppressible), nlgeom false without a threshold (NLS_THRESHOLD_UNSET, ' +
     'warning), an unloading step without a permanent-set limit (NLS_PERMANENT_SET_THRESHOLD_UNSET, warning), and, on verified results, the residual state beyond a stated permanent-set limit (NLS_PERMANENT_SET_EXCEEDED, error), nlgeom false beyond a stated small-rotation / strain limit (NLS_NLGEOM_RECOMMENDED, warning) and a snap-back ' +
-    'indicator on a displacement-controlled curve (NLS_SNAP_BACK_DETECTED, warning); per part with a plastic zone (elements whose corner-node mean PEEQ > 0): ' +
+    'indicator on a displacement-controlled curve (NLS_SNAP_BACK_DETECTED, warning); per part with positive PEEQ: ' +
     'PEEQ beyond the last point of the hardening curve, or beyond the equivalentPlasticStrain validity of an analytic law (NLS_STRAIN_BEYOND_CURVE, warning), ' +
-    'PEEQ above ln(1 + elongation at break), the smallest elongation of the material record at 293.15 K, when the record has one (NLS_STRAIN_EXCEEDS_ELONGATION, ' +
-    'error), and fewer than 2 elements across the plastic zone (slab-equivalent thickness 2 x volume / boundary area over the element size; ' +
+    'PEEQ above ln(1 + elongation at break), the smallest elongation of the material record at the case reference temperature (default 293.15 K), when the record has one (NLS_STRAIN_EXCEEDS_ELONGATION, ' +
+    'error), and fewer than 2 elements across the plastic zone (elements with PEEQ > 0 at every corner; slab-equivalent thickness 2 x volume / boundary area over the element size; ' +
     'NLS_MESH_PLASTIC_ADEQUACY, warning). No permanent-set / small-deformation threshold is invented: the owner or a company rule supplies ' +
     'them. Run it before fea_mesh / fea_solve and at the end of every job. Always reviewRequired: computed by llull, not approved.',
   annotations: { readOnly: true },

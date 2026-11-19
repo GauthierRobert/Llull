@@ -107,7 +107,7 @@ function plasticVolumeRecord(
     totalVolume: total,
     volumeUnit: `${lengthUnitName(analysis.unitSystem)}^3`,
     threshold: PLASTIC_PEEQ,
-    definition: `an element is plastic when the mean equivalent plastic strain of its corner nodes (largest over the stored increments) is > ${PLASTIC_PEEQ}; tetrahedra only`,
+    definition: `envelope over every stored increment (maxPeeq is the last stored increment): an element is plastic when the equivalent plastic strain of every corner node (its largest over the increments) is > ${PLASTIC_PEEQ}; tetrahedra only`,
     parts: zones.map((zone) => ({
       entityId: zone.entityId,
       fraction: zone.volume > 0 ? zone.plasticVolume / zone.volume : null,
@@ -167,8 +167,9 @@ export const nonlinearReport = defineCommand({
     'increments, cutbacks, iterations, lastLoadFactor, completed }], curves [{ probeId, name, loadUnit, displacementUnit, points, maxLoad, ' +
     'displacementRange, snapBack, curveHash, time[], load[], displacement[] }], maxPeeq { value, at, step } (equivalent plastic strain), permanentSet ' +
     '(after a step that returns every load to zero), plasticVolume { fraction, plasticVolume, totalVolume, volumeUnit, threshold, parts [{ entityId, ' +
-    'fraction, plasticElements, elements, elementsAcross }] } (volume of the elements whose corner-node mean PEEQ is > 0 over the volume of the ' +
-    'tetrahedra), loadCases (one per step, named step 1, step 2 ...), provenance, unverified, reviewRequired }. increments "summary" (default) gives at most 100 ' +
+    'fraction, plasticElements, elements, elementsAcross }] } (volume of the elements with PEEQ > 0 at every corner node, envelope over all ' +
+    'increments, over the volume of the tetrahedra; maxPeeq is the last stored increment), loadCases (one per step, named step 1, step 2 ... by ' +
+    'position; a step without stored stress / displacement is omitted), provenance, unverified, reviewRequired }. increments "summary" (default) gives at most 100 ' +
     'samples per curve (first and last kept); "all" pages the curve points 1000 at a time: pass the returned nextCursor as cursor for the next page. ' +
     'probe limits the curves to one probe (id or unique name). Refuses stale results (NLS_CURVE_STALE: run fea_mesh and fea_solve again). Always ' +
     'reviewRequired: computed by llull, not approved. Next: limit_load for the collapse load, check_nonlinear.',

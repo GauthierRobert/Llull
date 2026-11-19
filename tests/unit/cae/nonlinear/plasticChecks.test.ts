@@ -33,6 +33,9 @@ interface PlasticVolume {
 }
 
 const BAR_NODES = ['1', '2', '3', '4', '5', '6', '7', '8'];
+/** PEEQ on the nodes of one element layer of a grid: the two adjacent node planes z = layer and z = layer + 1. */
+const layerPeeq = (mesh: FeMeshArtifact, layer: number, value: number): Record<string, number> =>
+  Object.fromEntries(mesh.nodes.filter((node) => node[3] === layer || node[3] === layer + 1).map((node) => [String(node[0]), value]));
 const everyNode = (value: number): Record<string, number> => Object.fromEntries(BAR_NODES.map((node) => [node, value]));
 
 const check = (solved: SolvedCurve): CheckData =>
@@ -116,9 +119,22 @@ const plasticModel = (isotropic: Record<string, unknown>, validity?: readonly Re
 describe('plasticZones (pure)', () => {
   const mesh = gridMesh(10, 10, 4);
 
+  it('counts no element plastic from a single node plane (no ring of elastic elements around the zone)', () => {
+    const plane = Object.fromEntries(mesh.nodes.filter((node) => node[3] === 1).map((node) => [String(node[0]), 0.01]));
+    const [zone] = plasticZones(mesh, peeqResults(plane));
+    expect(zone).toMatchObject({ plasticElements: 0, plasticVolume: 0, elementsAcross: null, maxPeeq: { value: 0.01 } });
+  });
+
+  it('measures an inner element layer of a 20 x 20 x 6 plate as one layer, about one element across (reviewer repro)', () => {
+    const plate = gridMesh(20, 20, 6);
+    const [zone] = plasticZones(plate, peeqResults(layerPeeq(plate, 2, 0.01)));
+    expect(zone?.plasticElements).toBe(2400);
+    expect(zone?.plasticVolume).toBeCloseTo(400, 9);
+    expect(zone?.elementsAcross).toBeCloseTo((2 * 400) / (800 + 80), 9);
+  });
+
   it('measures a one-element layer as about one element across and a four-layer slab as 2 V / S over h', () => {
-    const bottom = Object.fromEntries(mesh.nodes.filter((node) => node[3] === 0).map((node) => [String(node[0]), 0.01]));
-    const [layer] = plasticZones(mesh, peeqResults(bottom));
+    const [layer] = plasticZones(mesh, peeqResults(layerPeeq(mesh, 0, 0.01)));
     expect(layer?.plasticElements).toBe(600);
     expect(layer?.plasticVolume).toBeCloseTo(100, 9);
     expect(layer?.volume).toBeCloseTo(400, 9);
@@ -134,8 +150,9 @@ describe('plasticZones (pure)', () => {
     const block = mesh.blocks[0];
     if (block === undefined) throw new Error('no block');
     const broken: FeMeshArtifact = { ...mesh, blocks: [{ ...block, elements: [...block.elements, [9999, 1, 2, 3]] }] };
-    const [zone] = plasticZones(broken, peeqResults({ '1': Number.NaN, '2': 0.01, '3': 0.01 }));
+    const [zone] = plasticZones(broken, peeqResults({ ...layerPeeq(mesh, 0, 0.01), '1': Number.NaN }));
     expect(zone?.maxPeeq).toEqual({ value: 0.01, node: 2 });
+    expect(zone?.plasticElements).toBeLessThan(600);
     expect(zone?.elements).toBe(2401);
     expect(zone?.elementsAcross).not.toBeNull();
   });
@@ -183,6 +200,18 @@ describe('hardeningCurveEnd / elongationAtBreak (pure)', () => {
     expect(hardeningCurveEnd(plasticModel({ kind: 'multilinear', stressUnit: 'MPa', curves: [] }))).toBeNull();
   });
 
+  it('reads the validity bound in strain units and prefers the equation range, naming it', () => {
+    const perfect = { kind: 'perfect', yieldStress: { value: 250, unit: 'MPa' } };
+    const percent = [...T293, { variable: 'equivalentPlasticStrain', unit: '%', data: [0, 5] }];
+    expect(hardeningCurveEnd(plasticModel(perfect, percent))).toMatchObject({ strain: 0.05 });
+    expect(hardeningCurveEnd(plasticModel(perfect, percent))?.source).toContain('(data range)');
+    const equation = [...T293, { variable: 'equivalentPlasticStrain', unit: '1', data: [0, 0.02], equation: [0, 0.04] }];
+    expect(hardeningCurveEnd(plasticModel(perfect, equation))).toMatchObject({ strain: 0.04 });
+    expect(hardeningCurveEnd(plasticModel(perfect, equation))?.source).toContain('(equation range)');
+    const bad = [...T293, { variable: 'equivalentPlasticStrain', unit: 'MPa', data: [0, 5] }];
+    expect(hardeningCurveEnd(plasticModel(perfect, bad))).toBeNull();
+  });
+
   it('uses the validity of an analytic law and knows no end without one', () => {
     const perfect = { kind: 'perfect', yieldStress: { value: 250, unit: 'MPa' } };
     expect(hardeningCurveEnd(plasticModel(perfect, peeqValidity(0.002)))).toMatchObject({ strain: 0.002 });
@@ -222,11 +251,13 @@ describe('hardeningCurveEnd / elongationAtBreak (pure)', () => {
     }).document;
     const material = doc.materials['steel'];
     if (material === undefined) throw new Error('no steel');
-    const found = elongationAtBreak('steel', material);
+    const found = elongationAtBreak('steel', material, 293.15);
     expect(found.value?.value).toBeCloseTo(0.1, 12);
     expect(found.notes).toHaveLength(1);
     expect(found.notes[0]).toContain('not read at 293.15 K');
-    expect(elongationAtBreak('steel', { ...material, propertyModels: [] })).toEqual({ value: null, notes: [] });
+    expect(elongationAtBreak('steel', { ...material, propertyModels: [] }, 293.15)).toEqual({ value: null, notes: [] });
+    expect(elongationAtBreak('steel', material, 450).value?.value).toBeCloseTo(0.1, 12);
+    expect(elongationAtBreak('steel', material, 450).notes).toEqual([]);
   });
 });
 
@@ -248,6 +279,43 @@ describe('plasticItems (pure, on a finer mesh)', () => {
     expect(items.map((entry) => entry.code)).toEqual(['NLS_STRAIN_BEYOND_CURVE', 'NLS_STRAIN_EXCEEDS_ELONGATION']);
     expect(items[0]?.message).toContain('2400 element(s) (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, +2390 more)');
     expect(notes).toEqual(['plastic-zone checks skipped for part(s) without tetrahedra: ghost']);
+  });
+
+  it('writes an unreadable elongation note once per material, however many parts use it', () => {
+    const { solved, boxId } = setUp();
+    const analysis = caseOf(solved.doc, solved.analysisId);
+    const entity = solved.doc.entities[boxId];
+    if (analysis === undefined || entity === undefined) throw new Error('no case');
+    const doc = run({ ...solved.doc, entities: { ...solved.doc.entities, twin: { ...entity, id: 'twin' } } }, 'set_material_property', {
+      material: 'steel',
+      property: 'elongation',
+      unit: '1',
+      basis: 'B',
+      source: SOURCE,
+      temperature: {
+        mode: 'absolute',
+        temperatureUnit: 'K',
+        points: [
+          [400, 0.2],
+          [500, 0.15],
+        ],
+      },
+    }).document;
+    const grid = gridMesh(4, 4, 2, boxId);
+    const block = grid.blocks[0];
+    if (block === undefined) throw new Error('no block');
+    const twin: FeMeshArtifact = {
+      ...grid,
+      blocks: [
+        block,
+        { ...block, entityId: 'twin', elements: block.elements.map((element) => [(element[0] ?? 0) + 1000, ...element.slice(1)]) },
+      ],
+    };
+    const all = Object.fromEntries(grid.nodes.map((node) => [String(node[0]), 0.02]));
+    const both = { ...analysis, parts: { ...analysis.parts, twin: analysis.parts[boxId] } } as typeof analysis;
+    const { items, notes } = plasticItems(doc, both, twin, peeqResults(all));
+    expect(notes.filter((note) => note.includes('not read at'))).toHaveLength(1);
+    expect(items.filter((entry) => entry.code === 'NLS_STRAIN_EXCEEDS_ELONGATION').map((entry) => entry.ids)).toEqual([[boxId], ['twin']]);
   });
 
   it('notes a part without a material or without a plastic law instead of judging its curve', () => {
@@ -277,7 +345,7 @@ describe('check_nonlinear plastic-zone guardrails', () => {
     const beyond = check(solvedPressure(undefined, { peeq: everyNode(0.01) }));
     const [found] = ofCode(beyond, 'NLS_STRAIN_BEYOND_CURVE');
     expect(found?.severity).toBe('warning');
-    expect(found?.message).toContain('validity equivalentPlasticStrain <= 0.001');
+    expect(found?.message).toContain('validity (data range) equivalentPlasticStrain <= 0.001');
     expect(found?.message).toContain('6 element(s)');
     const within = check(solvedPressure(undefined, { peeq: everyNode(0.0005) }));
     expect(ofCode(within, 'NLS_STRAIN_BEYOND_CURVE')).toEqual([]);
@@ -341,6 +409,14 @@ describe('check_nonlinear plastic-zone guardrails', () => {
     expect(elastic.items.filter((entry) => /^NLS_(STRAIN_|MESH_PLASTIC)/.test(entry.code))).toEqual([]);
   });
 
+  it('judges strain at a single-node peak (a notch) that leaves no element plastic at every corner, without an adequacy item', () => {
+    const notch = check(solvedPressure(undefined, { peeq: { '2': 0.01 }, prepare: elongation(0.005) }));
+    expect(notch.items.filter((entry) => /^NLS_(STRAIN_|MESH_PLASTIC)/.test(entry.code)).map((entry) => entry.code)).toEqual([
+      'NLS_STRAIN_BEYOND_CURVE',
+      'NLS_STRAIN_EXCEEDS_ELONGATION',
+    ]);
+  });
+
   it('returns findings unique by code + ids (regression)', () => {
     const many = solvedPressure(undefined, { peeq: everyNode(0.02), prepare: elongation(0.005) });
     const turning = solvedPull([1, 2, 3, 2.5, 2], [0.002, 0.004, 0.003, 0.0025, 0.002]);
@@ -370,11 +446,11 @@ describe('nonlinear_report plasticVolume', () => {
     expect(none?.parts[0]?.elementsAcross).toBeNull();
   });
 
-  it('counts only the elements that touch a plastic node', () => {
-    const partial = volume(solvedPressure());
-    expect(partial?.fraction).toBeGreaterThan(0);
-    expect(partial?.fraction).toBeLessThan(1);
-    expect(partial?.plasticVolume).toBeCloseTo((partial?.fraction ?? 0) * 2, 9);
+  it('counts only the elements plastic at every corner', () => {
+    expect(volume(solvedPressure())?.fraction).toBe(0);
+    const oneTet = volume(solvedPressure(undefined, { peeq: { '1': 0.01, '2': 0.01, '4': 0.01, '8': 0.01 } }));
+    expect(oneTet?.fraction).toBeCloseTo(1 / 6, 12);
+    expect(oneTet?.parts[0]?.plasticElements).toBe(1);
   });
 });
 

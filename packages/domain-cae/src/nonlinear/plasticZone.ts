@@ -6,7 +6,7 @@ import { cross3, len3, sub3 } from '@lib/vec3';
 import { memoByObject } from '@lib/memoByObject';
 import { elementVolume, indexMesh, type MeshElement, type MeshIndex } from '../thermal/meshGeometry';
 
-/** An element is plastic when the mean equivalent plastic strain of its corner nodes is above this value (strictly). */
+/** An element is plastic when the equivalent plastic strain of EVERY corner node is above this value (strictly): its smallest corner PEEQ. */
 export const PLASTIC_PEEQ = 0;
 /** NLS_MESH_PLASTIC_ADEQUACY: fewest elements across the plastic zone of a part (TR §7.1: "< 2 elements through a thickness with PEEQ > 0"). */
 export const PLASTIC_ZONE_ELEMENTS = 2;
@@ -31,9 +31,14 @@ const nodalPeeq: (results: FeResultsArtifact) => ReadonlyMap<number, number> = m
 
 const corners = (element: MeshElement): readonly number[] => element.nodes.slice(0, 4);
 
-/** Mean PEEQ of the corner nodes of `element` (a node without a value counts 0). */
-const elementPeeq = (element: MeshElement, peeq: ReadonlyMap<number, number>): number =>
-  corners(element).reduce((sum, node) => sum + (peeq.get(node) ?? 0), 0) / 4;
+/**
+ * Smallest PEEQ of the corner nodes of `element` (a node without a value counts 0). Nodal PEEQ is >= 0, so a mean or largest corner value would count
+ * every element touching a plastic node and add a ring of elastic elements around the zone; the smallest keeps only elements plastic at all corners.
+ */
+const elementPeeq = (element: MeshElement, peeq: ReadonlyMap<number, number>): number => {
+  const at = corners(element);
+  return at.length < 4 ? 0 : at.reduce((least, node) => Math.min(least, peeq.get(node) ?? 0), Number.POSITIVE_INFINITY);
+};
 
 export interface PartPlasticZone {
   readonly entityId: string;
@@ -114,7 +119,9 @@ function zoneOf(index: MeshIndex, entityId: string, members: readonly MeshElemen
 
 /**
  * The plastic zone of every part with tetrahedra (other element types are not counted), sorted by entity id.
- * @invariant pure; an element is plastic when its corner-node mean PEEQ (largest over the stored increments) is > PLASTIC_PEEQ; elementsAcross is the
+ * @invariant pure; the zone is the envelope over every stored increment: nodal PEEQ = its largest value over them, and an element is plastic when
+ *   the smallest of its corner-node PEEQ is > PLASTIC_PEEQ; the zone boundary S is every face of a plastic element not shared with another plastic
+ *   element (faces on the part surface and faces against elastic elements alike); elementsAcross is the
  *   slab-equivalent zone thickness 2 V / S (exact for a layer, an under-estimate for a compact zone: conservative) over h = (6 V / n)^(1/3) (a Kuhn cell of side s reads s)
  */
 export function plasticZones(mesh: FeMeshArtifact, results: FeResultsArtifact): PartPlasticZone[] {
