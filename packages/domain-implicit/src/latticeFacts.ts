@@ -12,6 +12,7 @@ import { type FieldNode, type StrutsNode, type TpmsNode, withField } from './mod
 import { KNOWN_CLASS, strutBookkeeping, strutGeometry } from './struts';
 import { TPMS_FACTS, rectangularCoordinates, tpmsRegisters } from './tpms';
 import { compileField } from './compile';
+import { RESERVED_ID_MARK } from './nodeValidation';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const TOLERANCE = 1e-6;
@@ -103,21 +104,24 @@ export function strutFacts(node: StrutsNode, box: Box | null, radius: LawRange):
   };
 }
 
-/** The lattice node without region, map and rotation, as a stand-alone node `__cell` (one unrotated rectangular cell at its origin). */
+/** Id of the transient bare-cell node: carries the reserved mark, so no stored node can share it (nodeValidation). */
+const BARE_CELL_ID = `${RESERVED_ID_MARK}cell`;
+
+/** The lattice node without region, map and rotation, as a stand-alone node `#cell` (one unrotated rectangular cell at its origin). */
 export function bareCell(doc: CadDocument, node: FieldNode & { op: 'tpms' | 'struts' }): ReturnType<typeof compileField> {
   const bare: FieldNode =
     node.op === 'tpms'
       ? (({ region: clipped, map: wrapped, ...rest }) => (
           void clipped,
           void wrapped,
-          { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }
+          { ...rest, rotation: [0, 0, 0] as Vec3, id: BARE_CELL_ID }
         ))(node)
       : (({ region: clipped, map: wrapped, ...rest }) => (
           void clipped,
           void wrapped,
-          { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }
+          { ...rest, rotation: [0, 0, 0] as Vec3, id: BARE_CELL_ID }
         ))(node);
-  return compileField(withField(doc, bare), '__cell');
+  return compileField(withField(doc, bare), BARE_CELL_ID);
 }
 
 /** Nodes per cell edge of the thickness analysis for a 2 x 2 x 2 block under the engine's budget (never above `wanted`). */

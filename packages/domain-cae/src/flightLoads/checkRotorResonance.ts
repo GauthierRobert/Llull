@@ -109,7 +109,9 @@ export const checkRotorResonance = defineCommand({
       .min(1)
       .max(HARMONIC_LIMIT)
       .optional()
-      .describe('Blades per rotor, for the blade-passing harmonic of every checked rotor that stores no bladeCount (add_rotor).'),
+      .describe(
+        "Blades per rotor, for the blade-passing harmonic of every checked rotor that stores no bladeCount (add_rotor); a value that disagrees with a rotor's stored count is refused (FLL_BLADE_COUNT_CONFLICT): use bladeCounts per id in a mixed set.",
+      ),
     bladeCounts: z
       .record(z.string(), z.number().int().min(1).max(HARMONIC_LIMIT))
       .optional()

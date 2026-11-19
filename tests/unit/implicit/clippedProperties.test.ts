@@ -12,7 +12,9 @@ import { implicitDocument } from '@implicit/document';
 import { implicitOf } from '@implicit/model';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { expectPure } from '../../helpers/expectNoOp';
-import { empty, ok, run } from './helpers';
+import { empty, expectRefused, ok, run } from './helpers';
+import { compileField } from '@implicit/compile';
+import { signComponentsOf } from '@implicit/measure';
 
 const BOUNDS: { min: Vec3; max: Vec3 } = { min: [-4, -3, -2], max: [4, 3, 2] };
 
@@ -43,6 +45,30 @@ describe('implicit_properties on an explicit-bounds body', () => {
     const inRegion = ok(region.doc, 'implicit_properties', { id: fieldId, region: region.id, voxel: 0.1 });
     expect(Math.abs(Number(data['volume']) / Number(inRegion.data['volume']) - 1)).toBeLessThan(1e-9);
     expect(inRegion.data['measured']).toBe('field');
+  });
+
+  it('pins components and voids of the clipped gyroid (from the clipped program) against the unclipped count it replaced', () => {
+    const { doc, bodyId, fieldId } = clippedGyroid();
+    const data = ok(doc, 'implicit_properties', { id: bodyId, voxel: 0.1 }).data;
+    const compiled = compileField(doc, fieldId);
+    if (!compiled.ok) throw new Error(compiled.message);
+    const voxel = Math.max(0.1, Math.cbrt((8 * 6 * 4) / 2 ** 20));
+    const unclipped = signComponentsOf(tsFieldEngine, compiled.program, BOUNDS, voxel);
+    if ('code' in unclipped) throw new Error(unclipped.message);
+    // unchanged on this example: one connected sheet, no enclosed void, before (unclipped program over the padded box) and after
+    expect([data['components'], (data['enclosedVoids'] as unknown[]).length]).toEqual([1, 0]);
+    expect([unclipped.solids.length, unclipped.voids.length]).toEqual([1, 0]);
+  });
+
+  it('a stale explicit-bounds body is refused (the fea_mesh gate), never measured as the FE solid', () => {
+    const { doc, bodyId } = clippedGyroid();
+    const model = implicitOf(doc);
+    const record = model.bodies[bodyId];
+    if (record === undefined) throw new Error('no body');
+    const stale: CadDocument = { ...doc, implicit: { ...model, bodies: { ...model.bodies, [bodyId]: { ...record, contentHash: 'old' } } } };
+    const result = run(stale, 'implicit_properties', { id: bodyId, voxel: 0.25 });
+    expectRefused(stale, result, 'IMP_BODY_STALE');
+    expect(result.result.summary).toContain('regenerate_implicit_bodies');
   });
 
   it('a body without explicit bounds is still measured on its mesh', () => {
@@ -89,6 +115,14 @@ describe('clip-node ids cannot collide with document nodes', () => {
       expect.stringContaining(`field '${RESERVED_ID_MARK}fll-clip' uses the reserved character`),
     ]);
     expect(implicitDocument.validate(withNode('fll-clip'))).toEqual([]);
+    for (const transient of ['#fll-clip', '#fll-clip-box', '#cell'])
+      expect(implicitDocument.validate(withNode(transient)), transient).toEqual([expect.stringContaining('uses the reserved character')]);
+    for (const old of ['__cell', 'fll-clip-box']) expect(implicitDocument.validate(withNode(old)), old).toEqual([]);
+    const start = empty();
+    const loaded = run(start, 'load_document', {
+      json: JSON.stringify({ ...JSON.parse(serializeDocument(doc)), document: withNode('#cell') }),
+    });
+    expect(loaded.doc).toBe(start);
   });
 
   it('a body whose own field carries the old clip id is clipped correctly (the old ids let the clip box replace it)', () => {
@@ -112,5 +146,18 @@ describe('clip-node ids cannot collide with document nodes', () => {
     const values = Array.from(tsFieldEngine.evaluate(found.program, Float64Array.from([3.5, 2.5, 1.5, 0, 0, 0]), false).values);
     expect(values[0]).toBeGreaterThan(0);
     expect(values[1]).toBeLessThan(0);
+  });
+
+  it('lattice_properties is unchanged by a stored node named like the old bare-cell id', () => {
+    const lattice = ok(empty(), 'add_tpms_lattice', { kind: 'gyroid', form: 'sheet', thickness: 1, cellSize: 12 });
+    const reference = ok(lattice.doc, 'lattice_properties', { id: lattice.id, resolution: 32 }).data;
+    const decoy = ok(lattice.doc, 'add_field_primitive', { shape: 'sphere', radius: 1 });
+    const model = implicitOf(decoy.doc);
+    const node = model.fields[decoy.id];
+    if (node === undefined) throw new Error('no node');
+    const { [decoy.id]: removed, ...others } = model.fields;
+    void removed;
+    const renamed: CadDocument = { ...decoy.doc, implicit: { ...model, fields: { ...others, __cell: { ...node, id: '__cell' } } } };
+    expect(ok(renamed, 'lattice_properties', { id: lattice.id, resolution: 32 }).data).toEqual(reference);
   });
 });

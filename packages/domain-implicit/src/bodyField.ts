@@ -13,7 +13,7 @@
 import { DEFAULT_DETERMINISM } from '@core/geometry/field/engineTypes';
 import type { FieldProgram } from '@core/geometry/field/program';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { compileField } from './compile';
+import { type Compiled, compileField } from './compile';
 import { bodyOf, type BooleanNode, type PrimitiveNode, withField } from './model';
 import { RESERVED_ID_MARK } from './nodeValidation';
 import { bodyGrid, contentHashOf } from './realise';
@@ -23,6 +23,8 @@ export type BodyField =
       readonly ok: true;
       readonly field: string;
       readonly program: FieldProgram;
+      /** The full compile result of `program` (min feature, quality, unverified flag). */
+      readonly compiled: Compiled;
       readonly bounds: { readonly min: Vec3; readonly max: Vec3 };
     }
   | { readonly ok: false; readonly code: 'FLL_IMPLICIT_FIELD_MISSING' | 'IMP_BODY_STALE'; readonly message: string };
@@ -56,10 +58,10 @@ export function implicitBodyField(doc: CadDocument, entityId: string): BodyField
   if (bounds === null) return stale('has an unbounded field');
   const hash = contentHashOf(compiled.program, bodyGrid(bounds, body.voxel), { determinism: DEFAULT_DETERMINISM }, body.mesher);
   if (hash !== body.contentHash) return stale(`is older than its field '${body.field}'`);
-  if (body.explicitBounds !== true) return { ok: true, field: body.field, program: compiled.program, bounds };
+  if (body.explicitBounds !== true) return { ok: true, field: body.field, program: compiled.program, compiled, bounds };
   const clipped = compileClippedField(doc, body.field, bounds);
   if (!clipped.ok) return stale(`cannot be clipped to its bounds (${clipped.code}: ${clipped.message})`);
-  return { ok: true, field: body.field, program: clipped.program, bounds };
+  return { ok: true, field: body.field, program: clipped.program, compiled: clipped, bounds };
 }
 
 /**
@@ -71,7 +73,7 @@ const CLIP_BOX_ID = `${RESERVED_ID_MARK}fll-clip-box`;
 const CLIP_ID = `${RESERVED_ID_MARK}fll-clip`;
 
 /** The program of field ∩ box(bounds): the solid an explicit-bounds body states (14 FLL-D8). */
-export function compileClippedField(
+function compileClippedField(
   doc: CadDocument,
   field: string,
   bounds: { readonly min: Vec3; readonly max: Vec3 },
