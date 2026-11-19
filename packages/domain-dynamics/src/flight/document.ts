@@ -38,6 +38,7 @@ const rotor = z.strictObject({
   coefficients,
   airDensity: z.number().positive(),
   spinInertiaKgM2: nonNegative,
+  bladeCount: z.number().int().min(1).max(64).optional(),
 });
 
 const bodyDrag = z.strictObject({

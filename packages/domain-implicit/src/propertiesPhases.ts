@@ -79,11 +79,12 @@ export interface Measured {
   readonly voxel: number;
   readonly quadrature: VolumeAnswer;
   readonly mesh: MeshMeasures | null;
+  readonly measured: 'body mesh' | 'field' | 'bounds-clipped solid';
 }
 
 /** The report of a measured body / field: data payload and one-line summary. */
 export function propertiesReport(doc: CadDocument, measured: Measured): CommandResult {
-  const { id, region, target, compiled, regionClipped: clipped, box, engine, voxel, quadrature, mesh } = measured;
+  const { id, region, target, compiled, regionClipped: clipped, box, engine, voxel, quadrature, mesh, measured: what } = measured;
   const program: FieldProgram = compiled.program;
   const meshEstimate =
     mesh !== null && Number.isFinite(compiled.minFeature)
@@ -105,6 +106,7 @@ export function propertiesReport(doc: CadDocument, measured: Measured): CommandR
   const data = {
     id,
     field: target.fieldId,
+    measured: what,
     volume,
     volumeUnit: `${doc.units}^3`,
     volumeMesh: mesh?.volume ?? null,
@@ -136,7 +138,7 @@ export function propertiesReport(doc: CadDocument, measured: Measured): CommandR
   };
   return report(
     doc,
-    `implicit_properties: ${id} volume ${volume.toPrecision(6)} ${doc.units}^3 (+-${errorEstimate.toPrecision(2)} estimated), relative density ${data.relativeDensity === null ? 'n/a' : data.relativeDensity.toPrecision(4)} of the ${data.densityReference}, ${data.components ?? '?'} solid component(s), ${data.enclosedVoids?.length ?? '?'} enclosed void(s)${compiled.unverified ? '; UNVERIFIED input' : ''}.`,
+    `implicit_properties: ${id}${what === 'bounds-clipped solid' ? ' (bounds-clipped solid)' : ''} volume ${volume.toPrecision(6)} ${doc.units}^3 (+-${errorEstimate.toPrecision(2)} estimated), relative density ${data.relativeDensity === null ? 'n/a' : data.relativeDensity.toPrecision(4)} of the ${data.densityReference}, ${data.components ?? '?'} solid component(s), ${data.enclosedVoids?.length ?? '?'} enclosed void(s)${compiled.unverified ? '; UNVERIFIED input' : ''}.`,
     data,
   );
 }

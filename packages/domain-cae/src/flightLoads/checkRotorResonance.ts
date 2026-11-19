@@ -45,7 +45,8 @@ const sig = (value: number): number => Number(value.toPrecision(5));
  * @affects nothing - read-only; data { rows[], crossings[], rotors[], status, reviewRequired, svg, width, ... }
  * @invariant reads the stored modal results only (state must be solved: a stale or unsolved case is refused); crossing rpm = 60 f / k exactly; margin = |f - k rpm/60| / (k rpm/60);
  *   a row passes only against a caller-given threshold with its source, otherwise it is unknown; a missing rpm band or blade count is unknown, never pass; modal frequencies are taken as rpm-independent
- * @failure unknown analysis, non-modal analysis, unsolved / stale / untrusted results, no flight rotors, unknown rotor or scenario, inverted band, threshold without source, failed trim -> rejected with the FLL / FEA code
+ * @invariant blade count = the rotor record's bladeCount (add_rotor), else the caller's bladeCounts[id] / bladeCount, else unassessed; a caller count that disagrees with a stored one is refused
+ * @failure blade count disagreeing with the rotor record -> FLL_BLADE_COUNT_CONFLICT; unknown analysis, non-modal analysis, unsolved / stale / untrusted results, no flight rotors, unknown rotor or scenario, inverted band, threshold without source, failed trim -> rejected with the FLL / FEA code
  */
 export const checkRotorResonance = defineCommand({
   name: NAME,
@@ -57,10 +58,10 @@ export const checkRotorResonance = defineCommand({
     'the band (0 at a crossing). Reads the stored modal frequencies only (create_analysis modal, solved; unsolved or stale results are refused); rigid-body modes (about 0 Hz) are skipped; ' +
     'frequencies are taken as constant with rpm (no centrifugal stiffening or gyroscopic split: the Campbell mode lines are horizontal). The rpm band is the caller rpmBand, else the ' +
     'minRpm..maxRpm of the flight controller commanding the rotor (scenario picks it), else the rotor own constant rpm; the operating speeds are the caller operatingRpm, else the ' +
-    'trimmed speed of scenario (trim_flight at airspeedMps / flightPathDeg), else the rotor own rpm when above 0. The blade count is not in the flight model: give bladeCount ' +
-    '(all rotors) or bladeCounts (per rotor id), else the blade-passing harmonic is listed as unassessed. The required margin is NEVER defaulted: give marginThresholdPct and ' +
+    'trimmed speed of scenario (trim_flight at airspeedMps / flightPathDeg), else the rotor own rpm when above 0. The blade count is the rotor own bladeCount (add_rotor), else the caller bladeCount ' +
+    '(all rotors) or bladeCounts (per rotor id; a value that disagrees with a stored count is refused, FLL_BLADE_COUNT_CONFLICT), else the blade-passing harmonic is listed as unassessed. The required margin is NEVER defaulted: give marginThresholdPct and ' +
     'marginSource (the requirement it comes from); without them every row is status "unknown" (the crossings and margins are still reported). data: { analysisId, rotors[] { ' +
-    'rotorId, bandRpm [low, high] | null, bandSource, operatingRpm[], operatingSource, harmonics[], bladeCount | null }, rows[] { rotorId, harmonic, label, mode, frequencyHz, ' +
+    'rotorId, bandRpm [low, high] | null, bandSource, operatingRpm[], operatingSource, harmonics[], bladeCount | null, bladeCountSource }, rows[] { rotorId, harmonic, label, mode, frequencyHz, ' +
     'crossingRpm | null, minMarginPct, minMarginAtRpm, atOperating[] { rpm, excitationHz, marginPct }, status pass|fail|unknown, reason }, crossings[] (rows with a crossing), ' +
     'unassessed[], threshold { pct, source } | null, status (fail if any row fails, else unknown if any row or rotor is unknown, else pass), reviewRequired, svg, width }. ' +
     'data.svg is the Campbell diagram (rpm against Hz: mode lines, k rpm/60 rays, shaded bands, crossings); with the CLI, `--save campbell.svg` writes it (`.png` rasterizes it). ' +
@@ -108,11 +109,11 @@ export const checkRotorResonance = defineCommand({
       .min(1)
       .max(HARMONIC_LIMIT)
       .optional()
-      .describe('Blades per rotor, for the blade-passing harmonic of every checked rotor (not stored in the flight model).'),
+      .describe('Blades per rotor, for the blade-passing harmonic of every checked rotor that stores no bladeCount (add_rotor).'),
     bladeCounts: z
       .record(z.string(), z.number().int().min(1).max(HARMONIC_LIMIT))
       .optional()
-      .describe('Blades per rotor id; overrides bladeCount for that rotor.'),
+      .describe('Blades per rotor id, for rotors that store no bladeCount; overrides bladeCount for that rotor.'),
     marginThresholdPct: z
       .number()
       .min(0)
@@ -170,6 +171,19 @@ export const checkRotorResonance = defineCommand({
       );
     const rotors = records.filter((rotor) => params.rotors === undefined || params.rotors.includes(rotor.id));
     if (rotors.length === 0) return fail('FLL_NO_ROTORS', 'no rotor selected: nothing to check');
+    const conflicts = rotors.flatMap((rotor) => {
+      const given = params.bladeCounts?.[rotor.id] ?? params.bladeCount;
+      return rotor.bladeCount !== null && given !== undefined && given !== rotor.bladeCount
+        ? [`'${rotor.id}' stores ${rotor.bladeCount} blades, the call gives ${given}`]
+        : [];
+    });
+    if (conflicts.length > 0)
+      return fail(
+        'FLL_BLADE_COUNT_CONFLICT',
+        `blade count disagrees with the flight model: ${conflicts.join('; ')}. Omit bladeCount / bladeCounts for rotors that store one, or change the rotor (add_rotor bladeCount)`,
+        [params.analysisId],
+        ['bladeCount', 'bladeCounts'],
+      );
     let trimmed: Record<string, number> = {};
     if (
       params.operatingRpm === undefined &&
@@ -212,11 +226,14 @@ export const checkRotorResonance = defineCommand({
             : rotor.rpm > 0
               ? { rpms: [rotor.rpm], source: 'rotor rpm (constant)' }
               : { rpms: [], source: 'none' };
-      const blades = params.bladeCounts?.[rotor.id] ?? params.bladeCount ?? null;
+      const caller = params.bladeCounts?.[rotor.id] ?? params.bladeCount ?? null;
+      const blades = rotor.bladeCount ?? caller;
+      const bladeSource = rotor.bladeCount !== null ? 'rotor (add_rotor bladeCount)' : caller !== null ? 'caller' : 'none';
       if (blades === null)
         unassessed.push({
           rotorId: rotor.id,
-          reason: 'blade count not given (bladeCount / bladeCounts): the blade-passing harmonic is not checked',
+          reason:
+            'blade count not stated (add_rotor bladeCount, or bladeCount / bladeCounts here): the blade-passing harmonic is not checked',
         });
       const orders = [...new Set([...baseHarmonics, ...(blades === null ? [] : [blades])])].sort((a, b) => a - b);
       for (const harmonic of orders)
@@ -247,6 +264,7 @@ export const checkRotorResonance = defineCommand({
         operatingSource: operating.source,
         harmonics: orders,
         bladeCount: blades,
+        bladeCountSource: bladeSource,
       };
     });
     const crossings = rows.filter((row) => row.crossingRpm !== null);

@@ -15,6 +15,7 @@ import type { FieldProgram } from '@core/geometry/field/program';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { compileField } from './compile';
 import { bodyOf, type BooleanNode, type PrimitiveNode, withField } from './model';
+import { RESERVED_ID_MARK } from './nodeValidation';
 import { bodyGrid, contentHashOf } from './realise';
 
 export type BodyField =
@@ -56,14 +57,27 @@ export function implicitBodyField(doc: CadDocument, entityId: string): BodyField
   const hash = contentHashOf(compiled.program, bodyGrid(bounds, body.voxel), { determinism: DEFAULT_DETERMINISM }, body.mesher);
   if (hash !== body.contentHash) return stale(`is older than its field '${body.field}'`);
   if (body.explicitBounds !== true) return { ok: true, field: body.field, program: compiled.program, bounds };
-  const clipped = compileField(clippedDocument(doc, body.field, bounds), CLIP_ID);
+  const clipped = compileClippedField(doc, body.field, bounds);
   if (!clipped.ok) return stale(`cannot be clipped to its bounds (${clipped.code}: ${clipped.message})`);
   return { ok: true, field: body.field, program: clipped.program, bounds };
 }
 
-/** Ids of the two transient nodes of the clip (never stored: the document they live in is local to this function). */
-const CLIP_BOX_ID = 'fll-clip-box';
-const CLIP_ID = 'fll-clip';
+/**
+ * Ids of the two transient nodes of the clip (never stored: the document they live in is local to the compile).
+ * @invariant the id minter (`@lib/id`: `<prefix>-<step>.<n>` or `<prefix>-<base36>-<base36>`, prefixes are lowercase literals) never emits '#',
+ *   and a stored field node whose id contains '#' is refused on load (nodeValidation), so a clip id never collides with a document node
+ */
+const CLIP_BOX_ID = `${RESERVED_ID_MARK}fll-clip-box`;
+const CLIP_ID = `${RESERVED_ID_MARK}fll-clip`;
+
+/** The program of field ∩ box(bounds): the solid an explicit-bounds body states (14 FLL-D8). */
+export function compileClippedField(
+  doc: CadDocument,
+  field: string,
+  bounds: { readonly min: Vec3; readonly max: Vec3 },
+): ReturnType<typeof compileField> {
+  return compileField(clippedDocument(doc, field, bounds), CLIP_ID);
+}
 
 /** `doc` with field ∩ box(bounds) as node CLIP_ID. */
 function clippedDocument(doc: CadDocument, field: string, bounds: { readonly min: Vec3; readonly max: Vec3 }): CadDocument {

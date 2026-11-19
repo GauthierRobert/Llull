@@ -41,6 +41,8 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_ROTOR_UNKNOWN: 'list the rotors with inspect_dynamics (data.flight.rotors)',
   FLL_TRIM_FAILED: 'fix the trim condition (trim_flight gives the refusal) or pass operatingRpm',
   FLL_BAND_INVALID: 'give rpmBand as [low, high] with low <= high, in rev/min',
+  FLL_BLADE_COUNT_CONFLICT:
+    'omit bladeCount / bladeCounts for rotors that store a blade count (inspect_dynamics data.flight.rotors), or correct the rotor record',
   FLL_THRESHOLD_SOURCE: 'give marginThresholdPct together with marginSource, or neither (the rows are then unknown)',
   FEA_MATERIAL_MISSING: 'assign a material to the part (assign_material): its Poisson ratio and density are read from it',
   FEA_MATERIAL_NO_ELASTIC:

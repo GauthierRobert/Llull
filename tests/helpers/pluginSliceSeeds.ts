@@ -665,7 +665,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
           },
         ],
         ['define_flight_scenario', { body: 'frame', durationS: 1, id: 'tumble', initialAngularVelocity: [0, 1, 0] }],
-        ['add_rotor', rotorParams({ id: 'r-static', hub: [10, 0, 0], spinInertiaKgM2: 1e-5 })],
+        ['add_rotor', rotorParams({ id: 'r-static', hub: [10, 0, 0], spinInertiaKgM2: 1e-5, bladeCount: 2 })],
         [
           'add_rotor',
           {
