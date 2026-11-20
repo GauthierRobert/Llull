@@ -7,8 +7,8 @@
 
 | Toolset | Commands |
 | ------- | -------- |
-| [core](#core) | 43 |
-| [2d](#2d) | 34 |
+| [core](#core) | 37 |
+| [2d](#2d) | 40 |
 | [3d](#3d) | 96 |
 | [measure](#measure) | 9 |
 | [parametric](#parametric) | 15 |
@@ -46,14 +46,11 @@
 | ------- | ----------- | ----- |
 | `add_layer` | Create a new layer with the given name and append it to the layer order. |  |
 | `align` | Move every entity in targetIds so that its bounding-box edge (or center) along the specified axis matches the reference entity's. |  |
-| `apply_dimension_style` | Give dimensions a dimension style (styleId) or clear it (styleId null: back to the renderer defaults). |  |
 | `array_linear` | Duplicate an entity into a linear pattern. |  |
 | `array_polar` | Duplicate an entity into a polar (circular) pattern about an axis line through center. |  |
 | `build_project` | Apply an ordered list of command actions as one project. |  |
 | `check_model` | Scan the document for geometry defects, structural issues, and parameter errors. | read-only |
 | `clear_document` | Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, components, constraint… |  |
-| `create_dimension_style` | Create a named dimension style: value text height, arrowhead size and shape, extension-line gap and overshoot, decimals, decimal separator, prefix / suffix and… |  |
-| `delete_dimension_style` | Delete a dimension style. |  |
 | `delete_entities` | Permanently remove several entities in one step (one undo). |  |
 | `delete_layer` | Delete a layer by id. |  |
 | `delete_parameter` | Remove a named parameter from the document. |  |
@@ -65,14 +62,12 @@
 | `fit_view` | Frame the entire document in the camera so all entities are visible. |  |
 | `group_entities` | Create a named group containing >= 2 existing entities. |  |
 | `kernel_info` | Report which geometry kernel is active for this session: "occt" (exact B-rep: STEP import, fillets, exact volumes) or "manifold" (mesh booleans only), its OCCT… | read-only |
-| `list_dimension_styles` | List the dimension styles of the document with their fields, how many dimensions use each, and the active style. | read-only |
 | `load_document` | Replace the current document with one parsed from a serialized JSON string produced by serializeDocument (envelope format: llull-document v3; v1 and v2 are sti… |  |
 | `mirror_entity` | Mirror an entity across the origin plane normal to a world axis by negating that axis component of its position ONLY: the entity's shape, size and rotation are… |  |
 | `move_entities` | Translate several entities by the same delta in one step (one undo). |  |
 | `render_view` | Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. | read-only |
 | `rotate_entity` | Rotate an entity. |  |
 | `scale_entity` | Uniformly scale an entity by a positive factor. |  |
-| `set_active_dimension_style` | Choose the dimension style that add_dimension gives new dimensions when it is not passed a style; null clears it (new dimensions then use the renderer defaults… |  |
 | `set_camera` | Set one or more camera fields (target, azimuth, polar, distance). |  |
 | `set_entity_color` | Set the display colour of one or more entities (2D or 3D). |  |
 | `set_entity_layer` | Move an entity to a different layer by updating its layerId. |  |
@@ -85,7 +80,6 @@
 | `set_units` | Set the document unit of length and/or the display precision (decimal places). |  |
 | `stack_on` | Translate movingId so that its bounding-box minimum face along axis exactly meets the bounding-box maximum face of baseId. |  |
 | `ungroup_entities` | Dissolve a group, removing it from the document. |  |
-| `update_dimension_style` | Change fields of a dimension style (same fields as create_dimension_style); every dimension using it redraws. |  |
 | `update_layer` | Change one or more properties of a layer: rename it (name), show or hide it (visible; hidden layers are not rendered), lock or unlock it (locked; every command… |  |
 
 ## 2d
@@ -97,12 +91,15 @@
 | `add_image_underlay` | Place a raster image (a scanned drawing, a photo of a sketch) on a 2D work plane as a semi-transparent underlay to trace over. |  |
 | `add_section_view` | Add a section view to a drawing sheet: the model is cut by a plane and seen from `direction` with the cut faces hatched (hidden lines omitted). |  |
 | `add_text` | Place an annotation text label in the document. |  |
+| `apply_dimension_style` | Give dimensions a dimension style (styleId) or clear it (styleId null: back to the renderer defaults). |  |
 | `break_sketch_link` | Break the link of projected sketch geometry: the project_edges_to_sketch step that made the entity is rewritten with its current plane-local geometry frozen, s… |  |
 | `calibrate_underlay` | Set an image underlay to true scale from a known dimension: two points in IMAGE PIXEL coordinates and the real distance between them (document units). |  |
 | `chamfer_2d` | Bevel a single vertex of a polyline with a straight chamfer at the given distance. |  |
+| `create_dimension_style` | Create a named dimension style: value text height, arrowhead size and shape, extension-line gap and overshoot, decimals, decimal separator, prefix / suffix and… |  |
 | `create_drawing_view` | Add an orthographic projection view (front, back, left, right, top, bottom or iso) of the 3D model to a drawing sheet. |  |
 | `create_sheet` | Create a drawing sheet: ISO paper with a frame and title block that documents the 3D model as orthographic line views. |  |
 | `create_sketch_plane` | Create a named sketch plane: a world plane (plane: "xy" \| "xz" \| "yz") or a planar FACE of a solid (face: { id, faceIndex \| faceNear \| faceName }), moved offse… |  |
+| `delete_dimension_style` | Delete a dimension style. |  |
 | `delete_drawing_view` | Remove a view from a drawing sheet. |  |
 | `delete_sheet` | Delete a drawing sheet and all its views. |  |
 | `draw_arc` | Draw a circular arc or a full circle in the local 2D work plane, defined by center and radius (and start/end angles in radians for an arc). |  |
@@ -119,11 +116,14 @@
 | `fillet_2d` | Round a single vertex of a polyline with a tangent arc of the given radius. |  |
 | `hatch_region` | Create a hatched planar region (entity kind "region") from closed 2D shapes: the AutoCAD HATCH / BHATCH of llull. |  |
 | `image_to_world` | Convert points read off an image underlay (pixel coordinates) into model coordinates. | read-only |
+| `list_dimension_styles` | List the dimension styles of the document with their fields, how many dimensions use each, and the active style. | read-only |
 | `offset_2d` | Create a parallel-offset copy of a 2D shape at the given distance. |  |
 | `place_on_sketch_plane` | Put 2D entities (sketches drawn in local coordinates) on a sketch plane: each entity's local plane becomes the sketch plane, its local origin at the plane orig… |  |
 | `project_edges_to_sketch` | Bring edges of a 3D solid into a sketch plane as LINKED 2D geometry: mode "project" draws each edge projected onto the plane (an open polyline), mode "intersec… | kernel |
+| `set_active_dimension_style` | Choose the dimension style that add_dimension gives new dimensions when it is not passed a style; null clears it (new dimensions then use the renderer defaults… |  |
 | `set_underlay` | Change an image underlay's display: `opacity` in [0, 1] and/or `locked` (a locked underlay is never picked in the viewport, so tracing over it cannot select it… |  |
 | `trim` | Shorten a line entity so it ends exactly at its intersection with a boundary line. |  |
+| `update_dimension_style` | Change fields of a dimension style (same fields as create_dimension_style); every dimension using it redraws. |  |
 | `update_drawing_view` | Change a view on a drawing sheet: caption (label), direction (projection and section views), entityIds, scale, paper position, section plane offset (section vi… |  |
 | `update_sheet` | Change a drawing sheet: name, paper size, scale (or autoScale to auto-fit again), projection angle (first / third; re-lays out the automatic views) and title b… |  |
 

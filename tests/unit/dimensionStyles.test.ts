@@ -224,3 +224,47 @@ describe('dimension style ids and the step counter', () => {
     expect(loaded.nextStepNumber).toBeGreaterThan(Number(/-(\d+)\./.exec(id)![1]));
   });
 });
+
+describe('dimension style load validation, field by field', () => {
+  const { doc } = drawing();
+  const load =
+    (style: Record<string, unknown>): (() => unknown) =>
+    () =>
+      deserializeDocument(
+        JSON.stringify({
+          format: 'llull-document',
+          version: 3,
+          document: { ...doc, dimensionStyles: { s: { id: 's', name: 'S', ...style } } },
+        }),
+      );
+  it.each([
+    ['textHeight', 0],
+    ['arrowSize', -1],
+    ['extensionGap', -0.1],
+    ['extensionBeyond', 'far'],
+    ['precision', 1.5],
+    ['angularPrecision', 99],
+    ['decimalSeparator', ';'],
+    ['prefix', 'x'.repeat(33)],
+    ['suffix', 7],
+    ['color', '#12345'],
+  ])('refuses a bad %s', (key, value) => {
+    expect(load({ [key]: value })).toThrow(new RegExp(`dimensionStyle 's': ${key} must be`));
+  });
+  it('accepts every field at a valid value', () => {
+    const style = {
+      textHeight: 2.5,
+      arrowSize: 0.5,
+      arrowStyle: 'tick',
+      extensionGap: 0,
+      extensionBeyond: 1,
+      precision: 2,
+      angularPrecision: 0,
+      decimalSeparator: ',',
+      prefix: 'R',
+      suffix: ' mm',
+      color: '#112233',
+    };
+    expect((load(style)() as CadDocument).dimensionStyles?.['s']).toEqual({ id: 's', name: 'S', ...style });
+  });
+});
