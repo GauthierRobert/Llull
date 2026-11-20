@@ -2,6 +2,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { OrientedBox } from '../../../industrial/clash/clashBoxes';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface BoxFootprint {
   readonly ring: ReadonlyArray<Vec2>;
@@ -41,5 +42,5 @@ export function boxFootprint(box: OrientedBox): BoxFootprint {
         corners.push([box.center[0] + (offset[0] ?? 0), box.center[1] + (offset[1] ?? 0), box.center[2] + (offset[2] ?? 0)]);
       }
   const zs = corners.map((corner) => corner[2]);
-  return { ring: hull(corners.map((corner): Vec2 => [corner[0], corner[1]])), zMin: Math.min(...zs), zMax: Math.max(...zs) };
+  return { ring: hull(corners.map((corner): Vec2 => [corner[0], corner[1]])), zMin: minOf(zs), zMax: maxOf(zs) };
 }

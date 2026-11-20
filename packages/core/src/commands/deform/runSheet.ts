@@ -21,6 +21,7 @@ import { defRejection } from './codes';
 import type { DeformRequest } from './request';
 import { NEXT_STEP } from './schema';
 import { type DeformTarget, defaultTolerance, isRefusal } from './target';
+import { appendAll } from '../../lib/appendAll';
 
 type Sheet = NurbsCurveEntity | NurbsSurfaceEntity;
 
@@ -33,13 +34,13 @@ function targetOf(entity: Sheet): DeformTarget {
   if (entity.kind === 'nurbs_curve') {
     const curve = worldCurve(entity);
     const [first, last] = curveDomain(curve);
-    for (let i = 0; i < BOUND_SAMPLES; i++) cloud.push(...evaluateCurve(curve, first + ((last - first) * i) / (BOUND_SAMPLES - 1)));
+    for (let i = 0; i < BOUND_SAMPLES; i++) appendAll(cloud, evaluateCurve(curve, first + ((last - first) * i) / (BOUND_SAMPLES - 1)));
   } else {
     const surface = worldSurface(entity);
     const [[u0, u1], [v0, v1]] = surfaceDomain(surface);
     for (let i = 0; i < BOUND_SAMPLES; i++)
       for (let j = 0; j < BOUND_SAMPLES; j++)
-        cloud.push(...evaluateSurface(surface, u0 + ((u1 - u0) * i) / (BOUND_SAMPLES - 1), v0 + ((v1 - v0) * j) / (BOUND_SAMPLES - 1)));
+        appendAll(cloud, evaluateSurface(surface, u0 + ((u1 - u0) * i) / (BOUND_SAMPLES - 1), v0 + ((v1 - v0) * j) / (BOUND_SAMPLES - 1)));
   }
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
   const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];

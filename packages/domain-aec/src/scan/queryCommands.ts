@@ -12,6 +12,8 @@ import { applyPoint, invertAffine } from './mat4';
 import { fromM, scanOf, toM, vecFromM, vecToM } from './model';
 import { assetBox, inRegion, resolveRegion, type MetricRegion } from './region';
 import { cloudIdParam, regionParam } from './schemas';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Largest number of points one query_cloud_points call returns (AF-12). */
 export const MAX_QUERY_POINTS = 200_000;
@@ -41,8 +43,8 @@ export const describePointCloud = defineCommand({
       corners.push(toDoc([c & 1 ? max[0] : min[0], c & 2 ? max[1] : min[1], c & 4 ? max[2] : min[2]]));
     }
     const bounds = {
-      min: [0, 1, 2].map((a) => round(Math.min(...corners.map((p) => p[a] ?? 0)))),
-      max: [0, 1, 2].map((a) => round(Math.max(...corners.map((p) => p[a] ?? 0)))),
+      min: [0, 1, 2].map((a) => round(minOf(corners.map((p) => p[a] ?? 0)))),
+      max: [0, 1, 2].map((a) => round(maxOf(corners.map((p) => p[a] ?? 0)))),
     };
     const scan = scanOf(doc);
     const registration =
@@ -106,7 +108,7 @@ function collectPoints(
       truncated = true;
       break;
     }
-    points.push(...vecFromM(doc, p));
+    appendAll(points, vecFromM(doc, p));
     indices.push(read.indices[i] ?? 0);
     if (source?.intensity !== undefined) columns.intensity.push(source.intensity[i] ?? 0);
     if (source?.rgb !== undefined) columns.rgb.push(source.rgb[3 * i] ?? 0, source.rgb[3 * i + 1] ?? 0, source.rgb[3 * i + 2] ?? 0);
@@ -189,7 +191,7 @@ export const queryCloudPoints = defineCommand({
       truncated,
       spacing: fromM(doc, read.spacing),
       totalPoints: manifest.pointCount,
-      maxQuantisationError: fromM(doc, Math.max(...manifest.quantum) / 2),
+      maxQuantisationError: fromM(doc, maxOf(manifest.quantum) / 2),
       ...(truncated ? { warnings: [{ code: 'SCN_QUERY_LIMIT', message: `maxPoints ${cap} reached; narrow the region or page` }] } : {}),
     };
     return report(doc, `${indices.length} point(s) of ${cloudId}${truncated ? ' (truncated: SCN_QUERY_LIMIT)' : ''}.`, data);
@@ -289,7 +291,7 @@ export const measureCloud = defineCommand({
     }
     const [a = [0, 0, 0], b = [0, 0, 0]] = ends;
     const delta = vecFromM(doc, [b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
-    const distance = Math.hypot(...delta);
+    const distance = Math.hypot(delta[0], delta[1], delta[2]);
     return report(doc, `Distance ${distance.toPrecision(7)} ${doc.units}.`, {
       cloudId,
       distance,

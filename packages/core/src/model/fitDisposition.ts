@@ -15,4 +15,6 @@ export type FitDispositions = Readonly<Record<string, FitDisposition>>;
 /** A disposition kept in `AnalysisModel.fitLedger` across replay (the recorded step carries no signature): the record plus its row. */
 export interface FitLedgerEntry extends FitDisposition {
   readonly rowKey: string;
+  /** Key of the feature step that recorded it (SIG-REPLAY, `@lib/replaySurvivors`: seeded only while that step is live); absent on older entries. */
+  readonly stepKey?: string;
 }

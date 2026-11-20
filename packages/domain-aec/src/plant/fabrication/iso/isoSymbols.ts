@@ -10,6 +10,7 @@ import type { PipingNetwork } from '../model';
 import type { IsoGraph, WalkStep } from './isoGraph';
 import type { IsoLayout } from './isoLayout';
 import type { IsoPrimitive } from './isoRender';
+import { appendAll } from '@lib/appendAll';
 
 const unitOf = (a: Vec2, b: Vec2): Vec2 => {
   const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
@@ -115,7 +116,7 @@ export function isoSymbols(input: SymbolInput): IsoPrimitive[] {
   const out = input.graph.steps.flatMap((step, index) => stepSymbol(step, index, input));
   for (const joint of input.joints) {
     const at = input.layout.nodes.get(joint.key);
-    if (at !== undefined) out.push(...jointSymbol(input.classes.get(joint.key) ?? joint.joint, at));
+    if (at !== undefined) appendAll(out, jointSymbol(input.classes.get(joint.key) ?? joint.joint, at));
   }
   return out;
 }

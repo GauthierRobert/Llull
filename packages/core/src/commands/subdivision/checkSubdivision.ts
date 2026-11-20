@@ -21,6 +21,9 @@ import {
   volumeFindings,
 } from './checkSubdivisionFindings';
 import { isEntity, subdivisionOf } from './shared';
+import { hypotOf } from '../../lib/hypotOf';
+import { appendAll } from '../../lib/appendAll';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const COMMAND = 'check_subdivision';
 
@@ -155,10 +158,8 @@ export const checkSubdivision = defineCommand({
     if (!isEntity(entity)) return entity;
     const topology = buildTopology(entity.vertices.length, entity.faces);
     const findings: Finding[] = [];
-    const size = Math.hypot(
-      ...[0, 1, 2].map(
-        (axis) => Math.max(...entity.vertices.map((p) => p[axis] as number)) - Math.min(...entity.vertices.map((p) => p[axis] as number)),
-      ),
+    const size = hypotOf(
+      [0, 1, 2].map((axis) => maxOf(entity.vertices.map((p) => p[axis] as number)) - minOf(entity.vertices.map((p) => p[axis] as number))),
     );
     const limits: Limits = {
       symmetry: params.tolerances?.symmetry ?? 1e-9 * size,
@@ -166,26 +167,26 @@ export const checkSubdivision = defineCommand({
       patchSeamGap: params.tolerances?.patchSeamGap ?? 1e-6 * size,
       patchSeamAngleRad: params.tolerances?.patchSeamAngleRad ?? 0.05,
     };
-    findings.push(...degenerateFaceFindings(entity, size));
+    appendAll(findings, degenerateFaceFindings(entity, size));
     const intersections = selfIntersectionFindings(entity);
     const level = intersections.level;
-    findings.push(...intersections.findings);
+    appendAll(findings, intersections.findings);
     const deviation = entity.symmetry === undefined ? 0 : symmetryDeviation(entity.vertices, entity.symmetry);
-    findings.push(...symmetryFindings(entity, deviation, limits.symmetry, doc.units));
+    appendAll(findings, symmetryFindings(entity, deviation, limits.symmetry, doc.units));
     const loops = boundaryLoops(topology);
     const open = loops.length > 0;
     const meshVolume = open ? null : levelMeshVolume(entity, entity.levels);
     const estimate = open ? null : limitVolumeEstimate(entity);
     const volumeRatio =
       estimate === null || meshVolume === null ? null : Math.abs(meshVolume - estimate.volume) / Math.abs(estimate.volume);
-    findings.push(...volumeFindings(entity, open, meshVolume, estimate, volumeRatio, limits.meshVsLimitRel));
+    appendAll(findings, volumeFindings(entity, open, meshVolume, estimate, volumeRatio, limits.meshVsLimitRel));
     const extraordinary = extraordinaryFindings(entity, topology);
-    findings.push(...extraordinary.findings, ...sharpnessBudgetFindings(entity));
+    appendAll(findings, [...extraordinary.findings, ...sharpnessBudgetFindings(entity)]);
     const euler = entity.vertices.length - topology.edges.length + entity.faces.length;
     const components = componentCount(entity.vertices.length, topology);
     const kernel = (ctx ?? currentContext()).kernel;
     const patches = open || params.exactSeams !== true ? null : limitPatches(kernel, entity);
-    findings.push(...patchSeamFindings(entity, patches, limits.patchSeamGap, limits.patchSeamAngleRad, doc.units));
+    appendAll(findings, patchSeamFindings(entity, patches, limits.patchSeamGap, limits.patchSeamAngleRad, doc.units));
     const status = findings.some((f) => f.severity === 'fail') ? 'fail' : findings.some((f) => f.severity === 'warn') ? 'warn' : 'pass';
     const sharp = edgeSharpnessMap(entity);
     const data = {

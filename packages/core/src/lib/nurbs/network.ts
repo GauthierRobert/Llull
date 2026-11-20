@@ -7,6 +7,7 @@
 import { reverseCurve } from './edit';
 import { meetCurves } from './meet';
 import type { NurbsCurveData } from './types';
+import { maxOf, minOf } from '../arrayExtrema';
 
 export interface NetworkIssue {
   readonly code: 'SWG_NETWORK_UNSORTABLE' | 'SWG_NETWORK_NOT_INTERSECTING';
@@ -37,7 +38,7 @@ interface Crossing {
 function boxesOverlap(a: NurbsCurveData, b: NurbsCurveData, margin: number): boolean {
   return [0, 1, 2].every((axis) => {
     const [pa, pb] = [a.poles.map((pole) => pole[axis] as number), b.poles.map((pole) => pole[axis] as number)];
-    return Math.min(...pa) - margin <= Math.max(...pb) && Math.min(...pb) - margin <= Math.max(...pa);
+    return minOf(pa) - margin <= maxOf(pb) && minOf(pb) - margin <= maxOf(pa);
   });
 }
 

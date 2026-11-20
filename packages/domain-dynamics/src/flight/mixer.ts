@@ -6,6 +6,8 @@
 import type { Vec3 } from '@core/model/vectors';
 import { invertDense } from '@lib/denseLinalg';
 import { cross3, dot3, scale3, sub3 } from '@lib/vec3';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { hypotOf } from '@lib/hypotOf';
 
 /** One rotor as the mixer sees it: body axes at the modelled pose, arm from the centre of mass in metres. */
 export interface MixerRotor {
@@ -38,10 +40,10 @@ export function effectiveness(rotors: readonly MixerRotor[], thrustAxis: Vec3): 
 /** Rank of a small dense matrix after scaling each row to a largest entry of 1 (rows in different units: N and N·m). */
 export function matrixRank(matrix: readonly (readonly number[])[]): number {
   const rows = matrix.map((row) => {
-    const scale = Math.max(...row.map(Math.abs));
+    const scale = maxOf(row.map(Math.abs));
     return scale > 0 ? row.map((value) => value / scale) : row.map(() => 0);
   });
-  const columns = Math.max(0, ...rows.map((row) => row.length));
+  const columns = Math.max(0, maxOf(rows.map((row) => row.length)));
   let rank = 0;
   for (let column = 0; column < columns && rank < rows.length; column++) {
     let pivot = rank;
@@ -74,8 +76,8 @@ export const MIN_GRAM_PIVOT_RATIO = 1e-8;
  * (rotors nearly in a line) stays small instead of being normalised away. 1 = balanced orthogonal axes, 0 = rank deficient.
  */
 export function gramPivotRatio(matrix: readonly (readonly number[])[]): number {
-  const norms = matrix.map((row) => Math.hypot(...row));
-  const torqueScale = Math.max(0, ...norms.slice(1));
+  const norms = matrix.map((row) => hypotOf(row));
+  const torqueScale = Math.max(0, maxOf(norms.slice(1)));
   const rows = matrix.map((row, i) => {
     const scale = i === 0 ? (norms[0] ?? 0) : torqueScale;
     return scale > 0 ? row.map((value) => value / scale) : row.map(() => 0);
@@ -100,13 +102,13 @@ export function gramPivotRatio(matrix: readonly (readonly number[])[]): number {
       gram[r] = row.map((value, k) => value - factor * (pivotRow[k] ?? 0));
     }
   }
-  const largest = Math.max(0, ...pivots);
-  return largest > 0 ? Math.min(...pivots) / largest : 0;
+  const largest = Math.max(0, maxOf(pivots));
+  return largest > 0 ? minOf(pivots) / largest : 0;
 }
 
 /** Moore-Penrose pseudo-inverse Bᵀ(BBᵀ)⁻¹ of a full-row-rank 4 × N effectiveness: N rows of 4, or null when BBᵀ is singular. */
 export function pseudoInverse(b: readonly (readonly number[])[]): MixerRow[] | null {
-  const n = Math.max(0, ...b.map((row) => row.length));
+  const n = Math.max(0, maxOf(b.map((row) => row.length)));
   const gram = b.map((row) => b.map((other) => row.reduce((sum, value, k) => sum + value * (other[k] ?? 0), 0)));
   const inverse = invertDense(gram, 1e-300);
   if (inverse === null) return null;

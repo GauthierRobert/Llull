@@ -49,7 +49,7 @@ function flangePieces(part: RoutedPart): Piece[] {
   const pipeOd = part.dims['pipeOutsideDiameter'];
   if (face === undefined || back === undefined || outer === undefined || pipeOd === undefined) return [];
   const axis = sub3(back.position, face.position);
-  const length = Math.hypot(...axis);
+  const length = Math.hypot(axis[0], axis[1], axis[2]);
   if (!(length > 0)) return [];
   const plate = Math.min(part.dims['thickness'] ?? length, length);
   const edge = add3(face.position, scale3(axis, plate / length));

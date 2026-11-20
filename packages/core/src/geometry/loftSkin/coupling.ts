@@ -12,6 +12,7 @@ import { arcLengthFit } from '../../lib/nurbs/ruled';
 import type { Vec3 } from '../../model/vectors';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import type { LoftIssue, LoftOptions } from './types';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface SegmentSet {
   /** `segments[s][k]`: segment s of section k. */
@@ -68,7 +69,7 @@ function byVertices(curves: readonly NurbsCurveData[], pairs: ReadonlyArray<read
 function constantSpeed(curve: NurbsCurveData): boolean {
   const [a, b] = curveDomain(curve);
   const speeds = Array.from({ length: 33 }, (_, k) => len3(curveDerivatives(curve, a + ((b - a) * k) / 32, 1)[1] as Vec3));
-  return Math.max(...speeds) - Math.min(...speeds) <= 1e-9 * Math.max(...speeds);
+  return maxOf(speeds) - minOf(speeds) <= 1e-9 * maxOf(speeds);
 }
 
 /** Segments from the corners of all sections, each piece refitted by arc length. */

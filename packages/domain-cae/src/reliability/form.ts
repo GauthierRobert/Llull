@@ -2,6 +2,7 @@
 
 import { normalCdf } from '@lib/specialFunctions';
 import { symmetricEigenvalues } from './numerics';
+import { maxOf } from '@lib/arrayExtrema';
 
 export const FD_STEP_U = 1e-6;
 const HESSIAN_STEP = 1e-3;
@@ -66,7 +67,7 @@ export function runForm(g: (u: number[]) => number, dimension: number, options: 
       next = next.map((component, i) => (component + (u[i] ?? 0)) / 2);
       nextValue = g(next);
     }
-    const change = Math.max(...next.map((component, i) => Math.abs(component - (u[i] ?? 0))));
+    const change = maxOf(next.map((component, i) => Math.abs(component - (u[i] ?? 0))));
     u = next;
     value = nextValue;
     grad = gradient(g, u);

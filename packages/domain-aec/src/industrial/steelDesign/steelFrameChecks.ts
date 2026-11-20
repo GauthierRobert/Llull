@@ -25,6 +25,7 @@ import {
   type CheckLine,
   type MemberRow,
 } from './steelMemberRows';
+import { maxOf } from '@lib/arrayExtrema';
 
 interface FrameCheckInput {
   readonly frame: MomentFrame;
@@ -67,13 +68,13 @@ function beamDiagram(result: FrameResult, layout: BarLayout, amplification: numb
     stations.push(high * amplification);
     const peak = member.maxMoment * amplification;
     if (peak > Math.max(Math.abs(low), Math.abs(high)) * amplification + 1) interior = Math.max(interior, peak);
-    shear = Math.max(shear, ...member.shear.map(Math.abs));
-    compression = Math.max(compression, ...member.axial.map((value) => -value));
+    shear = Math.max(shear, maxOf(member.shear.map(Math.abs)));
+    compression = Math.max(compression, maxOf(member.axial.map((value) => -value)));
   });
   return {
     stations,
-    sagging: Math.max(0, interior, ...stations),
-    hogging: Math.max(0, ...stations.map((value) => -value)),
+    sagging: Math.max(0, interior, maxOf(stations)),
+    hogging: Math.max(0, maxOf(stations.map((value) => -value))),
     shear,
     compression,
   };
@@ -182,7 +183,7 @@ function deflectionLine(bar: SteelBar, layout: BarLayout, result: FrameResult, r
     const t = layout.fractions[index] ?? 0;
     return Math.abs(value - (cantilever ? root : first + (last - first) * t));
   });
-  const value = Math.max(0, ...sag);
+  const value = Math.max(0, maxOf(sag));
   const limit = (cantilever ? 2 * bar.length : bar.length) / ratio;
   const label = cantilever ? `cantilever 2L/${ratio}` : `L/${ratio}`;
   return { value, line: deflectionCheckLine(`${bar.profileName} L ${metres(bar.length)} m`, label, value, limit) };
@@ -217,9 +218,9 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
       if (!forces || !geometry) return;
       const [bottom, top] = [system.nodes[geometry.a], system.nodes[geometry.b]];
       const length = Math.abs((top?.y ?? 0) - (bottom?.y ?? 0));
-      const compression = Math.max(0, ...forces.axial.map((value) => -value));
+      const compression = Math.max(0, maxOf(forces.axial.map((value) => -value)));
       const moment = forces.maxMoment * solutions.amplification;
-      const shear = Math.max(...forces.shear.map(Math.abs));
+      const shear = maxOf(forces.shear.map(Math.abs));
       const zText = `z ${metres(bottom?.y ?? 0)}–${metres(top?.y ?? 0)} m`;
       const buckling =
         axis === 'strong'
@@ -234,7 +235,7 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
         combination,
         detail: `${profile.name} (${axisText} in the frame plane), ${zText}, Lcr ${metres(length)} m${solutions.amplification > 1 ? `, sway ×${solutions.amplification.toFixed(2)}` : ''}: N ${kilo(compression).toFixed(0)} kN with M ${mega(moment).toFixed(1)} kNm, χ ${chi.toFixed(2)}`,
       });
-      const maxAxial = Math.max(...forces.axial.map(Math.abs));
+      const maxAxial = maxOf(forces.axial.map(Math.abs));
       section = worstOf(section, {
         name: 'cross-section N+M (§6.2.9)',
         utilisation: maxAxial / resistance.axial + moment / bending.moment,

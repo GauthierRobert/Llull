@@ -8,7 +8,9 @@ import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import { documentIdentity } from '@core/model/documentUid';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { refuseEnv } from './codes';
-import { DEVIATION_ACT, acceptanceDetails, nonceOf } from './gate';
+import { DEVIATION_ACT, acceptanceDetails } from './gate';
+import { nonceOf, notReapplied } from '../shared/signedGate';
+import { stepStamp } from '@lib/replaySurvivors';
 import type { ReviewedItem } from './deviations';
 import { spaceEnvironmentOf } from './model';
 import type { Deviation } from './types';
@@ -19,7 +21,7 @@ const COMMAND = 'approve_environment_deviation';
  * @affects doc.spaceEnvironment.deviations[itemKey] (decision, justification, fingerprint of the finding, signer, signatureId, the verified signature, document uid; affected: [itemKey]); never changes an item's status or any number
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); recorded only with a signature verified (and spent last) by `ctx.humanSignature` over sha256 of (act, item key, decision,
  *   justification, finding fingerprint, document uid, nonce); it applies only while the finding is unchanged and in this document; every check_space_environment re-verifies it (no port, foreign uid, junk signature: the item stays in the status);
- *   a replay honours a recorded step only from a deviation already in the slice (kept by replaySeed) with the same decision, justification, fingerprint and uid
+ *   a replay honours a recorded step only from a deviation already in the slice (kept by replaySeed while its stamped step is live; none kept: a no-op, pending) with the same decision, justification, fingerprint and uid
  * @failure no signing port, no signature or one that does not verify (an agent always) -> ENV_HUMAN_GATE; unknown key -> ENV_ITEM_NOT_FOUND; a pass item -> ENV_ITEM_NOT_ACCEPTABLE; blank justification -> ENV_PARAM_INVALID; a document without uid -> ENV_DOCUMENT_UNIDENTIFIED; no profile / unknown profile -> the check's refusal (all refusals, unchanged doc)
  */
 export const approveEnvironmentDeviation = defineCommand({
@@ -51,6 +53,7 @@ export const approveEnvironmentDeviation = defineCommand({
         'ENV_HUMAN_GATE',
         'approving an environment deviation needs a human-held signature: hand it to the qualified reviewer, do not retry',
       );
+    if (replayed && !Object.hasOwn(spaceEnvironmentOf(doc).deviations ?? {}, itemKey)) return notReapplied(doc, COMMAND, itemKey);
     if (justification.trim() === '') return fail('ENV_PARAM_INVALID', 'a decision needs a justification');
     const checked = execute(
       doc,
@@ -100,6 +103,7 @@ export const approveEnvironmentDeviation = defineCommand({
       signatureId: gate.signatureId,
       signature: confirmation,
       documentUid: uid,
+      ...stepStamp(ctx),
     };
     return changed(
       { ...doc, spaceEnvironment: { ...spaceEnvironmentOf(doc), deviations: { ...stored, [itemKey]: deviation } } },

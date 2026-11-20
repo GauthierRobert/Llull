@@ -9,6 +9,7 @@ import type { Vec3 } from '@core/model/types';
 import { significantNumber } from '@lib/compactNumber';
 import { roundDeep } from '@lib/significant';
 import type { FlowQueryInput, FlowQueryOp } from './queryInput';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const vec3 = z.tuple([z.number(), z.number(), z.number()]);
 const STOPS = ['not_traced', 'left_domain', 'wall', 'stagnation', 'max_length', 'max_steps'] as const;
@@ -162,7 +163,7 @@ export interface StoredFile {
 
 const range = (values: readonly number[], unit: string): string => {
   if (values.length === 0) return 'none';
-  const [lo, hi] = [Math.min(...values), Math.max(...values)];
+  const [lo, hi] = [minOf(values), maxOf(values)];
   return `${significantNumber(lo, 4)}..${significantNumber(hi, 4)} ${unit}`;
 };
 

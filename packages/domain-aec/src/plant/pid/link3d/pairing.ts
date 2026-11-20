@@ -1,5 +1,6 @@
 /** Pairing of P&ID items with 3D objects (plant 04 PID §5.6 steps 1 and 2): explicit links first, then a hash join on the normalised key. */
 
+import { appendAll } from '@lib/appendAll';
 export interface ModelObject {
   /** Building element ids the object stands for (a line: every run carrying the line number). */
   readonly ids: readonly string[];
@@ -76,8 +77,8 @@ export function pairUp<P extends { readonly id: string }, M extends ModelObject>
     const [onlyLeft, onlyRight] = [left[0], right[0]];
     if (left.length === 1 && right.length === 1 && onlyLeft !== undefined && onlyRight !== undefined) pairs.push([onlyLeft, onlyRight]);
     else if (left.length > 0 && right.length > 0) ambiguous.push({ key, pids: left, models: right });
-    else if (left.length > 0) unplaced.push(...left);
-    else notInPid.push(...right);
+    else if (left.length > 0) appendAll(unplaced, left);
+    else appendAll(notInPid, right);
   }
   return { pairs, stale, ambiguous, unplaced, notInPid };
 }

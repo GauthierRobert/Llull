@@ -5,6 +5,7 @@
  * @failure no free spot within MAX_TRIES steps -> shift [0, 0] (the label stays at its anchor)
  */
 
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 export interface LabelBox {
   readonly minX: number;
   readonly minY: number;
@@ -46,7 +47,7 @@ export function textBox(
   textAnchor: 'start' | 'middle' | 'end',
   angleDeg: number,
 ): LabelBox {
-  const width = Math.max(1, ...lines.map((line) => [...line].length)) * CHAR_WIDTH_EM * fontPx;
+  const width = Math.max(1, maxOf(lines.map((line) => [...line].length))) * CHAR_WIDTH_EM * fontPx;
   const left = textAnchor === 'start' ? 0 : textAnchor === 'end' ? -width : -width / 2;
   const top = (firstDyEm - ASCENT_EM) * fontPx;
   const bottom = (firstDyEm + (lines.length - 1) * LINE_HEIGHT_EM + DESCENT_EM) * fontPx;
@@ -59,7 +60,7 @@ export function textBox(
   ].map(([cx, cy]) => [x + (cx ?? 0) * cos - (cy ?? 0) * sin, y + (cx ?? 0) * sin + (cy ?? 0) * cos] as const);
   const xs = corners.map((corner) => corner[0]);
   const ys = corners.map((corner) => corner[1]);
-  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+  return { minX: minOf(xs), minY: minOf(ys), maxX: maxOf(xs), maxY: maxOf(ys) };
 }
 
 export function boxesOverlap(a: LabelBox, b: LabelBox, gap: number = 0): boolean {
@@ -83,12 +84,7 @@ export function triadBox(
   if (ox < -TRIAD_PAD_PX || ox > width + TRIAD_PAD_PX || oy < -TRIAD_PAD_PX || oy > height + TRIAD_PAD_PX) return null;
   const xs = [ox, ...points.tips.map((tip) => tip[0])];
   const ys = [oy, ...points.tips.map((tip) => tip[1])];
-  return {
-    minX: Math.min(...xs) - TRIAD_PAD_PX,
-    minY: Math.min(...ys) - TRIAD_PAD_PX,
-    maxX: Math.max(...xs) + TRIAD_PAD_PX,
-    maxY: Math.max(...ys) + TRIAD_PAD_PX,
-  };
+  return { minX: minOf(xs) - TRIAD_PAD_PX, minY: minOf(ys) - TRIAD_PAD_PX, maxX: maxOf(xs) + TRIAD_PAD_PX, maxY: maxOf(ys) + TRIAD_PAD_PX };
 }
 
 /** Screen shift [dx, dy] of each request, in order: each clears `fixed` and every earlier request at its final position. */

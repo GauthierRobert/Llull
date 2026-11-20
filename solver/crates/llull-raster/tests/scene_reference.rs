@@ -1,6 +1,6 @@
 //! Scene twin vs the TypeScript render raster (plant 09 VC-VIS-60 at crate level): `tests/unit/native/sceneRasterReference.test.ts`
 //! writes the RasterScene buffers render_view prepares and the sha256 of the RGBA `rasterScenePixels` produced; the CPU twin must hash
-//! identically, also through a job folder (`llull_raster::run`). With the `gpu` feature the wgpu fill is compared by tolerance
+//! identically, also through a job folder (`llull_raster::run`), and the native PNG of that RGBA must hash as `encodePng(…, true)`. With the `gpu` feature the wgpu fill is compared by tolerance
 //! (coverage IoU and mean colour difference), never by hash, and skipped with the reason when no adapter exists.
 
 use llull_protocol::sha256_hex;
@@ -18,6 +18,7 @@ struct Case {
     scene: Scene,
     job: Value,
     rgba_sha256: String,
+    png_sha256: String,
 }
 
 fn cases() -> Vec<Case> {
@@ -46,6 +47,7 @@ fn cases() -> Vec<Case> {
                 scene,
                 job: job.clone(),
                 rgba_sha256: case["rgbaSha256"].as_str().unwrap().to_string(),
+                png_sha256: case["pngSha256"].as_str().unwrap().to_string(),
             }
         })
         .collect()
@@ -60,6 +62,8 @@ fn cpu_twin_is_bit_identical_to_the_typescript_scene_raster() {
         let rgba = scene_cpu::raster_pixels(&case.scene);
         assert_eq!(rgba.len(), case.scene.width * case.scene.height * 4, "{}", case.name);
         assert_eq!(sha256_hex(&rgba), case.rgba_sha256, "{}: RGBA differs from the TypeScript reference", case.name);
+        let png = llull_raster::png::encode_png(case.scene.width, case.scene.height, &rgba);
+        assert_eq!(sha256_hex(&png), case.png_sha256, "{}: PNG differs from encodePng(…, true)", case.name);
     }
 }
 

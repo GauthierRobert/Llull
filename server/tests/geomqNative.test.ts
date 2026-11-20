@@ -6,11 +6,15 @@
  * solver/) and are skipped with a logged reason otherwise; the fallback and installation tests always run.
  */
 
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
-import { getGeometryQueryEngine, meshBvhEngine, setGeometryQueryEngine } from '@core/geometry/geometryQueries';
+import { type ViewFacet, getGeometryQueryEngine, meshBvhEngine, setGeometryQueryEngine } from '@core/geometry/geometryQueries';
+import { planarFacets } from '@cae/thermal/planarFacets';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { RigidTransform } from '@core/geometry/meshBvh';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
@@ -123,7 +127,7 @@ describe('callers through the native engine (VC-THM-64, VC-FPR-37)', () => {
     Object.fromEntries(Object.entries(data as Record<string, unknown>).filter(([key]) => key !== 'geometryQueries'));
 
   native(
-    'compute_view_factors: VC-THM-09 plates and an obstructed cavity give the TS matrix',
+    'compute_view_factors: VC-THM-09 plates and an obstructed cavity give the TS matrix, full and reciprocal',
     () => {
       const plates = [
         quad('floor', [
@@ -153,8 +157,20 @@ describe('callers through the native engine (VC-THM-64, VC-FPR-37)', () => {
           [0.9, 0.4, 0.2],
         ] as V3[],
       };
-      for (const extra of [{}, { obstruction: true }, { obstruction: true, blockers: [blocker] }]) {
-        const params = { lengthUnit: 'm', surfaces: plates, maxFacetSize: { value: 0.4, unit: 'm' }, ...extra };
+      const far = [
+        plates[0],
+        quad(
+          'high',
+          (plates[1]?.vertices ?? []).map(([x, y]): V3 => [x, y, 2]),
+        ),
+      ];
+      const cases = [{}, { obstruction: true }, { obstruction: true, blockers: [blocker] }].flatMap((extra) => [
+        { surfaces: plates, maxFacetSize: { value: 0.4, unit: 'm' }, ...extra },
+        { surfaces: plates, maxFacetSize: { value: 0.4, unit: 'm' }, integration: 'reciprocal', ...extra },
+        { surfaces: far, maxFacetSize: { value: 0.5, unit: 'm' }, integration: 'reciprocal', ...extra },
+      ]);
+      for (const extra of cases) {
+        const params = { lengthUnit: 'm', ...extra };
         const viaNative = execute(createEmptyDocument(), 'compute_view_factors', params, ctxOf(engine));
         const viaTs = execute(createEmptyDocument(), 'compute_view_factors', params, ctxOf());
         expect(viaNative.rejected, viaNative.summary).toBeUndefined();
@@ -166,6 +182,38 @@ describe('callers through the native engine (VC-THM-64, VC-FPR-37)', () => {
     },
     120_000,
   );
+
+  native('a binary that ignores integration (it predates the option) is not trusted with a reciprocal job', () => {
+    const folder = mkdtempSync(path.join(tmpdir(), 'llull-geomq-stale-'));
+    const stale = path.join(folder, 'llull-compute');
+    // drops the option from job.json, so the real binary runs (and reports) `full`
+    writeFileSync(stale, `#!/bin/sh\nsed -i 's/,"integration":"reciprocal"//' "$2/job.json"\nexec '${BINARY ?? ''}' "$@"\n`);
+    chmodSync(stale, 0o755);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const plate = (z: number, flip: boolean): readonly ViewFacet[] =>
+        planarFacets(
+          [
+            [0, 0, z],
+            [1, 0, z],
+            [1, 1, z],
+            [0, 1, z],
+          ],
+          flip,
+          0.5,
+        )?.facets ?? [];
+      const surfaces = [plate(0, false), plate(2, true)];
+      const engineOfStale = createNativeGeometryQueryEngine(stale);
+      expect(engineOfStale.viewFactorExchange?.(surfaces, null, { integration: 'reciprocal' })).toBeNull();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("did not run the 'reciprocal' view-factor integration"));
+      expect(engineOfStale.viewFactorExchange?.(surfaces, null)).toEqual(
+        engine.viewFactorExchange?.(surfaces, null, { integration: 'full' }),
+      );
+    } finally {
+      warn.mockRestore();
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
 
   native('check_assembly: wall-thickness rays give the TS statistics', () => {
     let doc = createEmptyDocument();

@@ -12,6 +12,7 @@ import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
 import { unboundedEffort } from '../sim/driveReport';
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** No real static propeller exceeds a figure of merit of ~0.75 (NACA TR-684); above 0.8 the Ct / Cp pair is not physical (named default). */
 const MAX_FIGURE_OF_MERIT: CheckThreshold = {
@@ -170,13 +171,13 @@ function loopItems(doc: CadDocument): { items: ReviewItem[]; simulatable: Simula
         'fail',
         gaps.map(([id]) => id),
         'Fix the joint anchors (anchorOnChild) so both pins of each loop coincide at the start pose.',
-        { values: { maxGapMm: Math.max(...gaps.map(([, gap]) => gap * 1000)), loops: ids.length }, threshold: limit },
+        { values: { maxGapMm: maxOf(gaps.map(([, gap]) => gap * 1000)), loops: ids.length }, threshold: limit },
       ),
     );
   else
     items.push(
       item('FPR_LOOP_OPEN', 'pass', ids, 'None.', {
-        values: { loops: ids.length, maxGapMm: Math.max(0, ...Object.values(mobility.loopGapsM)) * 1000 },
+        values: { loops: ids.length, maxGapMm: Math.max(0, maxOf(Object.values(mobility.loopGapsM))) * 1000 },
         threshold: limit,
       }),
     );

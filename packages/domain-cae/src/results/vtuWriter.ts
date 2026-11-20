@@ -3,6 +3,7 @@
 import type { FeElementType, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { num } from '../decks/format';
 import { vonMises } from './fields';
+import { appendAll } from '@lib/appendAll';
 
 /** VTK cell type of each element type; quadratic elements keep the corner-then-mid-edge node order shared by Abaqus and VTK. */
 const CELL_TYPES: Readonly<Record<FeElementType, number>> = {
@@ -106,7 +107,7 @@ export function writeVtu(
         dropped++;
         continue;
       }
-      connectivity.push(...(positions as number[]));
+      appendAll(connectivity, positions as number[]);
       offsets.push(connectivity.length);
       types.push(CELL_TYPES[block.type]);
       partIndex.push(parts.indexOf(block.entityId));

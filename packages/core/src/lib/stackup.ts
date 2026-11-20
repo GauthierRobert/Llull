@@ -6,6 +6,7 @@
 import { programFunction, programGradient, type Program } from './expressionProgram';
 import { normalCdf } from './specialFunctions';
 import { pow } from './pow';
+import { maxOf } from './arrayExtrema';
 
 type StackDistribution = 'normal' | 'uniform';
 
@@ -38,7 +39,7 @@ export const sigmaOf = (c: StackInput, sigmaPerHalfTolerance: number): number =>
 export function uniformSumCdf(x: number, terms: readonly { readonly lo: number; readonly width: number }[]): number | null {
   const n = terms.length;
   if (n > UNIFORM_CDF_MAX) return null;
-  const narrow = 1e-6 * Math.max(0, ...terms.map((t) => t.width));
+  const narrow = 1e-6 * Math.max(0, maxOf(terms.map((t) => t.width)));
   const widths = terms.filter((t) => t.width > narrow);
   const shift = terms.reduce((sum, t) => sum + (t.width > narrow ? t.lo : t.lo + t.width / 2), 0);
   if (widths.length === 0) return x >= shift ? 1 : 0;

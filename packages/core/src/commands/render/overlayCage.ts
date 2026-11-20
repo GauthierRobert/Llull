@@ -15,6 +15,7 @@ import {
   type OverlayStats,
 } from '../../model/renderOverlay';
 import type { RenderViewData } from './types';
+import { appendAll } from '../../lib/appendAll';
 
 const CAGE_COLOR = '#ffd24a';
 const NET_COLOR = '#44ddff';
@@ -44,11 +45,11 @@ function cageLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
         body.push(`    ${svgLine(screen[a] as [number, number], screen[b] as [number, number])}`);
       });
     for (const p of screen) body.push(`    ${svgDot(p, `fill="${CAGE_COLOR}" stroke="#1a1a2e" stroke-width="1"`)}`);
-    svg.push(
+    appendAll(svg, [
       `  <g class="cage-overlay" data-entity="${escapeXml(entity.id)}" stroke="${CAGE_COLOR}" stroke-width="1.2" stroke-linecap="round" opacity="0.9">`,
       ...body,
       '  </g>',
-    );
+    ]);
     ids.push(entity.id);
     lines += seen.size;
     points += screen.length;
@@ -83,11 +84,11 @@ function netLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
       }),
     );
     for (const p of screen.flat()) body.push(`    ${svgDot(p, `fill="${NET_COLOR}" stroke="#1a1a2e" stroke-width="1"`)}`);
-    svg.push(
+    appendAll(svg, [
       `  <g class="net-overlay" data-entity="${escapeXml(entity.id)}" stroke="${NET_COLOR}" stroke-width="1" stroke-dasharray="4 3" stroke-linecap="round" opacity="0.9">`,
       ...body,
       '  </g>',
-    );
+    ]);
     ids.push(entity.id);
     lines += drawn;
     points += screen.flat().length;
@@ -145,7 +146,7 @@ export function appendCageNetOverlays(
           ? cageLayer(shown, project)
           : netLayer(shown, project);
     stats[kind] = layer.stats;
-    if (layer.svg.length > 0) layers.push(`  <!-- ${kind} overlay -->`, ...layer.svg);
+    if (layer.svg.length > 0) appendAll(layers, [`  <!-- ${kind} overlay -->`, ...layer.svg]);
   }
   return { svg: layers.length === 0 ? svg : appendBeforeClose(svg, layers.join('\n')), stats };
 }

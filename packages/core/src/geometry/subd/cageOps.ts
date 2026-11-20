@@ -9,6 +9,8 @@ import type { CageState } from './cageState';
 import { edgeKey } from './edgeKey';
 import { mintElementId } from './elements';
 import { type CageTopology } from './topology';
+import { minOf } from '../../lib/arrayExtrema';
+import { spliceAll } from '../../lib/spliceAll';
 
 /** Drops the vertices no face uses; remaps faces, sharp edges (kept only while they are still edges) and corners. Returns old -> new index (-1 = dropped). */
 export function compactState(state: CageState): number[] {
@@ -21,8 +23,8 @@ export function compactState(state: CageState): number[] {
   const keep = (list: unknown[]): boolean[] => list.map((_, v) => (remap[v] as number) >= 0);
   const kept = keep(state.vertices);
   const filtered = <T>(list: T[]): T[] => list.filter((_, v) => kept[v]);
-  state.vertices.splice(0, state.vertices.length, ...filtered(state.vertices));
-  state.vertexIds.splice(0, state.vertexIds.length, ...filtered(state.vertexIds));
+  spliceAll(state.vertices, 0, state.vertices.length, filtered(state.vertices));
+  spliceAll(state.vertexIds, 0, state.vertexIds.length, filtered(state.vertexIds));
   state.faces.forEach((face, f) => (state.faces[f] = face.map((v) => remap[v] as number)));
   const edges = new Set<string>();
   for (const face of state.faces) face.forEach((a, i) => edges.add(edgeKey(a, face[(i + 1) % face.length] as number)));
@@ -33,18 +35,33 @@ export function compactState(state: CageState): number[] {
     const key = edgeKey(x, y);
     sharp.set(key, [x, y, Math.max(s, sharp.get(key)?.[2] ?? 0)]);
   }
-  state.sharp.splice(0, state.sharp.length, ...sharp.values());
+  spliceAll(state.sharp, 0, state.sharp.length, sharp.values());
   const corners = new Map<number, number>();
   for (const { v, s } of state.corners)
     if ((remap[v] as number) >= 0) corners.set(remap[v] as number, Math.max(s, corners.get(remap[v] as number) ?? 0));
-  state.corners.splice(0, state.corners.length, ...[...corners].map(([v, s]) => ({ v, s })));
+  spliceAll(
+    state.corners,
+    0,
+    state.corners.length,
+    [...corners].map(([v, s]) => ({ v, s })),
+  );
   return remap;
 }
 
 /** Removes `faces` and every vertex that no remaining face uses. */
 export function removeFaces(state: CageState, faces: ReadonlySet<number>): void {
-  state.faces.splice(0, state.faces.length, ...state.faces.filter((_, f) => !faces.has(f)));
-  state.faceIds.splice(0, state.faceIds.length, ...state.faceIds.filter((_, f) => !faces.has(f)));
+  spliceAll(
+    state.faces,
+    0,
+    state.faces.length,
+    state.faces.filter((_, f) => !faces.has(f)),
+  );
+  spliceAll(
+    state.faceIds,
+    0,
+    state.faceIds.length,
+    state.faceIds.filter((_, f) => !faces.has(f)),
+  );
   compactState(state);
 }
 
@@ -79,7 +96,7 @@ export function weldClusters(
 ): { vertices: number; faces: number } {
   const target = state.vertices.map((_, v) => v);
   for (const cluster of clusters) {
-    const rep = Math.min(...cluster);
+    const rep = minOf(cluster);
     if (atCentre) state.vertices[rep] = centroid3(cluster.map((v) => state.vertices[v] as Vec3));
     for (const v of cluster) target[v] = rep;
   }
@@ -93,10 +110,25 @@ export function weldClusters(
       survivors.push(f);
     }
   });
-  state.faces.splice(0, state.faces.length, ...survivors.map((f) => state.faces[f] as number[]));
-  state.faceIds.splice(0, state.faceIds.length, ...survivors.map((f) => state.faceIds[f] as string));
+  spliceAll(
+    state.faces,
+    0,
+    state.faces.length,
+    survivors.map((f) => state.faces[f] as number[]),
+  );
+  spliceAll(
+    state.faceIds,
+    0,
+    state.faceIds.length,
+    survivors.map((f) => state.faceIds[f] as string),
+  );
   state.sharp.forEach(([a, b, s], i) => (state.sharp[i] = [target[a] as number, target[b] as number, s]));
-  state.sharp.splice(0, state.sharp.length, ...state.sharp.filter(([a, b]) => a !== b));
+  spliceAll(
+    state.sharp,
+    0,
+    state.sharp.length,
+    state.sharp.filter(([a, b]) => a !== b),
+  );
   state.corners.forEach((corner, i) => (state.corners[i] = { v: target[corner.v] as number, s: corner.s }));
   compactState(state);
   return { vertices: vertexCount - state.vertices.length, faces: facesBefore - state.faces.length };

@@ -24,6 +24,8 @@ import { sweepStartAxes } from '../geometry/sweepEval/frames';
 import { hasSweepLaws } from '../geometry/sweepEval/laws';
 import { needsFittedFaces } from '../geometry/sweepEval/realisation';
 import type { Feature, FeatureProgram, LoftSection, PipeSection, ShapeSpec, SweptBuild, TracedCall } from './program';
+import { maxOf, minOf } from '../lib/arrayExtrema';
+import { hypotOf } from '../lib/hypotOf';
 
 /** Most poles one generated skin may carry (about 300 000 numbers, a few MB of data section): beyond it the source is unreadable and the mesh is kept. */
 const MAX_SKIN_POLES = 100_000;
@@ -122,13 +124,13 @@ function mitreLimit(path: ReadonlyArray<CurveSegment<Vec3>>): number | undefined
     const reach = (needs.get(i - 1) ?? 0) + (needs.get(i) ?? 0);
     return reach > 0 ? [chainLength([leg]) / reach] : [];
   });
-  return limits.length === 0 ? undefined : Math.min(...limits);
+  return limits.length === 0 ? undefined : minOf(limits);
 }
 
 /** The radius from which sweep_profile refuses this path: a bend not wider than the section, or (mitre) a leg shorter than the mitre reaches. */
 function radiusLimit(entity: SweepEntity, mitre: boolean): number | undefined {
   if (mitre) return mitreLimit(entity.path);
-  const bend = Math.min(...entity.path.map(minCurvatureRadius));
+  const bend = minOf(entity.path.map(minCurvatureRadius));
   return Number.isFinite(bend) ? bend : undefined;
 }
 
@@ -193,10 +195,8 @@ function loftSections(entity: LoftEntity): LoftSection[] {
 
 function sizeOf(faces: readonly NurbsSurfaceData[]): number {
   const poles = faces.flatMap((face) => face.poles.flat());
-  const extent = [0, 1, 2].map(
-    (axis) => Math.max(...poles.map((p) => p[axis] as number)) - Math.min(...poles.map((p) => p[axis] as number)),
-  );
-  return Math.hypot(...extent);
+  const extent = [0, 1, 2].map((axis) => maxOf(poles.map((p) => p[axis] as number)) - minOf(poles.map((p) => p[axis] as number)));
+  return hypotOf(extent);
 }
 
 function loftBuild(entity: LoftEntity): SweptBuild | Refusal {

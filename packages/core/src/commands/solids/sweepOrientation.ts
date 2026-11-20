@@ -9,6 +9,8 @@ import { lawFunction } from '../../lib/law/evaluate';
 import { dot3, isVec3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import { sectionLoops } from '../../geometry/sweepEval/sections';
 import { z } from '../schema';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 export const orientationField = z
   .object({
@@ -95,10 +97,8 @@ export function parseOrientation(input: OrientationInput | undefined, context: O
       const surface = context.surfaceOf(input.surfaceId);
       if (typeof surface === 'string') return surface;
       const poles = surface.poles.flat();
-      const extent = [0, 1, 2].map(
-        (axis) => Math.max(...poles.map((p) => p[axis] as number)) - Math.min(...poles.map((p) => p[axis] as number)),
-      );
-      const tolerance = input.tolerance ?? 1e-4 * Math.hypot(...extent);
+      const extent = [0, 1, 2].map((axis) => maxOf(poles.map((p) => p[axis] as number)) - minOf(poles.map((p) => p[axis] as number)));
+      const tolerance = input.tolerance ?? 1e-4 * hypotOf(extent);
       return tolerance > 0
         ? { mode: 'surface', surface, sourceId: input.surfaceId, tolerance, ...(input.flip === true ? { flip: true } : {}) }
         : 'orientation.tolerance must be > 0';
@@ -112,11 +112,11 @@ export function parseOrientation(input: OrientationInput | undefined, context: O
 function leastPitch(helix: HelixDefinition): number {
   if (typeof helix.pitch === 'number') return helix.pitch;
   const f = lawFunction(helix.pitch);
-  return Math.min(...Array.from({ length: 257 }, (_, k) => f(k / 256, 1)));
+  return minOf(Array.from({ length: 257 }, (_, k) => f(k / 256, 1)));
 }
 
 const maxScaleOf = (transforms: readonly SectionTransform[] | null): number =>
-  transforms === null ? 1 : Math.max(...transforms.map((t) => Math.max(t.sx, t.sy)));
+  transforms === null ? 1 : maxOf(transforms.map((t) => Math.max(t.sx, t.sy)));
 
 /** The section loop under the transform of frame `i` (as placed). */
 function transformedLoop(loop: readonly Vec2[], transforms: readonly SectionTransform[] | null, i: number): Vec2[] {
@@ -139,7 +139,7 @@ export function helixOverlap(entity: SweepEntity, transforms: readonly SectionTr
     const count = transforms === null ? 1 : transforms.length;
     for (let i = 0; i < count; i += Math.max(1, Math.floor(count / 128))) {
       const ys = transformedLoop(loop, transforms, i).map((p) => p[1]);
-      extent = Math.max(extent, Math.max(...ys) - Math.min(...ys));
+      extent = Math.max(extent, maxOf(ys) - minOf(ys));
     }
     return extent >= pitch
       ? `the section reaches ${extent.toFixed(4)} along the axis, the pitch is ${pitch.toFixed(4)}: neighbouring turns overlap`
@@ -148,7 +148,7 @@ export function helixOverlap(entity: SweepEntity, transforms: readonly SectionTr
   if (entity.section.shape !== 'circle') return null;
   const smallest = Math.min(helix.radius, helix.endRadius);
   const lead = (2 * Math.PI * smallest) / Math.hypot(2 * Math.PI * smallest, pitch);
-  const reach = Math.max(...loop.map((p) => Math.hypot(p[0], p[1]))) * maxScaleOf(transforms);
+  const reach = maxOf(loop.map((p) => Math.hypot(p[0], p[1]))) * maxScaleOf(transforms);
   return 2 * reach >= pitch * lead
     ? `the section is ${(2 * reach).toFixed(4)} wide, the turns are ${(pitch * lead).toFixed(4)} apart: neighbouring turns overlap`
     : null;
@@ -171,7 +171,7 @@ export function axisCrossing(
     const relative = sub3((frames[i] as SweepFrame).point, orientation.axisPoint);
     const radius = len3(sub3(relative, scale3(axis, dot3(relative, axis))));
     const xs = transformedLoop(loop, transforms, i).map((p) => p[0]);
-    const crosses = orientation.sectionFrame === 'axial' ? Math.min(...xs) <= 0 : -Math.min(...xs) >= radius;
+    const crosses = orientation.sectionFrame === 'axial' ? minOf(xs) <= 0 : -minOf(xs) >= radius;
     if (crosses) return `the section reaches across the axis (path radius ${radius.toFixed(4)}); the solid would self-intersect`;
   }
   return null;

@@ -7,6 +7,7 @@ import { checkFamily } from './catalogFile';
 import { fastenerProjections } from './projections';
 import { fastenerModel } from './fastenerDoc';
 import type { FastenerStack } from '@aero/fasteners/types';
+import { appendAll } from '@lib/appendAll';
 
 const HOLE_MODES: readonly unknown[] = ['cut_close_tolerance', 'cut_clearance', 'none'];
 
@@ -83,11 +84,15 @@ export const fastenersDocument: DocumentExtension = {
           errors.push(`fasteners.catalogs.${key}.sizes.${index}.dims must be an object (stored catalogues carry it)`);
       });
       const checked = checkFamily(family, `fasteners.catalogs.${key}`);
-      if ('issues' in checked) errors.push(...checked.issues.map((issue) => `${issue.code}: ${issue.message}`));
+      if ('issues' in checked)
+        appendAll(
+          errors,
+          checked.issues.map((issue) => `${issue.code}: ${issue.message}`),
+        );
       else if (checked.family.id !== key) errors.push(`fasteners.catalogs.${key}.id must equal its key`);
     }
     const entities = isRecord(raw['entities']) ? raw['entities'] : null;
-    for (const [key, stack] of Object.entries(slice['stacks'])) errors.push(...stackErrors(key, stack, entities));
+    for (const [key, stack] of Object.entries(slice['stacks'])) appendAll(errors, stackErrors(key, stack, entities));
     return errors;
   },
   derivedEntityIds: () => new Set(),

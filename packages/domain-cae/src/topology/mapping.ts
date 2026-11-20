@@ -8,6 +8,7 @@ import { cross3, distance3, dot3, len3, normalize3, sub3 } from '@lib/vec3';
 import { projectOntoSegment } from '@lib/polygon';
 import { quantizedKey } from '@lib/quantize';
 import { nodePosition, type TopologyGrid } from './voxel';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Node (i, j, k) -> index; dof c of node n is `components * n + c`. */
 const nodeIndex = (grid: TopologyGrid, i: number, j: number, k: number): number => i + (grid.nx + 1) * (j + (grid.ny + 1) * k);
@@ -88,7 +89,7 @@ function distanceToSegment(grid: TopologyGrid, point: Vec3, a: Vec3, b: Vec3): n
 const normalOf = ([a, b, c]: Triangle): Vec3 => normalize3(cross3(sub3(b, a), sub3(c, a)));
 const VERTEX_UNIT = 1e-6;
 const scaleOf = (triangles: readonly Triangle[]): number =>
-  Math.max(1e-12, ...triangles.flatMap((t) => t.map((p) => Math.max(...p.map(Math.abs)))));
+  Math.max(1e-12, maxOf(triangles.flatMap((t) => t.map((p) => maxOf(p.map(Math.abs))))));
 
 /** Triangles coplanar with `seed` that are connected to it through shared vertices. */
 function planarGroup(triangles: readonly Triangle[], seed: number): number[] {
@@ -213,7 +214,7 @@ export function mapTarget(
   }
   for (const point of target.facesNear ?? []) {
     const exact = triangles.map((triangle) => distance3(point, closestPointOnTriangle(point, triangle)));
-    const nearest = Math.min(...exact);
+    const nearest = minOf(exact);
     const tie = nearest + 1e-9 * scaleOf(triangles);
     const candidates = triangles.map((triangle, index) => ({ triangle, index })).filter(({ index }) => (exact[index] ?? Infinity) <= tie);
     const sides =
@@ -224,15 +225,14 @@ export function mapTarget(
     normal ??= normalOf(triangles[seed] as Triangle);
     faceArea = (faceArea ?? 0) + group.reduce((total, triangle) => total + triangleArea(triangle), 0);
     const before = found.size;
-    for (const index of sets.boundary)
-      if (near(index, (p) => Math.min(...group.map((t) => distanceToTriangle(grid, p, t))))) found.add(index);
+    for (const index of sets.boundary) if (near(index, (p) => minOf(group.map((t) => distanceToTriangle(grid, p, t))))) found.add(index);
     if (found.size === before) return { error: `no domain node lies on the face nearest to [${point.join(', ')}]` };
   }
   for (const point of target.edgesNear ?? []) {
     const chain = edgeChain(grid, triangles, point);
     const before = found.size;
     for (const index of sets.boundary)
-      if (near(index, (p) => Math.min(...chain.map((e) => distanceToSegment(grid, p, e.a, e.b))))) found.add(index);
+      if (near(index, (p) => minOf(chain.map((e) => distanceToSegment(grid, p, e.a, e.b))))) found.add(index);
     if (found.size === before) return { error: `no domain node lies on the edge nearest to [${point.join(', ')}]` };
   }
   return {

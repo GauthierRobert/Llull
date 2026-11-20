@@ -19,6 +19,7 @@ import {
   outwardMesh,
   withConventions,
 } from './meshCommon';
+import { appendAll } from '../../lib/appendAll';
 
 type Purpose = 'print' | 'boolean' | 'fit' | 'export';
 type Severity = 'fail' | 'warn';
@@ -236,7 +237,7 @@ export const checkMesh = defineCommand({
         smallShellFaces: smallShellFaces ?? DEFAULT_SMALL_SHELL_FACES,
         unit: doc.units,
       });
-      findings.push(...own);
+      appendAll(findings, own);
       if (loaded.weldDefaulted)
         defaults.set('weldTolerance', namedDefault('weldTolerance', loaded.weldTolerance, doc.units, 'llull default 1e-6 x bbox diagonal'));
       if (loaded.unverified) unverifiedIds.push(id);

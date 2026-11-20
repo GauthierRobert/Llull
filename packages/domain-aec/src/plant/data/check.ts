@@ -16,6 +16,7 @@ import { allProviders, elementOf } from './providers';
 import { isOpenEnd } from './openPort';
 import { inferredNozzles } from './plantReports/inferNozzles';
 import { duplicateTags, objectRegistry } from './registry';
+import { appendAll } from '@lib/appendAll';
 
 const RULE_ORDER = [
   'DAT_OUTSIDE_HIERARCHY',
@@ -81,7 +82,7 @@ function objectFindings(doc: CadDocument, data: PlantDataModel, object: PlantObj
           at(definition.name),
         ]),
       );
-  if (isProcessLine(data, object)) findings.push(...lineFindings(doc, data, object));
+  if (isProcessLine(data, object)) appendAll(findings, lineFindings(doc, data, object));
   const unverified = Object.entries(object.provenance ?? {}).flatMap(([name, provenance]) =>
     provenance.unverified === true ? [name] : [],
   );
@@ -223,11 +224,14 @@ export function checkFindings(doc: CadDocument, scope: CheckScope): DataFinding[
   const included = (id: string): boolean => scope.objects === undefined || scope.objects.has(id);
   for (const id of data.objectOrder) {
     const object = data.objects[id];
-    if (object !== undefined && included(id)) findings.push(...objectFindings(doc, data, object));
+    if (object !== undefined && included(id)) appendAll(findings, objectFindings(doc, data, object));
   }
-  if (data.objectOrder.length > 0) findings.push(...inferredFindings(doc, included));
-  findings.push(...tagFindings(data, (ids) => ids.some(included)));
-  if (scope.objects === undefined) findings.push(...unclassified(doc, data));
+  if (data.objectOrder.length > 0) appendAll(findings, inferredFindings(doc, included));
+  appendAll(
+    findings,
+    tagFindings(data, (ids) => ids.some(included)),
+  );
+  if (scope.objects === undefined) appendAll(findings, unclassified(doc, data));
   return findings.sort((a, b) => rank(a) - rank(b) || naturalCompare(a.paths[0] ?? a.ids[0] ?? '', b.paths[0] ?? b.ids[0] ?? ''));
 }
 

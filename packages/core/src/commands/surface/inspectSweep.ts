@@ -9,6 +9,7 @@ import { sweepSamples, sweepTotals } from '../../geometry/sweepEval/inspect';
 import { baseSectionArea } from '../../geometry/sweepEval/laws';
 import { sweepAnalyticVolume } from '../../geometry/sweepEval/volume';
 import { sweepRealisation } from '../../geometry/sweepEval/realisation';
+import { minOf } from '../../lib/arrayExtrema';
 
 const MAX_SAMPLES = 2000;
 const sig = (value: number): number => roundSignificant(value, 10);
@@ -116,7 +117,7 @@ export const inspectSweep = defineCommand({
       doc,
       `inspect_sweep ${id}: path length ${sig(evaluation.length)} ${doc.units}, ${orientation} frame, ${ts.length} samples, ` +
         `twist vs minimal ${sig(totals.twistVsMinimalRad)} rad, ∫A ds ${sig(totals.integralAreaDs)}, ` +
-        `${margins.length === 0 ? 'no fold risk (straight)' : `least fold margin ${sig(Math.min(...margins))}`}.`,
+        `${margins.length === 0 ? 'no fold risk (straight)' : `least fold margin ${sig(minOf(margins))}`}.`,
       data,
     );
   },

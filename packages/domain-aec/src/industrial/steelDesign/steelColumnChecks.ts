@@ -10,6 +10,7 @@ import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { type ColumnNode } from './steelFraming';
 import { selfWeightPerMetre, type SteelBar } from './steelMemberBars';
 import { analysedRow, columnSection, metres, ULS_COMBINATION, type CheckLine, type MemberRow } from './steelMemberRows';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Beam ends whose axes differ by less than this are one level, mm. */
 const LEVEL_TOLERANCE = 300;
@@ -95,7 +96,7 @@ export function checkColumn(column: SteelBar, segments: ReadonlyArray<ColumnSegm
     }
   }
   return analysedRow(column, [section, buckling], {
-    NEd: Math.max(0, ...segments.map((segment) => segment.axial)),
+    NEd: Math.max(0, maxOf(segments.map((segment) => segment.axial))),
     segments: segments.length,
   });
 }

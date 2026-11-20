@@ -13,6 +13,7 @@ import { searchFit, type FitControl, type ParamSpec } from './fitSearch';
 import { failure, type LawFailure } from './resolve';
 import { pronyRatio } from './viscoelastic';
 import { pow } from '../../lib/pow';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 type Rows = ReadonlyArray<readonly [number, number]>;
 
@@ -25,7 +26,7 @@ const sumSquares = (values: readonly number[]): number => values.reduce((sum, va
 const stats = (mode: string, residuals: readonly number[]): Residual & { readonly mode: string } => ({
   mode,
   rms: Math.sqrt(sumSquares(residuals) / Math.max(residuals.length, 1)),
-  maxAbs: Math.max(0, ...residuals.map(Math.abs)),
+  maxAbs: Math.max(0, maxOf(residuals.map(Math.abs))),
   count: residuals.length,
 });
 
@@ -42,8 +43,8 @@ const insufficient = (rows: number, parameters: number): LawFailure =>
 export function fitPronyFreeTau(rows: Rows, G0: number, terms: number, weight: number, control: FitControl): LawFit | LawFailure {
   if (rows.length <= 2 * terms) return insufficient(rows.length, 2 * terms);
   const times = rows.map(([t]) => t);
-  const tMin = Math.min(...times);
-  const tMax = Math.max(...times);
+  const tMin = minOf(times);
+  const tMax = maxOf(times);
   const specs: ParamSpec[] = [
     ...Array.from({ length: terms }, (_, k) => ({ name: `g${k + 1}`, lower: 1e-9, upper: 1 })),
     ...Array.from({ length: terms }, (_, k) => ({ name: `tau${k + 1}`, lower: tMin / 100, upper: tMax * 100, log: true })),
@@ -151,8 +152,8 @@ export function fitRambergOsgoodTrue(
       ),
       perTest: [stats('uniaxial_plastic', residuals)],
       convergence: report,
-      range: { variable: 'equivalentPlasticStrain', unit: '1', data: [0, Math.max(...usable.map(([e, stress]) => e - stress / E), 0)] },
-      plasticStrainMax: Math.max(...usable.map(([e, stress]) => e - stress / E), 0),
+      range: { variable: 'equivalentPlasticStrain', unit: '1', data: [0, Math.max(maxOf(usable.map(([e, stress]) => e - stress / E)), 0)] },
+      plasticStrainMax: Math.max(maxOf(usable.map(([e, stress]) => e - stress / E)), 0),
     };
   });
 }
@@ -160,7 +161,7 @@ export function fitRambergOsgoodTrue(
 const hardeningRange = (rows: Rows): NonlinearBase['range'] => ({
   variable: 'equivalentPlasticStrain',
   unit: '1',
-  data: [Math.min(...rows.map(([e]) => e)), Math.max(...rows.map(([e]) => e))],
+  data: [minOf(rows.map(([e]) => e)), maxOf(rows.map(([e]) => e))],
 });
 
 /**
@@ -178,7 +179,7 @@ export function fitVoce(rows: Rows, weight: number, control: FitControl): LawFit
   const model = (values: readonly number[], strain: number): number =>
     (values[0] ?? 0) + (values[1] ?? 0) * (1 - Math.exp(-(values[2] ?? 0) * strain));
   const starts: number[][] = [];
-  const strainMax = Math.max(...rows.map(([e]) => e), Number.MIN_VALUE);
+  const strainMax = Math.max(maxOf(rows.map(([e]) => e)), Number.MIN_VALUE);
   for (const b of [1 / strainMax, 5 / strainMax, 20 / strainMax, 100 / strainMax]) {
     const fit = solveLeastSquares(
       rows.map(([e]) => [1, 1 - Math.exp(-b * e)]),
@@ -343,7 +344,7 @@ export function fitGarofalo(
       ),
       perTest: [stats('creep_rate_ln', residuals)],
       convergence: report,
-      range: { variable: 'T', unit: 'K', data: [Math.min(...temperatures), Math.max(...temperatures)] },
+      range: { variable: 'T', unit: 'K', data: [minOf(temperatures), maxOf(temperatures)] },
     };
   });
 }

@@ -13,6 +13,7 @@ import { DEFAULT_ENTRY_TIME_MIN, intensityAt, type DrainageCriteria } from './dr
 import { computeFlows, type PipeFlow } from './drainageFlow';
 import { computeHgl, type ManholeHgl, type PipeHgl } from './drainageHgl';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface PipeRow {
   readonly id: string;
@@ -139,7 +140,7 @@ function manholeRow(
   const pipes = civilObjectsOf(civil, 'pipe');
   const incoming = pipes.filter((pipe) => pipe.toId === manhole.id).map((pipe) => pipe.invertTo);
   const outgoing = pipes.filter((pipe) => pipe.fromId === manhole.id).map((pipe) => pipe.invertFrom);
-  const dropM = incoming.length > 0 && outgoing.length > 0 ? round(toMetres(doc, Math.max(...incoming) - Math.min(...outgoing)), 3) : null;
+  const dropM = incoming.length > 0 && outgoing.length > 0 ? round(toMetres(doc, maxOf(incoming) - minOf(outgoing)), 3) : null;
   const reasons: string[] = [];
   if (dropM !== null && dropM < 0) reasons.push(`outgoing invert ${(-dropM).toFixed(3)} m above incoming`);
   if (!(manhole.rimElevation > manhole.invertElevation)) reasons.push('rim not above invert');

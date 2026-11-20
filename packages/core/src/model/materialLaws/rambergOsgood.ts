@@ -6,6 +6,7 @@
 import { solveLinear } from './linalg';
 import { contract, deviator, vonMises, type Vec6 } from './tensor';
 import { pow } from '../../lib/pow';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface RambergOsgoodMaterial {
   readonly E: number;
@@ -60,7 +61,7 @@ export function roSolve(material: RambergOsgoodMaterial, targets: readonly RoTar
     return targets.map((target, i) => (target.kind === 'strain' ? (strain[i] ?? 0) : (stress[i] ?? 0)) - target.value);
   };
   const scale = targets.map((target) => Math.max(Math.abs(target.value), target.kind === 'strain' ? (1e-3 * sigma0) / E : 1e-3 * sigma0));
-  const norm = (r: readonly number[]): number => Math.max(...r.map((value, i) => Math.abs(value) / (scale[i] ?? 1)));
+  const norm = (r: readonly number[]): number => maxOf(r.map((value, i) => Math.abs(value) / (scale[i] ?? 1)));
   let stress: Vec6 = [0, 0, 0, 0, 0, 0];
   for (const m of [{ ...material, alpha: 0 }, material]) {
     for (let iteration = 0; iteration < 60; iteration += 1) {

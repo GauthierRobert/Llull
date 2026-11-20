@@ -12,6 +12,7 @@ import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
 import { planarLoops } from './faceLoops';
 import { orientedAbout } from './sheetMetalMid';
 import type { MidFace, Midsurface, MidsurfaceRefusal } from './types';
+import { maxOf } from '@lib/arrayExtrema';
 
 const PLUS_Z: Vec3 = [0, 0, 1];
 /** A face lies in z = 0 when every vertex is within this fraction of the face size of it, and its normal is within 1e-6 of +-Z. */
@@ -119,7 +120,7 @@ export function planeStressDomain(
 ): Midsurface | MidsurfaceRefusal {
   const faces = sourceFaces(doc, entityId, points, thickness, kernel);
   if (!Array.isArray(faces)) return faces;
-  const size = Math.max(1, ...faces.flatMap((face) => face.outer.map((point) => Math.hypot(...point))));
+  const size = Math.max(1, maxOf(faces.flatMap((face) => face.outer.map((point) => Math.hypot(point[0], point[1], point[2])))));
   const bad = faces.find((face) => !inPlaneZ0(face, size));
   if (bad !== undefined)
     return {

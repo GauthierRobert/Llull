@@ -7,6 +7,7 @@
 import type { AnalysisCase, FeMeshArtifact } from '@core/model/analysis';
 import type { BoxEntity, CadDocument } from '@core/model/types';
 import { MAX_STRUCTURED_NODES } from './defaults';
+import { appendAll } from '@lib/appendAll';
 
 export interface ExplicitMesh {
   /** 3 coordinates per node. */
@@ -67,7 +68,10 @@ function appendShellGrid(
       point[u] = (min[u] ?? 0) + (i * (entity.size[u] ?? 0)) / (nu ?? 1);
       point[v] = (min[v] ?? 0) + (j * (entity.size[v] ?? 0)) / (nv ?? 1);
       point[thin] = (min[thin] ?? 0) + (entity.size[thin] ?? 0) / 2;
-      nodes.push(...point.map((value) => value * lengthToAnalysis));
+      appendAll(
+        nodes,
+        point.map((value) => value * lengthToAnalysis),
+      );
       nodePart.push(entityId);
     }
   const at = (i: number, j: number): number => base + i + ((nu ?? 1) + 1) * j;

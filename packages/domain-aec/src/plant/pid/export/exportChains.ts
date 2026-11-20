@@ -5,6 +5,7 @@
 
 import type { Vec2 } from '@core/model/vectors';
 import type { PidEndpoint, PidItem, PidModel, PidSegment } from '../model';
+import { appendAll } from '@lib/appendAll';
 
 export interface OrientedPiece {
   readonly from: PidEndpoint;
@@ -107,7 +108,7 @@ export function buildChains(pid: PidModel, sheets: ReadonlySet<string>, items: r
         for (const piece of run) chainOfSegment.set(piece.id, chain);
       }
     byLine.set(item.id, own);
-    chains.push(...own);
+    appendAll(chains, own);
   }
 
   const homed = new Set<string>();

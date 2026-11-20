@@ -5,6 +5,7 @@ import type { BuildingElement, BuildingModel } from '@aec/building/types';
 import { distance, polygonArea, toCounterClockwise } from '@lib/polygon';
 import { columnSectionArea } from './takeoffBasics';
 import { elementsOf } from '../model';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 type Slab = Extract<BuildingElement, { category: 'slab' }>;
 type Column = Extract<BuildingElement, { category: 'column' }>;
@@ -44,7 +45,7 @@ function slabAreaWithin(slab: Slab, within: ReadonlyArray<Poly>): number {
 
 const overlapLength = (a: ZRange, b: ZRange, ...rest: ZRange[]): number => {
   const ranges = [a, b, ...rest];
-  return Math.max(0, Math.min(...ranges.map((range) => range[1])) - Math.max(...ranges.map((range) => range[0])));
+  return Math.max(0, minOf(ranges.map((range) => range[1])) - maxOf(ranges.map((range) => range[0])));
 };
 
 const columnFootprint = (column: Column): Vec2[] => {

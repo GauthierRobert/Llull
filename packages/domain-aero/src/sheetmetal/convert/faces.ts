@@ -4,6 +4,7 @@ import type { FaceGraph } from '@core/geometry/kernelPorts';
 import type { ShapeEdge, ShapeTopology } from '@core/geometry/kernel';
 import type { Vec3 } from '@core/model/types';
 import { distance3, dot3, normalize3, scale3, sub3 } from '@lib/vec3';
+import { appendAll } from '@lib/appendAll';
 
 export interface PlaneFacts {
   readonly index: number;
@@ -109,7 +110,7 @@ export function chainLoop(edges: readonly ShapeEdge[], tolerance: number): Loop3
     const index = remaining.findIndex((edge) => near3(edge.start, tail, tolerance) || near3(edge.end, tail, tolerance));
     if (index < 0) return null;
     const edge = remaining.splice(index, 1)[0] as ShapeEdge;
-    path.push(...edgePoints(edge, !near3(edge.start, tail, tolerance)).slice(1));
+    appendAll(path, edgePoints(edge, !near3(edge.start, tail, tolerance)).slice(1));
   }
   if (remaining.length > 0 || !near3(path[0] as Vec3, path[path.length - 1] as Vec3, tolerance)) return null;
   return { points: path.slice(0, -1) };

@@ -5,6 +5,7 @@
 
 import { escapeXml } from '@lib/escapeXml';
 import { pow } from '@lib/pow';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const FONT = 'font-family="Helvetica, Arial, sans-serif"';
 const PALETTE = ['#1f77b4', '#d62728', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b'] as const;
@@ -52,8 +53,8 @@ export function xyChart(title: string, xLabel: string, yLabel: string, series: r
   const [x0, x1, y0, y1] = [MARGIN.left, width - MARGIN.right, MARGIN.top, height - MARGIN.bottom];
   const xs = series.flatMap((s) => s.xs).filter(Number.isFinite);
   const ys = series.flatMap((s) => s.ys).filter(Number.isFinite);
-  const [xLow, xHigh] = [Math.min(0, ...xs), Math.max(0, ...xs, 1e-12)];
-  const [yLow, yHigh] = [Math.min(0, ...ys), Math.max(0, ...ys, 1e-12)];
+  const [xLow, xHigh] = [Math.min(0, minOf(xs)), Math.max(0, maxOf(xs), 1e-12)];
+  const [yLow, yHigh] = [Math.min(0, minOf(ys)), Math.max(0, maxOf(ys), 1e-12)];
   const sx = (x: number): number => x0 + ((x - xLow) / widthOf(xLow, xHigh)) * (x1 - x0);
   const sy = (y: number): number => y1 - ((y - yLow) / widthOf(yLow, yHigh)) * (y1 - y0);
   const parts: string[] = [`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="#ffffff" stroke="#888888"/>`];
@@ -107,7 +108,7 @@ export function barChart(
   const height = MARGIN.top + bars.length * rowHeight + 28;
   const [labelWidth, x1] = [210, width - MARGIN.right - 70];
   const x0 = MARGIN.left + labelWidth - 78;
-  const [low, high] = [Math.min(0, ...bars.map((bar) => bar.value)), Math.max(0, ...bars.map((bar) => bar.value), 1e-12)];
+  const [low, high] = [Math.min(0, minOf(bars.map((bar) => bar.value))), Math.max(0, maxOf(bars.map((bar) => bar.value)), 1e-12)];
   const sx = (v: number): number => x0 + ((v - low) / widthOf(low, high)) * (x1 - x0);
   const parts: string[] = [
     `<text x="${MARGIN.left}" y="${MARGIN.top - 10}" font-size="13" font-weight="bold" ${FONT}>${escapeXml(title)} (${escapeXml(unit)})</text>`,

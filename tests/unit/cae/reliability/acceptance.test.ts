@@ -150,7 +150,9 @@ describe('accept_reliability_result', () => {
     expect(resultHashOf(doc, 8)).not.toBe(resultHash);
     const study = data(execute(doc, 'run_reliability_study', { limitState: 'g', methods: ['form', 'mc'], seed: SEED, samples: SAMPLES }));
     expect(study['resultHash']).toBe(resultHash);
-    expect(data(execute(doc, 'run_reliability_study', { limitState: 'g', methods: ['form'] }))['resultHash']).toBeUndefined();
+    const formOnly = data(execute(doc, 'run_reliability_study', { limitState: 'g', methods: ['form'] }))['resultHash'];
+    expect(formOnly).toMatch(/^[0-9a-f]{64}$/);
+    expect(formOnly).not.toBe(resultHash);
   });
 
   it('an acceptance is bound to its seed: the same hash with another seed is refused, the other seed hash is a different result', () => {

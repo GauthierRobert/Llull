@@ -5,6 +5,7 @@ import type { ViewpointCamera } from '../../../model/review';
 import { boundsCenter, boundsCorners, boundsDiagonalRadius, boundsRadius, type Bounds } from '../../../geometry/bounds';
 import { add3, dot3, normalize3, scale3, sub3 } from '../../../lib/vec3';
 import { cameraBasis, cameraForView, type ViewName } from '../camera';
+import { maxOf, minOf } from '../../../lib/arrayExtrema';
 
 /** Share of the image the framed scene fills along its tighter axis. */
 const FILL = 0.9;
@@ -21,7 +22,7 @@ export function framedCamera(view: ViewName, direction: Vec3 | undefined, bounds
   const corners = boundsCorners(bounds);
   const spans = (axis: Vec3): [number, number] => {
     const along = corners.map((corner) => dot3(corner, axis));
-    return [Math.min(...along), Math.max(...along)];
+    return [minOf(along), maxOf(along)];
   };
   const [u0, u1] = spans(basis.right);
   const [v0, v1] = spans(basis.up);

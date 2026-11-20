@@ -13,6 +13,9 @@ const ON_REL: f64 = 1e-5;
 /// Sample points per edge are at most this fraction of the part diagonal apart.
 const SAMPLE_REL: f64 = 1.0 / 50.0;
 
+/// The prefilter boxes are grown by this multiple of the on-tolerance, so a rounding in a distance never drops a match.
+const PREFILTER_SLACK: f64 = 2.0;
+
 /// Two planes are one when their unit normals agree (either sign) and the point of one is this close to the other (analysis unit, relative to 1).
 const SAME_PLANE: f64 = 1e-9;
 
@@ -85,19 +88,37 @@ impl Imprinted {
         (1..=self.origins.len() as i32).filter(|&f| self.origins[f as usize - 1].iter().any(|o| faces.contains(o))).collect()
     }
 
-    /// Edges of the split shape lying on any of the original `edges` of `original`.
+    /// Edges of the split shape lying on any of the original `edges` of `original`. A bounding box prefilter (an edge's box, grown by the
+    /// tolerance, must meet the split edge's box, then hold all its samples) skips the exact distances of the pairs that cannot match:
+    /// both tests are necessary conditions of the distance test, so the edges found are those of the unfiltered pass.
     fn edges_from(&self, original: &Shape, edges: &BTreeSet<i32>, diagonal: f64) -> MeshResult<BTreeSet<i32>> {
         let mut out = BTreeSet::new();
         if edges.is_empty() {
             return Ok(out);
         }
-        // one distance to each original edge decides most split edges; the rest of the samples are checked only for the edges that pass
+        let slack = PREFILTER_SLACK * ON_REL * diagonal;
+        let mut own = Vec::with_capacity(edges.len());
+        for &edge in edges {
+            own.push((edge, original.edge_bounds(edge)?.map(|b| grown(&b, slack))));
+        }
         for edge in 1..=self.shape.edge_count() as i32 {
+            let bounds = self.shape.edge_bounds(edge)?;
+            let candidates: Vec<&(i32, Option<[f64; 6]>)> =
+                own.iter().filter(|(_, b)| !matches!((&bounds, b), (Some(s), Some(o)) if !overlaps(s, o))).collect();
+            if candidates.is_empty() {
+                continue;
+            }
             let samples = self.shape.sample_edge(edge, SAMPLE_REL * diagonal)?;
-            for &own in edges {
-                let mut near = !samples.is_empty();
+            if samples.is_empty() {
+                continue;
+            }
+            for (own_edge, own_box) in candidates {
+                if own_box.is_some_and(|b| !samples.iter().all(|p| holds(&b, p))) {
+                    continue;
+                }
+                let mut near = true;
                 for p in &samples {
-                    if original.edge_distance(own, p)? > ON_REL * diagonal {
+                    if original.edge_distance(*own_edge, p)? > ON_REL * diagonal {
                         near = false;
                         break;
                     }
@@ -124,6 +145,19 @@ impl Imprinted {
         }
         Ok(out)
     }
+}
+
+/// `b` = [min xyz, max xyz] grown by `margin` on every side.
+fn grown(b: &[f64; 6], margin: f64) -> [f64; 6] {
+    [b[0] - margin, b[1] - margin, b[2] - margin, b[3] + margin, b[4] + margin, b[5] + margin]
+}
+
+fn overlaps(a: &[f64; 6], b: &[f64; 6]) -> bool {
+    (0..3).all(|k| a[k] <= b[k + 3] && b[k] <= a[k + 3])
+}
+
+fn holds(b: &[f64; 6], p: &Point) -> bool {
+    (0..3).all(|k| b[k] <= p[k] && p[k] <= b[k + 3])
 }
 
 /// `shape` split by each of `planes` in turn.
@@ -203,4 +237,140 @@ fn apply_plane(
     item.edges = edges;
     item.section = true;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Instant;
+
+    /// A closed shell: the plate [0, 60]^2 x [0, 2] with `k` x `k` square through holes of side 4 (12 edges per hole, 12 for the plate).
+    fn perforated_plate(k: usize) -> Shape {
+        let (side, half, pitch) = (60.0, 2.0, 60.0 / k as f64);
+        let mut coords: Vec<f64> = Vec::new();
+        let (mut loop_sizes, mut face_loops) = (Vec::new(), Vec::new());
+        let square = |x0: f64, y0: f64, x1: f64, y1: f64, z: f64| [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]];
+        let holes: Vec<[f64; 4]> = (0..k * k)
+            .map(|h| {
+                let (cx, cy) = (pitch * ((h % k) as f64 + 0.5), pitch * ((h / k) as f64 + 0.5));
+                [cx - half, cy - half, cx + half, cy + half]
+            })
+            .collect();
+        for z in [0.0, 2.0] {
+            coords.extend(square(0.0, 0.0, side, side, z).iter().flatten());
+            loop_sizes.push(4);
+            for [x0, y0, x1, y1] in &holes {
+                coords.extend(square(*x0, *y0, *x1, *y1, z).iter().flatten());
+                loop_sizes.push(4);
+            }
+            face_loops.push(1 + holes.len() as u32);
+        }
+        let walls = std::iter::once([0.0, 0.0, side, side]).chain(holes.iter().copied());
+        for [x0, y0, x1, y1] in walls {
+            let ring = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+            for i in 0..4 {
+                let ([ax, ay], [bx, by]) = (ring[i], ring[(i + 1) % 4]);
+                coords.extend([ax, ay, 0.0, bx, by, 0.0, bx, by, 2.0, ax, ay, 2.0]);
+                loop_sizes.push(4);
+                face_loops.push(1);
+            }
+        }
+        Shape::planar_faces(&coords, &loop_sizes, &face_loops, 1e-7).unwrap()
+    }
+
+    /// `edges_from` before the prefilter (the reference the filtered pass must reproduce).
+    fn edges_from_unfiltered(split: &Imprinted, original: &Shape, edges: &BTreeSet<i32>, diagonal: f64) -> BTreeSet<i32> {
+        let mut out = BTreeSet::new();
+        for edge in 1..=split.shape.edge_count() as i32 {
+            let samples = split.shape.sample_edge(edge, SAMPLE_REL * diagonal).unwrap();
+            for &own in edges {
+                let near = !samples.is_empty() && samples.iter().all(|p| original.edge_distance(own, p).unwrap() <= ON_REL * diagonal);
+                if near {
+                    out.insert(edge);
+                    break;
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn the_bounding_box_prefilter_finds_the_edges_of_the_unfiltered_pass() {
+        let plate = perforated_plate(7);
+        assert_eq!(plate.edge_count(), 600, "49 holes x 12 edges + 12");
+        let diag = diagonal(&plate.bounds().unwrap());
+        // x = 31 crosses the middle column of holes (x 28..32) and the plate
+        let plane = Plane { point: [31.0, 0.0, 0.0], normal: [1.0, 0.0, 0.0] };
+        let split = imprint(&plate, &[plane], "plate").unwrap();
+        assert!(split.shape.edge_count() > plate.edge_count());
+        let every: BTreeSet<i32> = (1..=plate.edge_count() as i32).collect();
+        let some: BTreeSet<i32> = [1, 77, 300, 599].into_iter().collect();
+        for (name, edges) in [("every edge", &every), ("four edges", &some)] {
+            let start = Instant::now();
+            let reference = edges_from_unfiltered(&split, &plate, edges, diag);
+            let unfiltered = start.elapsed();
+            let start = Instant::now();
+            let filtered = split.edges_from(&plate, edges, diag).unwrap();
+            let elapsed = start.elapsed();
+            assert_eq!(filtered, reference, "{name}");
+            assert!(!filtered.is_empty() && filtered.len() < split.shape.edge_count(), "the section edges lie on no original edge");
+            eprintln!(
+                "edges_from, {name} of {} original / {} split edges: unfiltered {unfiltered:?}, prefiltered {elapsed:?}",
+                plate.edge_count(),
+                split.shape.edge_count()
+            );
+        }
+    }
+
+    fn fixture(name: &str) -> Shape {
+        Shape::read_step(&format!("{}/../../crates/llull-netgen/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR")), 1.0).unwrap()
+    }
+
+    /// The prefilter finds the edges of the unfiltered pass for every edge of `part` (and returns them), the part split by `plane`.
+    fn assert_identical(part: &Shape, point: Point, normal: Point, what: &str) -> BTreeSet<i32> {
+        let length = normal.iter().map(|c| c * c).sum::<f64>().sqrt();
+        let plane = Plane { point, normal: normal.map(|c| c / length) };
+        let split = imprint(part, &[plane], "part").unwrap_or_else(|e| panic!("{what}: {}", e.message));
+        let diag = diagonal(&part.bounds().unwrap());
+        let every: BTreeSet<i32> = (1..=part.edge_count() as i32).collect();
+        let start = Instant::now();
+        let reference = edges_from_unfiltered(&split, part, &every, diag);
+        let unfiltered = start.elapsed();
+        let start = Instant::now();
+        let filtered = split.edges_from(part, &every, diag).unwrap();
+        eprintln!("{what}, {} edges: unfiltered {unfiltered:?}, prefiltered {:?}", part.edge_count(), start.elapsed());
+        assert_eq!(filtered, reference, "{what}");
+        assert!(!filtered.is_empty(), "{what}");
+        filtered
+    }
+
+    #[test]
+    fn the_prefilter_finds_the_unfiltered_edges_on_curved_oblique_in_plane_and_near_tangent_cuts() {
+        assert_identical(&fixture("plate_hole.step"), [10.0, 0.0, 0.0], [1.0, 0.0, 0.0], "circular hole edges");
+        let solid = fixture("box_20x10x10.step");
+        assert_identical(&solid, [10.0, 5.0, 5.0], [1.0, 0.5, 1.0], "oblique plane");
+        assert_identical(&solid, [0.0, 0.0, 0.0], [1.0, -1.0, 0.0], "an original edge in the plane");
+        assert_identical(&solid, [1e-3, 0.0, 0.0], [1.0, 0.0, 0.0], "near-tangent cut, 1e-3 from the x = 0 face");
+        // NIST CTC-01 (public domain, 07 validation data): 322 edges, 14 of them B-spline curves
+        let nist = format!(
+            "{}/../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/nist_ctc_01_asme1_ap242.stp",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let nist = Shape::read_step(&nist, 1.0).unwrap();
+        let b = nist.bounds().unwrap();
+        let centre = [0, 1, 2].map(|k| 0.5 * (b[k] + b[k + 3]));
+        assert_identical(&nist, centre, [1.0, 1.0, 1.0], "B-spline edges, oblique plane");
+        let offset = fixture("box_offset_vertex.step");
+        assert_identical(&offset, [10.0, 0.0, 0.0], [1.0, 0.0, 0.0], "a vertex off its curves");
+        assert_identical(&offset, [3e-3, 0.0, 0.0], [1.0, 0.0, 0.0], "near-tangent cut by the off-curve vertex");
+    }
+
+    #[test]
+    fn box_helpers_grow_overlap_and_hold() {
+        assert!(
+            overlaps(&[0.0, 0.0, 0.0, 1.0, 1.0, 1.0], &[1.0, 1.0, 1.0, 2.0, 2.0, 2.0])
+                && !overlaps(&[0.0; 6], &[1.0, 0.0, 0.0, 2.0, 1.0, 1.0])
+        );
+        assert!(holds(&grown(&[0.0; 6], 0.5), &[0.5, -0.5, 0.0]) && !holds(&[0.0; 6], &[0.0, 0.0, 1e-9]));
+    }
 }

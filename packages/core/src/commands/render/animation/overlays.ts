@@ -8,6 +8,8 @@ import { OVERLAY_Z, type OverlayFill, type OverlayPrimitives, type OverlayStroke
 import { placeText } from './overlayText';
 import { readoutLabel } from './readouts';
 import type { AnimationTimelineEntry, TraceTrack } from './types';
+import { maxOf } from '../../../lib/arrayExtrema';
+import { appendAll } from '../../../lib/appendAll';
 
 const PANEL: Rgb = [16, 16, 28];
 const INK: Rgb = [232, 232, 244];
@@ -87,7 +89,7 @@ export function frameOverlayOf(request: OverlayRequest): FrameOverlay {
         const placed = lines.map((line, i) =>
           placeText(font, line, cap, left, firstBaseline + i * pitch, align, colors[i] ?? INK, OVERLAY_Z.text),
         );
-        const widest = Math.max(0, ...placed.map((text) => text.width));
+        const widest = Math.max(0, maxOf(placed.map((text) => text.width)));
         const x0 = align === 'left' ? left - margin / 2 : left - widest - margin / 2;
         const rect = rectangle(
           x0,
@@ -97,8 +99,8 @@ export function frameOverlayOf(request: OverlayRequest): FrameOverlay {
         );
         fills.push({ color: PANEL, z: OVERLAY_Z.panel, loops: [rect] });
         for (const text of placed) {
-          fills.push(...text.fills);
-          strokes.push(...text.strokes);
+          appendAll(fills, text.fills);
+          appendAll(strokes, text.strokes);
         }
       };
       if (request.time) block([`t = ${+entry.tS.toFixed(5)} s`], margin, margin + cap, 'left', [INK]);

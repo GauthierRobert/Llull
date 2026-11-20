@@ -11,6 +11,7 @@ import { GltfBuffers, SUPPORTED_EXTENSION, type GltfFile } from './gltfContainer
 import { GltfError, type Json, indexOf, isRecord, listAt, numbersOf, recordAt } from './gltfJson';
 import { IDENTITY, type Mat4, decompose, determinant3, fromTrs, multiply, transformPoint } from './gltfMath';
 import { pow } from '../../lib/pow';
+import { appendAll } from '../../lib/appendAll';
 
 /** Colour of a primitive without a material colour. */
 const DEFAULT_COLOR = '#9aa5b1';
@@ -181,7 +182,10 @@ export function planGltfScene(file: GltfFile, scale: number): ScenePlan {
   const bake = (name: string, primitive: Primitive, m: Mat4): PlannedBody => {
     const positions: number[] = [];
     for (let i = 0; i < primitive.positions.length; i += 3)
-      positions.push(...transformPoint(m, primitive.positions[i] ?? 0, primitive.positions[i + 1] ?? 0, primitive.positions[i + 2] ?? 0));
+      appendAll(
+        positions,
+        transformPoint(m, primitive.positions[i] ?? 0, primitive.positions[i + 1] ?? 0, primitive.positions[i + 2] ?? 0),
+      );
     if (!positions.every(Number.isFinite))
       throw new GltfError('GLTF_LIMIT', `${name}: the transform overflows the coordinates of the mesh`);
     const indices = Array.from(primitive.indices);

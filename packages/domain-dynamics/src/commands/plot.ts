@@ -12,6 +12,7 @@ import { dynamicsOf } from './bodies';
 import { DRIVE_CHART_QUANTITIES, DRIVE_PANEL_QUANTITIES, driveChart, drivePanels, isDriveChart, isDrivePanel } from './plotDrives';
 import { stackCharts } from '../sim/driveCharts';
 import type { RunData as DriveRunData } from '../sim/runData';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const MOTION_QUANTITIES = ['joint_angle', 'joint_velocity', 'motor_torque', 'motor_power', 'reaction_force', 'energy'] as const;
 const QUANTITIES = [...MOTION_QUANTITIES, ...DRIVE_PANEL_QUANTITIES, ...DRIVE_CHART_QUANTITIES] as const;
@@ -204,8 +205,8 @@ export const plotSimulation = defineCommand({
       unit: panel.unit,
       series: panel.series.map((s) => ({
         label: s.label,
-        min: Math.min(...s.values),
-        max: Math.max(...s.values),
+        min: minOf(s.values),
+        max: maxOf(s.values),
         final: s.values[s.values.length - 1] ?? 0,
       })),
     }));

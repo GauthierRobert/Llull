@@ -21,6 +21,7 @@ import { appendConnections, findMomentJoints } from '../connections/connectionSu
 import { memberMass } from '../../building/quantities/takeoffCompute';
 import { addGrid, gridLabels, nextFreeLabel } from '../../building/elements/grid';
 import { levelIdParam } from '../../building/levelParams';
+import { appendAll } from '@lib/appendAll';
 
 /** Steel mass of members created by a generator, kg. */
 function steelMass(doc: CadDocument, building: BuildingModel, ids: ReadonlyArray<string>): number {
@@ -165,7 +166,7 @@ export const addPortalFrameBuilding = defineCommand({
     const membersAdded = appendMembers(building, levelId, specs);
     if ('reason' in membersAdded) return noop(doc, `add_portal_frame_building failed: ${membersAdded.reason}.`);
     building = membersAdded.building;
-    ids.push(...membersAdded.ids);
+    appendAll(ids, membersAdded.ids);
     if (params.connections !== false) {
       const connections = appendConnections(
         doc,
@@ -175,7 +176,7 @@ export const addPortalFrameBuilding = defineCommand({
         haunch ? { spanFractions: { ...haunch, rafterSpanShare: monopitch ? 1 : 2 } } : {},
       );
       building = connections.building;
-      ids.push(...connections.ids);
+      appendAll(ids, connections.ids);
     }
     if (params.basePlates !== false) {
       const unplated = columnsWithoutPlates(building, null, new Set(membersAdded.ids));
@@ -190,7 +191,7 @@ export const addPortalFrameBuilding = defineCommand({
       for (const [columns, fixity] of groups) {
         const plates = appendBasePlates(doc, building, columns, { fixity });
         building = plates.building;
-        ids.push(...plates.ids);
+        appendAll(ids, plates.ids);
       }
     }
     // Crane runway on both sides, inboard of the columns.
@@ -216,7 +217,7 @@ export const addPortalFrameBuilding = defineCommand({
       const craneAdded = appendMembers(building, levelId, runway);
       if ('reason' in craneAdded) return noop(doc, `add_portal_frame_building failed: ${craneAdded.reason}.`);
       building = craneAdded.building;
-      ids.push(...craneAdded.ids);
+      appendAll(ids, craneAdded.ids);
     }
     if (params.footings !== false) {
       const footings = appendFootings(
@@ -227,7 +228,7 @@ export const addPortalFrameBuilding = defineCommand({
         {},
       );
       building = footings.building;
-      ids.push(...footings.ids);
+      appendAll(ids, footings.ids);
     }
     if (params.floorSlab !== false) {
       const inner = h(p.column) / 2;

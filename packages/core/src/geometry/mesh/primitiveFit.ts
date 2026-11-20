@@ -8,6 +8,7 @@
 import type { PrimitiveFit } from '../../model/meshProvenance';
 import type { Vec3 } from '../../model/vectors';
 import { eigenSymmetric3, levenbergMarquardt, type Mat3, solveLinear } from './linear';
+import { hypot3 } from '../../lib/vec3';
 
 export type PrimitiveKind = Exclude<PrimitiveFit['type'], 'freeform'>;
 
@@ -35,7 +36,7 @@ const scale = (a: Vec3, s: number): Vec3 => [a[0] * s, a[1] * s, a[2] * s];
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const unit = (a: Vec3): Vec3 => {
-  const l = Math.hypot(...a);
+  const l = Math.hypot(a[0], a[1], a[2]);
   return l > 0 ? scale(a, 1 / l) : [0, 0, 1];
 };
 
@@ -156,7 +157,7 @@ function cylinderCandidate(input: FitInput): Candidate | null {
     return input.points.map((q) => {
       const d = sub(q, origin);
       const along = dot(d, axis);
-      return Math.hypot(...sub(d, scale(axis, along))) - (p[4] as number);
+      return hypot3(sub(d, scale(axis, along))) - (p[4] as number);
     });
   };
   const refined = levenbergMarquardt([cx, cy, 0, 0, Math.sqrt(r2)], residuals);
@@ -197,7 +198,7 @@ function coneCandidate(input: FitInput): Candidate | null {
     return input.points.map((q) => {
       const d = sub(q, vertex);
       const z = dot(d, a);
-      return Math.hypot(...sub(d, scale(a, z))) * Math.cos(beta) - z * Math.sin(beta);
+      return hypot3(sub(d, scale(a, z))) * Math.cos(beta) - z * Math.sin(beta);
     });
   };
   const refined = levenbergMarquardt([apex[0] as number, apex[1] as number, apex[2] as number, 0, 0, Math.asin(sinBeta)], residuals);
@@ -223,15 +224,15 @@ export function fitDistance(fit: PrimitiveFit, p: Vec3): number {
     case 'plane':
       return Math.abs(dot(sub(p, fit.point), fit.normal));
     case 'sphere':
-      return Math.abs(Math.hypot(...sub(p, fit.center)) - fit.radius);
+      return Math.abs(hypot3(sub(p, fit.center)) - fit.radius);
     case 'cylinder': {
       const d = sub(p, fit.axisPoint);
-      return Math.abs(Math.hypot(...sub(d, scale(fit.axis, dot(d, fit.axis)))) - fit.radius);
+      return Math.abs(hypot3(sub(d, scale(fit.axis, dot(d, fit.axis)))) - fit.radius);
     }
     case 'cone': {
       const d = sub(p, fit.apex);
       const z = dot(d, fit.axis);
-      return Math.abs(Math.hypot(...sub(d, scale(fit.axis, z))) * Math.cos(fit.halfAngleRad) - z * Math.sin(fit.halfAngleRad));
+      return Math.abs(hypot3(sub(d, scale(fit.axis, z))) * Math.cos(fit.halfAngleRad) - z * Math.sin(fit.halfAngleRad));
     }
     case 'freeform':
       return 0;

@@ -4,6 +4,7 @@
  */
 
 import { luFactor, luSolve } from '@lib/denseLinalg';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface PanelSolution {
   readonly cl: number;
@@ -77,8 +78,8 @@ export function solveVortexPanels(
   const atZero = luSolve(factors, [...angles.map((theta) => Math.sin(theta)), 0]);
   const atRight = luSolve(factors, [...angles.map((theta) => -Math.cos(theta)), 0]);
   if ([...atZero, ...atRight].some((value) => !Number.isFinite(value))) return null;
-  const xMax = Math.max(...nodes.map(([x]) => x));
-  const xMin = Math.min(...nodes.map(([x]) => x));
+  const xMax = maxOf(nodes.map(([x]) => x));
+  const xMin = minOf(nodes.map(([x]) => x));
   const chord = xMax - xMin;
   const panelForces = (gamma: ArrayLike<number>, alpha: number): PanelSolution => {
     const surface = Array.from({ length: m }, (_, i) => {

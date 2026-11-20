@@ -10,6 +10,7 @@ import type { Vec3 } from '@core/model/types';
 import type { Frame } from './frame';
 import type { Law, ScalarNode } from './model';
 import { pow } from '@lib/pow';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface ScalarPart {
   readonly reg: number;
@@ -73,7 +74,7 @@ function arithmetic(
       return { reg: b.sub(x.reg, y.reg), lo: x.lo - y.hi, hi: x.hi - y.lo };
     case 'multiply': {
       const products = [x.lo * y.lo, x.lo * y.hi, x.hi * y.lo, x.hi * y.hi].map((p) => (Number.isNaN(p) ? 0 : p));
-      return { reg: b.mul(x.reg, y.reg), lo: Math.min(...products), hi: Math.max(...products) };
+      return { reg: b.mul(x.reg, y.reg), lo: minOf(products), hi: maxOf(products) };
     }
     case 'divide':
       return { reg: b.div(x.reg, y.reg), ...UNBOUNDED };
@@ -85,7 +86,7 @@ function arithmetic(
 }
 
 const unit = (v: Vec3): Vec3 => {
-  const length = Math.hypot(...v);
+  const length = Math.hypot(v[0], v[1], v[2]);
   return [v[0] / length, v[1] / length, v[2] / length];
 };
 

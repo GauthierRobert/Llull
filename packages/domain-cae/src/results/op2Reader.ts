@@ -9,6 +9,7 @@
  */
 
 import { boundHashes } from './inputBinding';
+import { stringFromCharCodes } from '@lib/charCodes';
 
 interface Op2Eigenvalue {
   readonly mode: number;
@@ -97,13 +98,13 @@ function splitRecords(bytes: Uint8Array): { readonly records: RecordSpan[]; read
 const ascii = (bytes: Uint8Array, span: RecordSpan): string =>
   span.length > MAX_TEXT_BYTES
     ? ''
-    : String.fromCharCode(...bytes.subarray(span.start, span.start + span.length))
+    : stringFromCharCodes(bytes.subarray(span.start, span.start + span.length))
         .replace(/[^\x20-\x7e]/g, ' ')
         .trim();
 
 /** Input-hash markers in the first bytes of an identification record (the title / subtitle fields; their exact offset is not relied on). */
 const markersOf = (ident: Uint8Array): string[] =>
-  boundHashes(String.fromCharCode(...ident.subarray(0, MAX_IDENT_SCAN_BYTES)).replace(/[^\x20-\x7e]/g, ' '));
+  boundHashes(stringFromCharCodes(ident.subarray(0, MAX_IDENT_SCAN_BYTES)).replace(/[^\x20-\x7e]/g, ' '));
 
 /** Concatenation of the byte ranges of `spans`. */
 function joined(bytes: Uint8Array, spans: readonly RecordSpan[]): Uint8Array {

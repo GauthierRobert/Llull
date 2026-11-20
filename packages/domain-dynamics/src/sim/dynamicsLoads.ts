@@ -15,6 +15,7 @@ import { RAD_PER_S_PER_RPM, propellerOutput } from './forceLaws';
 import type { SimulationData } from './simulationReport';
 import { pointAtPose } from '@core/geometry/bodyPose';
 import { reactionsOf } from './reactionsView';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export const LOAD_LAYERS = ['gravity', 'joints', 'drives', 'thrust', 'reactions'] as const;
 export type LoadLayer = (typeof LOAD_LAYERS)[number];
@@ -94,7 +95,7 @@ function centreAt(context: Context, bodyId: string): Vec3 | undefined {
 
 function weightItems(context: Context): LoadItem[] {
   const { dynamics, doc } = context;
-  const g = Math.hypot(...dynamics.gravity);
+  const g = Math.hypot(dynamics.gravity[0], dynamics.gravity[1], dynamics.gravity[2]);
   const items: LoadItem[] = [];
   for (const body of Object.values(dynamics.bodies)) {
     const props = bodyMassProperties(doc, body);
@@ -209,7 +210,7 @@ function motorDesign(motor: Motor): { value: string; detail: string; magnitude: 
   const rpms = motor.curve.map((point) => point[0]);
   return {
     value: `≤ ${formatSi(peak[1] * motor.throttle, 'N·m')}`,
-    detail: `torque curve ${formatQuantity(Math.min(...rpms))}–${formatQuantity(Math.max(...rpms))} rpm, peak ${formatQuantity(peak[1])} N·m @ ${formatQuantity(peak[0])} rpm · throttle ${formatQuantity(motor.throttle * 100)} %`,
+    detail: `torque curve ${formatQuantity(minOf(rpms))}–${formatQuantity(maxOf(rpms))} rpm, peak ${formatQuantity(peak[1])} N·m @ ${formatQuantity(peak[0])} rpm · throttle ${formatQuantity(motor.throttle * 100)} %`,
     magnitude: peak[1] * motor.throttle,
   };
 }

@@ -16,6 +16,7 @@ import {
 } from './actuators/thermal';
 import { marginOf, peakAbs, rmsOver } from './sizing';
 import { trackingLimit } from './driveReport';
+import { maxOf } from '@lib/arrayExtrema';
 
 type FindingStatus = 'fail' | 'warn' | 'info';
 
@@ -151,7 +152,7 @@ export function sizingOf(motor: DatasheetMotor, run: DriveRunData, ambientC: num
       runaway,
       runawayCurrentA: runawayCurrent(thermal),
       maxContinuousCurrentA: continuousCurrentAtLimit(thermal, ambientC),
-      peakWindingC: temperatures === null ? ambientC : Math.max(...temperatures.windingC),
+      peakWindingC: temperatures === null ? ambientC : maxOf(temperatures.windingC),
       endWindingC: temperatures === null ? ambientC : (temperatures.windingC[temperatures.windingC.length - 1] ?? ambientC),
       timeConstantsS: { network: networkTimeConstants(thermal), datasheet: thermal.datasheetTaus },
     };

@@ -5,6 +5,7 @@ import { isCteRefusal } from '@core/model/materialCte';
 import type { CadDocument } from '@core/model/types';
 import { elasticUnverifiedReasons, providerFor, REFERENCE_PROBE_KELVIN } from './cte';
 import { incompleteOrthoRefusal, ORTHO_DIRECTIONS } from './orthoCte';
+import { appendAll } from '@lib/appendAll';
 
 export interface CheckProblem {
   readonly code: string;
@@ -39,9 +40,12 @@ export function orthoPartProblems(
       problems.push({ code: probe.code, severity: 'error', message: `direction ${direction}: ${probe.reason}`, ids });
       continue;
     }
-    reasons.push(...probe.unverifiedReasons.map((reason) => `direction ${direction}: ${reason}`));
+    appendAll(
+      reasons,
+      probe.unverifiedReasons.map((reason) => `direction ${direction}: ${reason}`),
+    );
   }
-  reasons.push(...elasticUnverifiedReasons(doc, materialId));
+  appendAll(reasons, elasticUnverifiedReasons(doc, materialId));
   if (reasons.length > 0)
     problems.push({
       code: 'TMC_MATERIAL_UNVERIFIED',

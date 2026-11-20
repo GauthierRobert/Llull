@@ -38,6 +38,7 @@ import { appliedOver, CRITERIA, groupsOf, type Criterion } from './marginGroups'
 import { queryRefusal, refusalFor, verifiedArtifacts } from './marginQueryChecks';
 import { jointMarginSchema, jointMarginTable } from '../contact/jointMargins';
 import { limitLoadMarginSchema, limitLoadMarginTable } from './limitLoadMargins';
+import { appendAll } from '@lib/appendAll';
 
 const allowableSchema = z.union([
   z.enum(['ftu', 'fty']),
@@ -191,7 +192,11 @@ function buildRows(
             port: context.port,
           });
           if ('skipped' in plyRows) skipped.set(group.entityId, plyRows.skipped);
-          else (singular ? singularRows : rows).push(...plyRows.rows.map((row) => ({ rowId: '', ...row })));
+          else
+            appendAll(
+              singular ? singularRows : rows,
+              plyRows.rows.map((row) => ({ rowId: '', ...row })),
+            );
         }
         continue;
       }

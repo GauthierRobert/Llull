@@ -19,6 +19,7 @@ import {
   type MeshRay,
   type PlacedDistanceQuery,
   type ViewFacet,
+  type ViewFactorIntegration,
   meshBvhEngine,
   minDistanceByPlacement,
   setGeometryQueryEngine,
@@ -120,8 +121,21 @@ function outcomeOf(stdout: string): { outputs: Map<string, string> } | { code: s
   return null;
 }
 
-/** Runs one `geomq` job and returns `result.f64`; throws GeomqFailure. */
-function runJob(binary: string, env: NodeJS.ProcessEnv, files: Files): Float64Array {
+/** `integration` of the job's `report.json` (the rule the binary ran), or undefined. */
+function reportedIntegration(folder: string): unknown {
+  try {
+    const report: unknown = JSON.parse(readFileSync(path.join(folder, 'report.json'), 'utf8'));
+    return isRecord(report) ? report['integration'] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Runs one `geomq` job and returns `result.f64`; throws GeomqFailure. `integration` set = the report must name that view-factor rule
+ * (a binary that predates the option ignores it and would answer with the numbers of `full`).
+ */
+function runJob(binary: string, env: NodeJS.ProcessEnv, files: Files, integration?: ViewFactorIntegration): Float64Array {
   const folder = mkdtempSync(path.join(tmpdir(), 'llull-geomq-'));
   try {
     for (const [name, content] of Object.entries(files)) writeFileSync(path.join(folder, name), content);
@@ -142,6 +156,8 @@ function runJob(binary: string, env: NodeJS.ProcessEnv, files: Files): Float64Ar
     const sha = outcome?.outputs.get('result.f64');
     if (run.status !== 0 || sha === undefined)
       throw new GeomqFailure('NATIVE_PROTOCOL', `llull-compute geomq exited with ${String(run.status)} without result.f64`);
+    if (integration !== undefined && reportedIntegration(folder) !== integration)
+      throw new GeomqFailure('NATIVE_PROTOCOL', `llull-compute geomq did not run the '${integration}' view-factor integration`);
     const bytes = readFileSync(path.join(folder, 'result.f64'));
     if (createHash('sha256').update(bytes).digest('hex') !== sha)
       throw new GeomqFailure('NATIVE_PROTOCOL', 'result.f64 does not match the hash llull-compute reported');
@@ -228,9 +244,10 @@ export function createNativeGeometryQueryEngine(binary: string, env: NodeJS.Proc
         () => meshBvhEngine.rayCastBatch(mesh, rays, maxT),
       );
     },
-    viewFactorExchange(surfaces, blockers) {
+    viewFactorExchange(surfaces, blockers, options) {
       if (surfaces.length === 0) return [];
       const n = surfaces.length;
+      const integration = options?.integration ?? 'full';
       const rows = guarded<number[] | null>(
         'viewfactor',
         () => {
@@ -238,10 +255,22 @@ export function createNativeGeometryQueryEngine(binary: string, env: NodeJS.Proc
             ...surfaces.flatMap((facetsOf, surface) => facetsOf.map((facet) => facetRecord(facet, surface))),
             ...(blockers ?? []).map((facet) => facetRecord(facet, -1)),
           ].flat();
-          const values = runJob(binary, env, {
-            'job.json': JSON.stringify({ op: 'viewfactor', surfaces: n, obstruction: blockers !== null }),
-            'facets.f64': f64Bytes(Float64Array.from(facets)),
-          });
+          const reciprocal = integration === 'reciprocal';
+          const values = runJob(
+            binary,
+            env,
+            {
+              // `full` keeps the job of the binaries that predate the option
+              'job.json': JSON.stringify({
+                op: 'viewfactor',
+                surfaces: n,
+                obstruction: blockers !== null,
+                ...(reciprocal ? { integration } : {}),
+              }),
+              'facets.f64': f64Bytes(Float64Array.from(facets)),
+            },
+            reciprocal ? integration : undefined,
+          );
           if (values.length !== n * n) throw new GeomqFailure('NATIVE_PROTOCOL', `${values.length} exchange values for ${n} surfaces`);
           return Array.from({ length: n }, (_, i) => Array.from(values.subarray(i * n, (i + 1) * n)));
         },

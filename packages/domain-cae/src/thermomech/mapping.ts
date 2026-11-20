@@ -6,8 +6,9 @@
  */
 
 import type { FeMeshArtifact } from '@core/model/analysis';
-import { cross3, dot3, sub3 } from '@lib/vec3';
-import { closestPointOnTriangle } from '@core/geometry/triangleQueries';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { hypotOf } from '@lib/hypotOf';
+import { barycentricAt, buildLocator, locateElement, type LocatorElement } from './elementLocator';
 
 export interface MappingReport {
   /** Largest distance from a target node to the source element used (0 when all nodes are inside), in mesh length units. */
@@ -35,62 +36,8 @@ export interface MappingRefusal {
 
 type Vec = readonly [number, number, number];
 
-/** Barycentric slack that still counts as inside (a node on a shared face), and the distance below which two candidates tie. */
-const INSIDE = 1e-9;
-const TIE = 1e-15;
-
-interface SourceElement {
+interface SourceElement extends LocatorElement {
   readonly nodes: readonly number[];
-  /** Corner coordinates and the inverse of the barycentric matrix. */
-  readonly corners: readonly [Vec, Vec, Vec, Vec];
-  readonly low: Vec;
-  readonly high: Vec;
-}
-
-interface Tree {
-  readonly low: Vec;
-  readonly high: Vec;
-  readonly element?: number;
-  readonly left?: Tree;
-  readonly right?: Tree;
-}
-
-/** Barycentric coordinates of `p` in the tetrahedron `c` (null for a degenerate element). */
-function barycentric(c: readonly [Vec, Vec, Vec, Vec], p: Vec): [number, number, number, number] | null {
-  const a = sub3(c[1], c[0]);
-  const b = sub3(c[2], c[0]);
-  const d = sub3(c[3], c[0]);
-  const det = dot3(a, cross3(b, d));
-  if (!Number.isFinite(det) || Math.abs(det) < 1e-300) return null;
-  const q = sub3(p, c[0]);
-  const l1 = dot3(q, cross3(b, d)) / det;
-  const l2 = dot3(a, cross3(q, d)) / det;
-  const l3 = dot3(a, cross3(b, q)) / det;
-  return [1 - l1 - l2 - l3, l1, l2, l3];
-}
-
-const FACES = [
-  [0, 1, 2],
-  [0, 3, 1],
-  [1, 3, 2],
-  [2, 3, 0],
-] as const;
-
-/** Closest point of the (closed) tetrahedron to p, and its distance. */
-function closestOnTet(c: readonly [Vec, Vec, Vec, Vec], p: Vec): { readonly point: Vec; readonly distance: number } {
-  const inside = barycentric(c, p);
-  if (inside !== null && inside.every((l) => l >= -INSIDE)) return { point: p, distance: 0 };
-  let best: Vec = c[0];
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const [i, j, k] of FACES) {
-    const point = closestPointOnTriangle(p, [c[i as 0], c[j as 0], c[k as 0]]);
-    const distance = Math.hypot(...sub3(p, point));
-    if (distance < bestDistance) {
-      best = point;
-      bestDistance = distance;
-    }
-  }
-  return { point: best, distance: bestDistance };
 }
 
 /** Shape functions of C3D4 (4 nodes) / C3D10 (10 nodes, CalculiX order) at barycentric coordinates. */
@@ -111,59 +58,6 @@ function shape(l: readonly [number, number, number, number], nodes: number): num
   ];
 }
 
-function boxDistance(low: Vec, high: Vec, p: Vec): number {
-  const d = [0, 1, 2].map((axis) => Math.max((low[axis] ?? 0) - (p[axis] ?? 0), 0, (p[axis] ?? 0) - (high[axis] ?? 0)));
-  return Math.hypot(...d);
-}
-
-function build(elements: readonly SourceElement[], indices: readonly number[]): Tree {
-  const first = indices[0] ?? 0;
-  if (indices.length === 1) return { low: elements[first]?.low ?? [0, 0, 0], high: elements[first]?.high ?? [0, 0, 0], element: first };
-  const low: [number, number, number] = [Infinity, Infinity, Infinity];
-  const high: [number, number, number] = [-Infinity, -Infinity, -Infinity];
-  for (const index of indices)
-    for (let axis = 0; axis < 3; axis++) {
-      low[axis] = Math.min(low[axis] ?? Infinity, elements[index]?.low[axis] ?? Infinity);
-      high[axis] = Math.max(high[axis] ?? -Infinity, elements[index]?.high[axis] ?? -Infinity);
-    }
-  const axis = [0, 1, 2].reduce((best, a) => ((high[a] ?? 0) - (low[a] ?? 0) > (high[best] ?? 0) - (low[best] ?? 0) ? a : best), 0);
-  const centre = (index: number): number => ((elements[index]?.low[axis] ?? 0) + (elements[index]?.high[axis] ?? 0)) / 2;
-  const sorted = [...indices].sort((a, b) => centre(a) - centre(b) || a - b);
-  const half = sorted.length >> 1;
-  return { low, high, left: build(elements, sorted.slice(0, half)), right: build(elements, sorted.slice(half)) };
-}
-
-interface Hit {
-  readonly element: number;
-  readonly distance: number;
-  readonly point: Vec;
-}
-
-/** The lowest-index element containing p (distance 0), else the nearest element (ties: lowest index). Branch and bound on box distance. */
-function locate(tree: Tree, elements: readonly SourceElement[], p: Vec): Hit | null {
-  let best: Hit | null = null;
-  const visit = (node: Tree): void => {
-    if (best !== null && boxDistance(node.low, node.high, p) > best.distance + TIE) return;
-    if (node.element !== undefined) {
-      const element = elements[node.element];
-      if (element === undefined) return;
-      const closest = closestOnTet(element.corners, p);
-      if (
-        best === null ||
-        closest.distance < best.distance - TIE ||
-        (Math.abs(closest.distance - best.distance) <= TIE && node.element < best.element)
-      )
-        best = { element: node.element, distance: closest.distance, point: closest.point };
-      return;
-    }
-    const children = [node.left, node.right].filter((child): child is Tree => child !== undefined);
-    children.sort((a, b) => boxDistance(a.low, a.high, p) - boxDistance(b.low, b.high, p));
-    for (const child of children) visit(child);
-  };
-  visit(tree);
-  return best;
-}
-
 function sourceElements(mesh: FeMeshArtifact): SourceElement[] | null {
   const coordinates = new Map(mesh.nodes.map(([id, x, y, z]) => [id, [x, y, z] as Vec]));
   const out: SourceElement[] = [];
@@ -178,8 +72,8 @@ function sourceElements(mesh: FeMeshArtifact): SourceElement[] | null {
       out.push({
         nodes,
         corners,
-        low: [0, 1, 2].map((axis) => Math.min(...all.map((p) => p[axis] ?? 0))) as unknown as Vec,
-        high: [0, 1, 2].map((axis) => Math.max(...all.map((p) => p[axis] ?? 0))) as unknown as Vec,
+        low: [0, 1, 2].map((axis) => minOf(all.map((p) => p[axis] ?? 0))) as unknown as Vec,
+        high: [0, 1, 2].map((axis) => maxOf(all.map((p) => p[axis] ?? 0))) as unknown as Vec,
       });
     }
   }
@@ -199,19 +93,15 @@ export function mapNodalField(
   const elements = sourceElements(source);
   if (elements === null || elements.length === 0)
     return { ok: false, message: 'the source mesh has no C3D4 / C3D10 elements with all their nodes' };
-  const tree = build(
-    elements,
-    elements.map((_, i) => i),
-  );
+  const locator = buildLocator(elements);
   const values: number[] = [];
   const used: number[] = [];
   const distances: number[] = [];
   for (const [, x, y, z] of target.nodes) {
-    const p: Vec = [x, y, z];
-    const hit = locate(tree, elements, p);
+    const hit = locateElement(locator, [x, y, z]);
     const element = hit === null ? undefined : elements[hit.element];
     if (hit === null || element === undefined) return { ok: false, message: 'no source element found for a target node' };
-    const l = barycentric(element.corners, hit.point);
+    const l = hit.barycentric ?? barycentricAt(locator.terms, hit.element, hit.point[0], hit.point[1], hit.point[2]);
     if (l === null) return { ok: false, message: `source element ${hit.element + 1} is degenerate` };
     const weights = shape(l, element.nodes.length);
     let value = 0;
@@ -247,7 +137,7 @@ export function mappingReport(
       if (value < (low[axis] ?? 0)) low[axis] = value;
       if (value > (high[axis] ?? 0)) high[axis] = value;
     }
-  const size = Math.hypot(...high.map((h, axis) => h - (low[axis] ?? 0)));
+  const size = hypotOf(high.map((h, axis) => h - (low[axis] ?? 0)));
   const tolerance = 1e-9 * size;
   const exact = new Map<string, number>(source.nodes.map(([id, x, y, z]) => [`${x}|${y}|${z}`, id]));
   let maxDistance = 0;

@@ -6,6 +6,7 @@ import type { EmbossRecipe } from './embossRecipe';
 import type { EmbossCall } from './embossRequest';
 import type { FaceSession } from './faceSession';
 import { probePoints } from './wrapMapping';
+import { minOf } from '../../lib/arrayExtrema';
 
 /**
  * How deep a deboss can go before it passes through the material: the distance from the deepest point of the mapped profile to the axis (cylinder: its radius;
@@ -16,7 +17,7 @@ function debossLimit(session: FaceSession, pieces: readonly (readonly PlaneSegme
   if (session.surface.type === 'cylinder' || session.surface.type === 'sphere') return session.surface.radius;
   if (session.surface.type === 'torus') return session.surface.minor;
   if (session.surface.type !== 'cone') return null;
-  const smallestV = Math.min(...pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[1])));
+  const smallestV = minOf(pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[1])));
   return smallestV * Math.sin(session.surface.semiAngle);
 }
 

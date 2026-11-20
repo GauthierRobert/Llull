@@ -12,6 +12,8 @@ import { localExtentOf, maxEdgeLength, splitHeights } from './bounds';
 import { toLocal } from './frame';
 import { edgeActive, featureEdgeLength } from './influence';
 import { type WeldedMesh, meshDiagonal, weldMesh } from '../mesh/weld';
+import { appendAll } from '../../lib/appendAll';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Triangles above which the mesh path refuses (01 DEF §5.7). */
 export const MAX_WARP_TRIANGLES = 4_000_000;
@@ -139,7 +141,7 @@ export function splitPass(soup: Soup, decide: EdgeSplit): boolean {
     const m = [split(v[0] as number, v[1] as number), split(v[1] as number, v[2] as number), split(v[2] as number, v[0] as number)];
     const splits = m.filter((index) => index >= 0).length;
     if (splits === 0) {
-      nextIndices.push(...v);
+      appendAll(nextIndices, v);
       continue;
     }
     any = true;
@@ -449,7 +451,7 @@ export function estimateWarp(source: MeshData, node: DeformNode, tolerance: numb
   for (let t = 0; t + 2 < source.indices.length; t += 3) {
     const corners = [0, 1, 2].map((k) => at(source.positions, source.indices[t + k] as number));
     const heights = corners.map((p) => toLocal(warp.frame, p)[2]);
-    if (node.region.infinite !== true && (Math.max(...heights) <= start || Math.min(...heights) >= end)) continue;
+    if (node.region.infinite !== true && (maxOf(heights) <= start || minOf(heights) >= end)) continue;
     const [a, b, c] = corners as [Vec3, Vec3, Vec3];
     const [u, w] = [sub(b, a), sub(c, a)];
     area += 0.5 * Math.hypot(u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]);

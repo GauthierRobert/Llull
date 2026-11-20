@@ -21,6 +21,8 @@ import { driveReport } from '../sim/driveReport';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
 import { flightData, flightSummary } from '../flight/flightReport';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Default samples per turn of the fastest announced joint (10 deg), and the floor below which a warning says the motion aliases. */
 const SAMPLES_PER_TURN = 36;
@@ -125,7 +127,7 @@ function planRun(base: Base): Plan {
     if ('error' in pilot) return 0;
     try {
       const trace = engine.simulate(pilot.model, { duration: PILOT_DURATION, timestep: PILOT_TIMESTEP, sampleInterval: 0.01 });
-      return Math.max(0, ...Object.values(trace.jointVelocity).flatMap((series) => series.map(Math.abs)));
+      return Math.max(0, maxOf(Object.values(trace.jointVelocity).flatMap((series) => series.map(Math.abs))));
     } catch {
       return 0;
     }
@@ -328,7 +330,7 @@ function reportRun(plan: Plan, attempt: Success, halvings: number): CommandResul
           propellerTorqueNm: Object.fromEntries(Object.entries(base.propellers).map(([id, output]) => [id, output.torque])),
           metresPerUnit: metres,
         });
-  if (engineReport !== null) warnings.push(...engineReport.warnings, ...(realism?.warnings ?? []), ...idealGearWarnings(dynamics));
+  if (engineReport !== null) appendAll(warnings, [...engineReport.warnings, ...(realism?.warnings ?? []), ...idealGearWarnings(dynamics)]);
   const data = {
     ...base,
     warnings,

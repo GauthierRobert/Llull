@@ -7,6 +7,7 @@
  */
 
 import type { CutPiece } from './cutList';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface NestedBar {
   readonly bar: string;
@@ -44,7 +45,7 @@ const percent = (waste: number, stock: number): number => (stock === 0 ? 0 : Mat
 
 /** The pieces no stock length can hold (cut + kerf longer than the longest bar). */
 export const tooLong = (pieces: readonly CutPiece[], stockLengthsMm: readonly number[], kerfMm: number): CutPiece[] =>
-  pieces.filter((piece) => piece.cutLengthMm + kerfMm > Math.max(...stockLengthsMm));
+  pieces.filter((piece) => piece.cutLengthMm + kerfMm > maxOf(stockLengthsMm));
 
 export function nestPieces(pieces: readonly CutPiece[], stockLengthsMm: readonly number[], kerfMm: number): Nesting {
   const stocks = [...new Set(stockLengthsMm)].sort((a, b) => a - b);

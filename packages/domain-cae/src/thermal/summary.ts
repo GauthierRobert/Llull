@@ -13,6 +13,7 @@ import { flowsAndBalance, nodal } from './heatBalance';
 import { physicalConstantsOf, hasRadiation } from './constants';
 import { caseTables } from './material';
 import { indexMesh } from './meshGeometry';
+import { hypotOf } from '@lib/hypotOf';
 
 type Step = FeResultsArtifact['steps'][number];
 const ORIGIN: Vec3 = [0, 0, 0];
@@ -82,7 +83,7 @@ export function thermalResultsSummary(
       if (t > maxT.value) maxT = { value: t, node, timeS: timeOf(step) };
       if (t < minT.value) minT = { value: t, node, timeS: timeOf(step) };
       const components = flux !== undefined && Object.hasOwn(flux.values, String(node)) ? (flux.values[String(node)] ?? []) : [];
-      const magnitude = Math.hypot(...components.slice(0, 3));
+      const magnitude = hypotOf(components.slice(0, 3));
       if (magnitude > maxFlux.value) maxFlux = { value: magnitude, node, timeS: timeOf(step) };
     }
   }

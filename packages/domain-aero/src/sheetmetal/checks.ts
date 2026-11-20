@@ -9,6 +9,7 @@ import { polygonToSegmentDistance } from './geometry2d';
 import { type FlatNode, bendsOf, flatsOf, hemsOf, joggleNodes, reliefNodes } from './graph';
 import { bendEnd } from './reliefGeometry';
 import { findRadiusRow } from './rules';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export type SkipCode = 'FTR_RULE_THRESHOLD_MISSING' | 'FTR_BEND_RADIUS_NO_TABLE_ROW';
 
@@ -136,7 +137,7 @@ export function holeDistances({ unit, part, rule }: Context, which: 'holeToBend'
       const edges = flat.outline
         .map((a, i) => ({ a, b: flat.outline[(i + 1) % flat.outline.length] as Vec2 }))
         .filter(({ a, b }) => !lines.some((line) => onLine(a, line.a, line.b) && onLine(b, line.a, line.b)));
-      const distance = Math.min(...edges.map(({ a, b }) => cutoutToSegment(cutout, a, b)));
+      const distance = minOf(edges.map(({ a, b }) => cutoutToSegment(cutout, a, b)));
       if (edges.length > 0 && distance < threshold.value - 1e-9)
         findings.push({
           code: 'FTR_HOLE_TO_EDGE_TOO_CLOSE',
@@ -161,7 +162,7 @@ export function minFlange({ unit, part, rule }: Context): RuleOutcome {
   if (threshold === undefined) return missingThreshold('min_flange', [part.id, rule.name], 'minFlange');
   const findings: FtrFinding[] = [];
   for (const flange of flanges) {
-    const length = Math.max(...flange.outline.map((point) => point[1]));
+    const length = maxOf(flange.outline.map((point) => point[1]));
     if (length < threshold.value - 1e-9)
       findings.push({
         code: 'FTR_FLANGE_TOO_SHORT',

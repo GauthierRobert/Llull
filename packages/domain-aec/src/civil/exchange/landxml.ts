@@ -12,6 +12,7 @@ import { civilObjectsOf, getCivil } from '../model';
 import { surfaceTin } from '../surface/surfaceTin';
 import { alignmentsXml, metres, northEast } from './landxmlAlignments';
 import { gridCivil, resolveFrame, type CoordinateFrame } from '../crs/crs';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export const LANDXML_NAMESPACE = 'http://www.landxml.org/schema/LandXML-1.2';
 
@@ -55,9 +56,7 @@ function surfaceXml(doc: Doc, civil: CivilModel, surface: SurfaceObject): string
   const tin = surfaceTin(civil, surface);
   const elevations = tin.points.map((point) => point[2]);
   const range =
-    elevations.length > 0
-      ? attr('elevMin', metres(doc, Math.min(...elevations))) + attr('elevMax', metres(doc, Math.max(...elevations)))
-      : '';
+    elevations.length > 0 ? attr('elevMin', metres(doc, minOf(elevations))) + attr('elevMax', metres(doc, maxOf(elevations))) : '';
   const faces: string[] = [];
   for (let k = 0; k + 2 < tin.triangles.length; k += 3) {
     const [a, b, c] = [tin.triangles[k], tin.triangles[k + 1], tin.triangles[k + 2]];

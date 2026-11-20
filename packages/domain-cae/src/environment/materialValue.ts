@@ -12,13 +12,26 @@ export interface MaterialValue {
   readonly unverified: boolean;
   readonly source: string;
   readonly modelId: string;
+  /** Test method recorded on the model condition (set_material_property testMethod), when any. */
+  readonly testMethod?: string;
 }
 
 /** The property could not be read: `code` is the PHY-01 / MAT refusal (PROP_NO_MODEL_FOR_PROPERTY, PROP_OUT_OF_RANGE, MAT_RECORD_NOT_FOUND ...). */
 export interface MaterialMissing {
   readonly code: string;
   readonly reason: string;
+  /** Test methods of the candidate models a PROP_NO_MODEL_FOR_PROPERTY refusal lists (undefined = none recorded). */
+  readonly candidateMethods?: readonly (string | undefined)[];
+  /** The read of the profile's test method was refused for a reason other than "no such model": nothing may stand in for it (no fallback, no RML derivation). */
+  readonly blocking?: true;
 }
+
+const candidateMethodsOf = (candidates: unknown): (string | undefined)[] =>
+  Array.isArray(candidates)
+    ? candidates.map((candidate: unknown) =>
+        isRecord(candidate) && typeof candidate['testMethod'] === 'string' ? candidate['testMethod'] : undefined,
+      )
+    : [];
 
 export const isMissing = (value: MaterialValue | MaterialMissing): value is MaterialMissing => 'reason' in value;
 
@@ -39,22 +52,35 @@ export function materialProperty(
   outputUnit: string,
   at: Readonly<Record<string, Quantity>> = {},
   direction?: string,
+  condition?: Readonly<Record<string, string>>,
 ): MaterialValue | MaterialMissing {
   const evaluated = execute(
     doc,
     'evaluate_property',
-    { material, property, at, outputUnit, ...(direction === undefined ? {} : { direction }) },
+    {
+      material,
+      property,
+      at,
+      outputUnit,
+      ...(direction === undefined ? {} : { direction }),
+      ...(condition === undefined ? {} : { condition }),
+    },
     ctx,
   );
   const data: unknown = evaluated.data;
   if (!isRecord(data)) return { code: 'ENV_PROPERTY_MISSING', reason: evaluated.summary };
   if (data['available'] === false || typeof data['value'] !== 'number')
-    return { code: String(data['code'] ?? 'ENV_PROPERTY_MISSING'), reason: String(data['reason'] ?? evaluated.summary) };
+    return {
+      code: String(data['code'] ?? 'ENV_PROPERTY_MISSING'),
+      reason: String(data['reason'] ?? evaluated.summary),
+      candidateMethods: candidateMethodsOf(data['candidates']),
+    };
   return {
     value: data['value'],
     unit: String(data['unit'] ?? outputUnit),
     unverified: data['unverified'] !== false,
     source: sourceText(data['provenance']),
     modelId: String(data['modelId'] ?? ''),
+    ...(typeof data['testMethod'] === 'string' ? { testMethod: data['testMethod'] } : {}),
   };
 }

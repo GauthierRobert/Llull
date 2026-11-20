@@ -13,6 +13,7 @@ import { surfaceDomain } from './surface';
 import type { NurbsSurfaceData, UvTrimLoop } from './surfaceTypes';
 import type { NurbsCurveData } from './types';
 import { domainLoop, insideRegion, loopsCross } from './trimRegion';
+import { maxOf } from '../arrayExtrema';
 
 type TrimFailureCode = 'SRF_TRIM_MISS' | 'SRF_TRIM_AMBIGUOUS' | 'SRF_TRIM_LOOP_INVALID' | 'SRF_TRIM_UNSUPPORTED';
 
@@ -170,7 +171,7 @@ export function buildTrimLoops(request: TrimRequest): TrimBuild {
     const hit = projector.project(tau);
     samples.push(hit);
   }
-  const maxGap = Math.max(0, ...samples.map((sample) => sample.gap).filter(Number.isFinite));
+  const maxGap = Math.max(0, maxOf(samples.map((sample) => sample.gap).filter(Number.isFinite)));
   const keepUv = keepPoint === null ? null : ((found) => [found.u, found.v] as const)(closestOnSurface(surface, keepPoint));
   const intervals = samples.length - 1;
   if (closed) {

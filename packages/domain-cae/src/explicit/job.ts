@@ -137,7 +137,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
   const walls = spec.rigidWallOrder.flatMap((id) => {
     const wall = spec.rigidWalls[id];
     if (wall === undefined) return [];
-    const length = Math.hypot(...wall.normal);
+    const length = Math.hypot(wall.normal[0], wall.normal[1], wall.normal[2]);
     return [{ name: wall.name, point: scaled(wall.point, lengthToAnalysis), normal: scaled(wall.normal, 1 / length) }];
   });
   return {

@@ -13,6 +13,7 @@ import { meshDiagonal } from '../../geometry/meshExtent';
 import { planeFrame } from '../../geometry/featureFrame';
 import { type Triangle, closestPointOnTriangle } from '../../geometry/triangleQueries';
 import { cross3, distance3, dot3, normalize3, sub3 } from '../../lib/vec3';
+import { appendAll } from '../../lib/appendAll';
 
 export interface ResolvedFace {
   readonly frame: FeatureFrame;
@@ -97,7 +98,15 @@ function meshFace(kernel: GeometryKernel, recipe: ShapeRecipe, near: Vec3): Face
     }),
   );
   const neighbours: number[][] = triangles.map(() => []);
-  for (const sharing of byEdge.values()) for (const a of sharing) neighbours[a]?.push(...sharing.filter((b) => b !== a));
+  for (const sharing of byEdge.values())
+    for (const a of sharing) {
+      const list = neighbours[a];
+      if (list)
+        appendAll(
+          list,
+          sharing.filter((b) => b !== a),
+        );
+    }
   const cluster = new Set<number>([seed]);
   const queue = [seed];
   let faceted = false;

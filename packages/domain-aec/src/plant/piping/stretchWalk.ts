@@ -7,6 +7,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { hypotOf } from '@lib/hypotOf';
 
 export type Disp = Vec3;
 const ZERO: Disp = [0, 0, 0];
@@ -78,7 +79,7 @@ function solveKeepingDirections(dirs: readonly Vec3[], first: Disp | null, last:
       reduced -= dot * c;
       for (let index = 0; index < columns; index++) v[index] = (v[index] as number) - dot * (q[index] as number);
     }
-    const norm = Math.hypot(...v);
+    const norm = hypotOf(v);
     if (norm > 1e-9) basis.push({ q: v.map((value) => value / norm), c: reduced / norm });
     else if (Math.abs(reduced) > 10 * eps) return null;
   }

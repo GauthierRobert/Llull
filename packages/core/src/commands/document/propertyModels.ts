@@ -10,7 +10,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { codedRejection, changed } from '../noop';
 import { editableMaterial } from './libraryReadonly';
-import { fitRecordSchema, formSchema, modelInputSchema, withoutUndefined } from './propertyModelSchema';
+import { conditionSchema, fitRecordSchema, formSchema, modelInputSchema, withoutUndefined } from './propertyModelSchema';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   MAT_RECORD_NOT_FOUND: 'create the material first with create_material (its name is the material id)',
@@ -46,16 +46,6 @@ const withModels = (doc: CadDocument, name: string, material: Material, models: 
   materials: { ...doc.materials, [name]: { ...material, propertyModels: models } },
 });
 
-const conditionSchema = z.strictObject({
-  temper: z.string().optional(),
-  productForm: z.string().optional(),
-  rrr: z.number().optional(),
-  environment: z.string().optional(),
-  note: z.string().optional(),
-  opticalKind: z.enum(['hemispherical_total', 'normal_total']).optional(),
-  lifeState: z.enum(['BOL', 'EOL']).optional(),
-});
-
 const firstIssuePath = (error: z.ZodError, prefix: string): string => {
   const path = error.issues[0]?.path ?? [];
   return [prefix, ...path.map(String)].join('.');
@@ -75,7 +65,7 @@ export const definePropertyModel = defineCommand({
     'Attach a property model to a material (create_material first): a law such as thermal conductivity k(T), specific heat cp(T), ' +
     "Young's modulus E(T), thermal strain or a strain-rate factor, with the unit of its output, every variable with its unit, a REQUIRED " +
     'valid range per variable (data range of the measurements and the wider equation range the source allows), a basis and the source ' +
-    'citation. Forms: constant, table1d, table2d, polynomial, log10Polynomial (NIST), nistRational (NIST copper), arrhenius, powerLaw, ' +
+    'citation. Forms: constant, table1d, table2d, polynomial, log10Polynomial (NIST), linearCoefficient (rho0 (1 + alpha (T - T0))), nistRational (NIST copper), arrhenius, powerLaw, ' +
     'piecewise, product, rateFactor (Johnson-Cook / Cowper-Symonds), ratioOf (e.g. % of room temperature). The coefficient hash is ' +
     'recomputed; llull never extrapolates outside the range. Next: evaluate_property / sample_property, then check_property_models.',
   params: z.object({
@@ -104,7 +94,7 @@ export const definePropertyModel = defineCommand({
         doc,
         name,
         'PROP_FORM_INVALID',
-        'condition fields are temper, productForm, environment, note (text), rrr (number), opticalKind (hemispherical_total | normal_total) and lifeState (BOL | EOL)',
+        'condition fields are temper, productForm, environment, note (text), rrr (number), opticalKind (hemispherical_total | normal_total), lifeState (BOL | EOL) and testMethod (a token, e.g. ASTM_E595)',
         [input.id],
         firstIssuePath(condition.error, 'model.condition'),
       );

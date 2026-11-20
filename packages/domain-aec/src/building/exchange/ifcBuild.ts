@@ -26,6 +26,7 @@ import {
 import { writePlantNodes } from './ifcPlantHierarchy';
 import { connectRealNozzles } from './ifcNozzleConnections';
 import { finishNozzles, newPortState } from './ifcPorts';
+import { appendAll } from '@lib/appendAll';
 
 export interface IfcExport {
   readonly filename: string;
@@ -75,7 +76,7 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     writer.add('IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.)'),
     writer.add('IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.)'),
   ];
-  if (run.x3) units.push(...plantUnits(context, units[2] as string));
+  if (run.x3) appendAll(units, plantUnits(context, units[2] as string));
   const unitAssignment = writer.add(`IFCUNITASSIGNMENT((${units.join(',')}))`);
   const { project } = building;
   const projectRef = writer.add(

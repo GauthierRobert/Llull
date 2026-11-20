@@ -13,6 +13,7 @@ import { type HoleMode, holeDiameterDoc, placeStack } from './placeStack';
 import { type SelectionParams, quantity, sharedFields } from './selectionParams';
 import { type SelectionOutcome, runSelection } from './selection';
 import { docToInches, quantityToDoc, toTicks } from './units';
+import { appendAll } from '@lib/appendAll';
 
 const MAX_ROW = 500;
 
@@ -183,7 +184,7 @@ function placeRow(
       return { failure: refuse(doc, 'insert_fastener_row', placed.code, `position ${stackIds.length + 1}: ${placed.message}`, placed.ids) };
     current = placed.document;
     plateIds = plateIds.map((id) => placed.replaced[id] ?? id);
-    affected.push(...placed.affected);
+    appendAll(affected, placed.affected);
     stackIds.push(placed.stack.id);
     placed.representative.forEach((partNumber) => representative.add(partNumber));
   }

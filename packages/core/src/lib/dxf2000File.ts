@@ -3,6 +3,7 @@
 import { hexToAci } from './dxfUnits';
 import { INSUNITS } from './dxfWriter';
 import { LLULL_APP } from './dxfReadShapes';
+import { appendAll } from './appendAll';
 
 export type Group = readonly [code: number, value: string | number];
 
@@ -102,7 +103,7 @@ export function assembleFile(input: FileInput): string {
   const tables: Group[] = [];
   const addTable = (name: string, entries: ReadonlyArray<(owner: string) => Group[]>, extra: Group[] = []): string => {
     const { head, owner } = table(name, entries.length, extra);
-    tables.push(...head, ...entries.flatMap((entry) => entry(owner)), [0, 'ENDTAB']);
+    appendAll(tables, [...head, ...entries.flatMap((entry) => entry(owner)), [0, 'ENDTAB']]);
     return owner;
   };
   const viewport = (owner: string): Group[] =>

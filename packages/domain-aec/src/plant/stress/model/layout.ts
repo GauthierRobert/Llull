@@ -13,6 +13,7 @@ import { applyJunctions, type JunctionFitting } from './junctions';
 import type { Attachment, ElementComponent, FeElement, Layout, LayoutFailure } from './layoutTypes';
 import { arcOf, sectionAt, vertexArcs, type Section, type SectionStep } from './sections';
 import type { SourcePipe } from './sources';
+import { appendAll } from '@lib/appendAll';
 
 export interface LayoutComponent {
   readonly key: string;
@@ -258,7 +259,7 @@ export function buildLayout(input: LayoutInput): Layout | LayoutFailure {
     );
   const junctions = junctionAttachments(pipes, allPieces);
   if (!Array.isArray(junctions)) return junctions;
-  attachments.push(...junctions);
+  appendAll(attachments, junctions);
   for (const attachment of attachments) {
     const pipe = pipes.find((candidate) => candidate.id === attachment.pipeId);
     const pieces = allPieces.get(attachment.pipeId);

@@ -18,6 +18,7 @@ import { findPair } from './pairRules';
 import { forceUnitName } from './pretensionRules';
 import { CLAMP_ZONE_RADIUS_DIAMETERS, type BoltRow } from './pretensionResults';
 import { SLIDING_FRACTION, contactRows } from './reader';
+import { appendAll } from '@lib/appendAll';
 
 /** Most rows one contact_report returns (AF-12); narrow with pair / step. */
 const MAX_ROWS = 500;
@@ -229,10 +230,10 @@ export const checkContact = defineCommand({
     const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
     const scale = toAnalysisLength(doc, analysis.unitSystem, 1);
     if (analysis.pretension !== undefined && trust.meshArtifact !== null && (trust.state === 'meshed' || trust.state === 'solved'))
-      items.push(...sectionItems(doc, analysis, trust.meshArtifact));
+      appendAll(items, sectionItems(doc, analysis, trust.meshArtifact));
     if (analysis.contact !== undefined && trust.meshArtifact !== null && (trust.state === 'meshed' || trust.state === 'solved')) {
       const overclosure = overclosureItems(analysis, trust.meshArtifact, scale);
-      items.push(...overclosure.items);
+      appendAll(items, overclosure.items);
       if (overclosure.unmeasured.length > 0)
         notes.push(`initial overclosure not measured for ${overclosure.unmeasured.join(', ')} (no faces or too large)`);
     } else if (analysis.contact !== undefined)
@@ -252,12 +253,12 @@ export const checkContact = defineCommand({
       trust.resultsArtifact !== null
     ) {
       const rows = analysis.contact === undefined ? [] : contactRows(analysis, trust.meshArtifact, trust.resultsArtifact);
-      if (Array.isArray(rows)) items.push(...resultItems(analysis, trust.results, rows, tolerance, scale));
+      if (Array.isArray(rows)) appendAll(items, resultItems(analysis, trust.results, rows, tolerance, scale));
       else items.push({ code: rows.code, severity: 'error', ids: [analysis.id], message: rows.message, remediation: 'see contact_report' });
       const bolts = boltReport(doc, analysis, trust.meshArtifact, trust.resultsArtifact, 'summary');
       if ('code' in bolts)
         items.push({ code: bolts.code, severity: 'error', ids: bolts.ids, message: bolts.message, remediation: 'see contact_report' });
-      else items.push(...boltItems(analysis, bolts));
+      else appendAll(items, boltItems(analysis, bolts));
     } else notes.push('no current results: result checks skipped');
     const status = statusOf(items);
     return report(

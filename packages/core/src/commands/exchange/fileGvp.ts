@@ -9,6 +9,7 @@ import type { Vec3 } from '../../model/types';
 import type { FileGvp, Step21Summary } from '../../lib/step21/summary';
 import { type GvpSample, compareGvp, isPlaceholder, worstBand } from './gvpBands';
 import { powInt } from '../../lib/powInt';
+import { appendAll } from '../../lib/appendAll';
 
 /** Tolerances of a same-kernel round trip (validation `tolerancePolicy.sameKernelRoundTrip`): only decimal serialisation intervenes. */
 export const SAME_KERNEL_POLICY = { greenRel: 1e-9, yellowRel: 1e-6, greenCentroidPerDiag: 1e-9, yellowCentroidMm: 1e-3 } as const;
@@ -124,7 +125,7 @@ export function selfCheckGvp(
       continue;
     }
     used.add(best);
-    comparisons.push(...compareGvp(best, want, diagonalOf(want.name), 1, SAME_KERNEL_POLICY).comparisons);
+    appendAll(comparisons, compareGvp(best, want, diagonalOf(want.name), 1, SAME_KERNEL_POLICY).comparisons);
   }
   const band = missing.length > 0 ? 'red' : worstBand(comparisons.map((entry) => entry.band));
   return { band, comparisons, policy: SAME_KERNEL_POLICY, missing, products: expected.length };

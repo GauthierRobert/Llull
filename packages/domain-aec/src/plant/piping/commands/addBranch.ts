@@ -146,7 +146,7 @@ export const addBranch = defineCommand({
     const aim: Vec3 | undefined =
       params.legs?.[0] !== undefined ? legVector(params.legs[0].direction) : (params.via?.[0] ?? target?.end.point);
     const direction = aim === undefined ? null : params.legs?.[0] !== undefined ? unitVector(aim) : unitVector(sub3(aim, position));
-    if (direction === null || !(Math.hypot(...direction) > 0))
+    if (direction === null || !(Math.hypot(direction[0], direction[1], direction[2]) > 0))
       return refuse(
         doc,
         'add_branch',

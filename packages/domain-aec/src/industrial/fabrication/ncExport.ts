@@ -25,6 +25,8 @@ import {
   outlineMean,
 } from './ncMemberPieces';
 import { pointsExtent } from '@lib/extent';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 export type NcExport = { readonly files: NcFile[]; readonly count: number };
 
@@ -105,8 +107,8 @@ function endPlatePieces(doc: CadDocument, connection: MomentConnectionElement, s
       platePiece(doc, {
         mark: index === 0 ? connection.mark : `${connection.mark}b`,
         grade: connection.material,
-        length: Math.max(...solid.outline.map((point) => point[1])) - minY,
-        width: Math.max(...solid.outline.map((point) => point[0])) - minX,
+        length: maxOf(solid.outline.map((point) => point[1])) - minY,
+        width: maxOf(solid.outline.map((point) => point[0])) - minX,
         thickness: connection.plateThickness,
         holes,
         sourceId: connection.id,
@@ -183,7 +185,7 @@ export const exportNcFiles = defineCommand({
           const level = building.levels[element.levelId];
           if (!level || !inScope(element.rafterId, element.levelId)) continue;
           const solids = connectionSolids(doc, element, allMembers, level);
-          if (solids) pieces.push(...endPlatePieces(doc, element, solids));
+          if (solids) appendAll(pieces, endPlatePieces(doc, element, solids));
         }
       }
     }

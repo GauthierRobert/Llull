@@ -9,6 +9,7 @@ import { composeEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { instanceToWorld } from './instanceTransform';
 import { scaleGeometry } from './scaleGeometry';
 import { soupIndices } from './meshVolume';
+import { appendAll } from '../lib/appendAll';
 
 export const UNIT_SCALE: Vec3 = [1, 1, 1];
 
@@ -36,7 +37,7 @@ function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id
   const toWorld = instanceToWorld(scale, rotation, position);
   const positions: number[] = [];
   for (const [a, b, c] of solidTriangles(child)) {
-    for (const corner of mirrored ? [a, c, b] : [a, b, c]) positions.push(...toWorld(corner));
+    for (const corner of mirrored ? [a, c, b] : [a, b, c]) appendAll(positions, toWorld(corner));
   }
   return {
     id,

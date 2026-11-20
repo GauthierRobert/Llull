@@ -9,6 +9,7 @@ import { machineWarnings, stepperRunData, type StepperRunData } from './actuator
 import { driveSeries, trackingOf, type DriveSeries, type Tracking } from './actuators/series';
 import type { EnergyData } from './energyReport';
 import { ledgerOf, type LedgerData } from './ledger';
+import { appendAll } from '@lib/appendAll';
 
 const last = (values: readonly number[]): number => values[values.length - 1] ?? 0;
 const peak = (values: readonly number[]): number => values.reduce((largest, value) => Math.max(largest, Math.abs(value)), 0);
@@ -115,7 +116,7 @@ export function driveReport(
       warnings.push(
         `DRV_ELECTRICAL_QUASI_STATIC: motor '${run.motor.id}' electrical time constant ${(electricalTimeConstant(run.machine.params) * 1e6).toPrecision(3)} us is below timestep/50 (${timestep} s): the current is treated as quasi-static`,
       );
-    warnings.push(...machineWarnings(run, trace, peak(series.voltageV), timestep));
+    appendAll(warnings, machineWarnings(run, trace, peak(series.voltageV), timestep));
     if (tracking !== null && run.drive.mode === 'prescribed') {
       const threshold = trackingLimit(tracking);
       if (tracking.peakError > threshold)

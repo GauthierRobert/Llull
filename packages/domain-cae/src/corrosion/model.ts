@@ -1,6 +1,7 @@
 /** Access to and validation of the corrosion slice of the document (`CadDocument.corrosion`, plugin `physics-corrosion`). */
 
 import { z } from '@core/commands/schema';
+import { stepKeySchema } from '../shared/schemas';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import type { CadDocument } from '@core/model/types';
 import {
@@ -76,6 +77,7 @@ const acceptanceSchema = z.strictObject({
   signatureId: z.string().min(1).max(256),
   signature: z.unknown(),
   documentUid: z.string().min(1).max(256),
+  stepKey: stepKeySchema.optional(),
 });
 
 const sliceSchema = z

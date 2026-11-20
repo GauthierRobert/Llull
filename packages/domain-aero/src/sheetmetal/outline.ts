@@ -2,6 +2,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import { projectOntoSegment, signedArea } from '@lib/polygon';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface MergedOutline {
   readonly outer: Vec2[];
@@ -32,7 +33,7 @@ export function mergePolygons(polygons: ReadonlyArray<readonly Vec2[]>): MergedO
   if (all.length === 0) return null;
   const xs = all.map((p) => p[0]);
   const ys = all.map((p) => p[1]);
-  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const diagonal = Math.hypot(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys));
   const tol = 1e-7 * Math.max(1, diagonal);
   const vertices: Vec2[] = [];
   const canon = (p: Vec2): number => {

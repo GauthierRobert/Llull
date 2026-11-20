@@ -7,6 +7,7 @@ import type { HumanSignaturePort } from '@core/model/analysis';
 import { humanGatePayload } from '@core/model/humanGate';
 import { DISPOSE_ACT, dispositionDetails } from '@cae/electroOptical/gate';
 import { checkBonding, run, runPlan } from './fixtures';
+import { expectSignedReplayFollowsHistory } from '../../helpers/signedReplay';
 
 /** A port that verifies a signature only when it names the exact payload it was made over (what a real signature does). */
 const port: HumanSignaturePort = {
@@ -183,13 +184,40 @@ describe('dispose_bond_check: history replay', () => {
     expect(again.document).toBe(accepted);
   });
 
-  it('refuses a forged replayed step (no signed record) and one whose decision differs', () => {
+  it('a forged replayed step (no signed record) re-applies nothing; one whose decision differs is refused', () => {
     const { doc, p2, hash } = base();
-    expect(dispose(doc, { pathId: p2, confirmation: { verified: true } }, replay).error?.code).toBe('EOP_HUMAN_GATE');
+    const forged = dispose(doc, { pathId: p2, confirmation: { verified: true } }, replay);
+    expect(forged.error).toBeUndefined();
+    expect(forged.document).toBe(doc);
+    expect(forged.summary).toContain('not re-applied');
     const accepted = dispose(doc, { pathId: p2, confirmation: signature(doc, p2, hash) }).document;
     expect(dispose(accepted, { pathId: p2, decision: 'rejected', confirmation: { verified: true } }, replay).error?.code).toBe(
       'EOP_HUMAN_GATE',
     );
+  });
+
+  it('SIG-REPLAY: suppressing or deleting the dispose step drops the disposition (the row is pending_human again); unsuppressing does not restore it', () => {
+    const { doc, p2, hash } = base();
+    const accepted = dispose(doc, { pathId: p2, confirmation: signature(doc, p2, hash) });
+    expect(accepted.error, accepted.summary).toBeUndefined();
+    const outcome = expectSignedReplayFollowsHistory(
+      accepted.document,
+      'dispose_bond_check',
+      (next) => next.electroOptical?.dispositions[p2],
+      signing,
+    );
+    for (const next of [outcome.suppressed, outcome.deleted, outcome.restored])
+      expect(checkBonding(next, {}, signing).rows.find((row) => row.pathId === p2)?.disposition).toBe('pending_human');
+  });
+
+  it('deleting the disposed bond path, then regenerating, does not fail the replayed dispose step', () => {
+    const { doc, p2, hash } = base();
+    const accepted = dispose(doc, { pathId: p2, confirmation: signature(doc, p2, hash) }).document;
+    const deleted = execute(accepted, 'delete_bond_path', { pathId: p2 }, signing);
+    expect(deleted.error, deleted.summary).toBeUndefined();
+    const replayed = execute(deleted.document, 'replay_history', {}, signing);
+    expect(replayed.error, replayed.summary).toBeUndefined();
+    expect(replayed.document.electroOptical?.dispositions[p2]).toBeUndefined();
   });
 
   it('the plugin replay seed keeps the dispositions and drops the rest', async () => {
@@ -199,6 +227,7 @@ describe('dispose_bond_check: history replay', () => {
     const seed = electroOpticalPlugin.document?.replaySeed?.(accepted);
     expect(seed).toEqual({ electroOptical: { coatings: {}, bondPaths: {}, dispositions: accepted.electroOptical?.dispositions } });
     expect(electroOpticalPlugin.document?.replaySeed?.(doc)).toEqual({});
+    expect(electroOpticalPlugin.document?.replaySeed?.(accepted, new Set())).toEqual({});
   });
 });
 

@@ -11,6 +11,7 @@ import {
 import type { NamedValue } from '@core/model/topology';
 import { LSQ_METHOD, percent, type Finding, type LeastSquaresSummary, type OrderPairSummary } from './analysisShared';
 import { fitOutcome } from './leastSquaresAnalysis';
+import { appendAll } from '@lib/appendAll';
 
 export const FS_THREE = { value: 1.25, source: 'Roache 1994; Celik et al. 2008' };
 const FS_TWO = { value: 3, source: "Roache's two-grid recommendation (as reported in arXiv 2103.14559)" };
@@ -177,7 +178,7 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
     if (fitted) {
       const outcome = fitOutcome(samples, triplets, safetyFactor.value);
       ({ summaryReport, lsq } = outcome);
-      findings.push(...outcome.findings);
+      appendAll(findings, outcome.findings);
     } else {
       summaryReport = triplets[0] as TripletReport;
       const statusFinding = STATUS_CODES[summaryReport.status];

@@ -6,6 +6,8 @@
 import type { Vec2, Vec3 } from '../model/vectors';
 import { positiveSweep, toRadians } from './angle';
 import { type DxfRecord, codeNumber } from './dxfRecord';
+import { appendAll } from './appendAll';
+import { maxOf } from './arrayExtrema';
 
 /** Application name of the extended data written by `export_dxf` (registered in the APPID table). */
 export const LLULL_APP = 'LLULL';
@@ -219,7 +221,7 @@ function edgePath(read: Reader): Vec2[] | null {
       loop.push([x1, y1], [x2, y2]);
     } else if (type === 2) {
       const [cx, cy, radius, start, end, ccw] = [read.next(10), read.next(20), read.next(40), read.next(50), read.next(51), read.next(73)];
-      loop.push(...arcEdge(cx, cy, radius, toRadians(start), toRadians(end), ccw !== 0));
+      appendAll(loop, arcEdge(cx, cy, radius, toRadians(start), toRadians(end), ccw !== 0));
     } else return null;
   }
   return loop;
@@ -235,7 +237,7 @@ function boundaryLoops(record: DxfRecord): Vec2[][] | null {
     const flag = read.next(92);
     const raw = (flag & 2) !== 0 ? polylinePath(read) : edgePath(read);
     if (raw === null || raw.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) return null;
-    const reach = Math.max(1, ...raw.map(([x, y]) => Math.max(Math.abs(x), Math.abs(y))));
+    const reach = Math.max(1, maxOf(raw.map(([x, y]) => Math.max(Math.abs(x), Math.abs(y)))));
     const same = (p: Vec2, q: Vec2): boolean => Math.hypot(p[0] - q[0], p[1] - q[1]) <= JOINT_TOLERANCE * reach;
     const loop = raw.filter((p, index) => index === 0 || !same(p, raw[index - 1] as Vec2));
     if (loop.length > 1 && same(loop[0] as Vec2, loop[loop.length - 1] as Vec2)) loop.pop();

@@ -20,6 +20,7 @@ import { directionOf, layoutSteelStair } from '../stair/steelStairLayout';
 import { stairSizes } from '../stair/steelStairMeasure';
 import { breachFinding, type Finding } from './finding';
 import { allCandidates, verticalSpan, type Candidate } from './obstructions';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Sample spacing along and across the stair, mm. */
 const SAMPLE_MM = 50;
@@ -110,8 +111,8 @@ export function stairHeadroom(
   ];
   // Obstructions whose plan extent meets the stair plan: their edges (in stair coordinates) join the sample positions, so a narrow one is never missed.
   const corners = [at(0, -stair.width / 2), at(run, -stair.width / 2), at(run, stair.width / 2), at(0, stair.width / 2)];
-  const [minX, maxX] = [Math.min(...corners.map((c) => c[0])), Math.max(...corners.map((c) => c[0]))];
-  const [minY, maxY] = [Math.min(...corners.map((c) => c[1])), Math.max(...corners.map((c) => c[1]))];
+  const [minX, maxX] = [minOf(corners.map((c) => c[0])), maxOf(corners.map((c) => c[0]))];
+  const [minY, maxY] = [minOf(corners.map((c) => c[1])), maxOf(corners.map((c) => c[1]))];
   const near = candidates.filter((c) => c.max[0] >= minX && c.min[0] <= maxX && c.max[1] >= minY && c.min[1] <= maxY);
   const alongEdges: number[] = [];
   const acrossEdges: number[] = [];

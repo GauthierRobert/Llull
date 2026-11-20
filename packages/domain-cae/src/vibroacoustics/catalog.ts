@@ -1,8 +1,9 @@
-/** PHY-20 vibro-acoustics hand-off commands (spectra, conversions, levels, exposures, export package, check). */
+/** PHY-20 vibro-acoustics hand-off commands (spectra, conversions, levels, exposures, export package, check, reviewer disposition). */
 
 import { commandCatalog } from '@core/commands/schema';
 import { checkAcousticHandoff } from './checkCommand';
 import { convertAcousticSpectrum } from './convertCommand';
+import { disposeAcousticExport } from './disposeCommand';
 import { defineAcousticExposure, deleteAcousticExposure } from './exposureCommands';
 import { exportAcousticLoad } from './exportCommand';
 import { acousticLevel, acousticSpectrumReport } from './queryCommands';
@@ -18,4 +19,5 @@ export const vibroacousticsCommands = commandCatalog(
   deleteAcousticExposure,
   exportAcousticLoad,
   checkAcousticHandoff,
+  disposeAcousticExport,
 );

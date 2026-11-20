@@ -25,6 +25,7 @@ import {
 } from '../assembly/assemblyParts';
 import { railingRunsProblem } from './platformRailing';
 import type { CircularSpec } from './platformSpec';
+import { appendAll } from '@lib/appendAll';
 
 const RAD = Math.PI / 180;
 
@@ -137,7 +138,7 @@ export function buildCircularPlatform(
       [segment],
     );
     building = placed.building;
-    gratingIds.push(...placed.ids);
+    appendAll(gratingIds, placed.ids);
   });
 
   const railingIds: string[] = [];
@@ -156,7 +157,7 @@ export function buildCircularPlatform(
     if (problem !== null) return problem;
     const placed = placeRailings(building, slots.railing, partBase, fields, paths);
     building = placed.building;
-    railingIds.push(...placed.ids);
+    appendAll(railingIds, placed.ids);
   }
   const partIds = [...brackets.ids, ...gratingIds, ...railingIds];
   return {

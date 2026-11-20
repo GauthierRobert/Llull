@@ -11,6 +11,8 @@ import type { StationAnalysis } from './roadReport';
 import { stationText } from '../model';
 import { scaleDenominator, svgDocument, svgLine, svgPolygon, svgPolyline, svgRect, svgText } from './roadSvg';
 import { toMetres } from '@core/model/units';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 const PANEL_WIDTH = 380;
 const PANEL_HEIGHT = 230;
@@ -79,8 +81,8 @@ export function crossSectionSvg(
   for (const { cross } of entries) {
     if (!cross) continue;
     const zs = cross.design.map((node) => node.z * metre);
-    halfWidth = Math.max(halfWidth, ...cross.design.map((node) => Math.abs(node.offset) * metre));
-    spanZ = Math.max(spanZ, Math.max(...zs) - Math.min(...zs) + 2);
+    halfWidth = Math.max(halfWidth, maxOf(cross.design.map((node) => Math.abs(node.offset) * metre)));
+    spanZ = Math.max(spanZ, maxOf(zs) - minOf(zs) + 2);
   }
   const scale = Math.min((PANEL_WIDTH - 40) / (2 * halfWidth), (PANEL_HEIGHT - 70) / spanZ);
   const rowsCount = Math.ceil(entries.length / COLUMNS);
@@ -113,7 +115,7 @@ export function crossSectionSvg(
       });
       const groundLine = samples.map((sample): Pair => [px(sample.offset), py(sample.ground)]);
       if (groundLine.length >= 2) {
-        body.push(...earthworkPolygons(samples, px, py));
+        appendAll(body, earthworkPolygons(samples, px, py));
         body.push(svgPolyline(groundLine, '#5a4a2a', 1.5));
       }
     }

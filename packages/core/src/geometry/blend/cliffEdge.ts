@@ -8,6 +8,7 @@ import type { GeometryKernel, ShapeTopology } from '../kernel';
 import type { FaceGraph } from '../kernelPorts';
 import type { ShapeHandle } from '../kernelTypes';
 import { blendSource } from './continuity';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface CliffEdge {
   /** Unique-edge index of the cliff edge. */
@@ -39,7 +40,7 @@ export function cliffEdgeOf(
     if (otherName === undefined || source.supports.includes(otherName)) continue;
     const measured = kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null;
     if (measured === null || measured.length === 0) continue;
-    return { edge, beyond, angleRad: Math.max(...measured.map((sample) => sample.g1)) };
+    return { edge, beyond, angleRad: maxOf(measured.map((sample) => sample.g1)) };
   }
   return null;
 }

@@ -10,6 +10,7 @@ import { daylightPoints, type DaylightPoint } from './platformDaylight';
 import { surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt, type Tin } from '../surface/tin';
 import { toMetres } from '@core/model/units';
+import { appendAll } from '@lib/appendAll';
 
 const CUT_COLOR = '#c0794a';
 const FILL_COLOR = '#8fae6b';
@@ -27,7 +28,7 @@ function pushTriangle(
 ): void {
   const normalZ = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
   const base = mesh.positions.length / 3;
-  mesh.positions.push(...a, ...b, ...c);
+  appendAll(mesh.positions, [...a, ...b, ...c]);
   mesh.indices.push(base, normalZ >= 0 ? base + 1 : base + 2, normalZ >= 0 ? base + 2 : base + 1);
 }
 
@@ -87,7 +88,7 @@ export function evaluatePlatform(context: CivilContext, platform: PlatformObject
   const pad = triangulatePolygon(outline as Vec2[]);
   const padMesh: MeshBuffer = { positions: [], indices: [] };
   pad.vertices.forEach((vertex) => padMesh.positions.push(vertex[0], vertex[1], platform.elevation));
-  pad.triangles.forEach((triangle) => padMesh.indices.push(...triangle));
+  pad.triangles.forEach((triangle) => appendAll(padMesh.indices, triangle));
   entities.push(civilMesh(platform, 'pad', `${platform.name} pad`, 'grading', padMesh));
   entities.push(civilPolyline(platform, 'outline', `${platform.name} outline`, 'grading', outline, true, platform.elevation));
   const tin = surfaceTinById(context.civil, platform.surfaceId);

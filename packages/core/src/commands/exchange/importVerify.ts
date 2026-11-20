@@ -12,6 +12,7 @@ import type { EmbeddedGvp, GvpCheck, GvpPolicy } from '../../model/exchange';
 import type { Step21Summary } from '../../lib/step21/summary';
 import { type FileGvpGroup, embeddedOf, groupFileGvp, groupOfProduct } from './fileGvp';
 import { type GvpSample, compareGvp, worstBand } from './gvpBands';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** One integrated piece: volume, area, centroid and its axis-aligned box (mm). */
 interface Piece {
@@ -55,8 +56,8 @@ function placed(piece: Piece, matrix: readonly number[]): Piece {
     volume: piece.volume,
     area: piece.area,
     centroid: place(matrix, piece.centroid),
-    min: [Math.min(...axis(0)), Math.min(...axis(1)), Math.min(...axis(2))],
-    max: [Math.max(...axis(0)), Math.max(...axis(1)), Math.max(...axis(2))],
+    min: [minOf(axis(0)), minOf(axis(1)), minOf(axis(2))],
+    max: [maxOf(axis(0)), maxOf(axis(1)), maxOf(axis(2))],
   };
 }
 
@@ -66,8 +67,8 @@ function sum(pieces: readonly Piece[]): Piece | undefined {
   const centroid = [0, 1, 2].map(
     (k) => pieces.reduce((total, piece) => total + piece.volume * (piece.centroid[k] ?? 0), 0) / volume,
   ) as unknown as Vec3;
-  const lowest = (k: 0 | 1 | 2): number => Math.min(...pieces.map((piece) => piece.min[k]));
-  const highest = (k: 0 | 1 | 2): number => Math.max(...pieces.map((piece) => piece.max[k]));
+  const lowest = (k: 0 | 1 | 2): number => minOf(pieces.map((piece) => piece.min[k]));
+  const highest = (k: 0 | 1 | 2): number => maxOf(pieces.map((piece) => piece.max[k]));
   return {
     volume,
     area: pieces.reduce((total, piece) => total + piece.area, 0),

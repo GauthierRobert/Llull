@@ -6,6 +6,7 @@
 
 import { solveLeastSquares } from '../../lib/leastSquares';
 import { solveLinear } from './linalg';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export type LmStop = 'cost_change' | 'exact' | 'gradient' | 'no_descent' | 'invalid_probe' | 'max_iterations' | 'invalid_start';
 
@@ -111,7 +112,7 @@ export function levenbergMarquardt(residuals: Residuals, start: readonly number[
     const a = gram(j, n);
     const current = r;
     const g = Array.from({ length: n }, (_, c) => j.reduce((sum, row, i) => sum + (row[c] ?? 0) * (current[i] ?? 0), 0));
-    if (Math.max(...g.map(Math.abs)) <= 1e-15 * Math.max(1, Math.sqrt(2 * cost))) {
+    if (maxOf(g.map(Math.abs)) <= 1e-15 * Math.max(1, Math.sqrt(2 * cost))) {
       stop = 'gradient';
       break;
     }

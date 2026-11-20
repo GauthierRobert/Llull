@@ -11,6 +11,7 @@ import { quantizedKey } from '../lib/quantize';
 import { cross3, sub3 } from '../lib/vec3';
 import { signedMeshVolume } from './meshVolume';
 import type { Triangle } from './triangles';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 export interface PrismSection {
   /** Extrusion direction (unit) and the Euler rotation of the frame whose +Z it is. */
@@ -131,7 +132,7 @@ function sectionAlong(tris: readonly Triangle[], axis: Vec3, size: number): Pris
   const tolerance = Math.max(1e-9, size * 1e-7);
   const local = tris.map((tri): Triangle => [applyMat3(inverse, tri[0]), applyMat3(inverse, tri[1]), applyMat3(inverse, tri[2])]);
   const zs = local.flatMap((tri) => tri.map((p) => p[2]));
-  const [zLow, zHigh] = [Math.min(...zs), Math.max(...zs)];
+  const [zLow, zHigh] = [minOf(zs), maxOf(zs)];
   const depth = zHigh - zLow;
   if (depth <= tolerance * 10) return { reason: 'flat along that axis' };
   const plane = (z: number): 'low' | 'high' | null =>
@@ -192,8 +193,8 @@ function sectionAlong(tris: readonly Triangle[], axis: Vec3, size: number): Pris
 export function recognizePrism(tris: readonly Triangle[]): PrismResult {
   if (tris.length < 4) return { reason: 'a solid needs at least 4 triangles' };
   const points = tris.flatMap((tri) => tri.map((p) => p));
-  const extent = [0, 1, 2].map((i) => Math.max(...points.map((p) => p[i] as number)) - Math.min(...points.map((p) => p[i] as number)));
-  const size = Math.max(...extent);
+  const extent = [0, 1, 2].map((i) => maxOf(points.map((p) => p[i] as number)) - minOf(points.map((p) => p[i] as number)));
+  const size = maxOf(extent);
   if (!(size > 0)) return { reason: 'the mesh has no extent' };
   let lastReason = 'no candidate axis';
   for (const axis of candidateAxes(tris)) {

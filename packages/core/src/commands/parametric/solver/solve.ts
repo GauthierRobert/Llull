@@ -8,6 +8,8 @@ import { buildProblem, cost } from './problem';
 import { referenceOnlyEntities } from './reference';
 import { sizePreservation } from './rigid';
 import { compileConstraint } from './residuals';
+import { maxOf } from '../../../lib/arrayExtrema';
+import { appendAll } from '../../../lib/appendAll';
 
 export interface SolveOptions {
   /** Solve only these constraints (and only the entities they reference). */
@@ -80,7 +82,7 @@ interface ComponentResult {
 function solveComponent(layout: Layout, group: readonly Compiled[], usable: readonly Constraint[], guess: Float64Array): ComponentResult {
   const problem = buildProblem(layout, group);
   const entities = new Set(group.flatMap((c) => c.entities));
-  const scale = Math.max(1, ...[...entities].map((id) => featureSize(layout, id)));
+  const scale = Math.max(1, maxOf([...entities].map((id) => featureSize(layout, id))));
   const rows = Math.max(problem.rows, 1);
   const costTarget = (1e-11 * scale) ** 2;
   const satisfied = rows * (1e-10 * scale) ** 2;
@@ -164,7 +166,7 @@ export function runSolver(doc: CadDocument, options: SolveOptions = {}): SolveOu
     } else if (options.focus === undefined) {
       const analysis = analyze(problem, layout, solution);
       rank += analysis.rank;
-      fullyConstrained.push(...analysis.fullyConstrained);
+      appendAll(fullyConstrained, analysis.fullyConstrained);
     }
   }
   return {

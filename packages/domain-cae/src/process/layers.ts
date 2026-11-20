@@ -4,6 +4,7 @@ import type { AnalysisCase, FeMeshArtifact } from '@core/model/analysis';
 import type { AmBuildSettings } from '@core/model/am';
 import type { DeckRefusal } from '../decks/context';
 import { dot3 } from '@lib/vec3';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** A deck holds two steps and one material per layer. */
 export const MAX_LAYERS = 500;
@@ -57,7 +58,7 @@ export function amLayerPlan(
     .flatMap((block) => block.elements.flatMap((e) => e.slice(1)));
   if (plateNodes.length === 0)
     return refuse('PRC_BUILD_SETUP_INVALID', `the mesh has no element of the plate '${am.plateEntityId}'`, [am.plateEntityId]);
-  const plateTop = Math.max(...plateNodes.map((node) => height.get(node) ?? -Infinity));
+  const plateTop = maxOf(plateNodes.map((node) => height.get(node) ?? -Infinity));
   const thickness = am.layerHeight * lengthToAnalysis;
   const byLayer = new Map<number, Map<number, number[]>>();
   for (const block of mesh.blocks) {

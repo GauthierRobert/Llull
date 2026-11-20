@@ -1,6 +1,7 @@
 /** Recognises joggles in a converted graph: two reverse bends of equal angle and radius around one short inclined flat. */
 
 import type { SheetNode } from '@core/model/sheetMetal';
+import { maxOf } from '@lib/arrayExtrema';
 
 type Bend = Extract<SheetNode, { type: 'bend' }>;
 
@@ -17,7 +18,7 @@ export function recogniseJoggles(nodes: readonly SheetNode[], thickness: number)
     const phi = Math.abs(first.angle);
     const opposite = Math.abs(first.angle + second.angle) < 1e-6 && phi <= Math.PI / 2 + 1e-9;
     if (!opposite || Math.abs(first.insideRadius - second.insideRadius) > 1e-6 * Math.max(1, thickness)) continue;
-    const straight = Math.max(...incline.outline.map((point) => point[1]));
+    const straight = maxOf(incline.outline.map((point) => point[1]));
     const rm = first.insideRadius + thickness / 2;
     found.push({
       id: `j${found.length + 1}`,

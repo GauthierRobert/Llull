@@ -11,6 +11,7 @@ import { localDeterminant } from './laws';
 import { determinantRange as pointRange } from './pointPush';
 import { type LocalFrame, toLocal } from './frame';
 import { rampAt } from './region';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Axis-aligned extent of a body in local frame coordinates. */
 export interface LocalExtent {
@@ -161,12 +162,12 @@ export function jacobianRange(node: Pick<DeformNode, 'law' | 'region'>, extent: 
   const inside = overlaps(region, extent);
   if (law.kind === 'stretch') {
     const values = [...(inside ? [law.factor] : []), ...(!inside || extendsOutside(region, extent) ? [1] : [])];
-    const min = Math.min(...values);
-    return { min, max: Math.max(...values), minAt: corner(Math.max(extent.min[2], region.start)) };
+    const min = minOf(values);
+    return { min, max: maxOf(values), minAt: corner(Math.max(extent.min[2], region.start)) };
   }
   const [low, high] = [(law.radius - extent.max[1]) / law.radius, (law.radius - extent.min[1]) / law.radius];
   const values = [...(inside ? [low, high] : []), ...(!inside || extendsOutside(region, extent) ? [1] : [])];
-  return { min: Math.min(...values), max: Math.max(...values), minAt: corner(Math.max(extent.min[2], region.start), extent.max[1]) };
+  return { min: minOf(values), max: maxOf(values), minAt: corner(Math.max(extent.min[2], region.start), extent.max[1]) };
 }
 
 /** Placeholder region of a flow (its law ignores it). */

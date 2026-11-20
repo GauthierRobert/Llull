@@ -37,11 +37,32 @@ export interface AcousticExposure {
   readonly notes?: string;
 }
 
+export const REVIEW_DECISIONS = ['accepted', 'rejected'] as const;
+
+/**
+ * A qualified reviewer's signed disposition of the acoustic load package of one exposure (`dispose_acoustic_export`).
+ * @invariant `exposure` is its key; it covers the package only while `fingerprint` equals the current one (exposure, spectrum, target geometry, units) and in the document `documentUid`
+ */
+export interface AcousticReview {
+  readonly exposure: string;
+  readonly decision: (typeof REVIEW_DECISIONS)[number];
+  readonly justification: string;
+  readonly fingerprint: string;
+  readonly signer: string;
+  readonly signatureId: string;
+  readonly signature: unknown;
+  readonly documentUid: string;
+  /** Key of the feature step that recorded it (SIG-REPLAY: seeded only while that step is live); absent on older records. */
+  readonly stepKey?: string;
+}
+
 export interface VibroacousticsModel {
   readonly spectra: Readonly<Record<string, AcousticSpectrum>>;
   readonly spectrumOrder: readonly string[];
   readonly exposures: Readonly<Record<string, AcousticExposure>>;
   readonly exposureOrder: readonly string[];
+  /** Signed reviewer dispositions by exposure name (absent until the first one; kept by the replay seed). */
+  readonly reviews?: Readonly<Record<string, AcousticReview>>;
 }
 
 declare module '@core/model/documentExtensions' {

@@ -83,7 +83,8 @@ function distanceNode(doc: CadDocument, p: ScalarParams, id: string, label: Labe
   let to: DistanceTarget;
   if (p.toPoint !== undefined) to = { point: p.toPoint };
   else if (p.toPlane !== undefined) {
-    if (!(Math.hypot(...p.toPlane.normal) > 0)) return problem('IMP_PARAM_RANGE', 'toPlane.normal must be non-zero', 'toPlane.normal');
+    if (!(Math.hypot(p.toPlane.normal[0], p.toPlane.normal[1], p.toPlane.normal[2]) > 0))
+      return problem('IMP_PARAM_RANGE', 'toPlane.normal must be non-zero', 'toPlane.normal');
     to = { plane: p.toPlane };
   } else if (p.toEntity !== undefined) {
     const solid = closedSolidMesh(doc, p.toEntity);

@@ -9,6 +9,8 @@
 import type { Vec3 } from '../../model/vectors';
 import type { EditMesh } from './editMesh';
 import { normalOf } from './editMesh';
+import { hypot3 } from '../../lib/vec3';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Liepa's density factor alpha (default sqrt 2): larger inserts more vertices. */
 export const LIEPA_ALPHA = Math.SQRT2;
@@ -24,7 +26,7 @@ function cornerAngle(mesh: EditMesh, apex: number, a: number, b: number): number
   const [p, pa, pb] = [mesh.p(apex), mesh.p(a), mesh.p(b)];
   const u: Vec3 = [pa[0] - p[0], pa[1] - p[1], pa[2] - p[2]];
   const v: Vec3 = [pb[0] - p[0], pb[1] - p[1], pb[2] - p[2]];
-  const l = Math.hypot(...u) * Math.hypot(...v);
+  const l = Math.hypot(u[0], u[1], u[2]) * Math.hypot(v[0], v[1], v[2]);
   return l > 0 ? Math.acos(Math.max(-1, Math.min(1, dot(u, v) / l))) : 0;
 }
 
@@ -106,7 +108,7 @@ interface FairSystem {
 const cot = (apex: Vec3, a: Vec3, b: Vec3): number => {
   const u: Vec3 = [a[0] - apex[0], a[1] - apex[1], a[2] - apex[2]];
   const v: Vec3 = [b[0] - apex[0], b[1] - apex[1], b[2] - apex[2]];
-  const area2 = Math.hypot(...normalOf(apex, a, b));
+  const area2 = hypot3(normalOf(apex, a, b));
   return area2 > 1e-300 ? dot(u, v) / area2 : 0;
 };
 
@@ -124,7 +126,7 @@ function buildSystem(mesh: EditMesh, free: ReadonlyArray<number>, thinPlate: boo
   for (const f of faces) {
     const corners = mesh.corners(f);
     const points = corners.map((c) => mesh.p(c)) as [Vec3, Vec3, Vec3];
-    const area = Math.hypot(...normalOf(...points)) / 2;
+    const area = hypot3(normalOf(...points)) / 2;
     for (let k = 0; k < 3; k++) {
       const [a, b] = [corners[(k + 1) % 3] as number, corners[(k + 2) % 3] as number];
       const key = Math.min(a, b) * 67_108_864 + Math.max(a, b);
@@ -183,7 +185,7 @@ export function fairVertices(mesh: EditMesh, free: ReadonlyArray<number>, fairin
     ids.forEach((v, k) => (fixedOnly[k] = freeSet.has(v) ? 0 : (mesh.pos[v * 3 + axis] as number)));
     const rhsFull = operator(system, fixedOnly);
     const b = system.freeLocal.map((k) => -(rhsFull[k] as number));
-    const norm = Math.hypot(...b);
+    const norm = hypotOf(b);
     const place = (values: ReadonlyArray<number>): Float64Array => {
       const x = new Float64Array(size);
       system.freeLocal.forEach((k, i) => (x[k] = values[i] as number));

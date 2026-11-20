@@ -10,6 +10,7 @@ import { circlePolygon } from '@lib/arc';
 import { findProfile } from '../../steel/profiles';
 import { add3, distance3, scale3, sub3 } from '@lib/vec3';
 import { atLevel, boltSize } from '../evaluate';
+import { appendAll } from '@lib/appendAll';
 
 /** World placement of a base plate and its anchor bolts. */
 export interface PlateLayout {
@@ -244,11 +245,12 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
   }
   if (haunchDepth > 0) {
     const rafter = profileDims(profile, mm);
-    solids.push(...haunchSolids({ frame, plate, face, rafter, length: connection.haunchLength, suffix: '' }));
+    appendAll(solids, haunchSolids({ frame, plate, face, rafter, length: connection.haunchLength, suffix: '' }));
     if (connection.kind === 'apex' && apexFar) {
       const { frame: farFrame, plate: farPlate, joint: farJoint } = apexFar;
-      solids.push(
-        ...haunchSolids({ frame: farFrame, plate: farPlate, face: farJoint, rafter, length: connection.haunchLength, suffix: '-2' }),
+      appendAll(
+        solids,
+        haunchSolids({ frame: farFrame, plate: farPlate, face: farJoint, rafter, length: connection.haunchLength, suffix: '-2' }),
       );
     }
   }

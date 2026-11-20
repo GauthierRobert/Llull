@@ -9,6 +9,7 @@ import type { CommandResult } from '../types';
 import { wrapRejection } from './codes';
 import { isFontFailure, loadFont } from './fontStore';
 import { wrapData } from './conventions';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Points kept per loop in `output: "loops"` (a longer loop is thinned evenly). */
 const MAX_LOOP_POINTS = 2000;
@@ -97,10 +98,10 @@ export const textOutlineCommand = defineCommand({
                 boxes.length === 0
                   ? null
                   : [
-                      Math.min(...boxes.map((box) => box.min[0])),
-                      Math.min(...boxes.map((box) => box.min[1])),
-                      Math.max(...boxes.map((box) => box.max[0])),
-                      Math.max(...boxes.map((box) => box.max[1])),
+                      minOf(boxes.map((box) => box.min[0])),
+                      minOf(boxes.map((box) => box.min[1])),
+                      maxOf(boxes.map((box) => box.max[0])),
+                      maxOf(boxes.map((box) => box.max[1])),
                     ],
             };
           })

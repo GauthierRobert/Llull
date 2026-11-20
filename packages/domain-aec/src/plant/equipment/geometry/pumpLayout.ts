@@ -7,6 +7,7 @@
 
 import type { Vec3 } from '@core/model/types';
 import type { PumpTemplate } from '../plantData';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface LayoutBox {
   readonly part: string;
@@ -57,7 +58,7 @@ export function pumpLayout(template: PumpTemplate): PumpLayout {
     });
   }
   const machineFrom = -envelope.a;
-  const machineTo = Math.max(...spans.map((span) => span.x[1]));
+  const machineTo = maxOf(spans.map((span) => span.x[1]));
   const plateCentre = (machineFrom + machineTo) / 2;
   spans.push({
     part: 'baseplate',
@@ -66,11 +67,11 @@ export function pumpLayout(template: PumpTemplate): PumpLayout {
     width: baseplate.width,
     z: [0, plateTop],
   });
-  const xMin = Math.min(...spans.map((span) => span.x[0]));
-  const xMax = Math.max(...spans.map((span) => span.x[1]));
+  const xMin = minOf(spans.map((span) => span.x[0]));
+  const xMax = maxOf(spans.map((span) => span.x[1]));
   const shift = (xMin + xMax) / 2;
-  const width = Math.max(...spans.map((span) => span.width));
-  const top = Math.max(...spans.map((span) => span.z[1]), shaft + envelope.h2);
+  const width = maxOf(spans.map((span) => span.width));
+  const top = Math.max(maxOf(spans.map((span) => span.z[1])), shaft + envelope.h2);
   return {
     boxes: spans.map(
       (span): LayoutBox => ({

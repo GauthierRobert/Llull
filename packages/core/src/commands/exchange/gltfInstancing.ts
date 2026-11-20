@@ -5,6 +5,7 @@
  */
 
 import type { Vec3 } from '../../model/types';
+import { appendAll } from '../../lib/appendAll';
 
 export const GPU_INSTANCING_EXTENSION = 'EXT_mesh_gpu_instancing';
 
@@ -56,7 +57,7 @@ export class InstanceTransforms {
   add(position: Vec3, euler: Vec3, scale?: Vec3): void {
     this.translation.push(position[0], position[1], position[2]);
     const isIdentityRotation = euler[0] === 0 && euler[1] === 0 && euler[2] === 0;
-    this.rotation.push(...(isIdentityRotation ? [0, 0, 0, 1] : quaternionFromEulerXYZ(euler)));
+    appendAll(this.rotation, isIdentityRotation ? [0, 0, 0, 1] : quaternionFromEulerXYZ(euler));
     this.rotated ||= !isIdentityRotation;
     const [sx, sy, sz] = scale ?? [1, 1, 1];
     this.scale.push(sx, sy, sz);

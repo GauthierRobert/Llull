@@ -13,6 +13,7 @@ import { loftAdvancedFields, parseEnd } from '../solids/loftAdvanced';
 import { refuseSrf } from './shared';
 import { refuseSwg } from './swgRefusal';
 import { commitSurface, isRefusal, sig, surfaceStyleFields } from './surfaceShared';
+import { appendAll } from '../../lib/appendAll';
 
 const MAX_SECTIONS = 60;
 
@@ -48,7 +49,7 @@ function advancedSheet(doc: CadDocument, params: SheetParams, sections: NurbsCur
   for (const face of built.faces) {
     const made = commitSurface(current, face, { ...params, position: [0, 0, 0] }, () => '');
     current = made.document;
-    ids.push(...made.affected);
+    appendAll(ids, made.affected);
   }
   const { report } = built;
   return {

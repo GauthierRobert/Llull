@@ -90,7 +90,7 @@ export function primitiveField(b: FieldBuilder, node: PrimitiveNode, frame: Fram
     }
     case 'plane': {
       const n = vec(dims, 'normal', [0, 0, 1]);
-      const length = Math.hypot(...n);
+      const length = Math.hypot(n[0], n[1], n[2]);
       const dot = b.add(b.add(b.scale(x, n[0] / length), b.scale(y, n[1] / length)), b.scale(z, n[2] / length));
       return { reg: b.shift(dot, -num(dims, 'offset')), box: null };
     }

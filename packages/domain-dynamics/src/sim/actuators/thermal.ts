@@ -70,7 +70,7 @@ export function networkTimeConstants(p: ThermalParams): readonly [slow: number, 
 }
 
 /** Exact state after `h` seconds with a constant winding power `powerW`. */
-function stepThermal(p: ThermalParams, state: ThermalState, powerW: number, h: number): ThermalState {
+export function stepThermal(p: ThermalParams, state: ThermalState, powerW: number, h: number): ThermalState {
   const [a11, a12, a21, a22] = systemMatrix(p);
   const [l1, l2] = eigenvalues(p);
   const [e1, e2] = [Math.exp(l1 * h), Math.exp(l2 * h)];
@@ -86,7 +86,7 @@ function stepThermal(p: ThermalParams, state: ThermalState, powerW: number, h: n
 }
 
 /** Copper resistance at a winding temperature (C), ohm. */
-const resistanceAt = (p: ThermalParams, windingC: number): number => p.r25 * (1 + p.alpha * (windingC - REFERENCE_C));
+export const resistanceAt = (p: ThermalParams, windingC: number): number => p.r25 * (1 + p.alpha * (windingC - REFERENCE_C));
 
 /** Winding and housing temperatures (C) along a current series: from the ambient, one exact step per sample interval at the interval's mean i^2. */
 export function windingTemperatureSeries(

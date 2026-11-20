@@ -5,6 +5,7 @@ import type { TopologyStudy } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { analysisOf, caseOf, withCase } from '../shared/access';
+import { appendAll } from '@lib/appendAll';
 
 /** Studies of `analysisCase` in creation order. */
 export function studiesOf(analysisCase: AnalysisCase): TopologyStudy[] {
@@ -86,7 +87,7 @@ export function topologyErrors(raw: Record<string, unknown>): string[] {
     const order = analysisCase['topologyOrder'];
     if (!isRecord(studies) || !Array.isArray(order) || order.some((id) => typeof id !== 'string' || !Object.hasOwn(studies, id)))
       errors.push(`analysis.cases.${caseId}.topology / topologyOrder are malformed`);
-    else for (const [id, study] of Object.entries(studies)) errors.push(...studyErrors(`topology study '${id}'`, id, study));
+    else for (const [id, study] of Object.entries(studies)) appendAll(errors, studyErrors(`topology study '${id}'`, id, study));
   }
   return errors;
 }

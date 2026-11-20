@@ -1,0 +1,176 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "box-2.1": {
+        "id": "box-2.1",
+        "kind": "box",
+        "size": [300, 200, 100],
+        "position": [150, 100, 50],
+        "rotation": [0, 0, 0],
+        "layerId": "layer-default",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": ["box-2.1"],
+    "layers": { "layer-default": { "id": "layer-default", "name": "Layer 0", "visible": true, "locked": false } },
+    "layerOrder": ["layer-default"],
+    "selection": [],
+    "camera": { "target": [0, 0, 0], "azimuth": 2.356194490192345, "polar": 1.0471975511965976, "distance": 12 },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      { "id": "step-1", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
+      {
+        "id": "step-2",
+        "name": "add_box",
+        "params": { "size": [300, 200, 100], "position": [0, 0, 0], "anchor": "min" },
+        "suppressed": false,
+        "affected": ["box-2.1"]
+      },
+      {
+        "id": "step-3",
+        "name": "define_acoustic_spectrum",
+        "params": {
+          "name": "flat130",
+          "bandwidth": "third_octave",
+          "reference": "20uPa",
+          "bands": [
+            { "nominalHz": 25, "splDb": 130 },
+            { "nominalHz": 31.5, "splDb": 130 },
+            { "nominalHz": 40, "splDb": 130 },
+            { "nominalHz": 50, "splDb": 130 },
+            { "nominalHz": 63, "splDb": 130 },
+            { "nominalHz": 80, "splDb": 130 },
+            { "nominalHz": 100, "splDb": 130 },
+            { "nominalHz": 125, "splDb": 130 },
+            { "nominalHz": 160, "splDb": 130 },
+            { "nominalHz": 200, "splDb": 130 },
+            { "nominalHz": 250, "splDb": 130 },
+            { "nominalHz": 315, "splDb": 130 },
+            { "nominalHz": 400, "splDb": 130 },
+            { "nominalHz": 500, "splDb": 130 },
+            { "nominalHz": 630, "splDb": 130 },
+            { "nominalHz": 800, "splDb": 130 },
+            { "nominalHz": 1000, "splDb": 130 },
+            { "nominalHz": 1250, "splDb": 130 },
+            { "nominalHz": 1600, "splDb": 130 },
+            { "nominalHz": 2000, "splDb": 130 },
+            { "nominalHz": 2500, "splDb": 130 },
+            { "nominalHz": 3150, "splDb": 130 },
+            { "nominalHz": 4000, "splDb": 130 },
+            { "nominalHz": 5000, "splDb": 130 },
+            { "nominalHz": 6300, "splDb": 130 },
+            { "nominalHz": 8000, "splDb": 130 },
+            { "nominalHz": 10000, "splDb": 130 }
+          ],
+          "source": { "citation": "synthetic test input of VC-VAC-06 (not a test level)", "grade": "A" }
+        },
+        "suppressed": false,
+        "affected": ["flat130"]
+      },
+      {
+        "id": "step-4",
+        "name": "define_acoustic_exposure",
+        "params": {
+          "name": "enclosure_skin",
+          "spectrum": "flat130",
+          "target": { "entityId": "box-2.1", "facesNear": [[150, 100, 100]] },
+          "field": "diffuse"
+        },
+        "suppressed": false,
+        "affected": ["enclosure_skin"]
+      },
+      {
+        "id": "step-5",
+        "name": "dispose_acoustic_export",
+        "params": {
+          "exposure": "enclosure_skin",
+          "decision": "accepted",
+          "justification": "review record VAC-RR-1: launch acoustic environment, faces checked",
+          "confirmation": { "verified": true }
+        },
+        "suppressed": false,
+        "affected": ["enclosure_skin"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "uid": "96600ecd9cebe657afc5caf87981f09b",
+    "nextStepNumber": 6,
+    "vibroacoustics": {
+      "spectra": {
+        "flat130": {
+          "name": "flat130",
+          "bandwidth": "third_octave",
+          "reference": "20uPa",
+          "bands": [
+            { "nominalHz": 25, "exactMidHz": 25.118864315095795, "splDb": 130 },
+            { "nominalHz": 31.5, "exactMidHz": 31.622776601683793, "splDb": 130 },
+            { "nominalHz": 40, "exactMidHz": 39.810717055349734, "splDb": 130 },
+            { "nominalHz": 50, "exactMidHz": 50.11872336272723, "splDb": 130 },
+            { "nominalHz": 63, "exactMidHz": 63.09573444801933, "splDb": 130 },
+            { "nominalHz": 80, "exactMidHz": 79.43282347242814, "splDb": 130 },
+            { "nominalHz": 100, "exactMidHz": 100, "splDb": 130 },
+            { "nominalHz": 125, "exactMidHz": 125.89254117941672, "splDb": 130 },
+            { "nominalHz": 160, "exactMidHz": 158.4893192461113, "splDb": 130 },
+            { "nominalHz": 200, "exactMidHz": 199.526231496888, "splDb": 130 },
+            { "nominalHz": 250, "exactMidHz": 251.188643150958, "splDb": 130 },
+            { "nominalHz": 315, "exactMidHz": 316.22776601683796, "splDb": 130 },
+            { "nominalHz": 400, "exactMidHz": 398.1071705534972, "splDb": 130 },
+            { "nominalHz": 500, "exactMidHz": 501.18723362727224, "splDb": 130 },
+            { "nominalHz": 630, "exactMidHz": 630.9573444801932, "splDb": 130 },
+            { "nominalHz": 800, "exactMidHz": 794.3282347242815, "splDb": 130 },
+            { "nominalHz": 1000, "exactMidHz": 1000, "splDb": 130 },
+            { "nominalHz": 1250, "exactMidHz": 1258.9254117941673, "splDb": 130 },
+            { "nominalHz": 1600, "exactMidHz": 1584.8931924611136, "splDb": 130 },
+            { "nominalHz": 2000, "exactMidHz": 1995.2623149688795, "splDb": 130 },
+            { "nominalHz": 2500, "exactMidHz": 2511.8864315095802, "splDb": 130 },
+            { "nominalHz": 3150, "exactMidHz": 3162.2776601683795, "splDb": 130 },
+            { "nominalHz": 4000, "exactMidHz": 3981.0717055349724, "splDb": 130 },
+            { "nominalHz": 5000, "exactMidHz": 5011.872336272722, "splDb": 130 },
+            { "nominalHz": 6300, "exactMidHz": 6309.573444801933, "splDb": 130 },
+            { "nominalHz": 8000, "exactMidHz": 7943.282347242815, "splDb": 130 },
+            { "nominalHz": 10000, "exactMidHz": 10000, "splDb": 130 }
+          ],
+          "source": { "citation": "synthetic test input of VC-VAC-06 (not a test level)", "grade": "A" },
+          "unverified": false
+        }
+      },
+      "spectrumOrder": ["flat130"],
+      "exposures": {
+        "enclosure_skin": {
+          "name": "enclosure_skin",
+          "spectrum": "flat130",
+          "target": { "entityId": "box-2.1", "facesNear": [[150, 100, 100]] },
+          "field": "diffuse"
+        }
+      },
+      "exposureOrder": ["enclosure_skin"],
+      "reviews": {
+        "enclosure_skin": {
+          "exposure": "enclosure_skin",
+          "decision": "accepted",
+          "justification": "review record VAC-RR-1: launch acoustic environment, faces checked",
+          "fingerprint": "b6a394382552ebf43c43129dec1ae2680c3f2d43910ae01958a60203f002793c",
+          "signer": "frozen-reviewer",
+          "signatureId": "frozen-sig-1",
+          "signature": { "alg": "test", "key": "frozen-test-key", "nonce": "frozen-nonce-1" },
+          "documentUid": "96600ecd9cebe657afc5caf87981f09b"
+        }
+      }
+    }
+  }
+}

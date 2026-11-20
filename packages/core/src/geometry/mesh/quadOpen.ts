@@ -12,6 +12,7 @@ import type { Vec3 } from '../../model/vectors';
 import { cutMeshByPlane } from './planeCut';
 import { faceNormal, shellOfQuads } from './quadCage';
 import { SurfaceIndex } from './surfaceIndex';
+import { appendAll } from '../../lib/appendAll';
 
 const at = (positions: ReadonlyArray<number>, index: number): Vec3 => [
   positions[3 * index] as number,
@@ -114,7 +115,7 @@ export function rimLoop(source: MeshData, loop: ReadonlyArray<number>, axis: num
       const arc = starts[k] as number;
       const incoming = sub(q, rimPointAt(rim, arc - reach));
       const outgoing = sub(rimPointAt(rim, arc + reach), q);
-      const norms = Math.hypot(...incoming) * Math.hypot(...outgoing);
+      const norms = Math.hypot(incoming[0], incoming[1], incoming[2]) * Math.hypot(outgoing[0], outgoing[1], outgoing[2]);
       return { arc, k, cosine: norms > 0 ? dot(incoming, outgoing) / norms : 1 };
     })
     .filter((t) => t.cosine < cosine)
@@ -391,7 +392,10 @@ export function mirrorWeld(
     if (positions[3 * v + axis] === 0) twin[v] = v;
     else {
       twin[v] = out.length / 3;
-      out.push(...[0, 1, 2].map((a) => (a === axis ? -(positions[3 * v + a] as number) : (positions[3 * v + a] as number))));
+      appendAll(
+        out,
+        [0, 1, 2].map((a) => (a === axis ? -(positions[3 * v + a] as number) : (positions[3 * v + a] as number))),
+      );
     }
   }
   const mirrored: number[] = [];

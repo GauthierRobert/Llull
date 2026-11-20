@@ -19,6 +19,7 @@ import { daylightPoints } from './platformDaylight';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { powInt } from '@lib/powInt';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const DEFAULT_CUT_SLOPE = 1.5;
 const DEFAULT_FILL_SLOPE = 2;
@@ -231,8 +232,8 @@ function surfaceRange(tin: Tin, boundary: ReadonlyArray<Vec2>): [number, number]
   for (const vertex of boundary) include(elevationAt(tin, vertex) ?? low);
   const xs = boundary.map((point) => point[0]);
   const ys = boundary.map((point) => point[1]);
-  const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
-  const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+  const [minX, maxX] = [minOf(xs), maxOf(xs)];
+  const [minY, maxY] = [minOf(ys), maxOf(ys)];
   const steps = 60;
   for (let i = 0; i <= steps; i++) {
     for (let j = 0; j <= steps; j++) {

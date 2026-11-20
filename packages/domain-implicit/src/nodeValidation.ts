@@ -1,6 +1,7 @@
 /** Value validation of the raw field nodes of the `implicit` slice (05 IMP D3). */
 
 import { isRecord } from '@lib/isRecord';
+import { hypotOf } from '@lib/hypotOf';
 
 const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transform', 'tpms', 'struts', 'graph', 'voronoi', 'scalar']);
 const SHAPES = new Set(['sphere', 'box', 'cylinder', 'capsule', 'torus', 'cone', 'plane']);
@@ -24,7 +25,7 @@ function validMap(map: unknown): boolean {
       return (
         isVec3(map['origin']) &&
         isVec3(map['axis']) &&
-        Math.hypot(...(map['axis'] as number[])) > 0 &&
+        hypotOf(map['axis'] as number[]) > 0 &&
         isWhole(map['cellsAround']) &&
         isPositive(map['radialCellSize'])
       );
@@ -114,9 +115,13 @@ const NODE_CHECKS: Record<string, (node: RawNode) => boolean> = {
   scalar: scalarValid,
 };
 
+/** A character the id minter never emits (`@lib/id`): ids of transient nodes carry it (bodyField clip), stored nodes may not (14 FLL-M1b). */
+export const RESERVED_ID_MARK = '#';
+
 /** Why a stored field node is malformed (not a node, unknown op, bad parameters), or null when it is valid. */
 export function nodeError(key: string, node: unknown): string | null {
   if (!isRecord(node) || node['id'] !== key || typeof node['op'] !== 'string' || !OPS.has(node['op']))
     return `field '${key}' is not a valid node`;
+  if (key.includes(RESERVED_ID_MARK)) return `field '${key}' uses the reserved character '${RESERVED_ID_MARK}' (transient node ids only)`;
   return NODE_CHECKS[node['op']]?.(node) === true ? null : `field '${key}' (${node['op']}) has malformed parameters`;
 }

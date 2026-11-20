@@ -3,6 +3,7 @@ import type { BuildingModel, MomentConnectionElement } from '@aec/building/types
 import type { CadDocument } from '@core/model/types';
 import { elementsOf, getBuilding, withElement } from '../../building/model';
 import type { CheckRow } from './frameCheckSolve';
+import { minOf } from '@lib/arrayExtrema';
 
 /** Eaves haunch lengths tried, as fractions of the rafter plan length (0.2 / 0.3 / 0.4 = 10 / 15 / 20 % of the span of a duopitch roof). */
 const HAUNCH_STEPS = [0.2, 0.3, 0.4] as const;
@@ -51,7 +52,7 @@ export function tryLongerHaunch(
   });
   const fractionOf = (connection: MomentConnectionElement): number => connection.haunchLength / planLength(connection);
   if (eaves.length === 0) return null;
-  const shortest = Math.min(...eaves.map(fractionOf));
+  const shortest = minOf(eaves.map(fractionOf));
   const step = HAUNCH_STEPS.find((candidate) => candidate > shortest + 0.01);
   if (step === undefined) return null;
   let next = building;

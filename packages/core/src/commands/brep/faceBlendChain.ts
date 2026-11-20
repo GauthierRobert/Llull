@@ -14,6 +14,7 @@ import type { Vec3 } from '../../model/types';
 import { DEFAULT_LAW_SAMPLES, MAX_LAW_SAMPLES, MIN_LAW_SAMPLES, sampleExpression } from '../../geometry/blend/law';
 import type { EdgeLawInput } from './filletSpec';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Largest angle between the two edges at a joint of the chain (rad): the kernel chains edges that continue each other to about 0.1 rad (13.13.2); a size law over a creased chain is not offered. */
 const JOINT_TANGENT_RAD = 0.01;
@@ -84,7 +85,7 @@ export function planChain(
   const ends = endsOf(context, seeds);
   if (ends === null)
     return { problem: 'the kernel cannot sample the shared edges, so a size over their chain cannot be laid out', path: startPath };
-  const tolerance = JOINT_GAP * Math.max(1, ...seeds.map(lengthOf));
+  const tolerance = JOINT_GAP * Math.max(1, maxOf(seeds.map(lengthOf)));
   // partners of every end: the other ends at the same point
   const partners = (end: End): End[] => ends.filter((other) => other !== end && distance3(other.point, end.point) <= tolerance);
   for (const end of ends)
@@ -117,10 +118,10 @@ export function planChain(
     };
   if (closed && startNear !== undefined)
     return {
-      problem: `the shared edges ${seeds.join(', ')} form a closed loop, which has no start end: leave startNear out (t = 0 is the start of edge ${Math.min(...seeds)})`,
+      problem: `the shared edges ${seeds.join(', ')} form a closed loop, which has no start end: leave startNear out (t = 0 is the start of edge ${minOf(seeds)})`,
       path: 'startNear',
     };
-  const lowest = Math.min(...seeds);
+  const lowest = minOf(seeds);
   let begin: End | undefined;
   if (closed) begin = ends.find((end) => end.edge === lowest && end.side === 0);
   else if (startNear !== undefined) begin = [...open].sort((a, b) => distance3(a.point, startNear) - distance3(b.point, startNear))[0];

@@ -13,6 +13,7 @@ import { refuseCmp } from './codes';
 import { piecesOf } from './geometry2d';
 import { compositesOf, findPart, findPly, pliesOf } from './state';
 import { fromFlat } from './surface';
+import { maxOf } from '@lib/arrayExtrema';
 
 const DEFAULT_SPACING_MM = 75;
 const DEFAULT_CORNER_DEG = 20;
@@ -119,7 +120,7 @@ export const exportLaserProjection = defineCommand({
       for (const [index, piece] of piecesOf(ply, part).entries()) {
         const ordered = projectionPoints(part, piece, spacing / scale, cornerAngle);
         const points = reverse ? [...ordered].reverse() : ordered;
-        const gap = Math.max(...points.map((p, k) => distance3(p, points[(k + 1) % points.length] as Vec3))) * scale;
+        const gap = maxOf(points.map((p, k) => distance3(p, points[(k + 1) % points.length] as Vec3))) * scale;
         lines.push(
           `PLY ${ply.name.replace(/\s+/g, '_')} SEQ ${ply.sequence} MATERIAL ${ply.materialName.replace(/\s+/g, '_')} ANGLE ${ply.orientation} POINTS ${points.length}`,
         );

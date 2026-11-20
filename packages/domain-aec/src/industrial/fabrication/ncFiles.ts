@@ -2,6 +2,7 @@
 
 import { fileSlug } from '../../building/model';
 import type { NcPiece } from './ncMemberPieces';
+import { appendAll } from '@lib/appendAll';
 
 export interface NcFile {
   readonly name: string;
@@ -47,12 +48,12 @@ function renderPiece(piece: NcPiece, quantity: number, orderNumber: string, draw
     ].map(numberField),
     textField(''),
   ];
-  if (piece.contour.length > 0) lines.push('AK', ...piece.contour.map(([x, y]) => `  o${numberField(x)}${numberField(y)}`));
+  if (piece.contour.length > 0) appendAll(lines, ['AK', ...piece.contour.map(([x, y]) => `  o${numberField(x)}${numberField(y)}`)]);
   if (piece.holes.length > 0) {
-    lines.push(
+    appendAll(lines, [
       'BO',
       ...piece.holes.map((hole) => `  ${hole.face}${numberField(hole.x)}${numberField(hole.y)}${numberField(hole.diameter)}`),
-    );
+    ]);
   }
   lines.push('EN');
   return `${lines.join('\n')}\n`;

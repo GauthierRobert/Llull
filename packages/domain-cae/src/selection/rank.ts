@@ -1,6 +1,7 @@
 /** Weighted ranking and Pareto set of material candidates (PHY-12 §5.5, TR-SEL-05, TR-SEL-07): pure, deterministic, no NaN. */
 
 /** The named default of unspecified weights (FR-SEL-20). */
+import { maxOf } from '@lib/arrayExtrema';
 const EQUAL_WEIGHTS_SOURCE = 'equal weights: no weight given (TECHNICAL_SPEC 5.5, FR-SEL-20)';
 
 export interface Weights {
@@ -38,8 +39,8 @@ export function rankScored<T>(
   weights: readonly number[],
 ): { readonly item: T; readonly id: string; readonly rank: number; readonly score: number }[] {
   const best = weights.map((_, k) =>
-    Math.max(
-      ...candidates.flatMap((candidate) => {
+    maxOf(
+      candidates.flatMap((candidate) => {
         const value = candidate.values[k];
         return value === undefined ? [] : [value];
       }),

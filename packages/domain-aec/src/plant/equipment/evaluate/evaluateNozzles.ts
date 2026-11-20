@@ -7,6 +7,7 @@ import { cross3, normalize3OrZero } from '@lib/vec3';
 import { base } from '../../../building/evaluate/entities';
 import { placeNozzle, directionToWorld, toWorld } from '../geometry/ports';
 import type { NozzleRecord } from '../plantData';
+import { hypotOf } from '@lib/hypotOf';
 
 export const NOZZLE_COLOR = '#8f6a2f';
 const NOZZLE_SEGMENTS = 32;
@@ -42,7 +43,7 @@ export function evaluateNozzles(element: EquipmentElement, level: BuildingLevel)
   return plant.nozzles.flatMap((nozzle): Entity[] => {
     const placement = placeNozzle(plant.template, nozzle);
     if (placement === null) return [];
-    const length = Math.hypot(...placement.face.map((value, index) => value - (placement.base[index] as number)));
+    const length = hypotOf(placement.face.map((value, index) => value - (placement.base[index] as number)));
     if (length <= 0) return [];
     const section = nozzleSection(nozzle, length);
     const entity: RevolutionEntity = {

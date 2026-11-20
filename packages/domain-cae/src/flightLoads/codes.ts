@@ -11,12 +11,18 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_SCENARIO_UNKNOWN: 'define the scenario with define_flight_scenario (list them with inspect_dynamics)',
   FLL_STATE_INVALID: 'pass referencePoint [x, y, z] (document units): the centre of mass the acceleration refers to',
   FLL_RUN_FAILED: 'fix the flight run first: run_flight on the same scenario gives the refusal',
-  FLL_INSTANT_UNKNOWN: 'give a time inside the run (0 .. durationS), peak_load or envelope',
+  FLL_INSTANT_UNKNOWN: 'give a time inside the run (0 .. durationS), peak_load, envelope or convex_envelope',
+  FLL_ENVELOPE_TOO_LARGE:
+    'raise envelopeTolerance (the hull vertices within it are merged) or export a shorter scenario; at most 48 load cases are exported',
   FLL_MOUNT_INVALID: 'a mount is a name + target + either force [x, y, z] or rotorId + direction (unit vector of the thrust in model axes)',
   FLL_SOURCE_AMBIGUOUS: 'pass either scenario (+ at) or state, not both and not neither',
   FLL_RUN_STALE: 'the design changed after the flight run: re-run export_flight_loads for the same scenario, then re-solve',
   FLL_RELIEF_RESIDUAL:
     'balance the load case: the mounts must carry the rigid-body inertia of the part (sum of mount forces = mass x (a - g) ...) or the supports will take the difference',
+  FLL_RELIEF_REACTION:
+    'the solver did not see a balanced body: check FLL_RELIEF_RESIDUAL first; with rotation terms, or a coarse mesh of curved quadratic tets, refine the mesh (the body force is lumped at element centroids, FLL-D2), then re-solve. A warning, not an error, until the CalculiX RF convention (RF = reaction + the external load of the node) and the totals table layout are confirmed on a real solve (ccxFlightRelief)',
+  FLL_RELIEF_REACTION_UNREAD:
+    'solve again with the current deck (it prints the RF totals of the free-body supports); a pressure in a free-body case is not checked after the solve',
   FLL_RELIEF_UNASSESSED:
     'use total-distribution forces with target points and no pressure in a free-body case, and give the parts a material with a density',
   FLL_LOAD_CASE_EXISTS: 'choose another loadCase name',
@@ -35,6 +41,8 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_ROTOR_UNKNOWN: 'list the rotors with inspect_dynamics (data.flight.rotors)',
   FLL_TRIM_FAILED: 'fix the trim condition (trim_flight gives the refusal) or pass operatingRpm',
   FLL_BAND_INVALID: 'give rpmBand as [low, high] with low <= high, in rev/min',
+  FLL_BLADE_COUNT_CONFLICT:
+    'omit bladeCount / bladeCounts for rotors that store a blade count (inspect_dynamics data.flight.rotors), or correct the rotor record',
   FLL_THRESHOLD_SOURCE: 'give marginThresholdPct together with marginSource, or neither (the rows are then unknown)',
   FEA_MATERIAL_MISSING: 'assign a material to the part (assign_material): its Poisson ratio and density are read from it',
   FEA_MATERIAL_NO_ELASTIC:

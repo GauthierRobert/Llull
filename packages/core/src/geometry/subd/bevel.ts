@@ -14,6 +14,7 @@ import { compactState } from './cageOps';
 import { edgeKey } from './edgeKey';
 import { mintElementId } from './elements';
 import { type CageTopology, newellVector } from './topology';
+import { spliceAll } from '../../lib/spliceAll';
 
 export interface BevelProblem {
   readonly code: 'DIR_BEVEL_BOUNDARY' | 'DIR_BEVEL_CORNER_UNSUPPORTED' | 'DIR_BEVEL_TOO_WIDE';
@@ -306,7 +307,7 @@ export function bevelEdges(
     for (let k = 0; k + 1 < nodes.length; k++) sharp.push([nodes[k] as number, nodes[k + 1] as number, s]);
   }
   if (sharpness > 0) for (const [x, y] of longEdges) sharp.push([x, y, sharpness]);
-  state.sharp.splice(0, state.sharp.length, ...sharp);
+  spliceAll(state.sharp, 0, state.sharp.length, sharp);
   const created = { vertices: state.vertices.length - firstVertex, faces: state.faces.length - firstFace };
   compactState(state);
   return created;

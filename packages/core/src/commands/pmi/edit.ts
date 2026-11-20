@@ -10,6 +10,7 @@ import { autoPlacementOf, createSolidLookup, refreshItem } from './refresh';
 import { toleranceEntity, toleranceFindings } from './rules';
 import { toleranceField, toleranceProblem } from './dimension';
 import { currentContext } from '../context';
+import { appendAll } from '../../lib/appendAll';
 
 /** Fields `update_pmi` accepts per item kind (everything else is GDT_FIELD_INVALID_FOR_KIND). */
 const FIELDS_BY_KIND: Readonly<Record<PmiKind, readonly string[]>> = {
@@ -199,7 +200,7 @@ export const updatePmi = defineCommand({
     if (original.kind === 'datum_feature' && next.kind === 'datum_feature' && next.label !== original.label) {
       const renamedReferrers = renameDatumReferrers(doc, original, next);
       document = renamedReferrers.document;
-      touched.push(...renamedReferrers.touched);
+      appendAll(touched, renamedReferrers.touched);
     }
     if (next.kind === 'geometric_tolerance') {
       const problem = toleranceFindings(next, { ...pmiOf(document).items, [next.id]: next }).find((f) => f.severity === 'error');

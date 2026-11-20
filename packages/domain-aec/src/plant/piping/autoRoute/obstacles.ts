@@ -21,6 +21,8 @@ import { runPoints } from '../model';
 import { pipeOutsideDiameter } from '../specLookup';
 import type { ObstacleBox } from './lattice';
 import { map3 } from '@lib/vec3';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Keep-out inputs of a route request. */
 export interface KeepOuts {
@@ -65,7 +67,7 @@ const axisAligned = (box: OrientedBox): boolean => box.axes.every((axis) => axis
 export function aabbs(box: OrientedBox): Corners[] {
   const long = box.half[0] >= box.half[1] && box.half[0] >= box.half[2] ? 0 : box.half[1] >= box.half[2] ? 1 : 2;
   const length = 2 * (box.half[long] as number);
-  const section = Math.max(...box.half.filter((_, k) => k !== long));
+  const section = maxOf(box.half.filter((_, k) => k !== long));
   const wanted = Math.ceil(length / (CUT_LENGTH_IN_SECTIONS * section || 1));
   const cuts = axisAligned(box) ? 1 : Math.min(MAX_CUTS, Math.max(1, wanted));
   if (cuts === 1) return [aabb(box)];
@@ -115,7 +117,7 @@ export function collectObstacles(doc: CadDocument, piping: PipingModel, radius: 
     const { min, max } = entityBoundsInDoc(doc, entity);
     if ([...min, ...max].every(Number.isFinite)) obstacles.push(inflate(id, min, max, radius));
   }
-  for (const bodies of groups.values()) obstacles.push(...bodyBoxes(bodies, radius));
+  for (const bodies of groups.values()) appendAll(obstacles, bodyBoxes(bodies, radius));
   for (const runId of piping.runOrder) {
     const run = piping.runs[runId];
     const other = run === undefined ? undefined : piping.lines[run.lineId];

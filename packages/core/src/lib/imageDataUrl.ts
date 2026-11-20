@@ -4,6 +4,7 @@
  */
 
 import { base64ToUint8Array } from './base64';
+import { stringFromCharCodes } from './charCodes';
 
 type RasterMime = 'image/png' | 'image/jpeg';
 
@@ -28,7 +29,7 @@ function uint32(bytes: Uint8Array, at: number): number {
 /** [width, height] from the IHDR chunk that must follow the 8-byte signature. */
 function pngSize(bytes: Uint8Array): readonly [number, number] | null {
   const signed = PNG_SIGNATURE.every((byte, i) => bytes[i] === byte);
-  if (!signed || bytes.length < 24 || String.fromCharCode(...bytes.slice(12, 16)) !== 'IHDR') return null;
+  if (!signed || bytes.length < 24 || stringFromCharCodes(bytes.slice(12, 16)) !== 'IHDR') return null;
   return [uint32(bytes, 16), uint32(bytes, 20)];
 }
 

@@ -469,10 +469,13 @@ parameters and imperfection amplitudes come from the owner or a company rule (as
    Arc-length (Riks) does not exist in CalculiX (NLS_ARC_LENGTH_UNSUPPORTED): use displacement control, or \`beam_large_deflection\` for frames (limit points and snap-back).
 4. \`check_nonlinear\` before \`llull fea_mesh\` and \`llull fea_solve\` (errors stop the deck: NLS_NLGEOM_UNSET, NLS_NO_STEPS, NLS_MATERIAL_MODEL_MISSING ...). A run that stops
    (NLS_NOT_CONVERGED, NLS_INCREMENT_TOO_SMALL, NLS_MAX_INCREMENTS) records nothing: smaller initial increment or displacement control, never raise a tolerance silently.
-5. Read: \`nonlinear_report\` (steps, increments, cutbacks, curves with units, max PEEQ, permanentSet; \`increments=all\` pages 1000 points, pass nextCursor as cursor) and \`limit_load\`
+5. Read: \`nonlinear_report\` (steps, increments, cutbacks, curves with units, max PEEQ, permanentSet, plasticVolume fraction; \`increments=all\` pages 1000 points, pass nextCursor as cursor) and \`limit_load\`
    (method peak, or plateau with the slopeFraction + window you were given; a curve that never peaks gives only a lowerBound and NLS_LIMIT_NOT_REACHED: say "at least"). Stale results are
    refused (NLS_CURVE_STALE): run fea_mesh and fea_solve again. \`compute_margins\` criterion=limit_load turns the limit load into a margin; FAIL rows stay with a human (FEA_HUMAN_GATE).
-6. Finish with \`check_nonlinear\`: report NLS_SNAP_BACK_DETECTED, NLS_MATERIAL_MODEL_UNVERIFIED, NLS_THRESHOLD_UNSET and NLS_PERMANENT_SET_THRESHOLD_UNSET to the user and ask for the missing
+   The results summary names one load case per step, by position: \`step 1\`, \`step 2\` ... (not the step names, so a rename keeps results current); give that
+   name as loadCase wherever a load case is asked, e.g. \`llull run_convergence_study analysisId=ID quantity='{"kind":"field_max","field":"von_mises","loadCase":"step 2"}'\`.
+6. Finish with \`check_nonlinear\`: report NLS_SNAP_BACK_DETECTED, NLS_STRAIN_BEYOND_CURVE (PEEQ past the hardening data), NLS_STRAIN_EXCEEDS_ELONGATION (error: past the
+   elongation at break), NLS_MESH_PLASTIC_ADEQUACY (plastic zone < 2 elements across: refine), NLS_MATERIAL_MODEL_UNVERIFIED, NLS_THRESHOLD_UNSET and NLS_PERMANENT_SET_THRESHOLD_UNSET to the user and ask for the missing
    limits instead of inventing them; once given, state them with set_nonlinear_controls thresholds (each with its source) so check_nonlinear can judge NLS_PERMANENT_SET_EXCEEDED and NLS_NLGEOM_RECOMMENDED. A limit load without a mesh convergence study carries VNV_NO_CONVERGENCE_STUDY (\`llull run_convergence_study\`, section 18).
 
 ## 20. Acoustic environments: hand-off only (toolset analysis, PHY-20)
@@ -485,4 +488,41 @@ acoustic FE, no structural response (VAC_OUT_OF_SCOPE). Nothing is a default: th
 2. \`define_acoustic_exposure\` binds a spectrum to faces by points (target.facesNear) with field diffuse | progressive (VAC_FIELD_UNSET without it); \`delete_acoustic_exposure\` frees the spectrum.
 3. \`check_acoustic_handoff\`, then \`llull export_acoustic_load exposure=NAME --save FILE\`: face areas come from the exact kernel only (KRN_NO_EXACT_KERNEL otherwise, never a guess; VAC_EXPOSURE_UNRESOLVED for a point off
    the solid or on an edge). The check is unknown, never pass, when the faces could not be checked. Every package is reviewRequired: report VAC_REVIEW_PENDING and VAC_SPECTRUM_UNVERIFIED to the user.
+   The review is a human act (\`dispose_acoustic_export\`, VAC_HUMAN_GATE for an agent: hand the package to the reviewer, who signs with the signing port; desktop signing for this act is not built yet; do not retry); it ends when the exposure, spectrum or solid changes (review.status stale).
+
+## 21. Electrical bonding, coatings and optical balance (toolset analysis, PHY-15)
+
+llull ships NO property values, NO bond limit, NO solar flux and NO lightning zone: each comes from the user with its source (ask), never from memory. Every result
+carries unverified / unverifiedReasons and reviewRequired; report them.
+
+1. Properties are PHY-01 models on a material (\`define_property_model\`): electricalResistivity (ohm*m; constant, or form linearCoefficient { variable T, referenceValue rho0,
+   coefficient alpha per unit of the variable, reference T0 } for rho0 (1 + alpha (T - T0)), refused if rho goes <= 0 inside its validity range), emissivityIr (condition opticalKind
+   hemispherical_total | normal_total) and absorptivitySolar (condition lifeState BOL | EOL), both in [0, 1] (EOP_PROPERTY_RANGE). refractiveIndex / relativePermeability are not
+   catalogue rows: pass n and mur to the query.
+2. Coatings: \`define_material_record\` with productForm "coating", then \`assign_surface_coating\` (location exposed | bonded_interface; electrical conductive | insulating need a source,
+   unknown never passes a bond) / \`remove_surface_coating\`. Lightning zones (SAE ARP5414A 1A 1B 1C 2A 2B 3, the applicant zoning with its source): \`set_lightning_zone\` / \`remove_lightning_zone\`.
+3. Bond paths: \`define_bond_path\` (joints with resistance + source and their two solids in interfaces, straps from a resistivity material; a limit is a rule entry { value, unit, ruleId, source },
+   no default) / \`delete_bond_path\`. \`check_bonding\` sums each path (status pass | fail | unknown, never pass without a limit, with an undeclared coating or untouched joint solids) and lists
+   zoned solids: EOP_LIGHTNING_ZONE_NO_PATH = a composite solid in a zone that no path names. A fail or unknown path is disposed only by a human (\`dispose_bond_check\`, EOP_HUMAN_GATE for an agent: hand over).
+4. Queries: \`electrical_resistance\` (R = rho L / A at a temperature; skin depth and AC ratio need mur, no default), \`shield_absorption\` (absorption term only), \`normal_reflectance\` (n1, n2, k
+   required), \`optical_balance\` (solarFlux and incidenceAngle required, EOP_SOLAR_FLUX_MISSING; state BOL | EOL) and \`check_surface_properties\` before handing values to a thermal case.
+
+## 22. Creep and relaxation: Norton hold (toolset analysis, PHY-11)
+
+llull ships NO creep law, NO strain tolerance and NO damage limit: A, n, m with their validity and source, cetol and every limit come from the owner (ask), never from memory.
+Times are s, min or h; stresses MPa; strain is the equivalent creep strain ceeq (dimensionless). Every report is reviewRequired: "computed by llull, not approved".
+
+1. Hand check first, no solver: \`creep_closed_form\` check=norton_constant_stress | norton_relaxation | bolt_relaxation | thick_cylinder_stationary | beam_stationary | maxwell | kelvin_voigt | sls |
+   prony_relaxation | wlf_shift | convert_norton_a (inputs carry units in the key: sigma_MPa, t_s; with material=NAME A, n, m come from the material's law and temperature_K is range-checked; a private-library law is refused, CRP_LAW_PRIVATE).
+2. Law: \`add_material_model\` creep_norton (time hardening; A in any stress / time unit, converted for the card) + an elastic_isotropic model, \`define_constitutive_set\` { elastic, creep }
+   makeDefault, \`assign_material\`. Garofalo or strain hardening is CRP_LAW_FORM_UNSUPPORTED; a temperature outside the law validity is CRP_LAW_OUT_OF_RANGE (never extrapolated).
+3. Case: \`create_analysis\` analysisType=creep (CalculiX) → \`set_part_idealization\` → constraints and loads → \`set_creep_step\` duration, cetol (required, CRP_CETOL_INVALID if <= 0), temperature,
+   and set maxIncrement: CETOL cannot bound the increment under a constant stress (CRP_INCREMENT_UNBOUNDED warns; CalculiX 2.21 measured to stop on a singular matrix) →
+   \`add_result_probe\` quantity=ceeq → \`check_creep\` → \`llull fea_mesh\` → \`llull fea_solve\`. \`delete_creep_step\` removes the hold.
+4. Read: \`creep_report\` (hold complete?, laws, max ceeq and von Mises with places, probe histories in hold seconds, at most maxPoints points, and a norton_constant_stress quick check: ratio 1 only
+   for a uniform uniaxial case) and \`check_creep\` again (CRP_HOLD_INCOMPLETE: the solve stopped before the duration; report it, do not shorten the hold). Stale results are refused (FEA_RESULTS_STALE).
+5. Licensed data: a law from a private material library shows its library pin, licence and source with coefficients "private" (redacted: true) and no quick check; without the library on this machine
+   creep_report answers available: false (MAT_LIBRARY_UNRESOLVED: \`resolve_material_libraries\`). Never copy such coefficients into a plan, a parameter or a message.
+6. Compare with a reference value: \`llull compare_expected report.json expected_results.json VC-CRP-10 pointer=/data/maxCeeq/value\` judges one value of a saved --json answer
+   (pointer: JSON pointer, -1 = last array item) against a pack case (tolerance and grade of the case; exit 1 on fail). \`llull run_benchmarks packs=11-creep-viscoelasticity\` judges the whole pack.
 `;

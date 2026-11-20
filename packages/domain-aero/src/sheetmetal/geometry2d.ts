@@ -4,6 +4,7 @@ import type { Vec2 } from '@core/model/types';
 import type { CurveSegment } from '@core/model/curve';
 import { lerp2, orient2, perp2, sub2, dot2, normalize2 } from '@lib/vec2';
 import { lineIntersection, polygonArea, signedArea, projectOntoSegment, segmentIntersection, segmentsIntersect } from '@lib/polygon';
+import { minOf } from '@lib/arrayExtrema';
 
 /** Length tolerance of the planar helpers, in document units. */
 export const EPS = 1e-9;
@@ -120,7 +121,7 @@ export function segmentDistance(a1: Vec2, a2: Vec2, b1: Vec2, b2: Vec2): number 
 
 /** Smallest distance from the closed polygon boundary to the segment a-b. */
 export function polygonToSegmentDistance(polygon: readonly Vec2[], a: Vec2, b: Vec2): number {
-  return Math.min(...polygon.map((p, i) => segmentDistance(p, polygon[(i + 1) % polygon.length] as Vec2, a, b)));
+  return minOf(polygon.map((p, i) => segmentDistance(p, polygon[(i + 1) % polygon.length] as Vec2, a, b)));
 }
 
 /** Signed side of `point` relative to the directed line p -> q (> 0 left). */

@@ -7,6 +7,7 @@ import { isValidAxis } from '../../lib/axis';
 import { unitAxis } from '../motion/rigidMotion';
 import { scale3 } from '../../lib/vec3';
 import { changed, noop } from '../noop';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const AXIS = z.union([z.string(), z.array(z.number())]);
 
@@ -65,7 +66,7 @@ export const createExplodedView = defineCommand({
     const viewId = idOrNext(id, 'explode');
     if (idTaken(doc.explodedViews ?? {}, viewId)) return noop(doc, `create_exploded_view: view '${viewId}' already exists.`);
     const view: ExplodedView = { id: viewId, name, offsets: [...merged.values()] };
-    const steps = Math.max(...view.offsets.map((offset) => offset.step));
+    const steps = maxOf(view.offsets.map((offset) => offset.step));
     return changed(
       { ...doc, explodedViews: { ...doc.explodedViews, [viewId]: view } },
       `create_exploded_view: '${viewId}' (${name}) with ${view.offsets.length} offset part(s) in ${steps} step(s); placements unchanged.`,

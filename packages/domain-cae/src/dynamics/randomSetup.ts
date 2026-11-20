@@ -14,6 +14,7 @@ import { caseLossFactor } from './materialDamping';
 import { modalTables, modeShapes, type ModalTables, type ModeShape } from './results/modalData';
 import { spectrumOf } from './store';
 import { gravityInUnitSystem } from './units';
+import { appendAll } from '@lib/appendAll';
 
 const DIRECTION_INDEX = { x: 0, y: 1, z: 2 } as const;
 
@@ -61,7 +62,10 @@ export function modalPost(doc: CadDocument, analysis: AnalysisCase, results: FeR
     const found = caseLossFactor(doc, analysis);
     if ('code' in found) return { code: found.code, message: found.message };
     eta = found.eta;
-    unverifiedReasons.push(...found.unverifiedReasons.map((reason) => `structuralLossFactor: ${reason}`));
+    appendAll(
+      unverifiedReasons,
+      found.unverifiedReasons.map((reason) => `structuralLossFactor: ${reason}`),
+    );
   } else if (damping.source.grade !== 'A') unverifiedReasons.push(`damping source grade ${damping.source.grade ?? 'unstated'} (not A)`);
   const fMax = analysis.dynamics?.basis.fMaxHz ?? Number.POSITIVE_INFINITY;
   const shapes = modeShapes(results);

@@ -10,6 +10,8 @@ import type { StrutSet } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
 import { powInt } from '@lib/powInt';
 import { pow } from '@lib/pow';
+import { hypotOf } from '@lib/hypotOf';
+import { maxOf } from '@lib/arrayExtrema';
 
 interface AffineStiffness {
   /** E / E_s along x, y, z (null when the normal block of the stiffness is singular). */
@@ -40,7 +42,7 @@ function affineStiffness(set: StrutSet, cell: Vec3): AffineStiffness {
     const [a, b] = [set.nodes[beam.a], set.nodes[beam.b]];
     if (a === undefined || b === undefined) continue;
     const d = AXES.map((axis) => b[axis] - a[axis]);
-    const length = Math.hypot(...d);
+    const length = hypotOf(d);
     if (length === 0) continue;
     const n = d.map((v) => v / length);
     const area = Math.PI * ((beam.ra + beam.rb) / 2) ** 2;
@@ -80,7 +82,7 @@ function invert3(m: readonly (readonly number[])[]): number[][] | null {
     return v(r1, q1) * v(r2, q2) - v(r1, q2) * v(r2, q1);
   };
   const det = v(0, 0) * cofactor(0, 0) + v(0, 1) * cofactor(0, 1) + v(0, 2) * cofactor(0, 2);
-  const scale = Math.max(...m.flat().map(Math.abs), 1e-300);
+  const scale = Math.max(maxOf(m.flat().map(Math.abs)), 1e-300);
   if (Math.abs(det) < 1e-9 * powInt(scale, 3)) return null;
   return [0, 1, 2].map((r) => [0, 1, 2].map((q) => cofactor(q, r) / det));
 }

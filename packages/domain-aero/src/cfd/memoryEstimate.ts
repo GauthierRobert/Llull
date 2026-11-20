@@ -10,6 +10,7 @@ import type { Box } from './domainSizing';
 import { map3 } from '@lib/vec3';
 import { powInt } from '@lib/powInt';
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
 
 export const CELLS_PER_REFERENCE_LENGTH: Readonly<Record<CfdQuality, number>> = { draft: 64, standard: 128, fine: 256 };
 /**
@@ -75,7 +76,7 @@ function clampTo(box: Box, within: Box): Box {
 /** Cells and cell updates per step-unit of the nested-box LBM grid: level k has cells of size h·2^k, boxes grow around the body. */
 function lbmCells(input: EstimateInput, n: number): { cells: number; updates: number } {
   const h = input.referenceLengthM / n;
-  const length = Math.max(...[0, 1, 2].map((a) => (input.body.max[a] ?? 0) - (input.body.min[a] ?? 0)));
+  const length = maxOf([0, 1, 2].map((a) => (input.body.max[a] ?? 0) - (input.body.min[a] ?? 0)));
   let previous = 0;
   let cells = 0;
   let updates = 0;
@@ -102,7 +103,7 @@ function lbmCells(input: EstimateInput, n: number): { cells: number; updates: nu
 
 /** Coarsening levels above the finest cell until the cell is an eighth of the body length (never negative). */
 const octreeLevels = (input: EstimateInput, h: number): number => {
-  const length = Math.max(...[0, 1, 2].map((a) => (input.body.max[a] ?? 0) - (input.body.min[a] ?? 0)));
+  const length = maxOf([0, 1, 2].map((a) => (input.body.max[a] ?? 0) - (input.body.min[a] ?? 0)));
   return Math.max(0, Math.ceil(Math.log2(length / (8 * h))));
 };
 

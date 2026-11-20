@@ -4,6 +4,8 @@ import type { CadDocument } from '../../../model/types';
 import { boundsDiagonalRadius, boundsOfPoints, mergeBounds, type Bounds } from '../../../geometry/bounds';
 import { computeSceneSnapshot } from '../../inspect/scene';
 import type { MotionFrames } from './types';
+import { hypotOf } from '../../../lib/hypotOf';
+import { maxOf } from '../../../lib/arrayExtrema';
 
 /** An entity moves when its pose differs between two frames by more than this fraction of the scene size (position) or this many radians (rotation). */
 const MOVE_TOLERANCE = 1e-9;
@@ -26,8 +28,8 @@ export function analyseMotion(motion: MotionFrames, frames: number): MotionAnaly
     for (const [id, entity] of Object.entries(doc.entities)) {
       const start = first.entities[id];
       if (start === undefined) continue;
-      const position = Math.hypot(...entity.position.map((c, i) => c - (start.position[i] ?? 0)));
-      const rotation = Math.max(...entity.rotation.map((c, i) => angleBetween(c, start.rotation[i] ?? 0)));
+      const position = hypotOf(entity.position.map((c, i) => c - (start.position[i] ?? 0)));
+      const rotation = maxOf(entity.rotation.map((c, i) => angleBetween(c, start.rotation[i] ?? 0)));
       const seen = travel.get(id);
       travel.set(id, { position: Math.max(seen?.position ?? 0, position), rotation: Math.max(seen?.rotation ?? 0, rotation) });
     }

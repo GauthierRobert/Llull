@@ -11,6 +11,7 @@ import { currentContext } from '../context';
 import { chainCurves, maxCurveDeviation, sizeOfCurves, worldCurves } from './curveInputs';
 import { refuseSrf } from './shared';
 import { commitSurface, isRefusal, sig, surfaceEntityOf, surfaceStyleFields } from './surfaceShared';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const MAX_CURVES = 12;
 
@@ -123,13 +124,13 @@ export const fillSurface = defineCommand({
       // the ends of an edge sit on the corners, where the adjacent boundary curves fix the surface: the headline figures are those of the middle 80 %
       const interior = joint.samples.filter((sample) => sample.t >= 0.1 && sample.t <= 0.9);
       const [g0, g1, g2] = [
-        Math.max(0, ...interior.map((sample) => sample.g0Gap)),
-        Math.max(0, ...interior.map((sample) => sample.g1AngleRad)),
-        Math.max(0, ...interior.map((sample) => sample.g2Gap)),
+        Math.max(0, maxOf(interior.map((sample) => sample.g0Gap))),
+        Math.max(0, maxOf(interior.map((sample) => sample.g1AngleRad))),
+        Math.max(0, maxOf(interior.map((sample) => sample.g2Gap))),
       ];
       const edge = sideEdge(constraint.surface, constraint.side);
-      const curvature = Math.max(
-        ...[0.1, 0.5, 0.9].map((f) =>
+      const curvature = maxOf(
+        [0.1, 0.5, 0.9].map((f) =>
           Math.abs(
             crossFrameAt(constraint.surface, constraint.side, edge.interval[0] + (edge.interval[1] - edge.interval[0]) * f).curvature,
           ),

@@ -138,3 +138,23 @@ export const removeIsolation = defineCommand({
     return changed(withCorrosion(doc, { isolations }), `remove_isolation: removed '${id}'.`, [id]);
   },
 });
+
+/**
+ * @affects doc.corrosion.surfaceSystems (removes 1; affected: [id])
+ * @invariant the covered solids are left without a surface system (their group comes from their material again)
+ * @failure unknown id -> COR_SURFACE_SYSTEM_NOT_FOUND (document unchanged)
+ */
+export const removeSurfaceSystem = defineCommand({
+  name: 'remove_surface_system',
+  description:
+    'Remove a surface system by its id (from assign_surface_system or list_surface_systems), also when a solid it names no longer exists. ' +
+    'Its solids are left with no finish: a plated part couples as its base material again. To clear one solid only, use assign_surface_system with layers [{class:"none"}].',
+  params: z.object({ id: z.string().describe('Surface system id, e.g. "ss-4.1".') }),
+  run: (doc, { id }): CommandResult => {
+    const systems = corrosionOf(doc).surfaceSystems;
+    if (!Object.hasOwn(systems, id))
+      return refuseCor(doc, 'remove_surface_system', 'COR_SURFACE_SYSTEM_NOT_FOUND', `no surface system '${id}'`, [id], ['id']);
+    const surfaceSystems = Object.fromEntries(Object.entries(systems).filter(([key]) => key !== id));
+    return changed(withCorrosion(doc, { surfaceSystems }), `remove_surface_system: removed '${id}'.`, [id]);
+  },
+});

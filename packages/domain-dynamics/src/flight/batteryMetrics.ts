@@ -2,6 +2,7 @@
 
 import { powerBase } from './flightBlock';
 import { POWER, remainingS, type PowerRuntime } from './powerBlock';
+import type { MotorThermalMetrics } from './motorThermal';
 
 export interface BatteryMetrics {
   readonly batteryId: string;
@@ -32,6 +33,8 @@ export interface BatteryMetrics {
   /** Flight time to the cut-off: reached, or (an ESTIMATE, optimistic on a sloping OCV or a constant-power load; estimate_endurance integrates properly) the run time plus what the final current still allows (state of charge down to the cut-off floor). null = no load. */
   readonly enduranceS: number | null;
   readonly enduranceBasis: 'cutoff_reached' | 'extrapolated_at_final_current' | 'no_load';
+  /** Winding temperatures of the motors; present only when the motor datasheet carries `thermal` (13 FLT M3b). */
+  readonly motorThermal?: MotorThermalMetrics;
 }
 
 /** Metrics of powertrain `index` of the run; `final(slot)` reads an aux slot at the last sample. */
@@ -83,6 +86,11 @@ export function batteryWarnings(id: string, metrics: BatteryMetrics): string[] {
   if (metrics.overCurrentFraction > 0)
     warnings.push(
       `FLT_MOTOR_CURRENT_LIMIT: powertrain '${id}' motor current peaked at ${metrics.motorPeakCurrentA.toPrecision(4)} A, over its ${metrics.motorCurrentLimitA.toPrecision(4)} A limit for ${(100 * metrics.overCurrentFraction).toPrecision(3)} % of the steps`,
+    );
+  const thermal = metrics.motorThermal;
+  if (thermal !== undefined && thermal.overLimitAtS !== null)
+    warnings.push(
+      `FLT_MOTOR_OVERTEMP: powertrain '${id}' motor winding of rotor '${thermal.hottestRotorId}' reached ${thermal.peakWindingC.toPrecision(4)} C, over its ${thermal.maxWindingC.toPrecision(4)} C limit from t = ${thermal.overLimitAtS.toPrecision(5)} s (${(100 * thermal.overLimitFraction).toPrecision(3)} % of the steps; ambient ${thermal.ambientC.toPrecision(3)} C)`,
     );
   if (metrics.voltageLimitedFraction > 0)
     warnings.push(

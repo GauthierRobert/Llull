@@ -4,6 +4,7 @@ import type { Vec3 } from '../../model/vectors';
 import { distance3, dot3, sub3 } from '../vec3';
 import { curveDerivatives, curveDomain } from './evaluate';
 import type { NurbsCurveData } from './types';
+import { maxOf } from '../arrayExtrema';
 
 const SAMPLES_PER_SPAN = 8;
 const MIN_SAMPLES = 48;
@@ -68,8 +69,8 @@ function meetsAgain(
   const [sa, sb] = samples;
   const [da, db] = [curveDomain(a), curveDomain(b)];
   const resolution = Math.max(
-    ...sa.slice(1).map((s, i) => distance3(s.point, (sa[i] as Sample).point)),
-    ...sb.slice(1).map((s, i) => distance3(s.point, (sb[i] as Sample).point)),
+    maxOf(sa.slice(1).map((s, i) => distance3(s.point, (sa[i] as Sample).point))),
+    maxOf(sb.slice(1).map((s, i) => distance3(s.point, (sb[i] as Sample).point))),
   );
   const threshold = Math.max(tolerance, 1.5 * resolution);
   const [far, farB] = [SEPARATION * (sa.length - 1), SEPARATION * (sb.length - 1)];

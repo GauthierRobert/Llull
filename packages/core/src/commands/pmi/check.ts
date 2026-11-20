@@ -9,6 +9,7 @@ import { currentContext } from '../context';
 import { type Finding, finding, toleranceFindings } from './rules';
 import { pmiItems, pmiOf } from './pmiOps';
 import { createSolidLookup, refreshItem } from './refresh';
+import { appendAll } from '../../lib/appendAll';
 
 const entityOf = (item: PmiItem, items: Readonly<Record<string, PmiItem>>): string | undefined => {
   switch (item.kind) {
@@ -70,7 +71,7 @@ function dataFindings(items: readonly PmiItem[], byId: Readonly<Record<string, P
     if (item.kind === 'geometric_tolerance') {
       if ('pmiId' in item.target && !Object.hasOwn(byId, item.target.pmiId))
         out.push(finding('error', 'GDT_TARGET_DANGLING', [item.id], `target '${item.target.pmiId}' is not a PMI item`, ['target.pmiId']));
-      out.push(...toleranceFindings(item, byId));
+      appendAll(out, toleranceFindings(item, byId));
       const entity = entityOf(item, byId);
       for (const datum of item.datums) referenced.add(`${entity}/${datum.label}`);
     }
@@ -125,9 +126,9 @@ export const checkPmi = defineCommand({
       const result = refreshItem(item, lookup);
       notRun = notRun || result.notRun;
       refreshed.push(result.item);
-      findings.push(...result.findings);
+      appendAll(findings, result.findings);
     }
-    findings.push(...dataFindings(items, byId));
+    appendAll(findings, dataFindings(items, byId));
     const needReview = items.filter((item) => item.review.required);
     if (needReview.length > 0)
       findings.push(
@@ -166,7 +167,7 @@ export const checkPmi = defineCommand({
           'rules builtin+table requested but no rule table is installed; only the built-in rules ran',
         ),
       );
-    if (requireCoverage && pmiOf(doc).generalToleranceNote === undefined) findings.push(...coverageFindings(doc, refreshed, lookup));
+    if (requireCoverage && pmiOf(doc).generalToleranceNote === undefined) appendAll(findings, coverageFindings(doc, refreshed, lookup));
     const errors = findings.filter((f) => f.severity === 'error');
     const warnings = findings.filter((f) => f.severity === 'warning');
     const status = errors.length > 0 ? 'fail' : warnings.length > 0 ? 'warn' : 'pass';

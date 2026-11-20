@@ -7,6 +7,7 @@ import { commentText } from '../format';
 import { densityToAnalysis, stressPerMpa } from '../units';
 import { cardLines, intField, realField, roundingError } from './fields';
 import { isCompositePart } from '../../shell/shellDeck';
+import { appendAll } from '@lib/appendAll';
 
 /** CORD2R id of the material system (MCID) of composite property `pid` is this + pid. */
 export const COMPOSITE_CID_BASE = 100;
@@ -74,7 +75,7 @@ export function gridCards(ctx: DeckContext, track: Rounding): string[] | DeckRef
     ];
     const bad = fields.find(failed);
     if (bad !== undefined) return bad as DeckRefusal;
-    lines.push(...cardLines('GRID', fields as string[]));
+    appendAll(lines, cardLines('GRID', fields as string[]));
   }
   return lines;
 }
@@ -94,7 +95,7 @@ export function elementCards(ctx: DeckContext, property: ReadonlyMap<string, num
       const fields = [integer(id, 'element id'), String(pid), ...nodes.map((node) => integer(node, 'node id')), ...mcid];
       const bad = fields.find(failed);
       if (bad !== undefined) return bad as DeckRefusal;
-      lines.push(...cardLines(mapped.card, fields as string[]));
+      appendAll(lines, cardLines(mapped.card, fields as string[]));
     }
   }
   return lines;
@@ -128,8 +129,8 @@ export function propertyCards(ctx: DeckContext, track: Rounding): { readonly lin
         ]);
       const text = real(thickness * ctx.lengthToAnalysis, `thickness of ${entityId}`, track);
       if (failed(text)) return text;
-      lines.push(...cardLines('PSHELL', [String(pid), String(mid), text, String(mid), '', String(mid)]));
-    } else lines.push(...cardLines('PSOLID', [String(pid), String(mid)]));
+      appendAll(lines, cardLines('PSHELL', [String(pid), String(mid), text, String(mid), '', String(mid)]));
+    } else appendAll(lines, cardLines('PSOLID', [String(pid), String(mid)]));
     comments.push(`$ llull: property ${pid} = part '${entityId}'`);
   }
   const done = new Set<number>();
@@ -150,7 +151,7 @@ export function propertyCards(ctx: DeckContext, track: Rounding): { readonly lin
     ];
     const bad = fields.find(failed);
     if (bad !== undefined) return bad as DeckRefusal;
-    lines.push(...cardLines('MAT1', fields as string[]));
+    appendAll(lines, cardLines('MAT1', fields as string[]));
     comments.push(`$ llull: material ${mid} = '${commentText(ctx.materialId(entityId) ?? '', 80)}' (${commentText(elastic.source)})`);
   }
   return { lines, comments };

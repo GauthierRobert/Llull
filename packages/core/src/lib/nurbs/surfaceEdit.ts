@@ -9,6 +9,7 @@ import { elevateDegree, insertKnot, reverseCurve } from './edit';
 import { expandKnots } from './knotVector';
 import type { NurbsCurveData } from './types';
 import type { NurbsSurfaceData } from './surfaceTypes';
+import { maxOf } from '../arrayExtrema';
 
 export type Direction = 'u' | 'v';
 
@@ -150,7 +151,7 @@ export function commonBasis(surfaces: ReadonlyArray<NurbsSurfaceData>): NurbsSur
   let current = surfaces.map(normalizeKnots);
   for (const direction of ['u', 'v'] as const) {
     const degreeOf = (surface: NurbsSurfaceData): number => (direction === 'u' ? surface.degreeU : surface.degreeV);
-    const degree = Math.max(...current.map(degreeOf));
+    const degree = maxOf(current.map(degreeOf));
     const raised: NurbsSurfaceData[] = [];
     for (const surface of current) {
       const result = elevateSurface(surface, direction, degree - degreeOf(surface));

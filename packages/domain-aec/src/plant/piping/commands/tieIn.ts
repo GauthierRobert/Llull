@@ -36,7 +36,7 @@ export const addTieInPoint = defineCommand({
   }),
   run: (doc, { tag, position, direction, dn, endType, rating, facing, kind = 'tie_in' }): CommandResult => {
     const piping = getPiping(doc);
-    const length = Math.hypot(...direction);
+    const length = Math.hypot(direction[0], direction[1], direction[2]);
     if (!(length > 1e-12)) return refuse(doc, 'add_tie_in_point', 'RTE_INVALID_PORT', 'the direction is zero', [], ['direction']);
     const clash = piping.tieInOrder.find((id) => piping.tieIns[id]?.tag === tag);
     if (clash !== undefined)

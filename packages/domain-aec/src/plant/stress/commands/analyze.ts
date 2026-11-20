@@ -13,6 +13,7 @@ import type { StressModel } from '../model/schema';
 import { SOLVER_VERSION } from '../solve/run';
 import { analysisRefusal, isRefusal, modelOr } from './common';
 import { decodeCursor, encodeCursor, pageOf } from './paging';
+import { maxOf } from '@lib/arrayExtrema';
 
 const DEG = 180 / Math.PI;
 const nodeIndex = (id: string): number => Number(id.slice(1)) - 1;
@@ -59,7 +60,7 @@ function summary(analysis: Analysis, model: StressModel): Record<string, unknown
     },
     solver: {
       version: SOLVER_VERSION,
-      maxResidual: Math.max(0, ...analysis.states.map((state) => state.residual)),
+      maxResidual: Math.max(0, maxOf(analysis.states.map((state) => state.residual))),
       iterations: Object.fromEntries(analysis.states.map((state) => [state.name, state.iterations])),
     },
     cases: analysis.states.map((state, index) => ({
@@ -274,7 +275,7 @@ export const checkPipeStress = defineCommand({
           severity: 'warn',
           ids: over.map((entry) => entry.node),
           paths: [],
-          message: `operating displacement ${Math.max(...over.map((entry) => entry.mm)).toFixed(1)} mm exceeds ${displacementLimitMm} mm`,
+          message: `operating displacement ${maxOf(over.map((entry) => entry.mm)).toFixed(1)} mm exceeds ${displacementLimitMm} mm`,
           remediation: remediationOf('PST_DISPLACEMENT_LIMIT'),
         });
     }

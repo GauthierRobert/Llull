@@ -59,6 +59,17 @@ export interface BondPath {
   readonly temperature?: Quantity;
 }
 
+/** SAE ARP5414A lightning zones: 1A / 1B first return stroke (low / high hang-on probability), 1C its transition zone, 2A / 2B swept stroke (low / high hang-on), 3 conducted current only. */
+export const LIGHTNING_ZONES = ['1A', '1B', '1C', '2A', '2B', '3'] as const;
+
+/** The lightning zone of a solid as zoned by the applicant (per solid, like coatings; a zoning drawing or report is the source). */
+export interface LightningZoneLabel {
+  readonly id: string;
+  readonly entityId: string;
+  readonly zone: (typeof LIGHTNING_ZONES)[number];
+  readonly source: EopSource;
+}
+
 export const DISPOSITIONS = ['accepted', 'rejected', 'redesign'] as const;
 
 /** A qualified human's decision on a bond path, bound to the path as it was (`inputsHash`) and to the document it was signed for. */
@@ -71,12 +82,16 @@ export interface BondDisposition {
   readonly signatureId: string;
   readonly signature: unknown;
   readonly documentUid: string;
+  /** Key of the feature step that recorded it (SIG-REPLAY: seeded only while that step is live); absent on older records. */
+  readonly stepKey?: string;
 }
 
 export interface ElectroOpticalModel {
   readonly coatings: Readonly<Record<string, CoatingAssignment>>;
   readonly bondPaths: Readonly<Record<string, BondPath>>;
   readonly dispositions: Readonly<Record<string, BondDisposition>>;
+  /** Absent in files written before set_lightning_zone. */
+  readonly zones?: Readonly<Record<string, LightningZoneLabel>>;
 }
 
 declare module '@core/model/documentExtensions' {

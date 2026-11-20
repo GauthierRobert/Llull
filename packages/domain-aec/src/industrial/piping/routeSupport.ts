@@ -44,7 +44,7 @@ function segmentsOf(route: ReadonlyArray<Vec3>): Segment[] {
   return route.slice(1).map((b, index): Segment => {
     const a = route[index] as Vec3;
     const delta = sub3(b, a);
-    const length = Math.hypot(...delta);
+    const length = Math.hypot(delta[0], delta[1], delta[2]);
     return { a, delta, length, direction: [delta[0] / length, delta[1] / length, delta[2] / length] };
   });
 }

@@ -14,6 +14,8 @@ import { defRejection } from './codes';
 import { chainOf, isChainFailure } from './deformChain';
 import { deformNodeOf, sourceMeshOf } from './sourceMesh';
 import { idParam } from './schema';
+import { appendAll } from '../../lib/appendAll';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Triangles the map may return (each carries 3 vertices of 3 coordinates and one determinant: about 10 MB of JSON). */
 const MAX_TRIANGLES = 200_000;
@@ -28,8 +30,9 @@ const DETERMINANT_EVALUATIONS = 6;
 function placedPositions(entity: Pick<Entity, 'position' | 'rotation'>, positions: ArrayLike<number>): number[] {
   const placed: number[] = [];
   for (let i = 0; i + 2 < positions.length; i += 3)
-    placed.push(
-      ...entityLocalToWorld(entity, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]).map(Math.fround),
+    appendAll(
+      placed,
+      entityLocalToWorld(entity, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]).map(Math.fround),
     );
   return placed;
 }
@@ -43,7 +46,7 @@ function sampleAt(rest: ArrayLike<number>, a: number, b: number, c: number, nudg
   const [ux, uy, uz] = [at(b, 0) - at(a, 0), at(b, 1) - at(a, 1), at(b, 2) - at(a, 2)];
   const [vx, vy, vz] = [at(c, 0) - at(a, 0), at(c, 1) - at(a, 1), at(c, 2) - at(a, 2)];
   const normal: Vec3 = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
-  const length = Math.hypot(...normal) || 1;
+  const length = Math.hypot(normal[0], normal[1], normal[2]) || 1;
   return [0, 1, 2].map((k) => (at(a, k) + at(b, k) + at(c, k)) / 3 - (nudge * (normal[k] as number)) / length) as unknown as Vec3;
 }
 
@@ -55,7 +58,7 @@ const boundsDiagonal = (positions: ArrayLike<number>): number => {
       low[k] = Math.min(low[k] as number, positions[i + k] as number);
       high[k] = Math.max(high[k] as number, positions[i + k] as number);
     }
-  return positions.length === 0 ? 1 : Math.hypot(...[0, 1, 2].map((k) => (high[k] as number) - (low[k] as number)));
+  return positions.length === 0 ? 1 : hypotOf([0, 1, 2].map((k) => (high[k] as number) - (low[k] as number)));
 };
 
 /** 4 significant digits: the map is a picture, not a measurement (analyze_deformation has the numbers). */

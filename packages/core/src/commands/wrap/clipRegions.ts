@@ -13,6 +13,8 @@ import { splitCurve } from '../../lib/nurbs/curveSplit';
 import { pointInPolygon } from '../../lib/polygon';
 import { sampleSegment, segmentArea, segmentEnd, segmentStart, type PlaneSegment } from '../../geometry/planeSegments';
 import type { ChartRegion } from './sketchProfiles';
+import { maxOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 /** The kept side is where `normal . (p - point) >= 0`. */
 export interface HalfPlane {
@@ -45,7 +47,7 @@ function crossings(curve: NurbsCurve2Data, plane: HalfPlane): number[] {
   const [first, last] = curveDomain(lifted(curve));
   const at = (k: number): number => first + ((last - first) * k) / ROOT_SAMPLES;
   const values = Array.from({ length: ROOT_SAMPLES + 1 }, (_, k) => signed(plane, pointAt2(curve, at(k))));
-  const eps = 1e-12 * Math.max(1, ...values.map(Math.abs));
+  const eps = 1e-12 * Math.max(1, maxOf(values.map(Math.abs)));
   const sign = (value: number): number => (Math.abs(value) <= eps ? 0 : Math.sign(value));
   const roots: number[] = [];
   for (let k = 1; k <= ROOT_SAMPLES; k++) {
@@ -104,7 +106,9 @@ function cut(segment: PlaneSegment, plane: HalfPlane, scale: number): Piece[] {
 const sizeOf = (chains: ReadonlyArray<readonly PlaneSegment[]>): number =>
   Math.max(
     1e-12,
-    ...chains.flatMap((chain) => chain.flatMap((segment) => sampleSegment(segment, 5).flatMap((p) => [Math.abs(p[0]), Math.abs(p[1])]))),
+    maxOf(
+      chains.flatMap((chain) => chain.flatMap((segment) => sampleSegment(segment, 5).flatMap((p) => [Math.abs(p[0]), Math.abs(p[1])]))),
+    ),
   );
 
 interface Run {
@@ -162,7 +166,7 @@ export function clipRegions(regions: readonly ChartRegion[], plane: HalfPlane): 
     const consider = (loop: readonly PlaneSegment[]): void => {
       const result = loop === region.outer ? outer : runsOfLoop(loop, plane, scale);
       if (result === 'whole') loops.push(loop);
-      else if (result !== 'gone') runs.push(...result);
+      else if (result !== 'gone') appendAll(runs, result);
     };
     consider(region.outer);
     for (const hole of region.holes) consider(hole);
@@ -192,7 +196,7 @@ export function clipRegions(regions: readonly ChartRegion[], plane: HalfPlane): 
         for (let guard = 0; guard <= runs.length; guard++) {
           used.add(at);
           const run = runs[at] as Run;
-          loop.push(...run.pieces);
+          appendAll(loop, run.pieces);
           const next = partner.get(at);
           if (next === undefined) return null;
           const entry = (runs[next] as Run).start;

@@ -12,6 +12,7 @@
 import type { MeshEngineFailure, MeshInput, MeshOp, MeshOpName, MeshProcessingEngine } from './engineTypes';
 import { isEngineFailure } from './engineTypes';
 import { tsMeshEngine } from './tsEngine';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Code of the refusal of an engine that only answers through the host's resolving path (the native one, outside `resolveDeferred`): the next engine may answer. */
 export const MESH_ENGINE_NEEDS_HOST = 'MESH_ENGINE_NEEDS_HOST';
@@ -68,7 +69,7 @@ export function composeMeshEngines(engines: ReadonlyArray<MeshProcessingEngine>)
           return result;
         refusals.set(position, result);
       }
-      const last = Math.max(-1, ...refusals.keys());
+      const last = Math.max(-1, maxOf(refusals.keys()));
       return refusals.get(last) ?? { code: 'MESH_ENGINE_UNSUPPORTED', message: `no installed mesh engine answers "${op.op}"` };
     },
   };

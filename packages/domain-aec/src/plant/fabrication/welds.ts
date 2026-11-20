@@ -6,6 +6,7 @@
 
 import { isWeldJoint, nodeKey, type JointNode, type LineGraph } from './joints';
 import type { FabricationModel, FabricationRules, PipingNetwork, WeldKind, WeldRecord } from './model';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface WeldEntry {
   readonly joint: JointNode;
@@ -40,7 +41,7 @@ export function baseHighest(fabrication: FabricationModel, lineId: string, netwo
   return Math.max(
     fabrication.highestWeldNumber?.[lineId] ?? 0,
     Number.isFinite(fromFile) ? fromFile : 0,
-    ...storedWelds(fabrication, lineId).map((weld) => weld.n),
+    maxOf(storedWelds(fabrication, lineId).map((weld) => weld.n)),
   );
 }
 

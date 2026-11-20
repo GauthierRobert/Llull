@@ -17,6 +17,7 @@ import {
 } from '../code/nozzleLimits';
 import { ruleRows } from '../code/ruleSets';
 import { refuse } from '../codes';
+import { maxOf } from '@lib/arrayExtrema';
 
 const finite = z.number().refine(Number.isFinite, 'must be finite');
 const vec3 = z.tuple([finite, finite, finite]);
@@ -180,7 +181,7 @@ export const nozzleLoadCheck = defineCommand({
         unverified = [`user limits are caller-supplied (${user.source})`];
         numbers = { source: user.source, unit: si ? 'N, N.m' : 'lbf, ft.lbf' };
       }
-      ratio = Math.max(...components.map((entry) => entry.ratio));
+      ratio = maxOf(components.map((entry) => entry.ratio));
       numbers = { ...numbers, components };
     }
     const ok = ratio <= 1;

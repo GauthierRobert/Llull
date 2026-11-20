@@ -217,7 +217,7 @@ export function ellipseShape(record: DxfRecord, transform: Transform): ShapeResu
   const [center, major] = [point(record), point(record, 1)];
   const ratio = codeNumber(record, 40, 1);
   const [start, end] = [codeNumber(record, 41, 0), codeNumber(record, 42, Math.PI * 2)];
-  if (!(ratio > 0 && ratio <= 1) || !(Math.hypot(...major) > 0)) return null;
+  if (!(ratio > 0 && ratio <= 1) || !(Math.hypot(major[0], major[1], major[2]) > 0)) return null;
   if (transform.scale === null || Math.abs(positiveSweep(end - start) - Math.PI * 2) > 1e-9) {
     const points = ellipsePoints(center, major, ratio, start, end).map((p) => transform.apply(p));
     return { kind: 'polyline', points, closed: Math.abs(positiveSweep(end - start) - Math.PI * 2) < 1e-9, mark: null };

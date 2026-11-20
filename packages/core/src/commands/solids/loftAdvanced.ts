@@ -19,6 +19,8 @@ import { newEntity } from '../entity/newEntity';
 import { commitSolid, existingLayerOrDefault } from './shared';
 import type { SectionSpec } from './sectionSpecs';
 import { anyWorldCurve, sketchSectionCurve, specCurve, worldCurveOf } from './loftSectionCurves';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
+import { hypotOf } from '../../lib/hypotOf';
 
 const conditionShape = {
   type: z
@@ -199,10 +201,8 @@ export function sectionCurvesOf(
 
 const sizeOf = (curves: readonly NurbsCurveData[]): number => {
   const poles = curves.flatMap((curve) => curve.poles);
-  const extent = [0, 1, 2].map(
-    (axis) => Math.max(...poles.map((p) => p[axis] as number)) - Math.min(...poles.map((p) => p[axis] as number)),
-  );
-  return Math.max(Math.hypot(...extent), 1e-9);
+  const extent = [0, 1, 2].map((axis) => maxOf(poles.map((p) => p[axis] as number)) - minOf(poles.map((p) => p[axis] as number)));
+  return Math.max(hypotOf(extent), 1e-9);
 };
 
 /**

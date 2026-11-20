@@ -11,6 +11,7 @@ import { wrapRejection } from './codes';
 import { wrapData } from './conventions';
 import { isDevelopableSurface, isRejection, openFace, type FaceSession } from './faceSession';
 import { faceRefField } from './schemas';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Points kept per outline loop and per reported curve. */
 const MAX_OUTLINE_POINTS = 2000;
@@ -47,14 +48,9 @@ function faceExtent(session: FaceSession, chart: FaceChart): Extent | null {
   const vs = resolved.map((uv) => uv[1]);
   if (chart.kind === 'plane') {
     const us = resolved.map((uv) => uv[0]);
-    return { uMin: Math.min(...us), uSpan: Math.max(...us) - Math.min(...us), vMin: Math.min(...vs), vMax: Math.max(...vs) };
+    return { uMin: minOf(us), uSpan: maxOf(us) - minOf(us), vMin: minOf(vs), vMax: maxOf(vs) };
   }
-  return {
-    uMin: (resolved[0] as Vec2)[0],
-    uSpan: Math.min(Math.abs(uHigh - uLow), 2 * Math.PI),
-    vMin: Math.min(...vs),
-    vMax: Math.max(...vs),
-  };
+  return { uMin: (resolved[0] as Vec2)[0], uSpan: Math.min(Math.abs(uHigh - uLow), 2 * Math.PI), vMin: minOf(vs), vMax: maxOf(vs) };
 }
 
 const thin = (points: Vec2[]): Vec2[] => {

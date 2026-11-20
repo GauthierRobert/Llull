@@ -8,6 +8,7 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { maxOverNodes, magnitude, nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from '../results/fields';
 import { extractCurves } from './curves';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Increments, cutbacks and iterations of CalculiX step `number`: the `.sta` rows when the artifact has them, else the stored result sets. */
 function stepProgress(
@@ -20,10 +21,10 @@ function stepProgress(
       increments: rows.length,
       cutbacks: rows.reduce((sum, row) => sum + Math.max(0, row.attempts - 1), 0),
       iterations: rows.reduce((sum, row) => sum + row.iterations, 0),
-      lastTime: Math.max(...rows.map((row) => row.totalTime)),
+      lastTime: maxOf(rows.map((row) => row.totalTime)),
     };
   const stored = results.steps.filter((step) => step.step === number);
-  return { increments: stored.length, cutbacks: 0, iterations: 0, lastTime: Math.max(0, ...stored.map((step) => step.time)) };
+  return { increments: stored.length, cutbacks: 0, iterations: 0, lastTime: Math.max(0, maxOf(stored.map((step) => step.time))) };
 }
 
 /** Largest equivalent plastic strain (FRD block `PE`) over the nodes of the last stored increment, with its position. */
@@ -80,7 +81,7 @@ export function nonlinearSummary(
       name: curve.name,
       points: curve.time.length,
       peakLoad: peak,
-      dispRange: [Math.min(...curve.displacement), Math.max(...curve.displacement)] as const,
+      dispRange: [minOf(curve.displacement), maxOf(curve.displacement)] as const,
       curveHash: sha256Hex(canonicalJson({ time: curve.time, load: curve.load, displacement: curve.displacement })),
     };
   });

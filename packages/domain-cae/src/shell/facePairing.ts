@@ -11,6 +11,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { add3, dot3, normalize3, scale3, sub3 } from '@lib/vec3';
 import { planarLoops } from './faceLoops';
 import { distinctThicknesses, extentOf, type MidFace, type Midsurface, type MidsurfaceOptions, type MidsurfaceRefusal } from './types';
+import { minOf } from '@lib/arrayExtrema';
 
 interface Pair {
   readonly a: FaceDetail;
@@ -99,7 +100,7 @@ export function pairedMidsurface(
       code: 'FEA_MIDSURFACE_NO_PAIRS',
       message: `'${entityId}' has no two planar faces facing each other across a wall <= ${options.maxThickness} thick`,
     };
-  const deflection = Math.max(1e-3, Math.min(...pairs.map((pair) => pair.gap)) / 4);
+  const deflection = Math.max(1e-3, minOf(pairs.map((pair) => pair.gap)) / 4);
   const faces: MidFace[] = [];
   const warnings: string[] = [];
   for (const pair of pairs) {

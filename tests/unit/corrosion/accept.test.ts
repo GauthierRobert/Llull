@@ -5,6 +5,7 @@ import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { signingContext } from '../../helpers/signedPlantDoc';
 import { check, pair, run, withEnvironment } from './fixtures';
+import { expectSignedReplayFollowsHistory } from '../../helpers/signedReplay';
 
 /** The failing couple of the validation plan: 7075 plate with a titanium block, normal environment (item galvanic:<plate>|<block>). */
 function failing(): { doc: CadDocument; key: string } {
@@ -133,12 +134,31 @@ describe('accept_corrosion_item: the human gate (VC-COR-15)', () => {
     expect(replayed.document.corrosion?.acceptances[key]).toMatchObject({ decision: 'accepted', signer: 'alice' });
   });
 
-  it('a replay never invents an acceptance: with the kept record gone the recorded step is refused', () => {
+  it('a replay never invents an acceptance: with the kept record gone the recorded step re-applies nothing (and does not fail)', () => {
     const { doc, key } = failing();
     const accepted = accept(doc, key, { confirmation: { nonce: 'n1' } }).document;
     const stripped = { ...accepted, corrosion: { ...accepted.corrosion!, acceptances: {} } };
     const replayed = execute(stripped, 'replay_history', {}, signingContext);
+    expect(replayed.error, replayed.summary).toBeUndefined();
     expect(replayed.document.corrosion?.acceptances[key]).toBeUndefined();
+  });
+
+  it('SIG-REPLAY: suppressing or deleting the accept step drops the acceptance (the item counts against the status again); unsuppressing does not restore it', () => {
+    const { doc, key } = failing();
+    const accepted = accept(doc, key, { confirmation: { nonce: 'n1' } });
+    expect(accepted.error, accepted.summary).toBeUndefined();
+    expect(check(accepted.document, {}, signingContext).status).toBe('pass');
+    const outcome = expectSignedReplayFollowsHistory(
+      accepted.document,
+      'accept_corrosion_item',
+      (next) => next.corrosion?.acceptances[key],
+      signingContext,
+    );
+    for (const next of [outcome.suppressed, outcome.deleted, outcome.restored]) {
+      const after = check(next, {}, signingContext);
+      expect(after.status).toBe('fail');
+      expect(after.items[0]?.acceptance).toBeUndefined();
+    }
   });
 
   it('a recorded confirmation outside a replay is no signature', () => {

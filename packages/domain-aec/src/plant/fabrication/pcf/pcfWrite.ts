@@ -10,6 +10,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { NetworkComponent, NetworkPoint, PcfLineData, PcfUnit, PcfUnits } from '../model';
 import { MAX_PCF_LINE } from './pcfLexer';
 import { MM_PER_INCH, boreFromMm } from './pcfUnits';
+import { appendAll } from '@lib/appendAll';
 
 export interface PcfWriteOptions {
   /** Units written; a bolt unit that is undefined is not written (the file did not declare it). */
@@ -101,9 +102,9 @@ export function writePcfText(data: PcfLineData, options: PcfWriteOptions): PcfWr
   for (const key of [...known, ...others]) out.push(entry(key, data.attributes[key] ?? ''));
   const unknownAt = (after: number): string[] =>
     data.unknownRecords.filter((record) => record.after === after && record.afterMaterials !== true).flatMap((record) => record.text);
-  out.push(...unknownAt(0));
+  appendAll(out, unknownAt(0));
   data.components.forEach((component, index) => {
-    out.push(...componentLines(component, index + 1, fmt), ...unknownAt(index + 1));
+    appendAll(out, [...componentLines(component, index + 1, fmt), ...unknownAt(index + 1)]);
   });
   if (options.includeMaterials && data.materials.length > 0) {
     out.push('MATERIALS');
@@ -112,7 +113,10 @@ export function writePcfText(data: PcfLineData, options: PcfWriteOptions): PcfWr
       for (const [key, value] of Object.entries(material.fields)) out.push(entry(key, value));
     }
   }
-  out.push(...data.unknownRecords.filter((record) => record.afterMaterials === true).flatMap((record) => record.text));
+  appendAll(
+    out,
+    data.unknownRecords.filter((record) => record.afterMaterials === true).flatMap((record) => record.text),
+  );
   const truncatedLines: number[] = [];
   const cut = out.map((text, index) => {
     if (text.length <= MAX_PCF_LINE) return text;

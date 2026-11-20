@@ -17,6 +17,7 @@ import type { CadDocument, MeshData, Vec3 } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { type CompileWarning, compileField } from './compile';
+import { rememberMeshResult } from './meshFacts';
 
 /** Bumped when the tape semantics or the mesher change what the same program realises. */
 const ENGINE_MAJOR = 1;
@@ -109,6 +110,7 @@ export function realiseField(doc: CadDocument, request: RealiseRequest, engine: 
   const grid = bodyGrid(bounds, request.voxel);
   const result = engine.mesh(program, grid, { mesher: request.mesher ?? 'tetra', maxTriangles: request.maxTriangles });
   if (!result.ok) return failureOf(result, request.field);
+  rememberMeshResult(result);
   if (result.mesh.indices.length === 0)
     return { ok: false, code: 'IMP_BODY_EMPTY', message: `no sample of field '${request.field}' is inside the grid`, ids: [request.field] };
   return {

@@ -6,6 +6,7 @@
  */
 
 import type { Vec3 } from '@core/model/types';
+import { minOf } from '@lib/arrayExtrema';
 
 /** Relative error bound of the filter: about 100 times the one of Shewchuk's orient3d / insphere (7 eps and 16 eps), safe for the subtraction roundings of the inputs. */
 const FILTER = 1e-13;
@@ -30,7 +31,7 @@ type Big3 = [bigint, bigint, bigint];
 
 function exact(points: readonly Vec3[]): Big3[] {
   const parts = points.map((p) => p.map(decompose));
-  const lowest = Math.min(0, ...parts.flatMap((p) => p.filter((c) => c.mantissa !== 0n).map((c) => c.exponent)));
+  const lowest = Math.min(0, minOf(parts.flatMap((p) => p.filter((c) => c.mantissa !== 0n).map((c) => c.exponent))));
   return parts.map((p) => p.map((c) => c.mantissa << BigInt(c.exponent - lowest)) as Big3);
 }
 

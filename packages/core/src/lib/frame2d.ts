@@ -5,6 +5,7 @@
 
 import { solveDense } from './denseLinalg';
 import { powInt } from './powInt';
+import { maxOf } from './arrayExtrema';
 
 export interface FrameNode {
   readonly x: number;
@@ -51,7 +52,7 @@ export interface FrameResult {
 
 /** Gaussian elimination with partial pivoting, pivot tolerance 1e-10 of the largest entry; null when singular. */
 function solveLinear(matrix: number[][], rhs: number[]): number[] | null {
-  return solveDense(matrix, rhs, 1e-10 * Math.max(...matrix.flat().map(Math.abs), 1e-300));
+  return solveDense(matrix, rhs, 1e-10 * Math.max(maxOf(matrix.flat().map(Math.abs)), 1e-300));
 }
 
 interface Local {

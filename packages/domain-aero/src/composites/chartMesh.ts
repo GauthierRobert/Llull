@@ -5,6 +5,7 @@ import { pointInPolygon, polygonArea, toCounterClockwise } from '@lib/polygon';
 import { clipToConvex } from '@lib/polygonBoolean';
 import { triangulatePolygon } from '@lib/triangulate';
 import { densify } from './drape/flatten';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface ChartMesh {
   readonly uv: Vec2[];
@@ -20,8 +21,8 @@ const MAX_CELLS = 40_000;
 /** Structured mesh: the bounding grid of cell size maxEdge / sqrt 2, cells cut by the polygon clipped to it, interior cells kept whole. */
 function gridMesh(outer: readonly Vec2[], maxEdge: number): ChartMesh | null {
   const ring = toCounterClockwise(outer);
-  const [x0, x1] = [Math.min(...ring.map(([x]) => x)), Math.max(...ring.map(([x]) => x))];
-  const [y0, y1] = [Math.min(...ring.map(([, y]) => y)), Math.max(...ring.map(([, y]) => y))];
+  const [x0, x1] = [minOf(ring.map(([x]) => x)), maxOf(ring.map(([x]) => x))];
+  const [y0, y1] = [minOf(ring.map(([, y]) => y)), maxOf(ring.map(([, y]) => y))];
   let h = maxEdge / Math.SQRT2;
   while (Math.ceil((x1 - x0) / h) * Math.ceil((y1 - y0) / h) > MAX_CELLS) h *= 1.25;
   const [nx, ny] = [Math.max(1, Math.ceil((x1 - x0) / h)), Math.max(1, Math.ceil((y1 - y0) / h))];

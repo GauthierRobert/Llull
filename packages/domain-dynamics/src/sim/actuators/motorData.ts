@@ -6,6 +6,7 @@
 import type { DatasheetMotor, DcMotorDatasheet, InductionMotor, PmsmMotor, StepperMotor } from '@core/model/drives';
 import { inductionCircuit, inductionParameters } from './induction';
 import { phaseVoltageLimit, pmsmParameters } from './pmsm';
+import { maxOf } from '@lib/arrayExtrema';
 
 export const DATA_TOLERANCE = 0.02;
 
@@ -60,7 +61,7 @@ function resultOf(entries: readonly Entry[]): MotorDataResult {
   const gaps = checks.flatMap((check) => (check.relativeGap === null ? [] : [Math.abs(check.relativeGap)]));
   return {
     checks,
-    maxGap: Math.max(0, ...gaps),
+    maxGap: Math.max(0, maxOf(gaps)),
     consistent: checks.every((check) => check.status !== 'fail'),
     notGiven: checks.filter((check) => check.status === 'notGiven').map((check) => check.quantity),
   };

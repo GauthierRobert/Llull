@@ -6,6 +6,7 @@ import { closeForCutIn, effectivityProblem } from './effectivity';
 import { type PlmCode, remediationOf } from './refusal';
 import { currentRevisionOf, revisionText } from './state';
 import { unreleasedChildren } from './structure';
+import { appendAll } from '@lib/appendAll';
 
 export interface Finding {
   readonly code: PlmCode | 'PLM_UNVERIFIED_INPUT' | 'PLM_TITLEBLOCK_MISMATCH';
@@ -107,7 +108,7 @@ export function releaseFindings(doc: CadDocument, plm: PlmModel, inputs: Release
     if (revision.state !== 'in_work') return found;
   }
   const { findings: ecoFindings, eco } = changeOrderFindings(plm, revision, inputs.changeOrder);
-  found.push(...ecoFindings);
+  appendAll(found, ecoFindings);
   const approvals = revision.approvals;
   const missing = plm.policy.requiredApprovalRoles.filter((role) => !approvals.some((approval) => approval.role === role));
   if (missing.length > 0)

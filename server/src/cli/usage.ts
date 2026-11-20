@@ -29,7 +29,7 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   new [--force]               write an empty document
   undo | redo                 local: swap with FILE.bak (one level); server: shared history
   keys | release | lotar | vault | audit   signed releases and the local vault (09 PLM)   llull help plm
-  fuzz | fuzz-one | run_benchmarks         robustness fuzz and validation benchmarks      llull help fuzz
+  fuzz | fuzz-one | run_benchmarks | compare_expected   robustness fuzz and validation benchmarks   llull help fuzz
 
 Agent skills
   skills list | path          the shipped skills; skills install [--dir D] [--force] copies them into ~/.claude/skills
@@ -141,6 +141,10 @@ const FUZZ = `Validation tools
   run_benchmarks [packs=a,b]  judge every docs/physics/*/validation/expected_results.json case
                               (harness recipes + unit-test measurements); exit 1 on an A-grade
                               fail/error  [grades=A,B caseIds=… measurements=FILE root=DIR]
+  compare_expected ANSWER.json EXPECTED.json CASE [pointer=/data/…] [unit=U]
+                              judge one value of a saved --json answer (llull creep_report … --json) against
+                              one expected_results.json case (its tolerance and grade; pointer -1 = last item,
+                              default the case harness pointer); exit 1 on fail/error, 2 on a usage problem
 
 Robustness fuzz (local kernel; seeded designs on a 2.5 mm grid, checked after every step)
   fuzz [--from N] [--count K] [--jobs J] [--out DIR] [--report FILE] [--kinds join,cut,…] [--max-steps M]

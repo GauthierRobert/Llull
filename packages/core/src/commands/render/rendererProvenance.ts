@@ -7,6 +7,7 @@
 import type { RasterPort, RasterScene } from '../../model/raster';
 import { sha256Hex } from '../../lib/sha256';
 import type { PixelStage } from './types';
+import { rememberEncodedPng } from './raster';
 
 /** Bump when the reference raster's pixels change for the same inputs (pins `svgSha256` goldens, Q6). */
 export const REFERENCE_RENDERER_VERSION = 'llull-ts-raster/2';
@@ -27,14 +28,14 @@ export interface NativeRun {
   readonly result: () => NativeProvenance | { readonly code: string; readonly message: string };
 }
 
-/** A pixel stage drawing on `port` with `engine`. */
-export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu'): NativeRun {
+/** A pixel stage drawing on `port` with `engine`; `png` asks the port for the PNG too (render_view embeds it; framed renders blend first). */
+export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu', png = false): NativeRun {
   let failure: { code: string; message: string } | null = null;
   let provenance: NativeProvenance | null = null;
   const pixels = (scene: RasterScene): Uint8Array => {
     const blank = new Uint8Array(scene.width * scene.height * 4);
     if (failure !== null) return blank;
-    const outcome = port.render(scene, engine);
+    const outcome = port.render(scene, engine, { png });
     if (!outcome.ok) {
       failure = { code: outcome.code, message: outcome.message };
       return blank;
@@ -52,6 +53,7 @@ export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu'): NativeRun {
       version: image.version,
       ...(image.reason !== undefined ? { reason: image.reason } : {}),
     };
+    rememberEncodedPng(image.rgba, image.png);
     return image.rgba;
   };
   return {

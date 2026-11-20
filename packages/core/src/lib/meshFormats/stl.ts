@@ -1,6 +1,7 @@
 /** STL readers: ASCII (several `solid` blocks = several bodies) and binary (80-byte header, u32 count, 50 bytes per facet). Normals are ignored. */
 
 import { type MeshParseFailure, type ParsedBody, type ParsedMeshFile, parseFailure } from './types';
+import { appendAll } from '../appendAll';
 
 const BINARY_HEADER = 84;
 const FACET_BYTES = 50;
@@ -16,19 +17,20 @@ export function parseBinaryStl(bytes: Uint8Array): ParsedMeshFile | MeshParseFai
   if (!isBinaryStl(bytes)) return parseFailure('MESH_IMPORT_PARSE', 'binary STL: the byte length is not 84 + 50 x the facet count');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = view.getUint32(80, true);
-  const positions: number[] = [];
-  const triangles: number[] = [];
+  // The facet count is known: both arrays are allocated once (growing a 9-million-value array by pushes copies it several times).
+  const positions = new Array<number>(count * 9);
+  const triangles = new Array<number>(count * 3);
+  let write = 0;
   for (let facet = 0; facet < count; facet++) {
     const base = BINARY_HEADER + facet * FACET_BYTES + 12;
-    for (let corner = 0; corner < 3; corner++) {
-      for (let axis = 0; axis < 3; axis++) {
-        const value = view.getFloat32(base + corner * 12 + axis * 4, true);
-        if (!Number.isFinite(value))
-          return parseFailure('MESH_IMPORT_PARSE', `non-finite coordinate in facet ${facet} (byte ${base + corner * 12 + axis * 4})`);
-        positions.push(value);
-      }
-      triangles.push(facet * 3 + corner);
+    for (let offset = base; offset < base + 36; offset += 4) {
+      const value = view.getFloat32(offset, true);
+      if (!Number.isFinite(value)) return parseFailure('MESH_IMPORT_PARSE', `non-finite coordinate in facet ${facet} (byte ${offset})`);
+      positions[write++] = value;
     }
+    triangles[facet * 3] = facet * 3;
+    triangles[facet * 3 + 1] = facet * 3 + 1;
+    triangles[facet * 3 + 2] = facet * 3 + 2;
   }
   return { format: 'stl-binary', bodies: [{ positions, triangles, groups: [] }], dropped: count > 0 ? [`normals: ${count}`] : [] };
 }
@@ -55,7 +57,7 @@ export function parseAsciiStl(text: string): ParsedMeshFile | MeshParseFailure {
       if (values.length !== 3 || !values.every(Number.isFinite))
         return parseFailure('MESH_IMPORT_PARSE', `bad vertex at line ${index + 1}: "${line.slice(0, 60)}"`);
       current ??= { positions: [], triangles: [] };
-      current.positions.push(...values);
+      appendAll(current.positions, values);
       current.triangles.push(current.positions.length / 3 - 1);
       facetVertices++;
     } else if (token === 'facet') {

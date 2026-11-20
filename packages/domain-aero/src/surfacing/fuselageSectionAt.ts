@@ -12,6 +12,7 @@ import { briefNumbers, sig } from '../shared/results';
 import { IDENTITY_FRAME, toAircraft } from './aircraftFrame';
 import { aeroOf } from './aeroState';
 import { refuseAero } from './codes';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const RING_SAMPLES = 128;
 const BISECTIONS = 60;
@@ -90,7 +91,7 @@ export const fuselageSectionAt = defineCommand({
     const area = (4 * fine.area - rough.area) / 3;
     const perimeter = (4 * fine.perimeter - rough.perimeter) / 3;
     const [bls, wls] = [ring.map((p) => p[1] as number), ring.map((p) => p[2] as number)];
-    const [minBl, maxBl, minWl, maxWl] = [Math.min(...bls), Math.max(...bls), Math.min(...wls), Math.max(...wls)];
+    const [minBl, maxBl, minWl, maxWl] = [minOf(bls), maxOf(bls), minOf(wls), maxOf(wls)];
     const widest = ring.reduce((best, p) =>
       Math.abs((p[1] as number) - (minBl + maxBl) / 2) > Math.abs((best[1] as number) - (minBl + maxBl) / 2) ? p : best,
     );

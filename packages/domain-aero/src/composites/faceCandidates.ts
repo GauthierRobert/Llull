@@ -5,6 +5,7 @@ import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { applyEulerXYZ } from '@lib/eulerRotation';
 import { projectOntoSegment, pointInPolygon } from '@lib/polygon';
 import { ORIGIN, cross3, dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { minOf } from '@lib/arrayExtrema';
 
 export interface PlaneFace {
   readonly type: 'plane';
@@ -125,7 +126,7 @@ export function distanceToFace(face: FaceCandidate, p: Vec3): number {
     const local: Vec2 = [dot3(rel, face.xDir), dot3(rel, face.yDir)];
     const offset = Math.abs(dot3(rel, face.normal));
     if (pointInPolygon(local, face.ring)) return offset;
-    const edge = Math.min(...face.ring.map((a, i) => projectOntoSegment(local, a, face.ring[(i + 1) % face.ring.length] as Vec2).distance));
+    const edge = minOf(face.ring.map((a, i) => projectOntoSegment(local, a, face.ring[(i + 1) % face.ring.length] as Vec2).distance));
     return Math.hypot(offset, edge);
   }
   if (face.type === 'cylinder') {

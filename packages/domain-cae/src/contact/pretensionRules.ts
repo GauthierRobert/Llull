@@ -8,6 +8,7 @@ import { boundsCorners, entityBoundsInDoc } from '@core/geometry/bounds';
 import { dot3, sub3 } from '@lib/vec3';
 import { withCase } from '../shared/access';
 import type { PairProblem } from './pairRules';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
 
@@ -28,7 +29,10 @@ export function pretensionValueProblem(bolt: Omit<BoltPretension, 'id' | 'name'>
     if (!positive(preload.torque) || !positive(preload.diameter))
       return problem('CNT_PRELOAD_INVALID', 'torque and diameter must be finite and > 0', 'preload.torque');
   }
-  if (![...section.point, ...section.normal].every(Number.isFinite) || !(Math.hypot(...section.normal) > 0))
+  if (
+    ![...section.point, ...section.normal].every(Number.isFinite) ||
+    !(Math.hypot(section.normal[0], section.normal[1], section.normal[2]) > 0)
+  )
     return problem('CNT_PRETENSION_SECTION_INVALID', 'section.point must be finite and section.normal a non-zero finite vector', 'section');
   return null;
 }
@@ -48,7 +52,7 @@ export function pretensionProblem(doc: CadDocument, analysis: AnalysisCase, bolt
   if (!Object.hasOwn(analysis.parts, bolt.entityId))
     return problem('FEA_PART_NOT_IN_ANALYSIS', `entity '${bolt.entityId}' is not a part of analysis '${analysis.id}'`, 'entityId');
   const side = boundsCorners(entityBoundsInDoc(doc, entity)).map((corner) => dot3(sub3(corner, bolt.section.point), bolt.section.normal));
-  if (Math.min(...side) > 0 || Math.max(...side) < 0)
+  if (minOf(side) > 0 || maxOf(side) < 0)
     return problem(
       'CNT_PRETENSION_SECTION_INVALID',
       `the section plane does not meet the bounds of part '${bolt.entityId}'`,

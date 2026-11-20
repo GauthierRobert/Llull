@@ -1,7 +1,8 @@
 /**
  * TypeScript reference for the `llull-raster` scene twin (plant 09 VC-VIS-60 at crate level): the RasterScene buffers render_view prepares
  * for a few documents (orthographic, cutaway caps, 2D strokes, perspective with near-plane clipping, unsupersampled) and the sha256 of the
- * RGBA `rasterScenePixels` writes. `solver/crates/llull-raster/tests/scene_reference.rs` requires the CPU twin to hash identically.
+ * RGBA `rasterScenePixels` writes, and of the PNG `encodePng(…, true)` writes for it. `solver/crates/llull-raster/tests/scene_reference.rs`
+ * requires the CPU twin and the native PNG encoder to hash identically.
  * Regenerate with LLULL_WRITE_NATIVE_FIXTURES=1.
  */
 import { createHash } from 'node:crypto';
@@ -13,6 +14,7 @@ import { defaultContext } from '@core/commands/context';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { RasterScene } from '@core/model/raster';
 import { rasterScenePixels } from '@core/commands/render/raster';
+import { encodePng } from '@lib/png';
 
 const FILE = path.resolve(__dirname, '../../../solver/crates/llull-raster/tests/fixtures/scene.json');
 const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -108,6 +110,7 @@ describe('scene raster reference fixtures', () => {
         points: Array.from(points),
         strokes: Array.from(strokes),
         rgbaSha256: sha(rgba),
+        pngSha256: sha(encodePng(scene.width, scene.height, rgba, true)),
         covered: rgba.filter((_, i) => i % 4 === 3 && rgba[i] !== 0).length,
       };
     });

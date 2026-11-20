@@ -11,6 +11,8 @@ import { LLULL_APP } from './dxfReadShapes';
 import { encodeTextLiterals } from './dxfRecord';
 import type { Vec2 } from '../model/vectors';
 import { type DxfLayerDef, type Group, assembleFile, flatten, hexColor } from './dxf2000File';
+import { appendAll } from './appendAll';
+import { maxOf } from './arrayExtrema';
 
 const FORBIDDEN_IN_NAMES = '<>/\\":;?*|=`';
 
@@ -110,8 +112,9 @@ export class Dxf2000Writer {
               [1030, z],
             ]),
           ];
-    this.lines.push(
-      ...flatten([[0, type], [5, handle], [330, '1F'], [100, 'AcDbEntity'], [8, style.layer], ...colour, ...body, ...extended]),
+    appendAll(
+      this.lines,
+      flatten([[0, type], [5, handle], [330, '1F'], [100, 'AcDbEntity'], [8, style.layer], ...colour, ...body, ...extended]),
     );
     this.entityCount += 1;
   }
@@ -252,7 +255,7 @@ export class Dxf2000Writer {
       [21, s],
       [31, 0],
     ]);
-    const widest = Math.max(...content.split(/\r?\n/).map((line) => line.length));
+    const widest = maxOf(content.split(/\r?\n/).map((line) => line.length));
     this.extendByTextBox(at, height, widest, anchor, rotation);
   }
 

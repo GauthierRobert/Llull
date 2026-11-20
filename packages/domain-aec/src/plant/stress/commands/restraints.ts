@@ -63,7 +63,7 @@ export const addStressRestraint = defineCommand({
       return fail('PST_PARAM_INVALID', 'a translational restraint needs exactly one of axis and direction', [model.id], ['axis']);
     if (params.kind !== 'translational' && (params.axis !== undefined || params.direction !== undefined || params.oneWay !== undefined))
       return fail('PST_PARAM_INVALID', 'axis, direction and oneWay apply to translational restraints only', [model.id], ['axis']);
-    if (params.direction !== undefined && !(Math.hypot(...params.direction) > 1e-9))
+    if (params.direction !== undefined && !(Math.hypot(params.direction[0], params.direction[1], params.direction[2]) > 1e-9))
       return fail('PST_PARAM_INVALID', 'direction must be a non-zero vector', [model.id], ['direction']);
     if (params.direction !== undefined && (params.frictionCoefficient ?? 0) > 0)
       return fail('PST_PARAM_INVALID', 'friction is modelled on axis-aligned restraints only', [model.id], ['frictionCoefficient']);

@@ -106,7 +106,9 @@ function valveSlot(env: Env, { comp, dnIn }: Located, mint: Mint): Slot | Deriva
       const faces: readonly [Vec3, Vec3] = [at(centre, u, -length / 2), at(centre, u, length / 2)];
       const port = (position: Vec3, direction: Vec3): PartPort => ({ position, direction, dn: dnIn, endType: end, ...face });
       const stem =
-        comp.stemDirection !== undefined && Math.hypot(...comp.stemDirection) > 0 ? unitVector(comp.stemDirection) : defaultStem(u);
+        comp.stemDirection !== undefined && Math.hypot(comp.stemDirection[0], comp.stemDirection[1], comp.stemDirection[2]) > 0
+          ? unitVector(comp.stemDirection)
+          : defaultStem(u);
       const valve = partOf(run.id, valveId, 'valve', row, [port(faces[0], scale3(u, -1)), port(faces[1], u)], {
         centre,
         componentId: comp.id,

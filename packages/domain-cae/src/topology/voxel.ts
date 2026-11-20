@@ -7,6 +7,7 @@ import type { Triangle } from '@core/geometry/triangles';
 import { is3D, type CadDocument, type Vec3 } from '@core/model/types';
 import { TOPOLOGY_VOXEL_CAP } from './defaults';
 import { pow } from '@lib/pow';
+import { appendAll } from '@lib/appendAll';
 
 /** World axes (x = 0, y = 1, z = 2) of grid directions i, j, k. A 2D study's k is the out-of-plane axis (one layer). */
 type GridAxes = readonly [number, number, number];
@@ -45,7 +46,7 @@ export function domainTriangles(doc: CadDocument, entityIds: readonly string[]):
       return { code: 'TOP_DOMAIN_INVALID', message: `'${id}' is not an existing 3D solid`, ids: [id] };
     const own = entityToTriangles(entity, doc);
     if (own.length === 0) return { code: 'TOP_DOMAIN_INVALID', message: `'${id}' has no faceted surface`, ids: [id] };
-    triangles.push(...own);
+    appendAll(triangles, own);
   }
   return triangles.length === 0 ? { code: 'TOP_DOMAIN_INVALID', message: 'the design domain is empty', ids: [] } : triangles;
 }

@@ -23,6 +23,7 @@ import {
 } from './meshCommon';
 import { faceGroupSelection, faceGroupsParam, meshOfFaces } from './faceGroupRegion';
 import { pow } from '../../lib/pow';
+import { appendAll } from '../../lib/appendAll';
 
 const DEFAULT_ITERATIONS = 10;
 const MAX_ITERATIONS = 30;
@@ -213,7 +214,7 @@ export const fitSubdivisionToMesh = defineCommand({
     const positions: number[] = [];
     for (let i = 0; i < world.positions.length; i += 3) {
       const point: Vec3 = [world.positions[i] as number, world.positions[i + 1] as number, world.positions[i + 2] as number];
-      positions.push(...inverseEulerXYZ(sub3(point, entity.position), entity.rotation));
+      appendAll(positions, inverseEulerXYZ(sub3(point, entity.position), entity.rotation));
     }
     const target: MeshData = { positions, indices: world.indices };
     const smoothing = params.smoothing ?? DEFAULT_SMOOTHING;

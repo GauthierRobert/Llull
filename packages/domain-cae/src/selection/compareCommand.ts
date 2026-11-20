@@ -22,6 +22,7 @@ import {
 } from './inputs';
 import { normaliseWeights, paretoSet, rankScored } from './rank';
 import type { Excluded, IndexResult, SelIssue } from './types';
+import { appendAll } from '@lib/appendAll';
 
 const COMMAND = 'compare_materials';
 
@@ -132,11 +133,14 @@ export const compareMaterials = defineCommand({
       }
       const failures = outcomes.flatMap((outcome) => (outcome.kind === 'fail' ? [outcome.failure] : []));
       if (failures.length > 0) {
-        failed.push(...failures);
+        appendAll(failed, failures);
         continue;
       }
       const results = evaluated.filter((entry): entry is IndexResult => !isExcluded(entry));
-      constraintInputs.push(...outcomes.flatMap((outcome) => (outcome.kind === 'pass' ? [{ input: outcome.use }] : [])));
+      appendAll(
+        constraintInputs,
+        outcomes.flatMap((outcome) => (outcome.kind === 'pass' ? [{ input: outcome.use }] : [])),
+      );
       survivors.push({ item: results, id: material, values: results.map((result) => result.value) });
     }
     const ranked = rankScored(survivors, weights.value).map((entry) => ({

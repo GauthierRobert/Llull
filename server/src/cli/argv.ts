@@ -1,6 +1,7 @@
 /** argv parsing for the `llull` CLI. No I/O. */
 
 import { DEFAULT_DOCUMENT_PATH } from '@protocol/documentFiles';
+import { appendAll } from '@lib/appendAll';
 
 /** Flags that never take a value (`--json`, not `--json yes`). */
 const BOOLEAN_FLAGS: ReadonlySet<string> = new Set(
@@ -22,7 +23,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index] ?? '';
     if (arg === '--') {
-      positionals.push(...argv.slice(index + 1));
+      appendAll(positionals, argv.slice(index + 1));
       break;
     }
     if (arg === '-h') {

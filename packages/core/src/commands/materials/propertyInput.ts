@@ -36,6 +36,7 @@ export interface PropertyInput {
   readonly temperature?: TemperatureInput | undefined;
   readonly source?: { readonly [K in keyof Provenance]?: string | undefined } | undefined;
   readonly preferred?: boolean | undefined;
+  readonly testMethod?: string | undefined;
   readonly id?: string | undefined;
 }
 
@@ -70,12 +71,13 @@ export function inputProblem(input: PropertyInput): InputProblem | null {
   return null;
 }
 
-/** Condition of the value: thickness range, e/D and exposure time. */
+/** Condition of the value: thickness range, e/D, exposure time and test method. */
 export function conditionOf(input: PropertyInput): PropertyCondition | undefined {
   const condition: PropertyCondition = {
     ...(input.thickness !== undefined ? { thickness: input.thickness } : {}),
     ...(input.edOverD !== undefined ? { edOverD: input.edOverD } : {}),
     ...(input.temperature?.exposureHours !== undefined ? { exposureHours: input.temperature.exposureHours } : {}),
+    ...(input.testMethod !== undefined ? { testMethod: input.testMethod } : {}),
   };
   return Object.keys(condition).length > 0 ? condition : undefined;
 }
@@ -92,6 +94,7 @@ export function modelIdFor(input: PropertyInput, taken: ReadonlySet<string>): st
     ...(input.thickness !== undefined ? [`t${roundTrip(input.thickness.min)}-${roundTrip(input.thickness.max)}`] : []),
     ...(input.edOverD !== undefined ? [`ed${roundTrip(input.edOverD)}`] : []),
     ...(input.temperature !== undefined ? [input.temperature.mode === 'percentOfRT' ? 'Tpct' : 'T'] : []),
+    ...(input.testMethod !== undefined ? [input.testMethod] : []),
   ];
   const base = parts.join('.');
   if (!taken.has(base)) return base;

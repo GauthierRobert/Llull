@@ -3,6 +3,7 @@
 import type { Vec2 } from '../../model/vectors';
 import type { DrawingView, ProjectionAngle, ViewDirection } from '../../model/sheet';
 import { niceStep } from '../../lib/niceStep';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export interface Area {
   readonly x: number;
@@ -122,8 +123,8 @@ const sum = (values: ReadonlyArray<number>): number => values.reduce((total, val
 function measure(cells: ReadonlyArray<Cell>): { cols: number[]; rows: number[]; colWidths: number[]; rowHeights: number[] } {
   const cols = [...new Set(cells.map((cell) => cell.col))].sort((a, b) => a - b);
   const rows = [...new Set(cells.map((cell) => cell.row))].sort((a, b) => a - b);
-  const colWidths = cols.map((col) => Math.max(...cells.filter((cell) => cell.col === col).map((cell) => cell.sized.boxWidth)));
-  const rowHeights = rows.map((row) => Math.max(...cells.filter((cell) => cell.row === row).map((cell) => cell.sized.boxHeight)));
+  const colWidths = cols.map((col) => maxOf(cells.filter((cell) => cell.col === col).map((cell) => cell.sized.boxWidth)));
+  const rowHeights = rows.map((row) => maxOf(cells.filter((cell) => cell.row === row).map((cell) => cell.sized.boxHeight)));
   return { cols, rows, colWidths, rowHeights };
 }
 
@@ -168,7 +169,7 @@ function arrange(auto: ReadonlyArray<Sized>, { angle, limit, floatingIso = false
     }
     const parentId = sized.item.view.section?.parentViewId ?? sized.item.view.detail?.parentViewId;
     const parentRow = cells.find((cell) => cell.sized.item.view.id === parentId)?.row ?? 0;
-    const beside: Cell = { sized, col: Math.max(-1, ...cells.map((cell) => cell.col)) + 1, row: cells.length > 0 ? parentRow : 0 };
+    const beside: Cell = { sized, col: Math.max(-1, maxOf(cells.map((cell) => cell.col))) + 1, row: cells.length > 0 ? parentRow : 0 };
     if (cells.length === 0 || !fitsLimit([...cells, beside], limit)) continue;
     cells.push(beside);
     extras.splice(extras.indexOf(sized), 1);
@@ -177,7 +178,7 @@ function arrange(auto: ReadonlyArray<Sized>, { angle, limit, floatingIso = false
   const gridWidth = cells.length > 0 ? sum(colWidths) : 0;
   const gridHeight = cells.length > 0 ? sum(rowHeights) : 0;
   const extrasWidth = extras.length > 0 ? sum(extras.map((sized) => sized.boxWidth)) : 0;
-  const extrasHeight = Math.max(0, ...extras.map((sized) => sized.boxHeight));
+  const extrasHeight = Math.max(0, maxOf(extras.map((sized) => sized.boxHeight)));
   const width = Math.max(gridWidth, extrasWidth);
   const height = gridHeight + (cells.length > 0 && extras.length > 0 ? GAP : 0) + extrasHeight;
   const centers = new Map<Sized, Vec2>();

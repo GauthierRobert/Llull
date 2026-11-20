@@ -1,5 +1,6 @@
 /** Which way an unsettled joint speed is going, so the warning can say it (a decelerating flywheel is not "accelerating"). */
 
+import { maxOf, minOf } from '@lib/arrayExtrema';
 export type SpeedTrend =
   | { readonly kind: 'accelerating' | 'decelerating'; readonly changeFraction: number }
   | { readonly kind: 'amplitude_decaying' | 'amplitude_growing'; readonly changeFraction: number }
@@ -13,7 +14,7 @@ const MIN_PEAK = 0.2;
 /** |v| at its local maxima (the speed peaks of an oscillation, in time order). */
 function speedPeaks(velocity: readonly number[]): number[] {
   const magnitude = velocity.map(Math.abs);
-  const largest = Math.max(...magnitude);
+  const largest = maxOf(magnitude);
   return magnitude.flatMap((m, i) =>
     i > 0 && i < magnitude.length - 1 && m > (magnitude[i - 1] ?? 0) && m >= (magnitude[i + 1] ?? 0) && m >= MIN_PEAK * largest ? [m] : [],
   );
@@ -26,7 +27,7 @@ function speedPeaks(velocity: readonly number[]): number[] {
 export function speedTrend(velocity: readonly number[]): SpeedTrend {
   const n = velocity.length;
   const late = velocity.slice(Math.floor(n * 0.4));
-  if (Math.min(...late) < 0 && Math.max(...late) > 0) {
+  if (minOf(late) < 0 && maxOf(late) > 0) {
     const peaks = speedPeaks(velocity);
     const now = peaks[peaks.length - 1] ?? 0;
     const before = peaks[peaks.length - 3] ?? peaks[peaks.length - 2];

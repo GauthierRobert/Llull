@@ -11,6 +11,7 @@ import { sig } from '../shared/results';
 import { refuseCmp } from './codes';
 import { flatPiecesOf } from './flatPieces';
 import { compositesOf, findPart, findPly, pliesOf } from './state';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const GAP_MM = 10;
 const LABEL_FIELDS = ['name', 'orientation', 'sequence', 'material'] as const;
@@ -103,8 +104,8 @@ export const exportFlatPatternsDxf = defineCommand({
         const centre = polygonCentroid(grown);
         const xs = grown.map(([x]) => x * scale);
         const ys = grown.map(([, y]) => y * scale);
-        const [minX, minY] = [Math.min(...xs), Math.min(...ys)];
-        const [width, height] = [Math.max(...xs) - minX, Math.max(...ys) - minY];
+        const [minX, minY] = [minOf(xs), minOf(ys)];
+        const [width, height] = [maxOf(xs) - minX, maxOf(ys) - minY];
         const place = ([x, y]: Vec2): Vec2 => [x * scale - minX + cursor, y * scale - minY];
         writer.polyline(layer, grown.map(place), true);
         const direction = fibre;

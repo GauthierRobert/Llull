@@ -13,6 +13,7 @@ import { PLANT_EQUIPMENT_SCHEMA } from '../plantData';
 import { asmeThickness, type CodeFinding } from './asme';
 import { COVERAGE_CODES, issuesOf, warning, type ElementCheck, type Found } from './findings';
 import { nozzleFindings } from './nozzleFindings';
+import { appendAll } from '@lib/appendAll';
 
 const ELLIPSOIDAL: HeadSpec = { type: 'ellipsoidal', ratio: 2 };
 const FLAT: HeadSpec = { type: 'flat' };
@@ -181,6 +182,6 @@ export function checkExchanger(element: EquipmentElement, mmPerUnit: number): El
       );
   if (template.tubes.wallUnverified)
     found.push(warning('EQP_TABLE_UNVERIFIED', `tube wall from a grade B table row (${template.tubes.wallSource})`, 'tubes.wallThickness'));
-  found.push(...nozzleFindings(template, plant.nozzles));
+  appendAll(found, nozzleFindings(template, plant.nozzles));
   return { issues: issuesOf(element, found), reviewRequired: true, reviewReason: EXCHANGER_REVIEW_REASON, notChecked: NOT_CHECKED };
 }

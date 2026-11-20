@@ -7,6 +7,7 @@ import { environmentPlugin } from '@cae/index';
 import { spaceEnvironmentErrors } from '@cae/environment/model';
 import { signingContext } from '../../helpers/signedPlantDoc';
 import { run, withMaterial, withPanel, emptyMm } from './fixtures';
+import { expectSignedReplayFollowsHistory } from '../../helpers/signedReplay';
 
 interface Item {
   key: string;
@@ -167,11 +168,28 @@ describe('approve_environment_deviation: the human gate (FR-ENV-13, VC-ENV-14)',
     expect(replayed.document.spaceEnvironment?.deviations?.[KEY]).toMatchObject({ decision: 'accepted', signer: 'alice' });
   });
 
-  it('a replay never invents a deviation: with the kept record gone the recorded step is refused', () => {
+  it('a replay never invents a deviation: with the kept record gone the recorded step re-applies nothing (and does not fail)', () => {
     const accepted = approve(failing(), { confirmation: { nonce: 'n1' } }).document;
     const stripped = { ...accepted, spaceEnvironment: { ...accepted.spaceEnvironment, deviations: {} } };
     const replayed = execute(stripped, 'replay_history', {}, signingContext);
+    expect(replayed.error, replayed.summary).toBeUndefined();
     expect(replayed.document.spaceEnvironment?.deviations?.[KEY]).toBeUndefined();
+  });
+
+  it('SIG-REPLAY: suppressing or deleting the approve step drops the deviation (the item fails again); unsuppressing does not restore it', () => {
+    const accepted = approve(failing(), { confirmation: { nonce: 'n1' } });
+    expect(accepted.error, accepted.summary).toBeUndefined();
+    const outcome = expectSignedReplayFollowsHistory(
+      accepted.document,
+      'approve_environment_deviation',
+      (next) => next.spaceEnvironment?.deviations?.[KEY],
+      signingContext,
+    );
+    for (const next of [outcome.suppressed, outcome.deleted, outcome.restored]) {
+      const item = check(next).items.find((candidate) => candidate.key === KEY);
+      expect(item?.status).toBe('fail');
+      expect(item?.deviation).toBeUndefined();
+    }
   });
 
   it('a recorded confirmation outside a replay is no signature', () => {

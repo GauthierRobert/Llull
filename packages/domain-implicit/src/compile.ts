@@ -19,6 +19,8 @@ import { primitiveField } from './primitives';
 import { type ScalarPart, compileScalar } from './scalar';
 import { feResultInput, topologyDensityInput } from './sampledInputs';
 import { closedSolidMesh } from './solidMesh';
+import { appendAll } from '@lib/appendAll';
+import { minOf } from '@lib/arrayExtrema';
 
 export type { CompileFailure, CompileWarning } from './compileTypes';
 
@@ -133,7 +135,7 @@ class Compiler implements CompileHost {
       case 'primitive': {
         const local = placeFrame(b, frame, node.position, node.rotation, 1);
         const { reg, box } = primitiveField(b, node, local);
-        this.features.push(...primitiveFeatures(node));
+        appendAll(this.features, primitiveFeatures(node));
         return { reg, quality: 'exact', lipschitz: 1, box: box === null ? null : placeBox(box, node.position, node.rotation, 1) };
       }
       case 'solid': {
@@ -279,7 +281,7 @@ function primitiveFeatures(node: Extract<FieldNode, { op: 'primitive' }>): numbe
       return [get('radius')];
     case 'box': {
       const size = node.dims['size'];
-      return Array.isArray(size) ? [Math.min(...(size as number[])) / 2] : [];
+      return Array.isArray(size) ? [minOf(size as number[]) / 2] : [];
     }
     case 'cylinder':
     case 'cone':
@@ -307,7 +309,7 @@ function finishCompile(compiler: Compiler, root: () => Part | ScalarPart): Compi
       program,
       warnings: compiler.warnings,
       unverified: compiler.unverified,
-      minFeature: compiler.features.length === 0 ? Infinity : Math.min(...compiler.features),
+      minFeature: compiler.features.length === 0 ? Infinity : minOf(compiler.features),
       nodes: compiler.visited,
       ...(solid ? {} : { scalarRange: { lo: part.lo, hi: part.hi } }),
     };

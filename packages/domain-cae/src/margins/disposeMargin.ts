@@ -8,7 +8,8 @@ import { analysisIdSchema } from '../shared/schemas';
 import { analysisInputHash } from '../hash/inputHash';
 import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
-import { keptDisposition, verifiedSigner, withDispositionLedgered } from '../shared/dispositionLedger';
+import { keptDisposition, replayedWithoutEntry, verifiedSigner, withDispositionLedgered } from '../shared/dispositionLedger';
+import { notReapplied } from '../shared/signedGate';
 import { marginDispositionPayload } from './disposition';
 import { marginQueryShape, marginTable } from './computeMargins';
 import { refuseMarginsAs } from './refusal';
@@ -20,7 +21,7 @@ import { refuseMarginsAs } from './refusal';
  *   `ctx.humanSignature` over sha256 of (analysisId, rowKey, status, ms, decision, justification, resultsHash, documentUid) and spent LAST (a refusal
  *   never burns it, a retry of a used one is FEA_HUMAN_GATE): the decision binds to the row as computed now, to the current results hash and to this document
  *   (its uid, recorded with the disposition and re-verified by compute_margins), and ends when the case is solved again; a replay honours a recorded step
- *   only from `analysis.dispositionLedger` (kept by replaySeed; same case, row, decision, justification, results and this document's uid, its signature
+ *   only from `analysis.dispositionLedger` (kept by replaySeed while its stamped step is live, none kept for the row: a no-op, pending; same case, row, decision, justification, results and this document's uid, its signature
  *   re-verified when a port is installed), spends nothing, and a document with another uid loses it
  * @failure a signature is single-use and its payload has no nonce (signing kind `payload`): once the act is undone, the same signature cannot be spent again, so the reviewer re-signs with the justification reworded;
  *   with NO port a replay trusts the ledger (the record of an act a verified human made here); no signing port, no signature or a signature that does not verify -> FEA_HUMAN_GATE (an agent caller always lands here); unknown analysis
@@ -84,6 +85,8 @@ export const disposeMargin = defineCommand({
       justification,
       resultsHash,
     });
+    if (replayedWithoutEntry(doc, ctx, confirmation, { act: 'dispose_margin', analysisId, rowKey }))
+      return notReapplied(doc, 'dispose_margin', rowId);
     // verify only (nothing spent): the signature is spent last, once no other refusal can follow
     const signed = verifiedSigner(port, kept, confirmation, payloadFor, documentIdentity(doc));
     if (signed === null)
@@ -106,7 +109,7 @@ export const disposeMargin = defineCommand({
     const next = { ...table.analysis, dispositions: { ...table.analysis.dispositions, [rowKey]: disposition } };
     return changed(
       kept === undefined
-        ? withDispositionLedgered(withCase(doc, next), { ...disposition, act: 'dispose_margin', analysisId, rowKey, signature })
+        ? withDispositionLedgered(withCase(doc, next), { ...disposition, act: 'dispose_margin', analysisId, rowKey, signature }, ctx)
         : withCase(doc, next),
       `dispose_margin: '${rowId}' (${rowKey}) ${row.status} ${decision} by ${signed.signer} (signature ${signed.signatureId}) on results ${resultsHash.slice(0, 12)}; the status stays ${row.status}.`,
       [analysisId],

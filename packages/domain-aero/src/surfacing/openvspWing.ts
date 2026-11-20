@@ -8,6 +8,7 @@ import type { Vec3 } from '@core/model/types';
 import { briefNumbers, sig } from '../shared/results';
 import { refuseAero } from './codes';
 import { findAll, parameter, parseXml, type XmlNode } from './vspXml';
+import { appendAll } from '@lib/appendAll';
 
 interface Segment {
   readonly span: number;
@@ -138,7 +139,7 @@ export const importOpenvspWing = defineCommand({
       const made = execute(current, 'airfoil_from_naca', { designation }, ctx);
       if (made.affected.length === 0) return refuse('AERO_PARAM_INVALID', `airfoil ${designation}: ${made.summary}`, 'fallbackNaca');
       current = made.document;
-      created.push(...made.affected);
+      appendAll(created, made.affected);
       airfoilIds.set(designation, made.affected[0] as string);
     }
     const [rootGroup] = groupNamed(chosen.node, /^XSec_0$/);

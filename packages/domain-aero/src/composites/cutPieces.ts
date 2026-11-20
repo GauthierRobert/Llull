@@ -4,6 +4,8 @@ import type { PlyCut } from '@core/model/composites';
 import type { Vec2 } from '@core/model/types';
 import { pointInPolygon, polygonArea, projectOntoSegment, segmentIntersection, signedArea, toCounterClockwise } from '@lib/polygon';
 import { clipToConvex, isConvex, unionPolygons } from '@lib/polygonBoolean';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 type Segment = readonly [Vec2, Vec2];
 
@@ -122,7 +124,7 @@ export function cutPieces(boundary: readonly (readonly Vec2[])[], cuts: readonly
   if (cuts.length === 0) return boundary.map((polygon) => toCounterClockwise(polygon));
   const xs = boundary.flatMap((polygon) => polygon.map(([x]) => x));
   const ys = boundary.flatMap((polygon) => polygon.map(([, y]) => y));
-  const size = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1e-9);
+  const size = Math.max(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys), 1e-9);
   const q = size * 1e-7;
   const eps = size * 1e-9;
   const pieces: Vec2[][] = [];
@@ -134,13 +136,9 @@ export function cutPieces(boundary: readonly (readonly Vec2[])[], cuts: readonly
       const mid: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
       return pointInPolygon(mid, ring) || edges.some((edge) => parameterOn(mid, edge, eps * 10) !== null);
     });
-    pieces.push(...faces(cutEdges, q));
+    appendAll(pieces, faces(cutEdges, q));
   }
-  pieces.sort(
-    (a, b) =>
-      Math.min(...a.map(([x]) => x)) - Math.min(...b.map(([x]) => x)) ||
-      Math.min(...a.map(([, y]) => y)) - Math.min(...b.map(([, y]) => y)),
-  );
+  pieces.sort((a, b) => minOf(a.map(([x]) => x)) - minOf(b.map(([x]) => x)) || minOf(a.map(([, y]) => y)) - minOf(b.map(([, y]) => y)));
   for (const cut of cuts) {
     if (cut.kind !== 'splice' || cut.overlap === undefined || cut.overlap <= 0) continue;
     const index = sidePiece(pieces, cut.path, size * 1e-4, 1);
@@ -162,7 +160,7 @@ export interface CutFace {
 }
 
 const edgeDistance = (point: Vec2, polygon: readonly Vec2[]): number =>
-  Math.min(...polygon.map((a, k) => projectOntoSegment(point, a, polygon[(k + 1) % polygon.length] as Vec2).distance));
+  minOf(polygon.map((a, k) => projectOntoSegment(point, a, polygon[(k + 1) % polygon.length] as Vec2).distance));
 
 const strictlyInside = (point: Vec2, polygon: readonly Vec2[]): boolean =>
   pointInPolygon(point, polygon) && edgeDistance(point, polygon) > 1e-9;

@@ -9,6 +9,9 @@ import { dcMotorProblem, driveProblem, driveReferenceProblems, profileProblem } 
 import { lossesProblem, propellerExtrasProblem } from './engineValidation';
 import { referenceSeriesBudgetProblems, referenceSeriesProblem, referenceSeriesReferenceProblems } from './referenceSeriesValidation';
 import { jointPhysicsProblem, loadScheduleProblem, transmissionProblem, transmissionReferenceProblems } from './transmissionsValidation';
+import { appendAll } from '../../lib/appendAll';
+import { inertiaProblem } from '../../lib/inertiaProblem';
+import type { Symmetric3 } from '../../lib/symmetricEigen';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
 const isNonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
@@ -27,7 +30,9 @@ const bodyProblem: Check = (body) =>
         ? 'density / massKg must be positive numbers'
         : !isOptional(body['inertiaKgM2'], isInertia)
           ? 'inertiaKgM2 must be 6 finite numbers [Ixx, Iyy, Izz, Ixy, Ixz, Iyz]'
-          : null;
+          : body['inertiaKgM2'] === undefined
+            ? null
+            : inertiaProblem(body['inertiaKgM2'] as Symmetric3);
 
 const jointProblem: Check = (joint) =>
   joint['kind'] !== 'revolute' && joint['kind'] !== 'prismatic' && joint['kind'] !== 'spherical'
@@ -207,11 +212,11 @@ export function dynamicsProblems(value: unknown): string[] {
       }
     }
   }
-  errors.push(
+  appendAll(errors, [
     ...driveReferenceProblems(value),
     ...transmissionReferenceProblems(value),
     ...referenceSeriesReferenceProblems(value),
     ...referenceSeriesBudgetProblems(value),
-  );
+  ]);
   return errors;
 }

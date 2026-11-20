@@ -10,6 +10,7 @@ import { roundTo } from '../../lib/compactNumber';
 import { add3, distance3, dot3, scale3, sub3 } from '../../lib/vec3';
 import { type Group, type Model, distanceToAxis, edgesOf, outwardNormal } from './model';
 import type { RecognizedHole } from './types';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** A countersink shallower than this fraction of the bore diameter could be a chamfer: reported as ambiguous. */
 const CHAMFER_MAX_RATIO = 0.1;
@@ -126,7 +127,7 @@ function segmentsOf(model: Model, part: readonly Group[], entrance: OpenEnd, dep
     const depths = edgesOf(model, group)
       .flatMap((edge) => model.edgePoints(edge))
       .map((point) => dot3(sub3(point, entrance.point), depthDirection));
-    return { group, from: Math.min(...depths), to: Math.max(...depths) };
+    return { group, from: minOf(depths), to: maxOf(depths) };
   });
 }
 

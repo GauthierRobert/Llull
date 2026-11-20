@@ -7,6 +7,8 @@
 import type { CadDocument, FeatureStep } from '../../model/types';
 import { canonicalJson } from '../../lib/canonicalJson';
 import { isRecord } from '../../lib/isRecord';
+import { stepKeyOf } from '../../lib/id';
+import { stepKeysOf } from '../../model/mergedStepKeys';
 import { currentContext } from '../context';
 import { defineCommand, z } from '../schema';
 import { kernelRefusal } from '../kernelRefusal';
@@ -26,7 +28,7 @@ const fingerprint = (doc: CadDocument): string => canonicalJson({ ...doc, featur
 
 /**
  * @affects replaces featureHistory steps from..to by ONE `build_project` step carrying their commands; entities and every other definition are unchanged
- * @invariant replaying the new history reproduces the current document exactly (entities, order, ids); the merged step keeps the id of the first step; nextStepNumber is unchanged (step numbers are never reused)
+ * @invariant replaying the new history reproduces the current document exactly (entities, order, ids); the merged step keeps the id of the first step and lists the other keys in mergedStepKeys; nextStepNumber is unchanged (step numbers are never reused)
  * @failure unknown step id, from after to, a single step, a suppressed step in the range, a failing replay, a kernel step without a kernel, or a merge that would change the document (typically it creates entities or elements whose ids come from the step number) -> no-op, history unchanged
  */
 export const squashSteps = defineCommand({
@@ -54,12 +56,15 @@ export const squashSteps = defineCommand({
     if (suppressed !== undefined)
       return noop(doc, `${COMMAND}: step '${suppressed.id}' is suppressed; un-suppress or exclude it. History unchanged.`);
     const first = range[0] as FeatureStep;
+    // every key of the range (and what earlier squashes merged) stays live: signed records stamped by a later step of the range keep their step (SIG-REPLAY)
+    const mergedStepKeys = [...new Set(range.flatMap(stepKeysOf))].filter((key) => key !== stepKeyOf(first.id));
     const merged: FeatureStep = {
       id: first.id,
       name: 'build_project',
       params: { actions: range.flatMap(actionsOf) },
       suppressed: false,
       affected: [...new Set(range.flatMap((step) => step.affected ?? []))],
+      mergedStepKeys,
       ...(label === undefined ? (first.label === undefined ? {} : { label: first.label }) : { label }),
     };
     const next = [...history.slice(0, from), merged, ...history.slice(to + 1)];

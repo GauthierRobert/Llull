@@ -11,6 +11,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { hostVersion } from './hostVersion';
 
 export type CrashSource = 'server-uncaught-exception' | 'server-unhandled-rejection' | 'command-threw' | 'desktop-main';
 
@@ -130,15 +131,6 @@ function errorText(error: unknown): string {
   }
 }
 
-function serverVersion(): string {
-  try {
-    const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8')) as { version?: unknown };
-    return typeof manifest.version === 'string' ? manifest.version : 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
-
 function freeReportId(directory: string, now: number): string {
   const base = new Date(now).toISOString().replace(/:/g, '-');
   let id = base;
@@ -192,7 +184,7 @@ export function writeCrashReport(input: CrashReportInput, options: WriteOptions)
       id,
       time: new Date(now).toISOString(),
       source: input.source,
-      appVersion: input.appVersion ?? serverVersion(),
+      appVersion: input.appVersion ?? hostVersion(),
       versions: Object.fromEntries(
         (['node', 'v8', 'electron', 'chrome'] as const).flatMap((key) => {
           const value = process.versions[key];

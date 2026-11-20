@@ -4,8 +4,9 @@
  */
 
 import { convertValue, isUnitFailure, parseUnit, sameDimension } from '../lib/quantity';
+import { linearBoundsProblem } from './propertyLinearBounds';
 import { catalogEntry } from './propertyCatalog';
-import { formVariables, type PropertyForm, type PropertyModel } from './propertyModel';
+import { formVariables, TEST_METHOD_PATTERN, type PropertyForm, type PropertyModel } from './propertyModel';
 
 export interface ModelProblem {
   readonly code: string;
@@ -101,6 +102,10 @@ function formProblem(form: PropertyForm, path: string, knownModelIds: ReadonlySe
       return Number.isFinite(form.preFactor) && Number.isFinite(form.activationEnergyJPerMol)
         ? null
         : invalid('preFactor', 'must be finite');
+    case 'linearCoefficient':
+      return finite([form.referenceValue, form.coefficient, form.reference])
+        ? null
+        : invalid('coefficient', 'referenceValue, coefficient and reference must be finite');
     case 'powerLaw':
       return form.reference > 0 && finite([form.coefficient, form.exponent]) ? null : invalid('reference', 'reference must be > 0');
     case 'rateFactor':
@@ -160,6 +165,13 @@ export function modelProblem(model: PropertyModel, otherModelIds: ReadonlySet<st
   if (model.provenance.citation === undefined && model.provenance.sourceId === undefined) {
     return problem('MAT_PROVENANCE_MISSING', 'model.source', 'give source.citation (and locator / url / accessed)');
   }
+  const testMethod: unknown = model.condition?.testMethod;
+  if (testMethod !== undefined && (typeof testMethod !== 'string' || !TEST_METHOD_PATTERN.test(testMethod)))
+    return problem(
+      'PROP_FORM_INVALID',
+      'model.condition.testMethod',
+      'testMethod is a token like ASTM_E595 (letters, digits, _ . -; at most 64)',
+    );
   const formIssue = formProblem(model.form, 'model.form', otherModelIds);
   if (formIssue !== null) return formIssue;
   if (entry.range !== undefined) {
@@ -201,7 +213,7 @@ export function modelProblem(model: PropertyModel, otherModelIds: ReadonlySet<st
   }
   const coverage = coverageProblem(model);
   if (coverage !== null) return coverage;
-  return null;
+  return linearBoundsProblem(model, entry);
 }
 
 /** Forms that read T as an absolute temperature (logarithms, powers, exp(−Q/RT)). */

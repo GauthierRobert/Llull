@@ -26,6 +26,7 @@ import { HELP_TOPICS, USAGE, helpTopic } from './usage';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
+import { compareExpectedCli } from './compareExpected';
 import { PlmUsage, confirmedParams, runPlmCli } from './plm';
 import { runVault } from './vault';
 import { runPackCli } from './pack';
@@ -501,6 +502,8 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
           { stdout: io.stdout, cwd: process.cwd() },
         );
       }
+      case 'compare_expected':
+        return compareExpectedCli(args.positionals.slice(1), { json: booleanFlag(args, 'json') }, { ...io, cwd: process.cwd() });
       case 'fuzz':
         return await hostCommand(() => fuzzCli(args, io));
       case 'fuzz-one':

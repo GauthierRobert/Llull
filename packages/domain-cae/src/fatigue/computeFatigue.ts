@@ -13,6 +13,7 @@ import { evaluateFeCase } from './feHotspots';
 import { item, REVIEW_NOTE, statusOfItems, type Item } from './items';
 import { meanModelName, walkerGamma } from './meanInputs';
 import { fatigueCaseOf } from './store';
+import { appendAll } from '@lib/appendAll';
 
 /** The row fields every result row shares (history row or FE hot spot). */
 function rowOf(fatigueCase: FatigueCase, evaluation: Evaluation): Record<string, unknown> {
@@ -199,7 +200,7 @@ export const checkFatigue = defineCommand({
         : evaluateFeCase(doc, fatigueCase, ctx?.feaArtifacts, false, params.acceptInadequateMesh === true);
     if (isEvaluationFailure(evaluation))
       items.push(item(evaluation.code, 'error', evaluation.message, 'see the command description of compute_fatigue', evaluation.ids));
-    else items.push(...evaluation.items);
+    else appendAll(items, evaluation.items);
     const status = statusOfItems(items);
     return report(
       doc,

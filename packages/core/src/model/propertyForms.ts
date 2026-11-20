@@ -147,6 +147,12 @@ export function evaluateForm(form: PropertyForm, at: Point, wrt?: PropertyVariab
       const value = pow(10, exponent);
       return withDerivative(value, wantsFor(form.variable) ? (value * slope) / x : 0, wrt !== undefined);
     }
+    case 'linearCoefficient': {
+      const x = read(form.variable);
+      if (x === undefined) return missing(form.variable);
+      const value = form.referenceValue * (1 + form.coefficient * (x - form.reference));
+      return withDerivative(value, wantsFor(form.variable) ? form.referenceValue * form.coefficient : 0, wrt !== undefined);
+    }
     case 'nistRational':
       return nistRational(form, at, wrt);
     case 'arrhenius': {

@@ -9,6 +9,8 @@ import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
 import { revolutionAxisIndex } from './revolution';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
+import { maxOf, minOf } from '../lib/arrayExtrema';
+import { appendAll } from '../lib/appendAll';
 
 /** World-space axis-aligned bounding box. */
 export interface Bounds {
@@ -45,7 +47,7 @@ const LINE_SPACING_RATIO = 1.2;
  */
 export function textLocalBounds(e: TextEntity): Bounds {
   const lines = e.content.split('\n');
-  const width = Math.max(...lines.map((line) => line.length)) * e.height * GLYPH_WIDTH_RATIO;
+  const width = maxOf(lines.map((line) => line.length)) * e.height * GLYPH_WIDTH_RATIO;
   const blockHeight = e.height * (1 + (lines.length - 1) * LINE_SPACING_RATIO);
   const left = e.anchor === 'center' ? -width / 2 : e.anchor === 'right' ? -width : 0;
   return bounds([left, -blockHeight / 2, 0], [left + width, blockHeight / 2, 0]);
@@ -94,8 +96,8 @@ function arcExtent(rMin: number, rMax: number, angle: number): [[number, number]
   const ys = thetas.flatMap((t) => [rMin * Math.sin(t), rMax * Math.sin(t)]);
   const snap = (n: number): number => (Math.abs(n) < 1e-12 ? 0 : n);
   return [
-    [snap(Math.min(...xs)), snap(Math.max(...xs))],
-    [snap(Math.min(...ys)), snap(Math.max(...ys))],
+    [snap(minOf(xs)), snap(maxOf(xs))],
+    [snap(minOf(ys)), snap(maxOf(ys))],
   ];
 }
 
@@ -139,9 +141,9 @@ export function localBounds(e: Entity): Bounds {
     case 'revolution': {
       // Radial extent follows the swept arc (from +X, counter-clockwise); axial extent from the profile.
       const radii = e.profile.map(([r]) => r);
-      const minAxial = Math.min(...e.profile.map(([, y]) => y));
-      const maxAxial = Math.max(...e.profile.map(([, y]) => y));
-      const [u, v] = arcExtent(Math.min(...radii), Math.max(...radii), e.angle);
+      const minAxial = minOf(e.profile.map(([, y]) => y));
+      const maxAxial = maxOf(e.profile.map(([, y]) => y));
+      const [u, v] = arcExtent(minOf(radii), maxOf(radii), e.angle);
       const axial = revolutionAxisIndex(e.axis);
       if (axial === 2) return bounds([u[0], v[0], minAxial], [u[1], v[1], maxAxial]);
       if (axial === 1) return bounds([u[0], minAxial, v[0]], [u[1], maxAxial, v[1]]);
@@ -315,7 +317,7 @@ export function instanceLocalCorners(doc: CadDocument, componentId: string, dept
   const corners: Vec3[] = [];
   for (const cid of component.order) {
     const child = component.entities[cid];
-    if (child) corners.push(...boundsCorners(entityBoundsInDoc(doc, child, depth + 1)));
+    if (child) appendAll(corners, boundsCorners(entityBoundsInDoc(doc, child, depth + 1)));
   }
   return corners;
 }

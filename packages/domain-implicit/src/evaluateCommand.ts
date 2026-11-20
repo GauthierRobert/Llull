@@ -7,6 +7,7 @@ import { resolveFieldEngine } from '@core/geometry/field/engine';
 import { refuseImplicit } from './codes';
 import { compileField } from './compile';
 import { fieldOf } from './model';
+import { appendAll } from '@lib/appendAll';
 
 const MAX_POINTS = 10_000;
 const MAX_GRID = 200;
@@ -66,7 +67,7 @@ export const evaluateField = defineCommand({
           point[u] = (min[0] as number) + (nu === 1 ? 0 : ((max[0] as number) - (min[0] as number)) * (i / (nu - 1)));
           point[v] = (min[1] as number) + (nv === 1 ? 0 : ((max[1] as number) - (min[1] as number)) * (j / (nv - 1)));
           point[w] = offset;
-          samples.push(...point);
+          appendAll(samples, point);
         }
     } else samples = [];
     const compiled = compileField(doc, p.field);

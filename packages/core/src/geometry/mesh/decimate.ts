@@ -14,6 +14,7 @@ import { EditMesh, normalOf } from './editMesh';
 import { meshDiagonal } from './weld';
 import { type SphereRegion, insideRegion } from './region';
 import { SurfaceIndex } from './surfaceIndex';
+import { appendAll } from '../../lib/appendAll';
 
 export interface DecimateParams {
   readonly targetTriangles?: number;
@@ -188,7 +189,7 @@ class Heap {
 
 function unitNormalOf(mesh: EditMesh, f: number): Vec3 | null {
   const n = mesh.faceNormal(f);
-  const l = Math.hypot(...n);
+  const l = Math.hypot(n[0], n[1], n[2]);
   return l > 0 ? [n[0] / l, n[1] / l, n[2] / l] : null;
 }
 
@@ -221,7 +222,7 @@ function penaliseEdge(mesh: EditMesh, quadrics: Quadric[], a: number, b: number,
   const [pa, pb] = [mesh.p(a), mesh.p(b)];
   const edge: Vec3 = [pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]];
   const side = normalOf([0, 0, 0], edge, n);
-  const l = Math.hypot(...side);
+  const l = Math.hypot(side[0], side[1], side[2]);
   if (l === 0) return;
   const k = planeQuadric([side[0] / l, side[1] / l, side[2] / l], pa, PENALTY);
   addInto(quadrics[a] as Quadric, k);
@@ -349,7 +350,7 @@ export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: M
         const after = normalOf(pos(x), pos(y), pos(z));
         const dotNormals = before[0] * after[0] + before[1] * after[1] + before[2] * after[2];
         // a normal or an area that is not a number (overflow) is no proof that the triangle survives: refused as a fold-over
-        const area = Math.hypot(...after) / 2;
+        const area = Math.hypot(after[0], after[1], after[2]) / 2;
         if (!(dotNormals > 0) || !(area > areaFloor)) return 'foldOver';
         fan.push([swap(x), swap(y), swap(z)]);
       }
@@ -409,7 +410,7 @@ export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: M
     addInto(sum, quadrics[removed] as Quadric);
     mesh.setP(kept, at);
     mesh.collapse(removed, kept);
-    (owned[kept] as number[]).push(...(owned[removed] as number[]));
+    appendAll(owned[kept] as number[], owned[removed] as number[]);
     owned[removed] = [];
     if (locked[removed] === 1) locked[kept] = 1;
     collapses++;

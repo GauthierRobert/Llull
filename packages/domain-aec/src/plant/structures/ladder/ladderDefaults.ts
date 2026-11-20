@@ -2,6 +2,7 @@
 
 import type { LadderFallProtection } from '@aec/building/types';
 import { ruleById, type RulesetName } from '../rules/ruleTable';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** OSHA 1910.28(b)(9): fixed ladders installed on or after this date need a ladder safety system or PFAS above the 24 ft threshold. */
 export const OSHA_LADDER_RULE_DATE = '2018-11-19';
@@ -17,8 +18,8 @@ export function pitchRange(rulesets: readonly RulesetName[]): { min: number; max
     ...(has(rulesets, 'osha_1910') ? [ruleById('OSHA-LAD-RUNG-PITCH')] : []),
   ];
   return {
-    min: Math.max(...rows.map((row) => row.min ?? 0)),
-    max: Math.min(...rows.map((row) => row.max ?? Infinity)),
+    min: maxOf(rows.map((row) => row.min ?? 0)),
+    max: minOf(rows.map((row) => row.max ?? Infinity)),
     basis: rows.map((row) => row.id).join(' + '),
   };
 }

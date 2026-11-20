@@ -88,9 +88,9 @@ export const MESH_READERS: readonly HostileReader[] = [
   {
     name: 'mesh: parseObj',
     covers: ['core/src/lib/meshFormats/obj.ts:parseObj'],
-    input: 'text',
+    input: 'bytes',
     build: objBuild,
-    read: (input) => parseObj(asText(input)),
+    read: (input) => parseObj(asBytes(input)),
     accepts: isOk,
   },
   {

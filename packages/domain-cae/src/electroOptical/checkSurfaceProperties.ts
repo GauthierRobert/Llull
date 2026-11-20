@@ -7,6 +7,7 @@ import type { CadDocument } from '@core/model/types';
 import { electroOpticalOf } from './model';
 import { isMissing, propertyOf } from './opticalProperty';
 import type { CoatingAssignment } from './types';
+import { appendAll } from '@lib/appendAll';
 
 type ItemStatus = 'pass' | 'warn' | 'fail';
 const RANK: Readonly<Record<ItemStatus, number>> = { pass: 0, warn: 1, fail: 2 };
@@ -62,8 +63,9 @@ function itemOf(doc: CadDocument, assignment: CoatingAssignment, ctx: ExecutionC
     });
   else {
     if (assignment.location === 'exposed') {
-      findings.push(
-        ...[
+      appendAll(
+        findings,
+        [
           propertyFinding(doc, assignment.coating, 'emissivityIr', { opticalKind: 'hemispherical_total' }, 'fail', ctx),
           propertyFinding(doc, assignment.coating, 'absorptivitySolar', { lifeState: 'BOL' }, 'fail', ctx),
           propertyFinding(doc, assignment.coating, 'absorptivitySolar', { lifeState: 'EOL' }, 'warn', ctx),

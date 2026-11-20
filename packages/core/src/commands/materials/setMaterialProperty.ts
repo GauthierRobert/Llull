@@ -93,7 +93,13 @@ export const setMaterialProperty = defineCommand({
     preferred: z
       .literal(true)
       .optional()
-      .describe('Mark as THE value for its key (at most one preferred per property, direction, basis, thickness, e/D).'),
+      .describe('Mark as THE value for its key (at most one preferred per property, direction, basis, thickness, e/D, test method).'),
+    testMethod: z
+      .string()
+      .optional()
+      .describe(
+        'Standard test method the value was measured with, a token such as ASTM_E595 or ECSS_Q_ST_70_02 (outgassing TML / CVCM / WVR / RML); stored in the model condition and compared by check_space_environment.',
+      ),
     id: z.string().optional().describe('Id of the value on the material (default derived from the key, e.g. "Ftu.L.A.t0p02-0p128").'),
     replace: z.boolean().optional().describe('Replace an existing value with the same id (default false: PROP_MODEL_EXISTS).'),
   }),

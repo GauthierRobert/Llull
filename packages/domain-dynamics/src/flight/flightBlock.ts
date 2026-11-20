@@ -13,6 +13,8 @@ import { rotate } from './frames';
 import { initialPowerAux, packRpm, POWER_SLOTS, stepPower, type MotorLoad, type PowerRuntime } from './powerBlock';
 import { rotorOutput, validatedRange, type RotorRuntime } from './rotorLaw';
 import { AERO_SLOTS, initialAeroAux, stepAero } from './aeroBlock';
+import { initialThermalAux, stepMotorThermal, thermalOffset, thermalSlotCount } from './motorThermal';
+import { motorPoint } from './powerChain';
 import type { AeroRuntime } from './aeroSurface';
 import { airRelative, type WindSource } from './wind';
 
@@ -59,6 +61,11 @@ export const powerBase = (rotorCount: number, power: number): number => ROTOR_BA
 
 /** First aux slot of the aero surfaces of a loop (they follow the power slots). */
 export const aeroBase = (loop: Pick<FlightLoop, 'rotors' | 'power'>): number => powerBase(loop.rotors.length, loop.power.length);
+
+/** First aux slot of the motor winding temperatures (they follow the aero slots; none without a thermal datasheet). */
+export const thermalBase = (loop: Pick<FlightLoop, 'rotors' | 'power' | 'aero'>): number => aeroBase(loop) + AERO_SLOTS * loop.aero.length;
+
+const blockSize = (loop: FlightLoop): number => thermalBase(loop) + thermalSlotCount(loop.power);
 
 export interface FlightLoop {
   readonly scenario: FlightScenario;
@@ -135,8 +142,9 @@ export function tiltOf(loop: FlightLoop, body: BodyKinematics): number {
 }
 
 function initialAux(loop: FlightLoop): Float64Array {
-  const aux = new Float64Array(aeroBase(loop) + AERO_SLOTS * loop.aero.length);
+  const aux = new Float64Array(blockSize(loop));
   aux[SLOT.divergedTime] = -1;
+  initialThermalAux(loop.power, aux, thermalBase(loop));
   initialAeroAux(loop.aero, loop.scenario, aux, aeroBase(loop));
   loop.power.forEach((feed, p) => initialPowerAux(feed, aux, powerBase(loop.rotors.length, p)));
   loop.rotors.forEach((rotor, i) => {
@@ -179,8 +187,14 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
   const endDecay = tau > 0 ? Math.exp(-dt / tau) : 0;
   const ranges = loop.rotors.map(validatedRange);
   const fedBy = loop.rotors.map((_, i) => loop.power.findIndex((feed) => feed.rotorIndexes.includes(i)));
+  const heatAt = loop.rotors.map((_, i) => {
+    const fed = loop.power.findIndex((feed) => feed.rotorIndexes.includes(i));
+    const feed = loop.power[fed];
+    const at = feed === undefined ? -1 : thermalOffset(loop.power, fed, feed.rotorIndexes.indexOf(i));
+    return at < 0 ? -1 : thermalBase(loop) + at;
+  });
   return {
-    size: aeroBase(loop) + AERO_SLOTS * loop.aero.length,
+    size: blockSize(loop),
     aux0: initialAux(loop),
     joints: [],
     ledgerLayout: [],
@@ -223,6 +237,11 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
           const sustained = packRpm(feed, aux, powerBase(loop.rotors.length, fed), rpm, output.torque);
           if (sustained !== rpm) output = rotorOutput(rotor, inflow, sustained);
           loads[fed]?.push({ torqueNm: output.torque, rpm: sustained });
+          const heat = heatAt[i];
+          if (heat !== undefined && heat >= 0) {
+            const currentA = motorPoint(feed.motor, output.torque, (sustained * 2 * Math.PI) / 60).currentA;
+            stepMotorThermal(feed, aux, heat, currentA, state.time, dt);
+          }
         }
         const id = rotor.rotor.bodyId;
         forces[id] = add3(forces[id] ?? [0, 0, 0], output.force);

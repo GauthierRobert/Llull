@@ -52,7 +52,7 @@ function planarPick(context: FaceOpContext): boolean {
 }
 
 const unit = (v: Vec3): Vec3 | null => {
-  const length = Math.hypot(...v);
+  const length = Math.hypot(v[0], v[1], v[2]);
   return length > 0 ? [v[0] / length, v[1] / length, v[2] / length] : null;
 };
 

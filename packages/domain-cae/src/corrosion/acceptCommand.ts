@@ -9,7 +9,8 @@ import { documentIdentity } from '@core/model/documentUid';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { refuseCor } from './codes';
 import { ACCEPT_ACT, acceptanceDetails } from './gate';
-import { nonceOf } from '../shared/signedGate';
+import { nonceOf, notReapplied } from '../shared/signedGate';
+import { stepStamp } from '@lib/replaySurvivors';
 import type { CompatibilityItem } from './items';
 import { corrosionOf, withCorrosion } from './model';
 import type { Acceptance } from './types';
@@ -22,7 +23,7 @@ const ACT = ACCEPT_ACT;
  * @invariant a replayed acceptance kept without a signing port is trusted only for the replay: every later check_material_compatibility re-verifies it and, with no port, does not count it; a skipped (untested) item is not acceptable
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); recorded only with a signature verified (and spent last) by `ctx.humanSignature` over sha256 of
  *   (act, item key, decision, justification, finding fingerprint, document uid, nonce); it applies only while the finding is unchanged (the check compares the fingerprint) and in this document; a replay honours a
- *   recorded step only from an acceptance already in the slice (kept by replaySeed) with the same decision, justification, fingerprint and uid, its signature re-verified when a port is installed
+ *   recorded step only from an acceptance already in the slice (kept by replaySeed while its stamped step is live; none kept: a no-op, pending) with the same decision, justification, fingerprint and uid, its signature re-verified when a port is installed
  * @failure no signing port, no signature or one that does not verify (an agent always) -> COR_HUMAN_GATE; no environment -> COR_ENVIRONMENT_UNSET; unknown key -> COR_ITEM_NOT_FOUND; a pass / pass_isolated item ->
  *   COR_ITEM_NOT_ACCEPTABLE; blank justification -> COR_PARAMS_INVALID; a document without uid -> COR_DOCUMENT_UNIDENTIFIED (all refusals, unchanged doc)
  */
@@ -58,6 +59,7 @@ export const acceptCorrosionItem = defineCommand({
         'COR_HUMAN_GATE',
         'accepting a corrosion item needs a human-held signature: hand it to the qualified reviewer, do not retry',
       );
+    if (replayed && !Object.hasOwn(corrosionOf(doc).acceptances, itemKey)) return notReapplied(doc, COMMAND, itemKey);
     if (justification.trim() === '') return fail('COR_PARAMS_INVALID', 'a decision needs a justification');
     const checked = execute(
       doc,
@@ -108,6 +110,7 @@ export const acceptCorrosionItem = defineCommand({
       signatureId: gate.signatureId,
       signature: confirmation,
       documentUid: uid,
+      ...stepStamp(ctx),
     };
     return changed(
       withCorrosion(doc, { acceptances: { ...stored, [itemKey]: acceptance } }),

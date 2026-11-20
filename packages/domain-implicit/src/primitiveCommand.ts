@@ -6,6 +6,7 @@ import { nextId } from '@lib/id';
 import { refuseImplicit } from './codes';
 import type { PrimitiveNode, PrimitiveShape } from './model';
 import { addNode } from './nodeResult';
+import { minOf } from '@lib/arrayExtrema';
 
 const positive = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value) && value > 0;
 
@@ -60,8 +61,8 @@ export const addFieldPrimitive = defineCommand({
         if (p.size === undefined || !p.size.every(positive))
           return fail(`box needs size [x, y, z] with every extent > 0 (got ${JSON.stringify(p.size)})`, 'size');
         dims['size'] = p.size;
-        if (p.rounding !== undefined && !(p.rounding >= 0 && p.rounding < Math.min(...p.size) / 2))
-          return fail(`rounding ${p.rounding} must be >= 0 and below half the smallest size (${Math.min(...p.size) / 2})`, 'rounding');
+        if (p.rounding !== undefined && !(p.rounding >= 0 && p.rounding < minOf(p.size) / 2))
+          return fail(`rounding ${p.rounding} must be >= 0 and below half the smallest size (${minOf(p.size) / 2})`, 'rounding');
         break;
       case 'cylinder':
       case 'cone':
@@ -89,7 +90,7 @@ export const addFieldPrimitive = defineCommand({
         dims['tubeRadius'] = p.tubeRadius;
         break;
       case 'plane':
-        if (p.normal === undefined || !p.normal.every(Number.isFinite) || Math.hypot(...p.normal) === 0)
+        if (p.normal === undefined || !p.normal.every(Number.isFinite) || Math.hypot(p.normal[0], p.normal[1], p.normal[2]) === 0)
           return fail(`plane needs a non-zero finite normal (got ${JSON.stringify(p.normal)})`, 'normal');
         dims['normal'] = p.normal;
         dims['offset'] = p.offset ?? 0;

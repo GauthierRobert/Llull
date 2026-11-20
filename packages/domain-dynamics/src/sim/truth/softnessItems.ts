@@ -10,6 +10,7 @@ import { type ReviewItem, reviewItem } from '@core/model/reviewEnvelope';
 import { couplingsOf, transmissionJoints } from '@core/model/transmissions';
 import type { RunData } from '../runData';
 import type { Topology } from '../topology';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Penetration of a stop at or under this fraction of its travel / gap passes (TR-DRV-23 (c)). */
 const PENETRATION_PASS = 0.01;
@@ -119,7 +120,7 @@ export function inertiaVariationItems(run: RunData, dynamics: DynamicsModel, top
     if (others.length === 0) return [];
     const travel = (joint: string): number => {
       const positions = run.series?.jointPosition[joint] ?? [];
-      return positions.length === 0 ? 0 : Math.max(...positions) - Math.min(...positions);
+      return positions.length === 0 ? 0 : maxOf(positions) - minOf(positions);
     };
     const moved = others.filter((joint) => travel(joint) > (dynamics.joints[joint]?.kind === 'prismatic' ? MOVED_M : MOVED_RAD));
     const status: ReviewItem['status'] = moved.length > 0 ? 'warn' : 'pass';
@@ -133,7 +134,7 @@ export function inertiaVariationItems(run: RunData, dynamics: DynamicsModel, top
           ? 'None.'
           : 'Hold the joints below the stop still during contact, or treat its peak force and restitution as approximate: the stop was damped for the inertia at the start configuration (per-step rewrite not built, spec 13.18).',
         {
-          values: { jointsBelow: others.length, jointsMoved: moved.length, largestTravel: Math.max(0, ...others.map(travel)) },
+          values: { jointsBelow: others.length, jointsMoved: moved.length, largestTravel: Math.max(0, maxOf(others.map(travel))) },
           note: `stop '${key}' acts on ${own.map((id) => `'${id}'`).join(', ')}; ${others.length} other joint(s) ${topology.loops.length > 0 ? 'of a closed-loop mechanism ' : 'below it '}change its effective inertia with the configuration; ${moved.length} of them moved during the run (${moved.join(', ') || 'none'})`,
           ...(status === 'pass' ? {} : { unverified: true }),
         },

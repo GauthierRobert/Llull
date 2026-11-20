@@ -33,11 +33,14 @@ import { BAR_PRINT, printedBar, recordCoupon } from '../unit/cae/printFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
-import { flatDocument } from '../unit/vibroacoustics/fixtures';
+import { vibroacousticsDocument } from '../unit/vibroacoustics/seed';
 import { missionDocument } from '../unit/environment/fixtures';
 import { corrosionDocument } from '../unit/corrosion/seed';
 import { electroOpticalDocument } from '../unit/electroOptical/seed';
 import { quadDrone, rotorParams } from '../unit/flight/flightFixture';
+import { rMinusS } from '../unit/cae/reliability/support';
+import { acceptancePayload } from '@cae/reliability/acceptance';
+import type { HumanSignaturePort } from '@core/model/analysis';
 import { SOURCE_TEXT, imperfectBar } from '../unit/cae/nonlinear/imperfectionFixtures';
 import {
   bemNozzles,
@@ -211,6 +214,37 @@ function plmDocument(): CadDocument {
   }
 }
 
+const RELIABILITY_SECRET = 'fuzz-prb';
+const reliabilityPort: HumanSignaturePort = {
+  verify: (given, payload) =>
+    typeof given === 'object' &&
+    given !== null &&
+    Reflect.get(given, 'secret') === RELIABILITY_SECRET &&
+    Reflect.get(given, 'payload') === payload
+      ? { signer: 'fuzz', signatureId: 'sig-fuzz' }
+      : null,
+  spend: () => true,
+};
+const reliabilityContext = (): ExecutionContext => ({ ...defaultContext(), humanSignature: reliabilityPort });
+
+/** PHY-18 PRB-b: R - S with a signed acceptance of an importance-sampling + SORM study (the stored `study` carries every option). */
+function reliabilityAccepted(): CadDocument {
+  const doc: CadDocument = { ...rMinusS(), uid: '9'.repeat(32) };
+  const options = { limitState: 'g', methods: ['sorm', 'is'], seed: 5, samples: 200, maxIterations: 60, tolerance: 1e-7 };
+  const study = execute(doc, 'run_reliability_study', options).data as Record<string, unknown>;
+  const resultHash = String(study['resultHash']);
+  const payload = acceptancePayload('g', resultHash, 5, 200, 'fuzz seed', doc.uid ?? '');
+  const confirmation = { secret: RELIABILITY_SECRET, payload };
+  const accepted = execute(
+    doc,
+    'accept_reliability_result',
+    { ...options, resultHash, justification: 'fuzz seed', confirmation },
+    reliabilityContext(),
+  );
+  if (accepted.error !== undefined) throw new Error(`reliability seed: ${accepted.summary}`);
+  return accepted.document;
+}
+
 const scanContext = (): ExecutionContext => ({ ...defaultContext(), pointClouds: fixturePort([{ key: KEY_A, points: [[0, 0, 0]] }]) });
 
 function scanDocument(): CadDocument {
@@ -330,14 +364,18 @@ function withLedgers(doc: CadDocument): CadDocument {
   };
   const analysis = {
     ...doc.analysis,
-    exceptionLedger: [exception, { ...exception, documentUid: 'e'.repeat(32) }],
+    // SIG-REPLAY: one entry of each ledger is stamped with the step that recorded it, one is legacy (no stepKey)
+    exceptionLedger: [
+      { ...exception, stepKey: '7' },
+      { ...exception, documentUid: 'e'.repeat(32) },
+    ],
     fitDispositions: { 'row 1': fit },
     fitLedger: [
-      { ...fit, rowKey: 'row 1' },
+      { ...fit, rowKey: 'row 1', stepKey: '7' },
       { ...fit, rowKey: 'row 1', documentUid: 'e'.repeat(32) },
     ],
     dispositionLedger: [
-      margin,
+      { ...margin, stepKey: '7' },
       { ...margin, act: 'dispose_thermal_limit', rowKey: 'lim-1:max' },
       { ...margin, documentUid: 'e'.repeat(32) },
     ],
@@ -365,8 +403,9 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     mutate: { name: 'set_service_environment', params: constant({ scheme: 'anodic_index', environment: 'harsh' }) },
   },
   'physics-vibroacoustics': {
-    roots: ['vibroacoustics'],
-    build: flatDocument,
+    // reviews listed again so the 36 sampled cases reach the signed review (the 27-band spectrum otherwise dominates the pool)
+    roots: ['vibroacoustics', 'vibroacoustics.reviews'],
+    build: vibroacousticsDocument,
     query: { name: 'acoustic_spectrum_report', params: constant({ spectrum: 'flat130' }) },
     mutate: { name: 'convert_acoustic_spectrum', params: constant({ spectrum: 'flat130', to: 'octave', name: 'fuzz_octave' }) },
   },
@@ -466,6 +505,17 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     roots: ['analysis'],
     build: planOf(plans, 'fea_modal_cantilever'),
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz analysis', analysisType: 'static' }) },
+  },
+  // PHY-18 PRB-b: an accepted reliability result with its study (methods, maxIterations, tolerance), seed and samples
+  'cae#reliability-accepted': {
+    roots: ['probabilistic'],
+    build: reliabilityAccepted,
+    ctx: reliabilityContext,
+    query: { name: 'check_probabilistic', params: constant({ limitState: 'g' }) },
+    mutate: {
+      name: 'define_random_variable',
+      params: constant({ name: 'S', unit: 'MPa', distribution: { kind: 'normal', mean: 210, sd: 40 }, citation: { text: 'fuzz' } }),
+    },
   },
   // 14 FLL-M3: a printed part (walls + infill + build direction, coupon values) and the recorded printed coupons
   'cae#printed': {
@@ -665,7 +715,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
           },
         ],
         ['define_flight_scenario', { body: 'frame', durationS: 1, id: 'tumble', initialAngularVelocity: [0, 1, 0] }],
-        ['add_rotor', rotorParams({ id: 'r-static', hub: [10, 0, 0], spinInertiaKgM2: 1e-5 })],
+        ['add_rotor', rotorParams({ id: 'r-static', hub: [10, 0, 0], spinInertiaKgM2: 1e-5, bladeCount: 2 })],
         [
           'add_rotor',
           {

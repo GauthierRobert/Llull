@@ -10,6 +10,7 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { withElement } from '../../building/model';
 import { membersOf } from './memberSupport';
 import { findProfile, lightestProfile, sectionProperties } from '../../steel/profiles';
+import { appendAll } from '@lib/appendAll';
 
 /** Iteration cap of the design loops of design_portal_frames and design_purlins. */
 const MAX_ITERATIONS = 15;
@@ -77,7 +78,7 @@ export function upsizeProfileGroups(
     changes.push(`${group.role}s ${group.profile} → ${larger}`);
     const resized = resizeGroup(next, group, larger);
     next = resized.building;
-    changedIds.push(...resized.changedIds);
+    appendAll(changedIds, resized.changedIds);
   }
   return { building: next, progressed, limited, changes, changedIds };
 }
@@ -99,7 +100,7 @@ export function iterateUpsizing(
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     const result = step(current);
     if (!result) break;
-    changes.push(...result.changes);
+    appendAll(changes, result.changes);
     for (const id of result.changedIds) changed.add(id);
     current = { ...current, building: result.building };
     if (result.limited) limited = true;

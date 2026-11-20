@@ -1,6 +1,6 @@
 /** Derivation guard: an entity an analysis still uses cannot disappear (the saved file would reference a missing part). */
 
-import type { DerivationGuard } from '@core/commands/derivation';
+import type { DerivationGuard, GuardContext } from '@core/commands/derivation';
 import type { AnalysisCase } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 
@@ -29,10 +29,12 @@ function referencedEntities(analysisCase: AnalysisCase): Set<string> {
 
 /**
  * @invariant a command may not remove (or replace under another id) an entity that an analysis case still references
+ * @invariant never refuses a step re-run by history replay; the net result of a history meta-command is still checked (L8)
  */
 export const analysisReferenceGuard: DerivationGuard = {
   domain: 'cae',
-  check(previous: CadDocument, next: CadDocument): string | null {
+  check(previous: CadDocument, next: CadDocument, _commandName: string, context?: GuardContext): string | null {
+    if (context?.replaying === true) return null;
     if (next.analysis === undefined) return null;
     for (const analysisCase of Object.values(next.analysis.cases))
       for (const id of referencedEntities(analysisCase))
@@ -65,10 +67,12 @@ const hasModel = (doc: CadDocument, materialId: string, modelId: string): boolea
 
 /**
  * @invariant a command may not remove a material or material model that a fatigue / crack growth case still references
+ * @invariant never refuses a step re-run by history replay; the net result of a history meta-command is still checked (L8)
  */
 export const durabilityReferenceGuard: DerivationGuard = {
   domain: 'cae',
-  check(previous: CadDocument, next: CadDocument): string | null {
+  check(previous: CadDocument, next: CadDocument, _commandName: string, context?: GuardContext): string | null {
+    if (context?.replaying === true) return null;
     for (const ref of durabilityModelRefs(next))
       if (hasModel(previous, ref.materialId, ref.modelId) && !hasModel(next, ref.materialId, ref.modelId))
         return `material model '${ref.modelId}' of '${ref.materialId}' is used by ${ref.owner}; delete or update that case first`;

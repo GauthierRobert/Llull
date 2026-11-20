@@ -19,6 +19,8 @@ import { layerBoundaries } from '../elements/wallLayers';
 import { DIMENSION_LAYER, type PlanSource, annotationText, band, isCut, layerName, thinLine } from './planModel';
 import type { DrawingPrimitive } from '@core/model/drawing';
 import { pointsExtent } from '@lib/extent';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Plan symbol of a door (leaf + swing) or window (three lines) in a straight wall frame. */
 function openingSymbol(wall: Pick<WallElement, 'start' | 'end' | 'thickness'>, opening: OpeningElement): DrawingPrimitive[] {
@@ -60,13 +62,13 @@ export function wallPrimitives(building: BuildingModel, wall: WallElement, cutHe
     const pieces = primitives.flatMap((primitive) => (primitive.type === 'polygon' ? [primitive.points] : []));
     for (const piece of pieces) {
       const along = piece.map((point) => (point[0] - wall.start[0]) * frame.direction[0] + (point[1] - wall.start[1]) * frame.direction[1]);
-      const [from, to] = [Math.min(...along), Math.max(...along)];
+      const [from, to] = [minOf(along), maxOf(along)];
       for (const across of boundaries) {
         primitives.push(thinLine(layer, pointAlong(wall, frame, from, across), pointAlong(wall, frame, to, across)));
       }
     }
   }
-  for (const opening of openings) primitives.push(...openingSymbol(wall, opening));
+  for (const opening of openings) appendAll(primitives, openingSymbol(wall, opening));
   return primitives;
 }
 
@@ -98,7 +100,7 @@ export function dimensionPrimitives(doc: PlanSource, building: BuildingModel, wa
   const ring = bubbleRing(doc, grids);
   const clear = fromMm(doc, 200);
   if (walls.length > 0) {
-    const half = Math.max(...walls.map((wall) => wall.thickness)) / 2;
+    const half = maxOf(walls.map((wall) => wall.thickness)) / 2;
     const extent = pointsExtent(walls.flatMap((wall) => [wall.start, wall.end]));
     const [minX, minY, maxX, maxY] = [extent.minX - half, extent.minY - half, extent.maxX + half, extent.maxY + half];
     const [baseX, baseY] = ring ? [Math.min(minX, ring[0] - clear), Math.min(minY, ring[1] - clear)] : [minX, minY];
@@ -138,7 +140,7 @@ export function curvedWallPrimitives(building: BuildingModel, wall: CurvedWallEl
     if (points) primitives.push({ type: 'polygon', layer, style: 'cut', fill: 'hatch', points });
   }
   for (const opening of openings) {
-    primitives.push(...openingSymbol(tangentWall(wall, opening.offset), opening));
+    appendAll(primitives, openingSymbol(tangentWall(wall, opening.offset), opening));
   }
   return primitives;
 }

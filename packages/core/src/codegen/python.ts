@@ -9,6 +9,7 @@ import { commentText, formatNumber, provenance, quote } from './format';
 import { sweptComment } from './sweptCalls';
 import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
+import { appendAll } from '../lib/appendAll';
 
 const LIBRARY: Readonly<Record<PythonBackend, string>> = { cadquery: 'CadQuery', build123d: 'build123d' };
 
@@ -68,12 +69,9 @@ export function emitPython(program: FeatureProgram, backend: PythonBackend): str
   lines.push(`LLULL_UNITS = ${quote(program.units)}`, '');
   lines.push(`# ── llull runtime (${LIBRARY[backend]}) · keep unchanged ${'─'.repeat(30)}`);
   lines.push(pythonRuntime(backend));
-  lines.push(
-    ...parametersAndModel(
-      program,
-      (p) => `${p.identifier} = param(${quote(p.name)}, ${p.expression ?? formatNumber(p.value)})`,
-      featureLine,
-    ),
+  appendAll(
+    lines,
+    parametersAndModel(program, (p) => `${p.identifier} = param(${quote(p.name)}, ${p.expression ?? formatNumber(p.value)})`, featureLine),
   );
   lines.push(
     '',

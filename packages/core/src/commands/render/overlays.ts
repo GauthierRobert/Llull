@@ -5,6 +5,7 @@ import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot, svgLine } from './svg';
 import { appendEntityLabels } from './labels';
 import { pow } from '../../lib/pow';
+import { maxOf } from '../../lib/arrayExtrema';
 
 interface OverlayFlags {
   showDimensions: boolean;
@@ -139,7 +140,7 @@ function worldAxesLines(project: Projector, data: RenderViewData, units: string,
       ]
     : [];
   // Orthographic: every axis has the same world length, so the longest projection is the visible scale.
-  const scalePx = Math.max(...axes.map(({ tip }) => Math.hypot(tip[0] - origin[0], tip[1] - origin[1])));
+  const scalePx = maxOf(axes.map(({ tip }) => Math.hypot(tip[0] - origin[0], tip[1] - origin[1])));
   const scaleLabel = `${r2(axisLength)} ${units} = ${r2(scalePx)} px`;
   lines.push(
     `  <text x="8" y="${height - 8}" font-family="monospace" font-size="10" ` +

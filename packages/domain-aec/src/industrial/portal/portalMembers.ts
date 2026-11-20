@@ -2,6 +2,7 @@
 
 import type { MemberSpec } from '../common/memberSupport';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';
+import { maxOf } from '@lib/arrayExtrema';
 
 interface HallMemberInput {
   readonly geometry: HallGeometry;
@@ -68,7 +69,7 @@ export function hallMemberSpecs(input: HallMemberInput): MemberSpec[] {
     [x0 - railOffset, Math.PI / 2, columnTop(x0)],
     [x1 + railOffset, -Math.PI / 2, columnTop(x1)],
   ] as const;
-  const railTop = Math.max(...railSides.map(([, , top]) => top));
+  const railTop = maxOf(railSides.map(([, , top]) => top));
   for (let z = railSpacing; z < railTop - railSpacing / 3; z += railSpacing) {
     for (const [x, roll, top] of railSides) {
       if (z >= top - railSpacing / 3) continue;

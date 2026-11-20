@@ -14,6 +14,7 @@ import { checkItem, refuseDyn, type DynamicCheckItem } from './codes';
 import { caseLossFactor } from './materialDamping';
 import { hasBaseConstraint } from './setupCommands';
 import { dynamicCaseOf, spectrumOf, type DynamicCase } from './store';
+import { appendAll } from '@lib/appendAll';
 
 /** Excitation band top must stay below this multiple of the highest kept mode (AF-30 rule held as data). */
 const BAND_TO_MODE_RATIO = 1.5;
@@ -99,7 +100,7 @@ function dynamicCheckItems(doc: CadDocument, found: DynamicCase, port: FeArtifac
   if (trust.state === 'stale')
     items.push(checkItem('DYN_RESULTS_STALE', 'error', 'an input changed after the solve', [found.analysisCase.id]));
   const summary = trust.results?.dynamics;
-  if (trust.state === 'solved' && summary !== undefined) items.push(...resultItems(found.analysisCase, summary));
+  if (trust.state === 'solved' && summary !== undefined) appendAll(items, resultItems(found.analysisCase, summary));
   return items;
 }
 

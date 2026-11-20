@@ -1,4 +1,5 @@
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
 /** Sound-pressure level arithmetic (TR-VAC-10, TR-VAC-12): dB re 20 uPa <-> rms pressure, energy sums. Pure, double precision. */
 
 /** Reference rms sound pressure in air, Pa (reference '20uPa'). */
@@ -19,7 +20,7 @@ export const pressureToSpl = (pRmsPa: number): number => 20 * Math.log10(pRmsPa 
  * @invariant levels non-empty (an empty sum is the caller's refusal)
  */
 export function energySumDb(levelsDb: readonly number[]): number {
-  const peak = Math.max(...levelsDb);
+  const peak = maxOf(levelsDb);
   let sum = 0;
   for (const level of levelsDb) sum += pow(10, (level - peak) / 10);
   return peak + 10 * Math.log10(sum);

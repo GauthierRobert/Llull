@@ -7,6 +7,7 @@ import type { ForwardAxis } from '../flight/aeroModel';
 import type { LatticeRow } from '../flight/aeroTable';
 import { flowSections, latticeRows, toFlow, type BodySection } from '../flight/aeroSweep';
 import { dynamicsOf } from './bodies';
+import { minOf } from '@lib/arrayExtrema';
 
 interface SurfaceInput {
   readonly name: string;
@@ -126,7 +127,7 @@ export function latticeSweep(
     ...(area === undefined ? {} : { referenceArea: area }),
     ...(chord === undefined ? {} : { referenceChord: chord }),
   });
-  const smallestPivot = Math.min(...pivots.map(Math.abs));
+  const smallestPivot = minOf(pivots.map(Math.abs));
   const zeroIndex = pivots.findIndex((pivot) => Math.abs(pivot) === smallestPivot);
   const call = (pivotDeg: number, area?: number, chord?: number): { rows: LatticeRow[]; data: Record<string, unknown> } | string => {
     const result = lattice.run(doc, callFor(pivotDeg, area, chord), ctx);

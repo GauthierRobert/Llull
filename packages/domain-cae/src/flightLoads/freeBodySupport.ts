@@ -10,6 +10,7 @@ import { analysisIdSchema } from '../shared/schemas';
 import { targetDistanceWarning, targetProblem } from '../shared/target';
 import { refuseFll } from './codes';
 import { bestSupportPattern } from './supportPattern';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Closest two support points may be, as a share of their spread (below it two of them snap to one node). */
 const MIN_POINT_SEPARATION = 1e-6;
@@ -53,10 +54,8 @@ export const setFreeBodySupport = defineCommand({
     if (analysis.constraintOrder.length > 0)
       return fail('FLL_SUPPORT_CONFLICT', `analysis '${analysisId}' already has ${analysis.constraintOrder.length} constraint(s)`);
     const triple = points;
-    const spread = Math.max(...triple.flatMap((p, i) => triple.slice(i + 1).map((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]))));
-    const closest = Math.min(
-      ...triple.flatMap((p, i) => triple.slice(i + 1).map((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]))),
-    );
+    const spread = maxOf(triple.flatMap((p, i) => triple.slice(i + 1).map((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]))));
+    const closest = minOf(triple.flatMap((p, i) => triple.slice(i + 1).map((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]))));
     if (!(spread > 0) || closest < MIN_POINT_SEPARATION * spread)
       return fail('FLL_SUPPORT_POINTS', 'two support points coincide', [analysisId], ['points']);
     for (const [index, point] of triple.entries()) {

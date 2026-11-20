@@ -5,6 +5,7 @@
 
 import type { Joint, PipingModel, RoutedPart } from '@aec/plant/types';
 import type { DerivationWarning, DerivedBranch, DerivedInline, DerivedLeg, DerivedTurn, RunDerivation } from './deriveTypes';
+import { appendAll } from '@lib/appendAll';
 
 export interface TakeoffRun {
   readonly runId: string;
@@ -221,12 +222,24 @@ export function takeoffOf(runs: readonly TakeoffRun[]): Takeoff {
       bump(counts, JOINT_KEYS[joint.kind]);
       joints.push(joint);
     }
-    legs.push(...derivation.legs.map((leg) => ({ ...leg, runId })));
-    turns.push(...derivation.turns.map((turn) => ({ ...turn, runId })));
-    inline.push(...derivation.inline.map((item) => ({ ...item, runId })));
-    branches.push(...derivation.branches);
-    warnings.push(...derivation.warnings);
-    reasons.push(...derivation.unverifiedReasons.filter((reason) => !reasons.includes(reason)));
+    appendAll(
+      legs,
+      derivation.legs.map((leg) => ({ ...leg, runId })),
+    );
+    appendAll(
+      turns,
+      derivation.turns.map((turn) => ({ ...turn, runId })),
+    );
+    appendAll(
+      inline,
+      derivation.inline.map((item) => ({ ...item, runId })),
+    );
+    appendAll(branches, derivation.branches);
+    appendAll(warnings, derivation.warnings);
+    appendAll(
+      reasons,
+      derivation.unverifiedReasons.filter((reason) => !reasons.includes(reason)),
+    );
     totalPipe += derivation.totalPipeMm;
     centreline += derivation.centrelineLengthMm;
   }

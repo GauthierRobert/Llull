@@ -1,6 +1,7 @@
 /** Variable spring hanger arithmetic (07 PST §5.8 / §5.10, FR-PST-13): cold load and load variability of a spring at its travel. */
 
 /** Named default limit of the load variability (MSS SP-58 practice, grade B); 0.15 near rotating equipment. */
+import { minOf } from '@lib/arrayExtrema';
 export const DEFAULT_MAX_VARIABILITY = 0.25;
 export const ROTATING_EQUIPMENT_MAX_VARIABILITY = 0.15;
 
@@ -52,5 +53,5 @@ export function pickSpring(sizes: readonly SpringChoiceSize[], hotLoadN: number,
     );
   const best = fits[0];
   if (best !== undefined) return { kind: 'size', size: best.size, coldLoadN: best.coldLoadN, variability: best.variability };
-  return { kind: 'none', reason: 'variability', lowestVariability: Math.min(...scored.map((entry) => entry.variability)) };
+  return { kind: 'none', reason: 'variability', lowestVariability: minOf(scored.map((entry) => entry.variability)) };
 }

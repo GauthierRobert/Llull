@@ -6,6 +6,7 @@
 import { endianness } from 'node:os';
 import type { ExplicitJob } from '@cae/index';
 import { f64Bytes } from './computeJob';
+import { maxOf } from '@lib/arrayExtrema';
 
 export type ExplicitDevice = 'cpu' | 'gpu' | 'auto';
 
@@ -44,7 +45,7 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
       ? {
           shell4: 'shell4.u32',
           shellThickness: 'shell_thickness.f64',
-          shellPoints: Math.max(...Object.values(spec.shells ?? {}).map((shell) => shell.points)),
+          shellPoints: maxOf(Object.values(spec.shells ?? {}).map((shell) => shell.points)),
         }
       : {}),
     elementMaterial: 'elmat.u32',

@@ -21,6 +21,7 @@ import {
   near,
   refusedRow,
 } from './bracingModel';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface BracingInputs {
   readonly windPressure: number;
@@ -85,9 +86,7 @@ export function craneLongitudinalPath(members: ReadonlyArray<Located>, centre: n
     inputs.craneCapacity ?? runways.map(({ member }) => craneCapacityOf(member)).find((value) => value !== null) ?? null;
   const runwayXs = runways.map(({ start }) => start[0]);
   const craneSpan =
-    runwayXs.length > 0 && Math.max(...runwayXs) - Math.min(...runwayXs) > 1000
-      ? Math.max(...runwayXs) - Math.min(...runwayXs)
-      : DEFAULT_CRANE_SPAN;
+    runwayXs.length > 0 && maxOf(runwayXs) - minOf(runwayXs) > 1000 ? maxOf(runwayXs) - minOf(runwayXs) : DEFAULT_CRANE_SPAN;
   const craneForce =
     craneCapacity !== null && runways.length > 0
       ? craneWallForce(craneCapacity, craneSpan, inputs.craneSelfWeight, travelSpeed, bufferStiffness)
@@ -125,7 +124,7 @@ function purlinGapAlong(context: PanelContext, rafter: Located, bayStart: number
     .map(({ start: s }) => s[0])
     .sort((a, b) => a - b);
   const gaps = positions.slice(1).map((position, index) => position - (positions[index] ?? 0));
-  return gaps.length === 0 ? slope : Math.max(...gaps) / cosine;
+  return gaps.length === 0 ? slope : maxOf(gaps) / cosine;
 }
 
 interface DiagonalGeometry {
@@ -191,7 +190,7 @@ function eavesRow(context: PanelContext, geometry: DiagonalGeometry): BracingRow
   const [bayStart, bayEnd] = [Math.min(start[1], end[1]), Math.max(start[1], end[1])];
   const wallX = near(xLow, x0) ? x0 : x1;
   // Eaves level of this wall (monopitch: the low and the high eaves differ).
-  const eavesZ = Math.min(...context.rafterEnds.filter((point) => near(point[0], wallX)).map((point) => point[2]));
+  const eavesZ = minOf(context.rafterEnds.filter((point) => near(point[0], wallX)).map((point) => point[2]));
   const eavesStrut = context.members.find(
     ({ member: candidate, start: s, end: e }) =>
       candidate.role === 'purlin' &&
