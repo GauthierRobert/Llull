@@ -12,7 +12,8 @@ import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { isStudyFailure } from './context';
 import { refuseReliability } from './codes';
 import { limitStateOf, reliabilityOf, withReliability } from './model';
-import { DEFAULT_STUDY, RESULT_METHODS, isSampledStudy, normalizeStudy, reliabilityResult, sameStudy } from './resultHash';
+import { DEFAULT_STUDY, isSampledStudy, normalizeStudy, reliabilityResult, sameStudy } from './resultHash';
+import { isValidResultStudy, maxIterationsSchema, resultMethodsSchema, samplingSchema, toleranceSchema } from './studySchema';
 import type { Acceptance, AcceptanceLedgerEntry, ResultStudy } from '@cae/reliability/types';
 
 const DEFAULT_SAMPLES = 10_000;
@@ -51,7 +52,10 @@ export function verifyAcceptance(
   if (verdict === 'foreign') return gate('the acceptance was signed for another document (copied in)');
   if (signed === null || signed.signer !== recorded.signer || signed.signatureId !== recorded.signatureId)
     return gate('the signature does not verify for this acceptance');
-  const now = reliabilityResult(doc, limitState, recordedStudy(recorded), recorded.seed, recorded.samples, ctx);
+  const study = recordedStudy(recorded);
+  if (study === null)
+    return { valid: false, code: 'PRB_RESULT_STALE', reason: 'the recorded study has options out of range: it is not re-run' };
+  const now = reliabilityResult(doc, limitState, study, recorded.seed, recorded.samples, ctx);
   return !isStudyFailure(now) && now.resultHash === recorded.resultHash
     ? { valid: true }
     : {
@@ -61,8 +65,16 @@ export function verifyAcceptance(
       };
 }
 
-/** The normalised study of a stored acceptance; one recorded before PRB-b carries none and is the default study. */
-const recordedStudy = (recorded: Acceptance): ResultStudy => normalizeStudy(recorded.study ?? DEFAULT_STUDY);
+/** The normalised study of a stored acceptance (one recorded before PRB-b carries none: the default study); null when its options are out of range. */
+const recordedStudy = (recorded: Acceptance): ResultStudy | null => {
+  const study = recorded.study ?? DEFAULT_STUDY;
+  return isValidResultStudy(study) ? normalizeStudy(study) : null;
+};
+
+const isSameRecordedStudy = (entry: Acceptance, wanted: ResultStudy): boolean => {
+  const study = recordedStudy(entry);
+  return study !== null && sameStudy(study, wanted);
+};
 
 interface Wanted {
   readonly limitState: string;
@@ -87,10 +99,24 @@ function keptAcceptance(
       entry.resultHash === wanted.resultHash &&
       entry.seed === wanted.seed &&
       entry.samples === wanted.samples &&
-      sameStudy(recordedStudy(entry), wanted.study) &&
+      isSameRecordedStudy(entry, wanted.study) &&
       entry.justification === wanted.justification &&
       entry.documentUid === documentIdentity(doc),
   );
+}
+
+/** The signer of this act: a replayed ledger entry re-verified (or kept as recorded without a port), else the fresh confirmation verified; null when neither verifies. */
+function verifiedSigner(
+  port: HumanSignaturePort | null,
+  kept: AcceptanceLedgerEntry | undefined,
+  confirmation: unknown,
+  payloadFor: (documentUid: string) => string,
+  uid: string,
+): { signer: string; signatureId: string } | null {
+  if (kept === undefined) return port === null ? null : port.verify(confirmation, payloadFor(uid));
+  const again =
+    port === null ? { signer: kept.signer, signatureId: kept.signatureId } : port.verify(kept.signature, payloadFor(kept.documentUid));
+  return again !== null && again.signer === kept.signer && again.signatureId === kept.signatureId ? again : null;
 }
 
 /**
@@ -128,16 +154,14 @@ export const acceptReliabilityResult = defineCommand({
       .max(2_000_000)
       .optional()
       .describe(`Samples of that study (default ${DEFAULT_SAMPLES}); read only by mc and is.`),
-    methods: z
-      .array(z.enum(RESULT_METHODS))
-      .min(1)
+    methods: resultMethodsSchema
       .optional()
       .describe(
         'Methods of the study (data.resultStudy.methods of run_reliability_study). Default ["form", "mc"] (the check_probabilistic study).',
       ),
-    sampling: z.enum(['mc', 'lhs', 'lhs_centred']).optional().describe('Sampling scheme of the mc method of that study (default "lhs").'),
-    maxIterations: z.number().int().min(1).max(1000).optional().describe('HL-RF iteration limit of that study (default 100).'),
-    tolerance: z.number().positive().optional().describe('FORM tolerance of that study (default 1e-8).'),
+    sampling: samplingSchema.optional().describe('Sampling scheme of the mc method of that study (default "lhs").'),
+    maxIterations: maxIterationsSchema.optional().describe('HL-RF iteration limit of that study (default 100).'),
+    tolerance: toleranceSchema.optional().describe('FORM tolerance of that study (default 1e-8).'),
     justification: z.string().describe('Mandatory engineering justification.'),
     confirmation: z
       .unknown()
@@ -176,12 +200,7 @@ export const acceptReliabilityResult = defineCommand({
     const payloadFor = (documentUid: string): string =>
       acceptancePayload(limitState, resultHash, seed, samples, justification, documentUid);
     const kept = keptAcceptance(doc, ctx, confirmation, { limitState, resultHash, seed, samples, study, justification });
-    let signed: { signer: string; signatureId: string } | null;
-    if (kept !== undefined) {
-      const again =
-        port === null ? { signer: kept.signer, signatureId: kept.signatureId } : port.verify(kept.signature, payloadFor(kept.documentUid));
-      signed = again !== null && again.signer === kept.signer && again.signatureId === kept.signatureId ? again : null;
-    } else signed = port === null ? null : port.verify(confirmation, payloadFor(uid));
+    const signed = verifiedSigner(port, kept, confirmation, payloadFor, uid);
     if (signed === null)
       return fail('PRB_HUMAN_GATE', 'the signature does not verify for this acceptance: hand over to the qualified reviewer');
     if (kept === undefined && port?.spend?.(confirmation, payloadFor(uid)) === false)

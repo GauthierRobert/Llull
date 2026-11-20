@@ -80,7 +80,6 @@ export interface Response {
   readonly query: { readonly command: string; readonly params: Readonly<Record<string, unknown>>; readonly pointer: string };
 }
 
-/** A reviewer's signed acceptance of the reliability result of one limit state (human gate; verified when read). */
 export type ResultMethod = 'form' | 'sorm' | 'mc' | 'is' | 'fosm';
 
 /**
@@ -94,6 +93,7 @@ export interface ResultStudy {
   readonly tolerance?: number;
 }
 
+/** A reviewer's signed acceptance of the reliability result of one limit state (human gate; verified when read). */
 export interface Acceptance {
   /** Hash of the model the result was computed on (limitStateModelHash). */
   readonly modelHash: string;

@@ -11,7 +11,8 @@ import { reliabilityOf } from './model';
 import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
 import { runMethods } from './methodRuns';
 import { limitStateModelHash } from './modelHash';
-import { RESULT_METHODS, isSampledStudy, normalizeStudy, studyDigest } from './resultHash';
+import { isSampledStudy, normalizeStudy, studyDigest } from './resultHash';
+import { maxIterationsSchema, resultMethodsSchema, samplingSchema, toleranceSchema } from './studySchema';
 import { fosmStudy, monteCarloStudy } from './studies';
 
 const MAX_SAMPLES = 2_000_000;
@@ -27,12 +28,8 @@ const seedSchema = z
   .describe(
     'Integer seed in [0, 4294967295] of the PRNG (xoshiro128**); the same model, method, samples and seed give bit-identical results.',
   );
-const iterationsSchema = z.number().int().min(1).max(1000).optional().describe('Maximum HL-RF iterations (default 100).');
-const toleranceSchema = z
-  .number()
-  .positive()
-  .optional()
-  .describe('FORM stops when no u component changes by more than this (default 1e-8).');
+const iterationsParam = maxIterationsSchema.optional().describe('Maximum HL-RF iterations (default 100).');
+const toleranceParam = toleranceSchema.optional().describe('FORM stops when no u component changes by more than this (default 1e-8).');
 
 /** Why the total sampling work (samples x limit states, samples x variables) is over budget, or null. */
 const budgetIssue = (samples: number, limitStates: number, variables: number): string | null =>
@@ -148,23 +145,21 @@ export const runReliabilityStudy = defineCommand({
     '(first-order second-moment). Default methods: form, mc, fosm; methods ["form"] is the plain FORM run. data.form (and data.sorm) = { beta, pfForm = Φ(-beta), designPointX { variable: { value, unit } } ' +
     '(most probable failure point), importance { variable: alpha^2 } (sums to 1: which variable drives failure), iterations, converged, items[] } (beta is negative when all variables at their medians already ' +
     'fail; exact for linear g in normal variables: (muR - muS) / sqrt(sR^2 + sS^2); gradients by central differences); data.monteCarlo and data.fosm as in propagate_uncertainty; data.resultHash = the result hash accept_reliability_result takes for exactly this study, ' +
-    'data.resultStudy = { methods, sampling?, maxIterations?, tolerance?, seed?, samples? } (the options the methods read) to pass to it with the hash; ' +
+    'data.resultStudy = { methods, sampling?, maxIterations?, tolerance? (the options the methods read), seed, samples (the values the signed payload carries, 0 / the default when unsampled) } to pass to it with the hash; ' +
     'comparison { pf: { method: Pf }, formInsideMonteCarloInterval } and the item PRB_FORM_MC_DISAGREE when the FORM Pf falls outside the Monte Carlo ' +
     `Wilson 95 % interval (report the Monte Carlo value, consider SORM). For several limit states or the distribution of g itself use propagate_uncertainty. ${REVIEW_NOTE}`,
   params: z.object({
     limitState: z.string().describe('Name of a limit state (define_limit_state).'),
-    methods: z
-      .array(z.enum(RESULT_METHODS))
-      .min(1)
+    methods: resultMethodsSchema
       .optional()
       .describe(
         'Methods to run, any of form, sorm, mc, is, fosm. Default ["form", "mc", "fosm"]. ["form"] = FORM only; add "sorm" for the Breitung correction.',
       ),
     samples: z.number().int().min(2).optional().describe(`Monte Carlo samples (default ${DEFAULT_SAMPLES}, at most ${MAX_SAMPLES}).`),
     seed: seedSchema.optional(),
-    sampling: z.enum(['mc', 'lhs', 'lhs_centred']).optional().describe('Sampling scheme of the "mc" method. Default "lhs".'),
-    maxIterations: iterationsSchema,
-    tolerance: toleranceSchema,
+    sampling: samplingSchema.optional().describe('Sampling scheme of the "mc" method. Default "lhs".'),
+    maxIterations: iterationsParam,
+    tolerance: toleranceParam,
   }),
   run: (doc, params, ctx): CommandResult => {
     const study = normalizeStudy(params, DEFAULT_METHODS);
@@ -202,7 +197,7 @@ export const runReliabilityStudy = defineCommand({
           });
         const resultHash = studyDigest(limitStateModelHash(doc, params.limitState) ?? '', study, seed, samples, runs);
         data['resultHash'] = resultHash;
-        data['resultStudy'] = { ...study, ...(sampled ? { seed, samples } : {}) };
+        data['resultStudy'] = { ...study, seed, samples };
         data['comparison'] = { pf, formInsideMonteCarloInterval: inside };
         data['items'] = items;
         const shown = Object.entries(pf).map(([method, value]) => `${method} ${value === null ? 'n/a' : value.toPrecision(6)}`);

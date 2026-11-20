@@ -10,6 +10,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { acceptancePayload } from '@cae/reliability/acceptance';
+import { DEFAULT_STUDY, studyDigest } from '@cae/reliability/resultHash';
 import { isRecord } from '@lib/isRecord';
 import { code, data, rMinusS, type Json } from './support';
 import { massModel } from './responses.support';
@@ -155,7 +156,9 @@ describe('acceptance study options', () => {
     const accepted = accept(doc, run.resultHash, run.study).document;
     const described = (d: CadDocument): unknown =>
       ((data(execute(d, 'describe_probabilistic_model', {}))['limitStates'] as Json[])[0]?.['acceptance'] as Json)['study'];
-    expect(described(accepted)).toEqual(run.study);
+    const { seed, samples, ...signedStudy } = run.study;
+    expect([seed, samples]).toEqual([0, 10_000]);
+    expect(described(accepted)).toEqual(signedStudy);
     const stored = accepted.probabilistic?.acceptances?.['g'];
     if (stored === undefined) throw new Error('no acceptance');
     const { study, ...old } = stored;
@@ -179,7 +182,32 @@ describe('acceptance study options', () => {
       { methods: ['nope'] },
       { methods: ['mc'], sampling: 'x' },
       { methods: ['form'], maxIterations: 0 },
+      { methods: ['form'], maxIterations: 1e6 },
+      { methods: ['form'], maxIterations: 1.5 },
+      { methods: ['form', 'sorm', 'mc', 'is', 'fosm', 'form'] },
+      { methods: ['form'], extra: 1 },
     ])
       expect(() => deserializeDocument(serializeDocument(withStudy(accepted, study)))).toThrow();
+    // a file can carry 1e400 (Infinity once parsed): written as text, not through JSON.stringify
+    const text = serializeDocument(withStudy(accepted, { methods: ['form'], tolerance: 123.456 })).replace('123.456', '1e400');
+    expect(text).toContain('1e400');
+    expect(() => deserializeDocument(text)).toThrow();
+  });
+
+  it('an out-of-range study edited in memory is never re-run: check_probabilistic reads PRB_RESULT_STALE at once', () => {
+    const run = studied(doc, { methods: ['form'] });
+    const accepted = accept(doc, run.resultHash, run.study).document;
+    for (const patch of [{ maxIterations: 1e15 }, { tolerance: Number.POSITIVE_INFINITY }]) {
+      const codes = checkCodes(withStudy(accepted, patch));
+      expect(codes).toContain('PRB_RESULT_STALE');
+      expect(codes).not.toContain('PRB_ACCEPTED');
+    }
+  });
+
+  it('the default-study digest is the one of the base commit (pinned literal, computed at c472b51f8)', () => {
+    const runs = { pf: { form: 0.0227501, mc: 0.0231 }, beta: 2.0, data: {}, compared: null, interval: null };
+    expect(studyDigest('ab'.repeat(32), DEFAULT_STUDY, 7, 2000, runs)).toBe(
+      'da0d57a97e3c1986a0573f8d95cdba37cf76a55720d6e72e4c1f8300c96d422d',
+    );
   });
 });

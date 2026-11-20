@@ -8,12 +8,11 @@ import { isStudyFailure, studyContext, type StudyFailure } from './context';
 import { DEFAULT_FORM_ITERATIONS, DEFAULT_FORM_TOLERANCE, runMethods, type MethodStudies } from './methodRuns';
 import { limitStateModelHash } from './modelHash';
 import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
+import { RESULT_METHODS } from './studySchema';
 import type { ResultMethod, ResultStudy } from './types';
 
 /** Significant digits of beta and Pf in the hash: the same inputs reproduce them bit-for-bit, the rounding only absorbs platform libm differences. */
 const RESULT_DIGITS = 6;
-
-export const RESULT_METHODS = ['form', 'sorm', 'mc', 'is', 'fosm'] as const satisfies readonly ResultMethod[];
 
 /** The check_probabilistic study (form + Latin hypercube Monte Carlo, default FORM limits): its hash is the pre-PRB-b digest, so older acceptances stay valid. */
 export const DEFAULT_STUDY: ResultStudy = {
