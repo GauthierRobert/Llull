@@ -4,6 +4,7 @@ import type { AnalysisCase } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { significantNumber } from '@lib/compactNumber';
 import { creepLawOf, isLawProblem, type CreepLaw } from './law';
+import { unresolvedStubOf } from './privateLaw';
 
 export interface PartIssue {
   readonly code: string;
@@ -20,6 +21,14 @@ export function partLaw(doc: CadDocument, entityId: string): CreepLaw | PartIssu
   if (materialId === undefined)
     return { code: 'CRP_LAW_MISSING', severity: 'error', message: `part '${entityId}' has no material (assign_material)`, ids: [entityId] };
   const material = Object.hasOwn(doc.materials, materialId) ? (doc.materials[materialId] ?? null) : null;
+  const stub = unresolvedStubOf(doc, materialId);
+  if (stub !== null)
+    return {
+      code: 'MAT_LIBRARY_UNRESOLVED',
+      severity: 'error',
+      message: `part '${entityId}': material '${materialId}' comes from private library '${stub.record.libraryRef.libraryId}', not resolved on this machine (${stub.record.unresolved.reason}); its creep law is unknown here`,
+      ids: [entityId, materialId],
+    };
   const law = creepLawOf(material, materialId);
   return isLawProblem(law)
     ? { code: law.code, severity: 'error', message: `part '${entityId}': ${law.message}`, ids: [entityId, materialId] }

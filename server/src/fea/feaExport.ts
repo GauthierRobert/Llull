@@ -6,6 +6,7 @@ import { sha256Hex } from '@lib/sha256';
 import type { FeaExportFormat, FeaHost, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
+import { privateCreepLawMaterials } from '@cae/index';
 import { currentMesh, feaFailure, isFailure } from './feaCommon';
 
 const EXTENSION: Readonly<Record<FeaExportFormat, string>> = { calculix_inp: 'inp', nastran_bdf: 'bdf', vtu: 'vtu' };
@@ -29,7 +30,8 @@ function currentResults(
 /**
  * @failure unknown analysis / missing or stale mesh -> the shared codes; a deck the writer refuses (materials, constraints, unsupported analysis type for
  *   the BDF, ids too large ...) -> its code; ITAR / EAR material records -> MAT_EXPORT_CONTROLLED for every format (the VTU leaves the machine
- *   like the decks do); the document is never changed
+ *   like the decks do); a deck (inp / bdf) of a case whose part material has a private-library creep law -> CRP_LAW_PRIVATE (FR-CRP-20);
+ *   the document is never changed
  */
 export function runFeaExport(
   analysisId: string,
@@ -39,6 +41,14 @@ export function runFeaExport(
 ): FeaToolResult {
   const format = options.format ?? 'calculix_inp';
   const doc = host.getDoc();
+  const privateLaws = format === 'vtu' ? [] : privateCreepLawMaterials(doc, analysisId);
+  if (privateLaws.length > 0)
+    return feaFailure(
+      'fea_export',
+      'CRP_LAW_PRIVATE',
+      `the creep law of ${privateLaws.map((id) => `'${id}'`).join(', ')} comes from a private material library: a deck would carry its coefficients, so none is exported (fea_solve still runs the case on this machine)`,
+      privateLaws,
+    );
   const current = currentMesh('fea_export', doc, analysisId, deps.store, deps.hooks);
   if (isFailure(current)) return current;
   let text: string;
