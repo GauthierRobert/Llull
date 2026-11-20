@@ -74,4 +74,28 @@ describe('acceptance across save and load', () => {
     expect(codes(accepted.document)).toContain('PRB_ACCEPTED');
     expect(codes(loaded)).toContain('PRB_ACCEPTED');
   });
+
+  it('fails safe when a plugin derivation differs on another machine: the model hash moves and the acceptance reads PRB_RESULT_STALE, never PRB_ACCEPTED', () => {
+    const resultHash = ((checked(doc)['limitStates'] as Record<string, Json>)['mass_budget'] as Json)['resultHash'] as string;
+    const payload = acceptancePayload('mass_budget', resultHash, study.seed, study.samples, 'covered by test', doc.uid ?? '');
+    const accepted = execute(
+      doc,
+      'accept_reliability_result',
+      { ...study, resultHash, justification: 'covered by test', confirmation: { secret: SECRET, payload } },
+      ctx(),
+    ).document;
+    const [derivedId] = [...derivedEntityIds(accepted)];
+    const derived = derivedId === undefined ? undefined : accepted.entities[derivedId];
+    expect(derived).toBeDefined();
+    if (derivedId === undefined || derived === undefined) return;
+    // the same definition, derived differently (another plugin build / machine): one coordinate of the derived entity differs
+    const otherMachine = {
+      ...accepted,
+      entities: { ...accepted.entities, [derivedId]: { ...derived, position: [0, 0, 1e-9] } },
+    } as CadDocument;
+    expect(limitStateModelHash(otherMachine, 'mass_budget')).not.toBe(limitStateModelHash(accepted, 'mass_budget'));
+    const codes = (checked(otherMachine)['items'] as Array<{ code: string }>).map((item) => item.code);
+    expect(codes).toContain('PRB_RESULT_STALE');
+    expect(codes).not.toContain('PRB_ACCEPTED');
+  });
 });
