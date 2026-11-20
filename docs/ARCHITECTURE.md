@@ -155,8 +155,12 @@ between steps never need rewriting. On top of that:
   load. Versions 1 and 2 are still read. Kernel results (`mesh` entities with a `brep` recipe) are
   derived too, opt-in: `set_mesh_storage recipe` makes a save omit their triangles (envelope version 4,
   `derivedMeshes`) and the loader rebuilds them from the recipe with the kernel it is given
-  (`KRN_DERIVED_MESH_NO_KERNEL` / `KRN_DERIVED_MESH_UNBUILT` when it cannot). Default `full` keeps the
-  stored triangles, which also serve as the fallback when a kernel cannot rebuild a tree.
+  (`KRN_DERIVED_MESH_NO_KERNEL` / `KRN_DERIVED_MESH_UNBUILT` when it cannot). Listed entities are validated before any
+  kernel sees them (`KRN_DERIVED_MESH_INVALID`); rebuilt triangles must hash to the saved ones, so content hashes and
+  released revisions stay stable (`KRN_DERIVED_MESH_DRIFT`, `load_document acceptMeshDrift` to take them anyway). Recipes
+  with an imported exact leaf (`{ op: 'brep' }`) keep their triangles, and recovery slots, autosave, crash reports and
+  vault objects always store full meshes (`keepKernelMeshes`). Default `full` keeps the stored triangles, which also
+  serve as the fallback when a kernel cannot rebuild a tree.
 
 ## Geometry kernel
 

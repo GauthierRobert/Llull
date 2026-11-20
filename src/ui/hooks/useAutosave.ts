@@ -42,7 +42,11 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       if (state.document.order.length === 0) clearAutosave(storage);
       else {
         const clean = !useSessionStore.getState().dirty;
-        const record = { savedAt: Date.now(), json: serializeDocument(state.document), ...(clean ? { clean: true as const } : {}) };
+        const record = {
+          savedAt: Date.now(),
+          json: serializeDocument(state.document, { keepKernelMeshes: true }),
+          ...(clean ? { clean: true as const } : {}),
+        };
         if (!writeAutosave(storage, record)) {
           // A stale copy must never be restored as if it were current.
           clearAutosave(storage);
@@ -60,7 +64,7 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       if (record === null) return;
       if (state.liveStatus === 'connected' || state.document.order.length > 0) {
         // Not applied automatically: offer unsaved work that differs from the current document.
-        if (record.clean !== true && record.json !== serializeDocument(state.document)) {
+        if (record.clean !== true && record.json !== serializeDocument(state.document, { keepKernelMeshes: true })) {
           useSessionStore.getState().setPendingLocalCopy({ savedAt: record.savedAt, json: record.json });
         }
         return;

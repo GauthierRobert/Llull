@@ -188,6 +188,8 @@ export const updateDimensionStyle = defineCommand({
     if (problem !== null) return noop(doc, `update_dimension_style: ${problem}; nothing changed.`);
     const kept = Object.fromEntries(Object.entries(style).filter(([key]) => !(reset as readonly string[]).includes(key))) as DimensionStyle;
     const next: DimensionStyle = { ...kept, ...patch, id: style.id, name: trimmed ?? style.name };
+    if (JSON.stringify(Object.entries(next).sort()) === JSON.stringify(Object.entries(style).sort()))
+      return noop(doc, `update_dimension_style: style ${styleId} already has those values; nothing changed.`);
     const users = dimensionsOf(doc)
       .filter((dimension) => dimension.styleId === styleId)
       .map((dimension) => dimension.id);
@@ -268,7 +270,13 @@ export const applyDimensionStyle = defineCommand({
         );
       targets.push(entity);
     }
-    if (targets.length === 0) return noop(doc, 'apply_dimension_style: the document has no dimensions to restyle.');
+    if (targets.length === 0)
+      return noop(
+        doc,
+        entityIds === undefined
+          ? 'apply_dimension_style: the document has no dimensions to restyle.'
+          : 'apply_dimension_style: entityIds is empty; nothing to restyle.',
+      );
     const moved = targets.map((dimension) => restyled(dimension, styleId ?? undefined));
     return changed(
       replaceEntitiesById(doc, moved),

@@ -94,7 +94,7 @@ describe('recipe mesh storage round trip', () => {
     expect(() => deserializeDocument(text, { kernel: fakeKernel({ solid: null }) })).toThrow(/KRN_DERIVED_MESH_UNBUILT.*occt-native/);
     const broken = JSON.parse(text) as { document: { entities: Record<string, { brep?: unknown }> } };
     delete broken.document.entities[id]!.brep;
-    expect(() => deserializeDocument(JSON.stringify(broken), { kernel: manifold })).toThrow(/KRN_DERIVED_MESH_UNBUILT.*mesh-/);
+    expect(() => deserializeDocument(JSON.stringify(broken), { kernel: manifold })).toThrow(/KRN_DERIVED_MESH_INVALID.*mesh-/);
     expect(() => deserializeDocument(JSON.stringify({ ...JSON.parse(text), derivedMeshes: 5 }), { kernel: manifold })).toThrow(
       /derivedMeshes/,
     );
@@ -110,5 +110,90 @@ describe('recipe mesh storage round trip', () => {
       },
     };
     expect(() => deserializeDocument(JSON.stringify({ format: 'llull-document', version: 3, document: bad }))).toThrow(/meshStorage/);
+  });
+});
+
+type Envelope = {
+  format: string;
+  version: number;
+  document: CadDocument;
+  derivedMeshes?: Record<string, { triangles: number; sha256: string }>;
+};
+const envelopeOf = (text: string): Envelope => JSON.parse(text) as Envelope;
+const contentHash = (doc: CadDocument): unknown => execute(doc, 'document_content_hash', {}).data;
+
+describe('recipe mesh storage hardening (review)', () => {
+  it('reloads identical triangles and the same document content hash', () => {
+    const { doc, id } = recipeDoc();
+    const loaded = deserializeDocument(serializeDocument(doc), { kernel: manifold });
+    expect(meshOf(loaded, id).mesh).toEqual(meshOf(doc, id).mesh);
+    expect(contentHash(loaded)).toEqual(contentHash(doc));
+  });
+
+  it('keeps the triangles of a recipe with an imported exact leaf ({ op: brep }) stored', () => {
+    const { doc, id } = recipeDoc();
+    const leaf = { op: 'brep', blob: 'a'.repeat(64) } as unknown as MeshSolidEntity['brep'];
+    const imported = { ...doc, entities: { ...doc.entities, [id]: { ...meshOf(doc, id), brep: leaf } } } as CadDocument;
+    const written = envelopeOf(serializeDocument(imported));
+    expect(written.version).toBe(3);
+    expect(written.derivedMeshes).toBeUndefined();
+    expect((written.document.entities[id] as MeshSolidEntity).mesh.indices.length).toBeGreaterThan(0);
+    expect(execute(imported, 'set_mesh_storage', { mode: 'full' }).summary).toContain('keep every');
+  });
+
+  it('keepKernelMeshes writes full meshes (recovery, autosave, vault)', () => {
+    const { doc, id } = recipeDoc();
+    const written = envelopeOf(serializeDocument(doc, { keepKernelMeshes: true }));
+    expect(written.version).toBe(3);
+    expect((written.document.entities[id] as MeshSolidEntity).mesh.indices.length).toBeGreaterThan(0);
+    expect(deserializeDocument(JSON.stringify(written)).entities[id]).toEqual(doc.entities[id]);
+  });
+
+  it('never hands a hostile listed entity to the kernel (KRN_DERIVED_MESH_INVALID)', () => {
+    const { doc, id } = recipeDoc();
+    const text = serializeDocument(doc);
+    let evaluated = 0;
+    const counting: GeometryKernel = { ...manifold, evaluate: (recipe) => ((evaluated += 1), manifold.evaluate(recipe)) };
+    const record = envelopeOf(text).derivedMeshes![id]!;
+    const variants: Array<(envelope: Envelope) => void> = [
+      (e) => (e.derivedMeshes = { __proto__x: record, ...e.derivedMeshes, missing: record }),
+      (e) => (e.derivedMeshes = { [Object.keys(e.document.entities).find((key) => key !== id) ?? 'x']: record }),
+      (e) => ((e.document.entities[id] as unknown as { brep: unknown }).brep = { op: 'boolean', kind: 'xor', a: null, b: null }),
+      (e) => ((e.document.entities[id] as unknown as { brep: unknown }).brep = { op: 'brep', blob: 'b'.repeat(64) }),
+    ];
+    for (const mutate of variants) {
+      const envelope = envelopeOf(text);
+      mutate(envelope);
+      expect(() => deserializeDocument(JSON.stringify(envelope), { kernel: counting })).toThrow(/KRN_DERIVED_MESH_INVALID/);
+    }
+    const proto = envelopeOf(text);
+    proto.derivedMeshes = JSON.parse(`{"__proto__": ${JSON.stringify(record)}}`) as NonNullable<Envelope['derivedMeshes']>;
+    expect(() => deserializeDocument(JSON.stringify(proto), { kernel: counting })).toThrow(/KRN_DERIVED_MESH_INVALID/);
+    expect(evaluated).toBe(0);
+  });
+
+  it('refuses rebuilt triangles that differ from the saved ones unless drift is accepted', () => {
+    const { doc, id } = recipeDoc();
+    const envelope = envelopeOf(serializeDocument(doc));
+    envelope.derivedMeshes![id] = { ...envelope.derivedMeshes![id]!, sha256: '0'.repeat(64) };
+    const text = JSON.stringify(envelope);
+    expect(() => deserializeDocument(text, { kernel: manifold })).toThrow(/KRN_DERIVED_MESH_DRIFT.*acceptMeshDrift/);
+    expect(meshOf(deserializeDocument(text, { kernel: manifold, acceptMeshDrift: true }), id).mesh).toEqual(meshOf(doc, id).mesh);
+    const ctx = { ...defaultContext(), kernel: manifold };
+    const target = createEmptyDocument();
+    expectNoOp(execute(target, 'load_document', { json: text }, ctx), target, 'KRN_DERIVED_MESH_DRIFT');
+    expect(
+      meshOf(execute(target, 'load_document', { json: text, acceptMeshDrift: true }, ctx).document, id).mesh.indices.length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('honours derivedMeshes only in a version 4 envelope, and requires it there', () => {
+    const { doc } = recipeDoc();
+    const envelope = envelopeOf(serializeDocument(doc));
+    expect(() => deserializeDocument(JSON.stringify({ ...envelope, version: 3 }), { kernel: manifold })).toThrow(
+      /only valid in a version 4/,
+    );
+    const { derivedMeshes: _table, ...bare } = envelope;
+    expect(() => deserializeDocument(JSON.stringify(bare), { kernel: manifold })).toThrow(/version 4 file needs derivedMeshes/);
   });
 });

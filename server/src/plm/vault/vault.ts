@@ -257,7 +257,7 @@ export function checkIn(vault: Vault, doc: CadDocument, holder: LockHolder, now:
   const externalized = execute(next, 'externalize_snapshots', {}, ctx);
   if (externalized.rejected === true) throw new VaultError('PLM_VAULT_REFUSED', externalized.summary);
   next = externalized.document;
-  const head = vault.objects.put(serializeDocument(next));
+  const head = vault.objects.put(serializeDocument(next, { keepKernelMeshes: true }));
   const item = (next.plm as NonNullable<CadDocument['plm']>).item;
   const current = item.revisions[item.currentRevision];
   const frozenRefs: Record<string, FrozenRef> = { ...refs?.revisions };

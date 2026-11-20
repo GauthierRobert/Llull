@@ -10,7 +10,7 @@ import { postRecovery } from './serverCommands';
 import { useSessionStore } from './sessionStore';
 
 export function preserveOfflineEdits(offlineDocument: CadDocument, changeCount: number): void {
-  const json = serializeDocument(offlineDocument);
+  const json = serializeDocument(offlineDocument, { keepKernelMeshes: true });
   void postRecovery('offline', { json, changeCount, path: useRecoveryStore.getState().documentPath }).then(
     () => {
       // the backend slot is now the recoverable copy: drop the device copy so the same work is not offered twice at next launch

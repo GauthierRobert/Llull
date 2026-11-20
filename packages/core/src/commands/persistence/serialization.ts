@@ -37,6 +37,11 @@ interface SerializeOptions {
    * Hashing and diffing pass true.
    */
   readonly includeDerived?: boolean;
+  /**
+   * Keep kernel-result triangles even under `meshStorage: 'recipe'`: recovery slots, autosave, vault objects and crash reports, which must reopen
+   * with whatever kernel is there (or none yet) and keep content hashes stable.
+   */
+  readonly keepKernelMeshes?: boolean;
 }
 
 /**
@@ -50,7 +55,9 @@ export function serializeDocument(doc: CadDocument, options: SerializeOptions = 
   const full = options.includeDerived === true;
   const stored = withoutPrivateValues(full ? doc : withoutDerivedEntities(doc));
   const { document, table } =
-    !full && doc.kernelSettings?.meshStorage === 'recipe' ? withoutDerivedMeshes(stored) : { document: stored, table: null };
+    !full && options.keepKernelMeshes !== true && doc.kernelSettings?.meshStorage === 'recipe'
+      ? withoutDerivedMeshes(stored)
+      : { document: stored, table: null };
   // The envelope `{ format, version, document[, derivedMeshes] }` in that key order, the document through the per-part text memo.
   const head = `{"format":"llull-document","version":${table === null ? CURRENT_SCHEMA_VERSION : DERIVED_MESHES_VERSION}`;
   return `${head},"document":${documentJson(document)}${table === null ? '' : `,"derivedMeshes":${JSON.stringify(table)}`}}`;
@@ -176,6 +183,8 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
 interface DeserializeOptions {
   /** Rebuilds the meshes a `meshStorage: 'recipe'` file omits; without it such a file is refused (KRN_DERIVED_MESH_NO_KERNEL). */
   readonly kernel?: GeometryKernel | null;
+  /** Accept rebuilt triangles that differ from the saved ones (another kernel build); without it such a file is refused (KRN_DERIVED_MESH_DRIFT). */
+  readonly acceptMeshDrift?: boolean;
 }
 
 /** Far beyond any document a command writes; well below the depth at which `JSON.stringify` overflows the stack. */
@@ -211,7 +220,10 @@ export function deserializeDocument(json: string, options: DeserializeOptions = 
       'load_document: document structure is invalid — missing or malformed required fields ' +
         '(entities, order, layers, layerOrder, selection, camera).',
     );
-  const withMeshes = rebuildDerivedMeshes(rawDoc, derivedMeshTableOf(parsed['derivedMeshes']) ?? {}, options.kernel);
+  const withMeshes = rebuildDerivedMeshes(rawDoc, derivedMeshTableOf(parsed['derivedMeshes'], parsed['version']) ?? {}, {
+    kernel: options.kernel,
+    ...(options.acceptMeshDrift === true ? { acceptDrift: true } : {}),
+  });
   const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrateRetiredCommands(migrate(withMeshes))));
   const valueErrors = validateDocumentValues(migratedDoc);
   if (valueErrors.length > 0) throw new Error(`load_document: document contains invalid values:\n  ${valueErrors.join('\n  ')}`);
@@ -233,11 +245,21 @@ export const loadDocument = defineCommand({
           '({ format: "llull-document", version: 3, document: { ... } }; versions 1 and 2 are also read). ' +
           'Must contain a valid CadDocument with entities, order, layers, layerOrder, selection, and camera.',
       ),
+    acceptMeshDrift: z
+      .boolean()
+      .describe(
+        'Only for a "recipe" mesh-storage file (version 4): take rebuilt kernel triangles that differ from the saved ones (opened with another kernel ' +
+          'or kernel build; the document content hash then changes). Default false: such a file is refused with KRN_DERIVED_MESH_DRIFT.',
+      )
+      .optional(),
   }),
-  run: (doc, { json }, ctx): CommandResult => {
+  run: (doc, { json, acceptMeshDrift }, ctx): CommandResult => {
     let parsed: CadDocument;
     try {
-      const read = deserializeDocument(json, { kernel: (ctx ?? currentContext()).kernel });
+      const read = deserializeDocument(json, {
+        kernel: (ctx ?? currentContext()).kernel,
+        ...(acceptMeshDrift === true ? { acceptMeshDrift: true } : {}),
+      });
       // A file without an identity (saved before VIS-ID, or built outside the commands) gets one from its own bytes, so signing on it works.
       parsed = read.uid === undefined ? { ...read, uid: sha256Hex(json).slice(0, 32) } : read;
     } catch (err) {

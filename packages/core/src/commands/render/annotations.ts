@@ -48,7 +48,7 @@ export function dimensionStrokes(
     e.dimensionKind,
     references(doc, e.entityIds),
     e.offset ?? DEFAULT_DIMENSION_OFFSET,
-    ARROW_PX * worldPerPx,
+    style.arrowSize ?? ARROW_PX * worldPerPx,
     style,
   );
   if (!drawing) return [];

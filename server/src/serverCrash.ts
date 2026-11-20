@@ -14,7 +14,7 @@ const EMPTY_DOCUMENT_JSON = serializeDocument(createEmptyDocument());
 
 function serializedOrUndefined(doc: CadDocument): string | undefined {
   try {
-    return serializeDocument(doc);
+    return serializeDocument(doc, { keepKernelMeshes: true });
   } catch {
     return undefined; // the report still carries the error and the command log
   }

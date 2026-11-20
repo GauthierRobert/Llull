@@ -134,6 +134,9 @@ describe('update / apply / delete / activate / list', () => {
     expectNoOp(execute(doc, 'update_dimension_style', { styleId: style, name: 'B' }), doc, 'already exists');
     expectNoOp(execute(doc, 'update_dimension_style', { styleId: style, name: ' ' }), doc, 'name must not be empty');
     expectNoOp(execute(doc, 'update_dimension_style', { styleId: style, arrowSize: -2 }), doc, 'arrowSize must be');
+    expectNoOp(execute(doc, 'update_dimension_style', { styleId: style, textHeight: 2 }), doc, 'already has those values');
+    expectNoOp(execute(doc, 'update_dimension_style', { styleId: style, reset: ['suffix'] }), doc, 'already has those values');
+    expectNoOp(execute(doc, 'apply_dimension_style', { styleId: style, entityIds: [] }), doc, 'entityIds is empty');
   });
   it('apply restyles given or all dimensions, null clears, refuses non-dimensions', () => {
     const { doc, other, linear, diameter } = setup();

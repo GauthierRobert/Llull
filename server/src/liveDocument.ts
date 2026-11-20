@@ -63,7 +63,7 @@ const started = startState();
 export const recoverySession = createRecoverySession({
   store: recoveryStore,
   debounceMs: positiveInteger(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'], 300),
-  serialize: serializeDocument,
+  serialize: (doc) => serializeDocument(doc, { keepKernelMeshes: true }),
   onStatus: (status) => reportAutosaveStatus(status),
   initial: started.binding,
   announceActive: AUTOSAVE_ENABLED && !started.resumed,

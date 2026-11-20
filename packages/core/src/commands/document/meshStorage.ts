@@ -11,6 +11,7 @@ import type { DocumentKernelSettings } from '../../model/types';
 
 /**
  * @affects sets `kernelSettings.meshStorage`; a document without `kernelSettings` gets one naming the active kernel ('manifold' when none is installed)
+ * @invariant like set_modeling_tolerance, a fresh slice stamps the ctx kernel as provenance: a replay under another kernel stamps that one (no geometry changes)
  * @invariant 'recipe' only changes what a SAVE writes (kernel-result `mesh` entities with a `brep` and no `asset` / `meshSource` are written empty and
  *   rebuilt on load); entities in the document keep their triangles
  * @failure mode not 'full' / 'recipe' -> rejected by the schema (no-op); already in that mode -> no-op, affected:[]

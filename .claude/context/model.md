@@ -142,9 +142,10 @@ still read and migrated (`migrate2to3`). v3 adds `kernelSettings` (kernel proven
 tolerances, stamped on save) and `blobs` (sha256-keyed healed B-rep / STEP payloads that `brep`
 recipe leaves reference; checked on load: KRN_BLOB_MISSING / KRN_BLOB_HASH_MISMATCH).
 `kernelSettings.meshStorage` (`set_mesh_storage`, absent = 'full'): in 'recipe' a save (not `includeDerived`) writes
-top-level `mesh` entities with `brep` and no `asset` / `meshSource` empty and adds envelope version 4 `derivedMeshes`
-`{ id: { triangles, sha256 } }`; `deserializeDocument(json, { kernel })` re-evaluates the recipes before validation
-(KRN_DERIVED_MESH_NO_KERNEL / KRN_DERIVED_MESH_UNBUILT; a differing hash is accepted). Hosts pass `getGeometryKernel()`.
+top-level `mesh` entities with `brep` (no `{ op: 'brep' }` leaf) and no `asset` / `meshSource` empty and adds envelope version 4
+`derivedMeshes` `{ id: { triangles, sha256 } }` (only in v4, always in v4); `deserializeDocument(json, { kernel, acceptMeshDrift? })`
+validates each listed entity, then re-evaluates its recipe (KRN_DERIVED_MESH_NO_KERNEL / _INVALID / _UNBUILT / _DRIFT when the rebuilt
+hash differs). Hosts pass `getGeometryKernel()`; recovery / autosave / crash / vault writes pass `keepKernelMeshes: true`.
 
 ## Invariants commands must preserve
 
