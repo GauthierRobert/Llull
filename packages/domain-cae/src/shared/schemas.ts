@@ -8,3 +8,6 @@ export const quantitySchema = z.object({
 });
 
 export const analysisIdSchema = z.string().describe('Id of the analysis (affected[0] of create_analysis, e.g. an-1.1).');
+
+/** The stored `stepKey` of a signed record (`@lib/replaySurvivors`, SIG-REPLAY): the key of the feature step that wrote it. */
+export const stepKeySchema = z.string().min(1).max(64);

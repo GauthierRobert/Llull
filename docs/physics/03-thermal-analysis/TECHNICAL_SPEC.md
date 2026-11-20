@@ -609,3 +609,13 @@ cases; a signing implementation (09 PLM); the `llull guide` thermal section.
 - **Deck text.** BC names, cavity names / ids, material origin and unverified reasons pass through `commentText`; the cavity keyword uses the
   sanitised upper-case name; `add_cavity_radiation` accepts only `[A-Za-z0-9_]{1,3}`.
 - **Temperatures** of every thermal quantity are bounded to (0, 1e5] K (named guard "llull guard", `shared/quantity.ts`).
+
+### As built (SIG-REPLAY, 2026-11-20): the signed record follows the history
+
+- `dispose_thermal_limit` stamps its signed record (`analysis.dispositionLedger`) with `stepKey`, the key of the feature step that wrote it (`@lib/replaySurvivors`). The plugin
+  `replaySeed` now receives the live step keys of the replayed history and seeds a record only while its step is live: suppressing or deleting the
+  signing step and regenerating drops the decision (the finding is pending again).
+- A replayed signing step whose subject has no kept record is a no-op (summary `not re-applied`), not a refusal: unsuppressing the step does not bring
+  the decision back (a human signs again), and deleting the subject then regenerating no longer fails the step. A kept record that disagrees with the
+  step, or whose signature no longer verifies, is still the human-gate refusal.
+- Records written before this change carry no `stepKey` and keep today's behaviour (seeded by every replay), so old documents regenerate unchanged.

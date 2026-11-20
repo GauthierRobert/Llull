@@ -53,6 +53,8 @@ export interface Deviation {
   readonly signatureId: string;
   readonly signature: unknown;
   readonly documentUid: string;
+  /** Key of the feature step that recorded it (SIG-REPLAY: seeded only while that step is live); absent on older records. */
+  readonly stepKey?: string;
 }
 
 export interface SpaceEnvironment {

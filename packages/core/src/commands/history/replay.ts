@@ -13,6 +13,7 @@ import { kernelRefusal } from '../kernelRefusal';
 import { nextStateKey, replayCacheFor } from './replayCache';
 import { deferralCount } from '../../geometry/mesh/engine';
 import { hashText } from '../../lib/hash';
+import { stepKeyOf } from '../../lib/id';
 import { remapIds } from './regenerate';
 import { mergeReplaySeeds } from './replaySeeds';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
@@ -97,8 +98,14 @@ export function replayFailureError(failures: readonly ReplayFailure[]): CommandE
     : undefined;
 }
 
+/** Keys (`stepKeyOf`) of the steps of `history` a replay runs (not suppressed). */
+function liveStepKeys(history: readonly FeatureStep[]): ReadonlySet<string> {
+  return new Set(history.filter((step) => step.suppressed !== true).map((step) => stepKeyOf(step.id)));
+}
+
 /** Empty geometry that keeps the document-level settings and input state of `base` (what no recorded step regenerates). */
 function replaySeed(base: CadDocument, history: FeatureStep[]): CadDocument {
+  const live = liveStepKeys(history);
   return {
     ...createEmptyDocument(),
     camera: base.camera,
@@ -127,7 +134,8 @@ function replaySeed(base: CadDocument, history: FeatureStep[]): CadDocument {
     ...fontSeed(base),
     // Plugin identity that survives replay while the slice content is regenerated (e.g. the building's IFC GlobalId salt).
     // Seeds are deep-merged; a leaf two plugins seed differently is reported by mergeReplaySeeds (first wins) and failed by tests/unit/contract/replaySeeds.test.ts.
-    ...mergeReplaySeeds(documentExtensions().map((extension) => extension.replaySeed?.(base) ?? {})).seed,
+    // A signed record whose recording step is suppressed or deleted in `history` is not seeded (SIG-REPLAY).
+    ...mergeReplaySeeds(documentExtensions().map((extension) => extension.replaySeed?.(base, live) ?? {})).seed,
   };
 }
 

@@ -259,3 +259,13 @@ pressure, in phase over all exposed faces" (FUNCTIONAL_SPEC risk table) and `rev
 unit pressure on those faces, so the response ASD is `sum_rs H_r H_s* Gamma_r Gamma_s G_p(f)`; this needs the mode shapes from a CalculiX `*FREQUENCY` run and the face load vector from the
 05 deck writer, so it cannot be tested without a solve. VC-VAC-34 then compares a flat plate under uniform pressure with the analytic fully correlated SDOF result. The viewport face highlight
 and the band chart (`src/ui`, Lane 2) are not built here.
+
+### As built (SIG-REPLAY, 2026-11-20): the signed record follows the history
+
+- `dispose_acoustic_export` stamps its signed record (`vibroacoustics.reviews`) with `stepKey`, the key of the feature step that wrote it (`@lib/replaySurvivors`). The plugin
+  `replaySeed` now receives the live step keys of the replayed history and seeds a record only while its step is live: suppressing or deleting the
+  signing step and regenerating drops the decision (the finding is pending again).
+- A replayed signing step whose subject has no kept record is a no-op (summary `not re-applied`), not a refusal: unsuppressing the step does not bring
+  the decision back (a human signs again), and deleting the subject then regenerating no longer fails the step. A kept record that disagrees with the
+  step, or whose signature no longer verifies, is still the human-gate refusal.
+- Records written before this change carry no `stepKey` and keep today's behaviour (seeded by every replay), so old documents regenerate unchanged.

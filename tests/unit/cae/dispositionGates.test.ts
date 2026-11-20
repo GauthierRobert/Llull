@@ -17,6 +17,7 @@ import { caseIn } from './helpers';
 import { marginBar, STAND_IN_MESH } from './marginsFixtures';
 import { caseOf, must } from './thermal/fixtures';
 import { solvedWall } from './thermal/solved';
+import { expectSignedReplayFollowsHistory } from '../../helpers/signedReplay';
 
 const SECRET = 'sig-bytes-5d21';
 const justification = 'accepted for the qualification test, covered by the thermostat';
@@ -240,6 +241,14 @@ describe.each([
     const { dispositionLedger, ...analysis } = signed.analysis ?? { cases: {}, caseOrder: [] };
     void dispositionLedger;
     expect(gate.stored(replay({ ...signed, analysis }, port()))).toBeUndefined();
+  });
+
+  it('SIG-REPLAY: suppressing or deleting the dispose step drops the disposition and its ledger entry; unsuppressing does not restore them', () => {
+    const entryOf = (document: CadDocument): { stepKey?: string } | undefined =>
+      ledger(document).find((entry) => entry['act'] === gate.act && entry['rowKey'] === gate.rowKey) as { stepKey?: string } | undefined;
+    expect(gate.stored(signed)).toBeDefined();
+    const outcome = expectSignedReplayFollowsHistory(signed, command, entryOf, ctxWith(port()));
+    for (const next of [outcome.suppressed, outcome.deleted, outcome.restored]) expect(gate.stored(next)).toBeUndefined();
   });
 
   it('a copy with another uid loses the disposition on replay, and the signature of this document does not verify in it', () => {

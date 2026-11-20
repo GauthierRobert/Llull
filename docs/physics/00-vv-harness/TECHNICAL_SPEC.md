@@ -561,3 +561,13 @@ are core. The transport is in `server/` and forwards: it holds no V&V arithmetic
 - **Guide.** `llull guide` gained section 18 (solution verification: the three kinds, the least-squares method, the reporting rules, the human gate).
 - **Not built (M4):** the PHY-09 dynamics transports for a dt study (above); shell and plane-stress studies (still `VNV_CASE_UNSUPPORTED`); weights other than 1 in the fit through the commands (the library
   takes them); the exception signing route (above); a rail tab for the panel (a section of the Analysis panel instead: a rail tab touches the shell store).
+
+### As built (SIG-REPLAY, 2026-11-20): the signed record follows the history
+
+- `dispose_margin` and `accept_verification_exception` stamps its signed record (`analysis.dispositionLedger` / `analysis.exceptionLedger`) with `stepKey`, the key of the feature step that wrote it (`@lib/replaySurvivors`). The plugin
+  `replaySeed` now receives the live step keys of the replayed history and seeds a record only while its step is live: suppressing or deleting the
+  signing step and regenerating drops the decision (the finding is pending again).
+- A replayed signing step whose subject has no kept record is a no-op (summary `not re-applied`), not a refusal: unsuppressing the step does not bring
+  the decision back (a human signs again), and deleting the subject then regenerating no longer fails the step. A kept record that disagrees with the
+  step, or whose signature no longer verifies, is still the human-gate refusal.
+- Records written before this change carry no `stepKey` and keep today's behaviour (seeded by every replay), so old documents regenerate unchanged.

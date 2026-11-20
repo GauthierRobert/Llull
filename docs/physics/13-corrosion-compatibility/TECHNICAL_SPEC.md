@@ -387,3 +387,13 @@ Tests: `tests/unit/inspect/contacts.test.ts` (VC-COR-01), `tests/unit/corrosion/
   - M5 (MIL-STD-889D matrix, SCC, HE: needs the standards);
   - RS-6 VC-COR-17 (Rust);
   - the UI contact overlay and the acceptance dialog.
+
+### As built (SIG-REPLAY, 2026-11-20): the signed record follows the history
+
+- `accept_corrosion_item` stamps its signed record (`corrosion.acceptances`) with `stepKey`, the key of the feature step that wrote it (`@lib/replaySurvivors`). The plugin
+  `replaySeed` now receives the live step keys of the replayed history and seeds a record only while its step is live: suppressing or deleting the
+  signing step and regenerating drops the decision (the finding is pending again).
+- A replayed signing step whose subject has no kept record is a no-op (summary `not re-applied`), not a refusal: unsuppressing the step does not bring
+  the decision back (a human signs again), and deleting the subject then regenerating no longer fails the step. A kept record that disagrees with the
+  step, or whose signature no longer verifies, is still the human-gate refusal.
+- Records written before this change carry no `stepKey` and keep today's behaviour (seeded by every replay), so old documents regenerate unchanged.

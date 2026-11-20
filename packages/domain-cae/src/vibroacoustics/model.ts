@@ -2,6 +2,7 @@
 
 import { z } from '@core/commands/schema';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
+import { stepKeySchema } from '../shared/schemas';
 import type { CadDocument } from '@core/model/types';
 import { bandByNominal } from './math/bands';
 import { LEVEL_DB_MAX, LEVEL_DB_MIN } from './math/levels';
@@ -126,6 +127,7 @@ const reviewSchema = z.strictObject({
   signatureId: z.string().min(1).max(256),
   signature: z.unknown(),
   documentUid: z.string().min(1).max(256),
+  stepKey: stepKeySchema.optional(),
 });
 
 const sliceSchema = z
