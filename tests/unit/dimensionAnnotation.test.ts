@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { dimensionDrawing, dimensionText, formatDimensionValue } from '@core/geometry/dimensionAnnotation';
+import { type DimensionDrawing, dimensionDrawing, dimensionText, formatDimensionValue } from '@core/geometry/dimensionAnnotation';
 import { xy } from '../helpers/xy';
 
 function draw(doc: CadDocument, command: string, params: object): { doc: CadDocument; entity: Entity } {
@@ -87,7 +87,8 @@ describe('dimension text', () => {
 
 describe('dimension style look (arrowheads, extension lines, number format)', () => {
   const { ids } = sketch();
-  const linear = (look: Parameters<typeof dimensionDrawing>[4]) => dimensionDrawing('linear', [ids['left'], ids['right']], 5, 0.3, look)!;
+  const linear = (look: Parameters<typeof dimensionDrawing>[4]): DimensionDrawing =>
+    dimensionDrawing('linear', [ids['left'], ids['right']], 5, 0.3, look)!;
 
   it('draws open (default), closed, tick, dot and no arrowheads', () => {
     expect(linear({}).segments).toHaveLength(3 + 4);
