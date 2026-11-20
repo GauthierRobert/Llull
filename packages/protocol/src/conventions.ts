@@ -506,4 +506,23 @@ carries unverified / unverifiedReasons and reviewRequired; report them.
    zoned solids: EOP_LIGHTNING_ZONE_NO_PATH = a composite solid in a zone that no path names. A fail or unknown path is disposed only by a human (\`dispose_bond_check\`, EOP_HUMAN_GATE for an agent: hand over).
 4. Queries: \`electrical_resistance\` (R = rho L / A at a temperature; skin depth and AC ratio need mur, no default), \`shield_absorption\` (absorption term only), \`normal_reflectance\` (n1, n2, k
    required), \`optical_balance\` (solarFlux and incidenceAngle required, EOP_SOLAR_FLUX_MISSING; state BOL | EOL) and \`check_surface_properties\` before handing values to a thermal case.
+
+## 22. Creep and relaxation: Norton hold (toolset analysis, PHY-11)
+
+llull ships NO creep law, NO strain tolerance and NO damage limit: A, n, m with their validity and source, cetol and every limit come from the owner (ask), never from memory.
+Times are s, min or h; stresses MPa; strain is the equivalent creep strain ceeq (dimensionless). Every report is reviewRequired: "computed by llull, not approved".
+
+1. Hand check first, no solver: \`creep_closed_form\` check=norton_constant_stress | norton_relaxation | bolt_relaxation | thick_cylinder_stationary | beam_stationary | maxwell | kelvin_voigt | sls |
+   prony_relaxation | wlf_shift | convert_norton_a (inputs carry units in the key: sigma_MPa, t_s; with material=NAME A, n, m come from the material's law and temperature_K is range-checked).
+2. Law: \`add_material_model\` creep_norton (time hardening; A in any stress / time unit, converted for the card) + an elastic_isotropic model, \`define_constitutive_set\` { elastic, creep }
+   makeDefault, \`assign_material\`. Garofalo or strain hardening is CRP_LAW_FORM_UNSUPPORTED; a temperature outside the law validity is CRP_LAW_OUT_OF_RANGE (never extrapolated).
+3. Case: \`create_analysis\` analysisType=creep (CalculiX) → \`set_part_idealization\` → constraints and loads → \`set_creep_step\` duration, cetol (required, CRP_CETOL_INVALID if <= 0), temperature,
+   and set maxIncrement: CETOL cannot bound the increment under a constant stress (CRP_INCREMENT_UNBOUNDED warns; CalculiX 2.21 measured to stop on a singular matrix) →
+   \`add_result_probe\` quantity=ceeq → \`check_creep\` → \`llull fea_mesh\` → \`llull fea_solve\`. \`delete_creep_step\` removes the hold.
+4. Read: \`creep_report\` (hold complete?, laws, max ceeq and von Mises with places, probe histories in hold seconds, at most maxPoints points, and a norton_constant_stress quick check: ratio 1 only
+   for a uniform uniaxial case) and \`check_creep\` again (CRP_HOLD_INCOMPLETE: the solve stopped before the duration; report it, do not shorten the hold). Stale results are refused (FEA_RESULTS_STALE).
+5. Licensed data: a law from a private material library shows its library pin, licence and source with coefficients "private" (redacted: true) and no quick check; without the library on this machine
+   creep_report answers available: false (MAT_LIBRARY_UNRESOLVED: \`resolve_material_libraries\`). Never copy such coefficients into a plan, a parameter or a message.
+6. Compare with a reference value: \`llull compare_expected report.json expected_results.json VC-CRP-10 pointer=/data/maxCeeq/value\` judges one value of a saved --json answer
+   (pointer: JSON pointer, -1 = last array item) against a pack case (tolerance and grade of the case; exit 1 on fail). \`llull run_benchmarks packs=11-creep-viscoelasticity\` judges the whole pack.
 `;

@@ -28,6 +28,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CRP_INPUT_INVALID: 'see the creep_closed_form description for the range of each input',
   CRP_WLF_OUT_OF_RANGE: 'WLF holds for T - Tr >= 0 and C2 + (T - Tr) > 0: use an Arrhenius or measured shift below Tr',
   CRP_NOTHING_TO_DELETE: 'the case has no creep step',
+  MAT_LIBRARY_UNRESOLVED: 'register the library file (register_material_library), then run resolve_material_libraries',
 };
 
 /** Remediation of a creep code (falls back to the 05 table). */

@@ -321,3 +321,27 @@ describe('CONVENTIONS_GUIDE electro-optical section (PHY-15)', () => {
       expect(section).toMatch(text);
   });
 });
+
+describe('CONVENTIONS_GUIDE creep section (PHY-11)', () => {
+  const section = (CONVENTIONS_GUIDE.split(/## \d+\. Creep and relaxation: Norton hold/)[1] ?? '').split('\n## ')[0] ?? '';
+  it('exists and names only registered commands, including every PHY-11 command', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(section.length).toBeGreaterThan(0);
+    const named = [...section.matchAll(/`([a-z_]+)`/g)].map((match) => match[1] ?? '');
+    for (const name of named) expect(getCommand(name), name).toBeDefined();
+    for (const name of ['creep_closed_form', 'set_creep_step', 'delete_creep_step', 'check_creep', 'creep_report'])
+      expect(named).toContain(name);
+  });
+  it('states that no law or tolerance is a default, the increment control, the licensed-data rule and the compare harness', () => {
+    for (const text of [
+      /NO creep law/,
+      /CRP_INCREMENT_UNBOUNDED/,
+      /maxIncrement/,
+      /MAT_LIBRARY_UNRESOLVED/,
+      /redacted: true/,
+      /llull compare_expected/,
+      /reviewRequired/,
+    ])
+      expect(section).toMatch(text);
+  });
+});

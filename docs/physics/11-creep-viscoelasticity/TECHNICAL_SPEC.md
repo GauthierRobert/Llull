@@ -499,8 +499,20 @@ Solver runs: CalculiX 2.21 (Windows build), Netgen 6.2.2604 through `llull-mesh`
 | VC-CRP-62 | pass | typical-basis law: `unverified: true` + reasons in `creep_closed_form` and `creep_report`; `CRP_LAW_UNVERIFIED` warning in `check_creep` / `check_analysis`, deck header `** UNVERIFIED` |
 | VC-CRP-63 | partial | temperature outside the law validity: refused by `creep_closed_form` and `set_creep_step`, error in `check_creep` and the deck; the **stress** range is not expressible (D7) |
 | VC-CRP-65 | partial | tested: `CRP_INPUT_MISSING`, `CRP_INPUT_INVALID`, `CRP_DURATION_INVALID`, `CRP_CETOL_INVALID`, `CRP_STEP_PARAM_INVALID`, `CRP_LAW_MISSING`, `CRP_NO_VISCOUS_MATERIAL`, `CRP_LAW_FORM_UNSUPPORTED`, `CRP_ORTHOTROPIC_V2`, `CRP_LAW_OUT_OF_RANGE`, `CRP_OVERSTRESS_MODEL`, `CRP_HOLD_INCOMPLETE`, `CRP_CASE_TYPE`, `CRP_SOLVER_UNSUPPORTED`, `CRP_WLF_OUT_OF_RANGE`; `m ≤ −1` is refused by PHY-02 on the law; the coarse temperature table is M4 |
-| VC-CRP-66 | not built | private-library redaction in `creep_report`; an unresolved library refuses the deck (`MAT_LIBRARY_UNRESOLVED`) |
+| VC-CRP-66 | pass (unit) | see §13.4: redacted law rows, no quick check, saved materials without the law, `available: false` after reload (`tests/unit/cae/creep/privateLibrary.test.ts`) |
 
 Not done in this change (outside the lane or later milestones): `llull guide` creep section, the `compare.py` CLI harness and the MCP prompt (`packages/protocol`, `server`;
 there is no MCP server, LC1), `--dry-run`, M4 (temperature tables, PHY-03 field, hold blocks, NLGEOM validation) and M5. The PHY-02 card writer converts `timeUnit` (D9).
+
+### 13.4 As built (CRP-M3, 2026-11-19)
+
+| Item | Built | File / test |
+| ---- | ----- | ----------- |
+| VC-CRP-66 redaction | `creep_report`: a law whose material record pins a library that is not a declared embedded one (fail-closed, the TR-MAT-31 stub rule) or is `licensed-no-redistribution` (TR-MAT-32) gives a row with `materialId`, `modelId`, parts, form, validity, basis, source, `library { libraryId, version, sha256, storage private \| undeclared, licence, title }`, `coefficients: "private: …"`, `redacted: true`, and no `A` / `n` / `m`; the quick check becomes `{ check, available: false, redacted: true, reason }` (its value and ratio are functions of the coefficients); `data.redacted: true` and the summary says "law coefficients withheld". A part material that is an unresolved private stub refuses with `MAT_LIBRARY_UNRESOLVED` and `data.available: false` (before the trust check); `check_creep` / the deck / `set_creep_step` name `MAT_LIBRARY_UNRESOLVED` instead of `CRP_LAW_MISSING`. | `creep/privateLaw.ts`, `creep/queries.ts`, `creep/readiness.ts`; `tests/unit/cae/creep/privateLibrary.test.ts` |
+| Guide | `llull guide` section 22 "Creep and relaxation: Norton hold" (test splits on the title). | `packages/protocol/src/conventions.ts`; `tests/unit/conventions.test.ts` |
+| CLI harness | `llull compare_expected ANSWER.json EXPECTED.json CASE [pointer=…] [unit=U] [--json]` replaces the README's `compare.py`: judges one value of a saved `--json` answer with the core judge (`judgeCase`, the case's tolerance and grade); pointer default = the case harness pointer, `-1` = last array item, a `{ value, unit }` object brings its unit; exit 0 pass / warn / skip, 1 fail / error (`VNV_RESULT_MISSING`), 2 usage. `pointerGet` of `run_benchmarks` now accepts negative indices. | `server/src/cli/compareExpected.ts`; `server/tests/compareExpected.test.ts` |
+
+Notes: today no command path puts a PHY-02 creep law on a library record (library files carry PHY-01 property models only; `add_material_model` refuses a library record with `MAT_RECORD_READONLY`), so the redacted row is a guard for a future library format and for loaded documents; the test builds the record by hand. The protocol's non-local redaction (`redactLicensedOutcome`) still applies on top.
+
+Not done: VC-CRP-43 (CalculiX `*VISCO` increment cut, needs CalculiX), VC-CRP-44 / 47 (need a solve; §13 asks for no new deck, the creep deck writer is pinned by `deck.test.ts`), VC-CRP-60 / 64 (M5: `creep_rupture_life`, `dispose_margin` rows; neither is an analytic check), `harness` recipes in `expected_results.json` (the generator owns that file).
 

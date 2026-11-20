@@ -106,15 +106,16 @@ function readMeasurements(file: string | undefined): Map<string, Measured> {
   return measurements;
 }
 
-const pointerGet = (value: unknown, pointer: string): unknown =>
+/** RFC 6901 JSON pointer read; `-1` (or any negative index) on an array counts from its end. */
+export const pointerGet = (value: unknown, pointer: string): unknown =>
   pointer
     .split('/')
     .slice(1)
     .map((token) => token.replace(/~1/g, '/').replace(/~0/g, '~'))
-    .reduce<unknown>(
-      (node, key) => (node !== null && typeof node === 'object' ? (node as Record<string, unknown>)[key] : undefined),
-      value,
-    );
+    .reduce<unknown>((node, key) => {
+      if (Array.isArray(node)) return /^-\d+$/.test(key) ? node.at(Number(key)) : (node as unknown[])[Number(key)];
+      return node !== null && typeof node === 'object' ? (node as Record<string, unknown>)[key] : undefined;
+    }, value);
 
 /** Run a harness recipe: optional plan (build_project), then each `command k=v` call; the pointer reads the last result. */
 function runHarness(dir: string, expected: ExpectedCase): Measured | { readonly error: string } {

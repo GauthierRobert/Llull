@@ -21,6 +21,7 @@ import { holdSets, selectIndices, MAX_HISTORY_POINTS } from './history';
 import { isPartIssue, partLaw } from './readiness';
 import type { CreepLaw } from './law';
 import { pow } from '@lib/pow';
+import { privateLibraryOf, REDACTED_LAW, unresolvedPartMaterials, type PrivateLibrary } from './privateLaw';
 
 const sig = (value: number): string => significantNumber(value, 5);
 
@@ -70,6 +71,25 @@ function quickCheck(
   };
 }
 
+/** One `laws[]` row: coefficients for a document / embedded law, the library pin and a redaction marker for a private one. */
+function lawRow(law: CreepLaw, parts: readonly string[], library: PrivateLibrary | null): Record<string, unknown> {
+  const coefficients =
+    library === null
+      ? { A: { value: law.A, unit: 'MPa^-n s^-(m+1)' }, n: law.n, m: law.m }
+      : { coefficients: REDACTED_LAW, redacted: true, library };
+  return {
+    materialId: law.materialId,
+    modelId: law.modelId,
+    parts,
+    form: 'norton',
+    ...coefficients,
+    validRangeK: law.temperatureRangeK,
+    stressValidity: 'not declared by creep_norton laws: the maximum stress of the hold is reported, not range-checked',
+    basis: law.basis,
+    source: law.source,
+  };
+}
+
 /** History of one probe, at most `maxPoints` points (the same log-spaced selection the document summary uses). */
 function probeRecords(
   readings: ReturnType<typeof evaluateProbes>,
@@ -101,7 +121,10 @@ function probeRecords(
  * @invariant read-only; numbers only from results re-verified against the artifact store (trustedRecord), so stale or unverifiable results are refused;
  *   histories at most `maxPoints` points per probe, hold time = CalculiX total time - preload period; `unverified` = the law flags; every result
  *   reviewRequired with a reason and the AF-33 sentence; an incomplete hold is reported in data.hold.complete, not refused
- * @failure unknown / non-creep case -> FEA_ANALYSIS_NOT_FOUND / CRP_CASE_TYPE; unknown probe id -> FEA_PROBE_NOT_FOUND; no hold set -> CRP_STEP_MISSING; stale -> FEA_RESULTS_STALE; no / unverifiable results -> CRP_RESULTS_MISSING /
+ * @invariant a law of a private-library record (privateLibraryOf) never shows A, n, m or the closed-form quick check: its row carries the library
+ *   pin, licence, basis, source, validity and `coefficients: 'private…', redacted: true` (FR-CRP-20, VC-CRP-66)
+ * @failure unknown / non-creep case -> FEA_ANALYSIS_NOT_FOUND / CRP_CASE_TYPE; unknown probe id -> FEA_PROBE_NOT_FOUND; no hold set -> CRP_STEP_MISSING; a part material from a private library not resolved on this
+ *   machine -> MAT_LIBRARY_UNRESOLVED with data.available false; stale -> FEA_RESULTS_STALE; no / unverifiable results -> CRP_RESULTS_MISSING /
  *   FEA_SUMMARY_MISMATCH (refusals, unchanged doc)
  */
 export const creepReport = defineCommand({
@@ -111,7 +134,9 @@ export const creepReport = defineCommand({
     'A (MPa^-n s^-(m+1)), n, m, validity, basis and source, the largest equivalent creep strain (ceeq) and the largest von Mises at the end and over the ' +
     'hold with their positions and entities (analysis length unit, MPa), the history of each probe (hold seconds, at most maxPoints points, log-spaced ' +
     'selection that keeps the first and last), a closed-form quick check (norton_constant_stress at the end-of-hold maximum stress; the ratio FE / closed form ' +
-    'is 1 for a uniform uniaxial case) and the unverified flags of the law. Time zero of the histories is the end of the elastic preload step. Refuses ' +
+    'is 1 for a uniform uniaxial case) and the unverified flags of the law. A law from a private material library shows its library pin, licence, ' +
+    'basis and source with coefficients "private" (redacted: true) and no quick check; an unresolved private library answers available: false ' +
+    '(MAT_LIBRARY_UNRESOLVED). Time zero of the histories is the end of the elastic preload step. Refuses ' +
     'stale results. Always reviewRequired: computed by llull, not approved. Follow with check_creep.',
   annotations: { readOnly: true },
   params: z.object({
@@ -130,6 +155,21 @@ export const creepReport = defineCommand({
     const unknown = (params.probes ?? []).filter((id) => !Object.hasOwn(analysis.probes, id));
     if (unknown.length > 0) return fail('FEA_PROBE_NOT_FOUND', `no probe ${unknown.map((id) => `'${id}'`).join(', ')}`, 'probes');
     if (analysis.creep === undefined) return fail('CRP_STEP_MISSING', `analysis '${analysis.id}' has no creep step`, 'analysisId');
+    const unresolved = unresolvedPartMaterials(doc, Object.keys(analysis.parts));
+    if (unresolved.length > 0) {
+      const message = `the creep law of ${unresolved.map((entry) => `'${entry.materialId}' (library '${entry.library?.libraryId ?? '?'}', ${entry.reason})`).join(', ')} comes from a private library not resolved on this machine; run resolve_material_libraries`;
+      return {
+        ...fail('MAT_LIBRARY_UNRESOLVED', message, 'analysisId'),
+        data: {
+          available: false,
+          code: 'MAT_LIBRARY_UNRESOLVED',
+          reason: message,
+          analysisId: analysis.id,
+          materials: unresolved,
+          reviewRequired: true,
+        },
+      };
+    }
     const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
     const blocked = unreadable(trust);
     if (blocked !== null || trust.meshArtifact === null || trust.resultsArtifact === null || trust.results === null)
@@ -139,9 +179,19 @@ export const creepReport = defineCommand({
     if (creep === undefined) return fail('CRP_RESULTS_MISSING', 'the verified results hold no creep summary', 'analysisId');
     const lengthToAnalysis = toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem);
     const readings = evaluateProbes(analysis, trust.meshArtifact, trust.resultsArtifact, lengthToAnalysis);
-    const laws = lawsOf(doc, analysis);
+    const laws = lawsOf(doc, analysis).map((entry) => ({ ...entry, library: privateLibraryOf(doc, entry.law.materialId) }));
+    const redacted = laws.filter((entry) => entry.library !== null);
     const reasons = [...new Set(laws.flatMap(({ law }) => law.unverifiedReasons))];
-    const quick = quickCheck(analysis, summary, laws);
+    const computed = quickCheck(analysis, summary, laws);
+    const quick =
+      computed !== null && redacted.length > 0
+        ? {
+            check: computed['check'],
+            available: false,
+            redacted: true,
+            reason: 'withheld: the closed form is a function of private law coefficients',
+          }
+        : computed;
     const spec = analysis.creep;
     const text = [
       `hold ${sig(creep.finalTimeS)} s of ${sig(spec.durationS)} s at ${sig(spec.temperature.valueK)} K${creep.holdComplete ? '' : ' (INCOMPLETE)'}`,
@@ -149,6 +199,9 @@ export const creepReport = defineCommand({
       creep.maxVonMisesEndMPa === undefined ? '' : `max von Mises at the end ${sig(creep.maxVonMisesEndMPa.value)} MPa`,
       typeof quick?.['ratioFeToClosedForm'] === 'number' ? `quick check ratio ${sig(quick['ratioFeToClosedForm'])}` : '',
       reasons.length > 0 ? `UNVERIFIED law (${reasons.join('; ')})` : '',
+      redacted.length > 0
+        ? `law coefficients withheld (private library ${[...new Set(redacted.map((entry) => `'${entry.library?.libraryId ?? '?'}'`))].join(', ')})`
+        : '',
     ].filter((part) => part !== '');
     return report(doc, `${command}: '${analysis.id}' ${text.join('; ')}. ${NOT_APPROVED}`, {
       analysisId: analysis.id,
@@ -164,19 +217,7 @@ export const creepReport = defineCommand({
         preloadPeriodS: spec.preloadPeriodS,
         timeOrigin: 'hold seconds = CalculiX total time minus the preload step; time hardening (m != 0) counts the preload period',
       },
-      laws: laws.map(({ law, parts }) => ({
-        materialId: law.materialId,
-        modelId: law.modelId,
-        parts,
-        form: 'norton',
-        A: { value: law.A, unit: 'MPa^-n s^-(m+1)' },
-        n: law.n,
-        m: law.m,
-        validRangeK: law.temperatureRangeK,
-        stressValidity: 'not declared by creep_norton laws: the maximum stress of the hold is reported, not range-checked',
-        basis: law.basis,
-        source: law.source,
-      })),
+      laws: laws.map(({ law, parts, library }) => lawRow(law, parts, library)),
       maxCeeq: creep.maxCeeq ?? null,
       maxVonMisesEndMPa: creep.maxVonMisesEndMPa ?? null,
       maxVonMisesOverHoldMPa: creep.maxVonMisesOverHoldMPa ?? null,
@@ -184,6 +225,7 @@ export const creepReport = defineCommand({
       quickCheck: quick,
       unverified: reasons.length > 0,
       unverifiedReasons: reasons,
+      ...(redacted.length > 0 ? { redacted: true } : {}),
       provenance: {
         resultsHash: analysis.results?.resultsHash ?? null,
         inputHash: analysis.results?.inputHash ?? null,
