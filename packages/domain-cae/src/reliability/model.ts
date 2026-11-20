@@ -72,9 +72,24 @@ export const responseOf = (doc: CadDocument, name: string): Response | undefined
   return Object.hasOwn(responses, name) ? responses[name] : undefined;
 };
 
+const STUDY_METHODS: readonly unknown[] = ['form', 'sorm', 'mc', 'is', 'fosm'];
+const SAMPLINGS: readonly unknown[] = ['mc', 'lhs', 'lhs_centred'];
+
+/** An acceptance's `study` (absent on pre-PRB-b acceptances): a non-empty method list and, when present, valid options. */
+const validStudy = (study: unknown): boolean =>
+  study === undefined ||
+  (isRecord(study) &&
+    Array.isArray(study['methods']) &&
+    study['methods'].length > 0 &&
+    study['methods'].every((method) => STUDY_METHODS.includes(method)) &&
+    (study['sampling'] === undefined || SAMPLINGS.includes(study['sampling'])) &&
+    (study['maxIterations'] === undefined || (Number.isInteger(study['maxIterations']) && Number(study['maxIterations']) >= 1)) &&
+    (study['tolerance'] === undefined || (typeof study['tolerance'] === 'number' && study['tolerance'] > 0)));
+
 function acceptanceErrors(slice: Record<string, unknown>): string[] {
   const valid = (entry: unknown, limitState: boolean): boolean =>
     isRecord(entry) &&
+    validStudy(entry['study']) &&
     isString(entry['modelHash']) &&
     isString(entry['resultHash']) &&
     typeof entry['seed'] === 'number' &&

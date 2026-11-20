@@ -9,10 +9,10 @@ import { refuseReliability } from './codes';
 import { isStudyFailure, studyContext, type StudyContext } from './context';
 import { reliabilityOf } from './model';
 import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
-import { importanceStudy } from './importanceStudy';
+import { runMethods } from './methodRuns';
 import { limitStateModelHash } from './modelHash';
-import { resultDigest } from './resultHash';
-import { formStudy, fosmStudy, monteCarloStudy } from './studies';
+import { RESULT_METHODS, isSampledStudy, normalizeStudy, studyDigest } from './resultHash';
+import { fosmStudy, monteCarloStudy } from './studies';
 
 const MAX_SAMPLES = 2_000_000;
 const DEFAULT_SAMPLES = 10_000;
@@ -132,61 +132,7 @@ export const propagateUncertainty = defineCommand({
   },
 });
 
-const METHODS = ['form', 'sorm', 'mc', 'is', 'fosm'] as const;
-
-interface MethodStudies {
-  pf: Record<string, number | null>;
-  data: Record<string, unknown>;
-  compared: { method: string; value: number | null } | null;
-  interval: [number, number] | null;
-}
-
-const runMethods = (
-  context: StudyContext,
-  params: {
-    limitState: string;
-    seed?: number | undefined;
-    sampling?: 'mc' | 'lhs' | 'lhs_centred' | undefined;
-    maxIterations?: number | undefined;
-    tolerance?: number | undefined;
-  },
-  methods: ReadonlySet<string>,
-  samples: number,
-): MethodStudies => {
-  const pf: Record<string, number | null> = {};
-  const data: Record<string, unknown> = { limitState: params.limitState, unit: context.limitState.unit, reviewRequired: true };
-  const iterations = params.maxIterations ?? 100;
-  const tolerance = params.tolerance ?? 1e-8;
-  let compared: { method: string; value: number | null } | null = null;
-  if (methods.has('form') || methods.has('sorm')) {
-    const study = formStudy(context, methods.has('sorm'), iterations, tolerance);
-    if (methods.has('form')) {
-      data['form'] = study.data;
-      pf['form'] = study.pf;
-    }
-    if (methods.has('sorm')) data['sorm'] = study.data;
-    if (methods.has('sorm')) pf['sorm'] = study.pfSorm;
-    compared = methods.has('form') ? { method: 'FORM', value: study.pf } : { method: 'SORM', value: study.pfSorm };
-  }
-  let interval: [number, number] | null = null;
-  if (methods.has('mc')) {
-    const study = monteCarloStudy(context, params.sampling ?? 'lhs', samples, params.seed ?? 0);
-    data['monteCarlo'] = study.data;
-    pf['mc'] = study.pf;
-    interval = study.wilson95;
-  }
-  if (methods.has('is')) {
-    const study = importanceStudy(context, samples, params.seed ?? Number.NaN, iterations, tolerance);
-    data['importanceSampling'] = study.data;
-    pf['is'] = study.pf;
-  }
-  if (methods.has('fosm')) {
-    const study = fosmStudy(context);
-    data['fosm'] = study.data;
-    pf['fosm'] = study.pf;
-  }
-  return { pf, data, compared, interval };
-};
+const DEFAULT_METHODS = ['form', 'mc', 'fosm'] as const;
 
 /**
  * @affects nothing; read-only, data { form?, sorm?, monteCarlo?, fosm?, comparison { pf per method, formInsideMonteCarloInterval? }, items, reviewRequired: true }
@@ -201,13 +147,14 @@ export const runReliabilityStudy = defineCommand({
     'distributions and correlation), "sorm" (FORM + Breitung curvature correction, needs a converged design point with beta > 0), "mc" (seeded Monte Carlo or Latin hypercube, needs `seed`), "is" (importance sampling centred on the FORM design point: unbiased, far smaller variance than mc for rare failures; needs `seed`; data.importanceSampling = { pf, standardError, ci95, effectiveFailureSamples, ... }) and "fosm" ' +
     '(first-order second-moment). Default methods: form, mc, fosm; methods ["form"] is the plain FORM run. data.form (and data.sorm) = { beta, pfForm = Φ(-beta), designPointX { variable: { value, unit } } ' +
     '(most probable failure point), importance { variable: alpha^2 } (sums to 1: which variable drives failure), iterations, converged, items[] } (beta is negative when all variables at their medians already ' +
-    'fail; exact for linear g in normal variables: (muR - muS) / sqrt(sR^2 + sS^2); gradients by central differences); data.monteCarlo and data.fosm as in propagate_uncertainty; data.resultHash (only when methods include form and mc, lhs sampling and default iteration limits) = the result hash accept_reliability_result takes; ' +
+    'fail; exact for linear g in normal variables: (muR - muS) / sqrt(sR^2 + sS^2); gradients by central differences); data.monteCarlo and data.fosm as in propagate_uncertainty; data.resultHash = the result hash accept_reliability_result takes for exactly this study, ' +
+    'data.resultStudy = { methods, sampling?, maxIterations?, tolerance?, seed?, samples? } (the options the methods read) to pass to it with the hash; ' +
     'comparison { pf: { method: Pf }, formInsideMonteCarloInterval } and the item PRB_FORM_MC_DISAGREE when the FORM Pf falls outside the Monte Carlo ' +
     `Wilson 95 % interval (report the Monte Carlo value, consider SORM). For several limit states or the distribution of g itself use propagate_uncertainty. ${REVIEW_NOTE}`,
   params: z.object({
     limitState: z.string().describe('Name of a limit state (define_limit_state).'),
     methods: z
-      .array(z.enum(METHODS))
+      .array(z.enum(RESULT_METHODS))
       .min(1)
       .optional()
       .describe(
@@ -220,11 +167,11 @@ export const runReliabilityStudy = defineCommand({
     tolerance: toleranceSchema,
   }),
   run: (doc, params, ctx): CommandResult => {
-    const methods = new Set(params.methods ?? ['form', 'mc', 'fosm']);
+    const study = normalizeStudy(params, DEFAULT_METHODS);
     const samples = params.samples ?? DEFAULT_SAMPLES;
     const precheck = (code: string, message: string, path: string): CommandResult =>
       refuseReliability(doc, 'run_reliability_study', code, message, [params.limitState], [path]);
-    const sampled = methods.has('mc') || methods.has('is');
+    const sampled = isSampledStudy(study);
     if (sampled && params.seed === undefined) return precheck('PRB_PARAMS_INVALID', "methods 'mc' and 'is' need an integer seed", 'seed');
     const budget = sampled ? budgetIssue(samples, 1, reliabilityOf(doc).variableOrder.length) : null;
     if (budget !== null) return precheck('PRB_BUDGET_EXCEEDED', budget, 'samples');
@@ -240,7 +187,9 @@ export const runReliabilityStudy = defineCommand({
             'samples',
           );
         const items: unknown[] = [];
-        const { pf, data, compared, interval } = runMethods(context, params, methods, samples);
+        const seed = params.seed ?? 0;
+        const runs = runMethods(context, study, seed, samples);
+        const { pf, data, compared, interval } = runs;
         const comparedPf = compared?.value ?? null;
         const inside = comparedPf !== null && interval !== null ? comparedPf >= interval[0] && comparedPf <= interval[1] : null;
         if (inside === false)
@@ -251,30 +200,15 @@ export const runReliabilityStudy = defineCommand({
             message: `${compared?.method} Pf ${comparedPf} is outside the Monte Carlo Wilson 95 % interval [${interval?.[0]}, ${interval?.[1]}]`,
             remediation: compared?.method === 'SORM' ? 'report the Monte Carlo value' : 'report the Monte Carlo value; consider SORM',
           });
-        const formData = data['form'] as { beta?: number } | undefined;
-        const formPf = pf['form'];
-        const mcPf = pf['mc'];
-        const hashable = formData?.beta !== undefined && formPf !== undefined && formPf !== null && mcPf !== undefined && mcPf !== null;
-        const customised = (params.sampling ?? 'lhs') !== 'lhs' || params.maxIterations !== undefined || params.tolerance !== undefined;
-        if (hashable && !customised)
-          data['resultHash'] = resultDigest(
-            limitStateModelHash(doc, params.limitState) ?? '',
-            params.seed ?? Number.NaN,
-            samples,
-            formData?.beta ?? Number.NaN,
-            formPf ?? Number.NaN,
-            mcPf ?? Number.NaN,
-          );
+        const resultHash = studyDigest(limitStateModelHash(doc, params.limitState) ?? '', study, seed, samples, runs);
+        data['resultHash'] = resultHash;
+        data['resultStudy'] = { ...study, ...(sampled ? { seed, samples } : {}) };
         data['comparison'] = { pf, formInsideMonteCarloInterval: inside };
         data['items'] = items;
         const shown = Object.entries(pf).map(([method, value]) => `${method} ${value === null ? 'n/a' : value.toPrecision(6)}`);
         return report(
           doc,
-          `run_reliability_study '${params.limitState}': Pf by method — ${shown.join(', ')}${inside === false ? ' (PRB_FORM_MC_DISAGREE)' : ''}.${
-            hashable && customised
-              ? ' No resultHash: it exists only for the reviewable study (lhs sampling, default maxIterations and tolerance); use check_probabilistic or the defaults.'
-              : ''
-          } ${REVIEW_NOTE}`,
+          `run_reliability_study '${params.limitState}': Pf by method — ${shown.join(', ')}${inside === false ? ' (PRB_FORM_MC_DISAGREE)' : ''}; resultHash ${resultHash.slice(0, 12)} (accept with data.resultStudy). ${REVIEW_NOTE}`,
           data,
         );
       },

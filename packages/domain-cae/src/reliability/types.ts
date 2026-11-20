@@ -81,6 +81,19 @@ export interface Response {
 }
 
 /** A reviewer's signed acceptance of the reliability result of one limit state (human gate; verified when read). */
+export type ResultMethod = 'form' | 'sorm' | 'mc' | 'is' | 'fosm';
+
+/**
+ * The study an acceptance binds (normalised: methods unique in form, sorm, mc, is, fosm order; `sampling` only with mc; `maxIterations` / `tolerance` only with form,
+ * sorm or is, all filled with their defaults). Absent on an acceptance = form + mc, lhs, 100 iterations, 1e-8 (the check_probabilistic study).
+ */
+export interface ResultStudy {
+  readonly methods: readonly ResultMethod[];
+  readonly sampling?: 'mc' | 'lhs' | 'lhs_centred';
+  readonly maxIterations?: number;
+  readonly tolerance?: number;
+}
+
 export interface Acceptance {
   /** Hash of the model the result was computed on (limitStateModelHash). */
   readonly modelHash: string;
@@ -88,6 +101,8 @@ export interface Acceptance {
   readonly resultHash: string;
   readonly seed: number;
   readonly samples: number;
+  /** The methods and options of the accepted study; absent on acceptances made before PRB-b (= the default study). */
+  readonly study?: ResultStudy;
   readonly justification: string;
   readonly signer: string;
   readonly signatureId: string;

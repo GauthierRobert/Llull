@@ -373,7 +373,7 @@
 
 | Command | Description | Flags |
 | ------- | ----------- | ----- |
-| `accept_reliability_result` | Record a qualified reviewer's acceptance of the reliability RESULT of one limit state (FORM + Latin hypercube Monte Carlo with a seed). |  |
+| `accept_reliability_result` | Record a qualified reviewer's acceptance of the reliability RESULT of one limit state (any run_reliability_study methods and options; default FORM + Latin hype… |  |
 | `accept_verification_exception` | Record a qualified reviewer's acceptance of ONE non-converged finding of a convergence study (VNV_NOT_ASYMPTOTIC, VNV_OSCILLATORY, VNV_DIVERGENT, VNV_ORDER_MIS… |  |
 | `acoustic_level` | Convert between sound pressure level (dB re 20 micropascal, air) and rms pressure (Pa), or sum band levels by energy. | read-only |
 | `acoustic_spectrum_report` | Report a stored acoustic spectrum: overall level OASPL (energy sum of the bands, dB re 20 micropascal), overall rms pressure (Pa) and per band the exact mid, l… | read-only |
