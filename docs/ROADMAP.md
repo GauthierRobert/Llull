@@ -37,9 +37,10 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 
 ## v0.5 — Parametric & constraints (the leap to "real CAD")
 
-- [ ] Named parameters / variables (`set_parameter`) — change a value, model regenerates
-- [ ] Geometric + dimensional constraints + a pure constraint solver
-- [ ] Feature history / timeline: insert, reorder, edit-params, suppress → re-evaluate
+- [x] Named parameters / variables (`set_parameter`, `delete_parameter`, `=expr` step params) — change a value, model regenerates
+- [x] Geometric + dimensional constraints + a pure constraint solver (`add_constraint`, `update_constraint`, `solve_constraints`)
+- [x] Feature history / timeline: insert, reorder, edit-params, suppress → re-evaluate (`insert_step`, `reorder_step`, `edit_step_params`,
+      `set_step_suppressed`, `delete_step`, `replay_history`)
 - [x] Constructive vs evaluated geometry split (`entities` becomes a derived cache) — plugin-derived entities and, opt-in, kernel results (`set_mesh_storage`)
 - See the `parametric` skill, architecture L8.
 
