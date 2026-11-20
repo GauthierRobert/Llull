@@ -8,6 +8,7 @@ import { Text } from '@react-three/drei';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '@ui/store';
 import type { DimensionEntity } from '@core/model/types';
+import type { DimensionStyleSettings } from '@core/model/dimensionStyle';
 import { ORIGIN } from '@lib/vec3';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { SELECTION_COLOR } from '@ui/viewport/viewportPalette';
@@ -18,31 +19,34 @@ import { DEFAULT_OFFSET, dimensionDrawing } from './dimensionGeometry';
 
 const DIM_LINE_COLOR = '#333333';
 const TEXT_HEIGHT = 0.5;
+const NO_STYLE: DimensionStyleSettings = {};
 
 export function DimensionRenderer2D({ entity, selected }: { entity: DimensionEntity; selected: boolean }): React.ReactElement | null {
-  const { dimensionKind, entityIds, offset: rawOffset, color, position } = entity;
+  const { dimensionKind, entityIds, offset: rawOffset, color, position, styleId } = entity;
   const offset = rawOffset ?? DEFAULT_OFFSET;
+  const style = useStore((s) => (styleId === undefined ? undefined : s.document.dimensionStyles?.[styleId])) ?? NO_STYLE;
+  const textHeight = style.textHeight ?? TEXT_HEIGHT;
   const textRef = useRef<THREE.Group>(null);
-  useMinScreenSize(textRef, TEXT_HEIGHT);
-  const dimColor = selected ? SELECTION_COLOR : color || DIM_LINE_COLOR;
+  useMinScreenSize(textRef, textHeight);
+  const dimColor = selected ? SELECTION_COLOR : style.color || color || DIM_LINE_COLOR;
 
   // Only the referenced entities (shallow): unrelated edits do not rebuild.
   const referenced = useStore(useShallow((s) => entityIds.map((id) => s.document.entities[id])));
   const displayPrecision = useStore((s) => s.document.displayPrecision);
 
   const drawing = useMemo(
-    () => dimensionDrawing(dimensionKind, referenced, offset, dimColor),
-    [dimensionKind, referenced, offset, dimColor],
+    () => dimensionDrawing(dimensionKind, referenced, offset, dimColor, style),
+    [dimensionKind, referenced, offset, dimColor, style],
   );
   if (!drawing) return null;
 
-  const displayText = dimensionText(entity, drawing.value, displayPrecision);
+  const displayText = dimensionText(entity, drawing.value, displayPrecision, style);
 
   return (
     <group position={[position[0], position[1], position[2]]}>
       {drawing.lines && <PlacedLineObject object={drawing.lines} position={ORIGIN} />}
       <group ref={textRef} position={[drawing.textX, drawing.textY, 0.01]}>
-        <Text font={TEXT_FONT_URL} fontSize={TEXT_HEIGHT} color={dimColor} anchorX="center" anchorY="middle">
+        <Text font={TEXT_FONT_URL} fontSize={textHeight} color={dimColor} anchorX="center" anchorY="middle">
           {displayText}
         </Text>
       </group>

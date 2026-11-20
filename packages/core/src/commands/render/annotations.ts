@@ -1,7 +1,7 @@
 /** render_view drawing of `dimension` and `text` entities: dimension lines as depth-tested strokes, values and text as SVG text on top. */
 
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
-import { dimensionDrawing, dimensionText, DEFAULT_DIMENSION_OFFSET } from '../../geometry/dimensionAnnotation';
+import { dimensionDrawing, dimensionStyleOf, dimensionText, DEFAULT_DIMENSION_OFFSET } from '../../geometry/dimensionAnnotation';
 import { planeToWorld } from '../../geometry/workPlane';
 import { escapeXml } from '../../lib/escapeXml';
 import { clamp } from '../../lib/clamp';
@@ -43,14 +43,16 @@ export function dimensionStrokes(
   background: string | null | undefined,
 ): PreDepthPolygon[] {
   if (e.kind !== 'dimension') return [];
+  const style = dimensionStyleOf(doc, e);
   const drawing = dimensionDrawing(
     e.dimensionKind,
     references(doc, e.entityIds),
     e.offset ?? DEFAULT_DIMENSION_OFFSET,
     ARROW_PX * worldPerPx,
+    style,
   );
   if (!drawing) return [];
-  const color = annotationInk(e.color, background);
+  const color = annotationInk(style.color ?? e.color, background);
   return drawing.segments.map(
     ([from, to]): PreDepthPolygon => ({
       verts: [
@@ -96,15 +98,16 @@ function labelOf(doc: CadDocument, e: Entity, worldPerPx: number): Label | null 
   }
   if (e.kind !== 'dimension') return null;
   const offset = e.offset ?? DEFAULT_DIMENSION_OFFSET;
-  const drawing = dimensionDrawing(e.dimensionKind, references(doc, e.entityIds), offset);
+  const style = dimensionStyleOf(doc, e);
+  const drawing = dimensionDrawing(e.dimensionKind, references(doc, e.entityIds), offset, undefined, style);
   if (!drawing) return null;
   return {
     id: e.id,
     kind: 'dimension',
     anchor: [drawing.textAt[0], drawing.textAt[1], drawing.z],
-    lines: [dimensionText(e, drawing.value, doc.displayPrecision)],
-    fontPx: DIMENSION_FONT_PX,
-    color: e.color,
+    lines: [dimensionText(e, drawing.value, doc.displayPrecision, style)],
+    fontPx: style.textHeight === undefined ? DIMENSION_FONT_PX : clamp(style.textHeight / worldPerPx, MIN_TEXT_PX, MAX_TEXT_PX),
+    color: style.color ?? e.color,
     textAnchor: 'middle',
     baseline: null,
     direction: [drawing.direction[0], drawing.direction[1], 0],

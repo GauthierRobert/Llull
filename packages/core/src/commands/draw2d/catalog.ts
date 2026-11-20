@@ -5,6 +5,14 @@ import { drawPolyline, drawArc, drawRectangle, drawPoint } from './basic';
 import { drawEllipse, drawSpline, drawInvolute } from './curves';
 import { hatchRegion } from './hatchRegion';
 import { addText, addDimension } from './annotate';
+import {
+  applyDimensionStyle,
+  createDimensionStyle,
+  deleteDimensionStyle,
+  listDimensionStyles,
+  setActiveDimensionStyle,
+  updateDimensionStyle,
+} from './dimensionStyles';
 import { drawBeltAround } from './belt';
 import { addImageUnderlay, calibrateUnderlayCommand, setUnderlay, imageToWorld } from './underlay';
 import { createSketchPlane, placeOnSketchPlane } from './sketchPlanes';
@@ -20,6 +28,12 @@ export const draw2dCommands = commandCatalog(
   hatchRegion,
   addText,
   addDimension,
+  createDimensionStyle,
+  updateDimensionStyle,
+  deleteDimensionStyle,
+  applyDimensionStyle,
+  setActiveDimensionStyle,
+  listDimensionStyles,
   drawInvolute,
   drawBeltAround,
   addImageUnderlay,

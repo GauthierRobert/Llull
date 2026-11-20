@@ -74,8 +74,12 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 
 ## v1.0 — Drawings & documentation
 
-- [ ] 2D drawings generated from 3D: orthographic / section / detail views
-- [ ] GD&T, dimension styles, title blocks, sheets (paper space)
+- [x] 2D drawings generated from 3D: orthographic / section / detail views (`create_sheet`, `create_drawing_view`, `add_section_view`,
+      `add_detail_view`, `export_sheet_svg`)
+- [x] GD&T (`add_geometric_tolerance`, datum features / targets, PMI), title blocks + sheets (paper space: `create_sheet`, `update_sheet`)
+- [x] Dimension styles (`create_dimension_style` / `update_` / `delete_` / `apply_` / `set_active_dimension_style`, `list_dimension_styles`):
+      text height, arrowheads (open / closed / tick / dot / none), extension gap + overshoot, decimals, separator, prefix / suffix, colour;
+      read by the 2D viewport, `render_view`, `describe_scene` and the DXF / SVG exports
 
 ## Civil / site engineering — see docs/CIVIL.md, docs/MARKET_READINESS.md
 

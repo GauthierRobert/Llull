@@ -3,7 +3,8 @@
 
 import * as THREE from 'three';
 import type { DimensionEntity, Entity } from '@core/model/types';
-import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing as constructDimension } from '@core/geometry/dimensionAnnotation';
+import type { DimensionStyleSettings } from '@core/model/dimensionStyle';
+import { DEFAULT_ARROW_SIZE, DEFAULT_DIMENSION_OFFSET, dimensionDrawing as constructDimension } from '@core/geometry/dimensionAnnotation';
 import { anchoredGeometry } from '../../lineGeometry';
 
 export const DEFAULT_OFFSET = DEFAULT_DIMENSION_OFFSET;
@@ -24,8 +25,9 @@ export function dimensionDrawing(
   refs: ReadonlyArray<Entity | null | undefined>,
   offset: number,
   color: string,
+  style: DimensionStyleSettings = {},
 ): DimensionDrawing | null {
-  const drawing = constructDimension(kind, refs, offset);
+  const drawing = constructDimension(kind, refs, offset, style.arrowSize ?? DEFAULT_ARROW_SIZE, style);
   if (!drawing) return null;
   const vertices = drawing.segments.flat();
   let lines: THREE.LineSegments | null = null;

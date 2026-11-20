@@ -60,7 +60,7 @@ EllipseEntity    'ellipse'    center: Vec2; radiusX; radiusY
 SplineEntity     'spline'     points: Vec2[]; closed
 RegionEntity     'region'     loops: Vec2[][] (loops[0] outer, even-odd nesting); curves?: exact loop chains; hatch?: {pattern: solid|lines|cross, angle, spacing}
 TextEntity       'text'       content; height; anchor?
-DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'diameter'|'angular'; entityIds; offset?; precision?; tolerance?; label?
+DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'diameter'|'angular'; entityIds; offset?; precision?; tolerance?; label?; styleId? (key of doc.dimensionStyles: text height, arrows, extension lines, number format; model/dimensionStyle.ts, resolved by geometry/dimensionAnnotation dimensionStyleOf)
 ImageEntity      'image'      dataUrl (png/jpeg base64); pixelWidth/Height; width/height (units, lower-left at position); opacity; locked — raster underlay, pixel (0,0) = top-left (geometry/imageUnderlay.ts)
 // CurveSegment<P> (model/curve.ts): {type:'line', points:[a,b]} | {type:'arc', points:[start,through,end]} | {type:'bezier', points:[p0,p1,p2,p3]}
 // Assembly

@@ -44,6 +44,8 @@ export interface DimensionSummary {
   unit: string;
   /** The text the drawing shows (label, or formatted value + tolerance); null when `value` is null. */
   text: string | null;
+  /** Dimension style id (`dimensionStyles`), when the dimension names one. */
+  styleId?: string;
 }
 
 /** A text annotation. */
