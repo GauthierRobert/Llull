@@ -3,6 +3,7 @@
  * ratio 2 and order 2, but its asymptotic ratio is f2 / f1 = (1 + 4x) / (1 + x) > 1.05 (x = h1^2 ~ 0.019: 1.0556): VNV_NOT_ASYMPTOTIC (hand-derived).
  */
 import { describe, expect, it } from 'vitest';
+import { expectSignedReplayFollowsHistory } from '../../../helpers/signedReplay';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
@@ -257,6 +258,16 @@ describe('accept_verification_exception: history, replay and what is shown', () 
     const { exceptionLedger, ...analysis } = accepted.analysis ?? { cases: {}, caseOrder: [] };
     void exceptionLedger;
     expect(study(execute({ ...accepted, analysis }, 'replay_history', {}, ctx).document, bar, studyId).exception).toBeUndefined();
+  });
+
+  it('SIG-REPLAY: suppressing or deleting the accept step drops the acceptance and its ledger entry; unsuppressing does not restore them', () => {
+    const entryOf = (document: CadDocument): { stepKey?: string } | undefined =>
+      (document.analysis?.exceptionLedger ?? []).find((entry) => entry.studyId === studyId && entry.code === 'VNV_NOT_ASYMPTOTIC');
+    const outcome = expectSignedReplayFollowsHistory(accepted, 'accept_verification_exception', entryOf, ctx);
+    for (const next of [outcome.suppressed, outcome.deleted, outcome.restored]) {
+      expect(study(next, bar, studyId).exception).toBeUndefined();
+      expect(checked(next).items.find((item) => item.code === 'VNV_NOT_ASYMPTOTIC')?.accepted).toBeUndefined();
+    }
   });
 
   it('refuses an unverified study, and a study whose artifacts the store disproves, before the gate', () => {

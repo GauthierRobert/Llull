@@ -259,3 +259,7 @@ pressure, in phase over all exposed faces" (FUNCTIONAL_SPEC risk table) and `rev
 unit pressure on those faces, so the response ASD is `sum_rs H_r H_s* Gamma_r Gamma_s G_p(f)`; this needs the mode shapes from a CalculiX `*FREQUENCY` run and the face load vector from the
 05 deck writer, so it cannot be tested without a solve. VC-VAC-34 then compares a flat plate under uniform pressure with the analytic fully correlated SDOF result. The viewport face highlight
 and the band chart (`src/ui`, Lane 2) are not built here.
+
+### As built (SIG-REPLAY, 2026-11-20)
+
+`dispose_acoustic_export` stamps its signed record with the step that wrote it, and a regeneration keeps a record only while that step is live (suppressed or deleted: pending again). See [SIG-REPLAY](../../decisions/SIG-REPLAY.md).

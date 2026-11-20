@@ -561,3 +561,7 @@ are core. The transport is in `server/` and forwards: it holds no V&V arithmetic
 - **Guide.** `llull guide` gained section 18 (solution verification: the three kinds, the least-squares method, the reporting rules, the human gate).
 - **Not built (M4):** the PHY-09 dynamics transports for a dt study (above); shell and plane-stress studies (still `VNV_CASE_UNSUPPORTED`); weights other than 1 in the fit through the commands (the library
   takes them); the exception signing route (above); a rail tab for the panel (a section of the Analysis panel instead: a rail tab touches the shell store).
+
+### As built (SIG-REPLAY, 2026-11-20)
+
+`dispose_margin` and `accept_verification_exception` stamp each signed record with the step that wrote it, and a regeneration keeps a record only while that step is live (suppressed or deleted: pending again). See [SIG-REPLAY](../../decisions/SIG-REPLAY.md).

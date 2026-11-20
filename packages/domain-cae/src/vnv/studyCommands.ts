@@ -7,6 +7,7 @@ import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/docume
 import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import type { StudyException } from '@core/model/convergenceStudy';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
+import { stepStamp } from '@lib/replaySurvivors';
 import { analysisOf, caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
@@ -14,6 +15,7 @@ import { analyseStudy, staleReasons, withLedgerEntry, withStudy, withoutStudy } 
 import { verifyStudy } from './studyVerify';
 import { refuseVnv } from './studyCodes';
 import { ACCEPTABLE_CODES, EXCEPTION_ACT, exceptionDetails, levelHashes, nonceOf } from './studyException';
+import { notReapplied } from '../shared/signedGate';
 
 const studyIdSchema = z
   .string()
@@ -51,7 +53,7 @@ export const deleteConvergenceStudy = defineCommand({
 
 /**
  * @affects doc.analysis.cases[analysisId].studies[studyId].exception (code, justification, signer, signatureId, signature, level hashes, document uid)
- * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); a replay honours a recorded step only from `analysis.exceptionLedger` (kept by replaySeed); recorded only with a signature verified (and spent) by `ctx.humanSignature` over sha256 of (act, study, analysis, code, justification, level
+ * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); a replay honours a recorded step only from `analysis.exceptionLedger` (kept by replaySeed while its stamped step is live; none kept for the study and code: a no-op, pending); recorded only with a signature verified (and spent) by `ctx.humanSignature` over sha256 of (act, study, analysis, code, justification, level
  *   result hashes, document uid, nonce); re-verified by check_verification, so a changed study or a copied document voids it; never changes the numbers
  * @failure no signing port / no signature / a signature that does not verify -> VNV_HUMAN_GATE (an agent always lands here); unknown analysis / study
  *   -> FEA_ANALYSIS_NOT_FOUND / VNV_STUDY_NOT_FOUND; a document without uid -> FEA_DOCUMENT_UNIDENTIFIED; empty justification -> VNV_PARAM_INVALID;
@@ -99,6 +101,14 @@ export const acceptVerificationException = defineCommand({
               entry.levelHashes.join() === levelHashes(study).join(),
           )
         : undefined;
+    if (
+      ctx?.replaying === true &&
+      isRecordedConfirmation(confirmation) &&
+      !(analysisOf(doc).exceptionLedger ?? []).some(
+        (entry) => entry.analysisId === analysisId && entry.studyId === studyId && entry.code === code,
+      )
+    )
+      return notReapplied(doc, 'accept_verification_exception', studyId);
     const port = ctx?.humanSignature ?? null;
     // a ledger entry is only as good as its signature: with a port installed it is re-verified (nothing spent), so a planted entry fails
     if (kept !== undefined && port !== null) {
@@ -153,7 +163,8 @@ export const acceptVerificationException = defineCommand({
       documentUid: documentIdentity(doc),
     };
     const withException = withStudy(doc, analysisCase, { ...study, exception });
-    const accepted = kept !== undefined ? withException : withLedgerEntry(withException, { ...exception, analysisId, studyId });
+    const accepted =
+      kept !== undefined ? withException : withLedgerEntry(withException, { ...exception, analysisId, studyId, ...stepStamp(ctx) });
     return changed(
       accepted,
       `accept_verification_exception: ${code} of '${study.id}' accepted by ${gate.signer} (signature ${gate.signatureId}); the numbers are unchanged.`,

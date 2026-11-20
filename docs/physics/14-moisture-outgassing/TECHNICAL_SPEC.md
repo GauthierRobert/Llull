@@ -325,3 +325,7 @@ See FUNCTIONAL_SPEC §11 [R1]–[R13] and `validation/sources.md` [S1]–[S17]. 
 - `Mm(RH)` property model: not built. RH is not a PHY-01 `PropertyVariable`.
   - Plan: add `RH` (unit `%`, range 0..100) to the core variable list and catalogue, and let `moistureSaturation` models take `powerLaw` on RH.
   - Then `boundaryInput` would evaluate the material at `{T, RH}` from the mission exposure before the caller's `saturationLaw`. The core change (variable list, validity, unit `%`) is outside this pack's write scope.
+
+### As built (SIG-REPLAY, 2026-11-20)
+
+`approve_environment_deviation` stamps its signed record with the step that wrote it, and a regeneration keeps a record only while that step is live (suppressed or deleted: pending again). See [SIG-REPLAY](../../decisions/SIG-REPLAY.md).

@@ -324,3 +324,6 @@ shapes and are executed by `tests/unit/electroOptical/`.
   skin-depth path accept a material in place of `n2` / `mur`.
 - UI overlay (bond paths, coating and zone labels, disposition dialog): `src/ui`, Lane 2.
 
+### As built (SIG-REPLAY, 2026-11-20)
+
+`dispose_bond_check` stamps its signed record with the step that wrote it, and a regeneration keeps a record only while that step is live (suppressed or deleted: pending again). See [SIG-REPLAY](../../decisions/SIG-REPLAY.md).

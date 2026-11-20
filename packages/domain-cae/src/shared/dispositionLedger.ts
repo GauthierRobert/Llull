@@ -6,6 +6,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import { documentIdentity } from '@core/model/documentUid';
 import type { CadDocument } from '@core/model/types';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
+import { stepStamp } from '@lib/replaySurvivors';
 import { analysisOf } from './access';
 
 export type Signer = { readonly signer: string; readonly signatureId: string };
@@ -53,8 +54,24 @@ export function verifiedSigner(
   return port === null ? null : port.verify(confirmation, payloadFor(documentUid));
 }
 
-/** `doc` with `entry` appended to the ledger (the case itself is written by the caller). */
-export function withDispositionLedgered(doc: CadDocument, entry: DispositionLedgerEntry): CadDocument {
+/** `doc` with `entry` appended to the ledger, stamped with the step running in `ctx` (SIG-REPLAY; the case itself is written by the caller). */
+export function withDispositionLedgered(doc: CadDocument, entry: DispositionLedgerEntry, ctx: ExecutionContext | undefined): CadDocument {
   const model = analysisOf(doc);
-  return { ...doc, analysis: { ...model, dispositionLedger: [...(model.dispositionLedger ?? []), entry] } };
+  return { ...doc, analysis: { ...model, dispositionLedger: [...(model.dispositionLedger ?? []), { ...entry, ...stepStamp(ctx) }] } };
+}
+
+/**
+ * True for a REPLAYED step (recorded confirmation) when the ledger holds no entry at all for its act, case and row: the replay seed dropped it (its
+ * step was suppressed or deleted) and the step must re-apply nothing (`notReapplied`) rather than fail (SIG-REPLAY).
+ */
+export function replayedWithoutEntry(
+  doc: CadDocument,
+  ctx: ExecutionContext | undefined,
+  confirmation: unknown,
+  wanted: Pick<DispositionLedgerEntry, 'act' | 'analysisId' | 'rowKey'>,
+): boolean {
+  if (ctx?.replaying !== true || !isRecordedConfirmation(confirmation)) return false;
+  return !(analysisOf(doc).dispositionLedger ?? []).some(
+    (entry) => entry.act === wanted.act && entry.analysisId === wanted.analysisId && entry.rowKey === wanted.rowKey,
+  );
 }

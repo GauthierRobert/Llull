@@ -1,6 +1,7 @@
 /** Access to and load validation of the space-environment slice (`CadDocument.spaceEnvironment`, plugin `physics-environment`). */
 
 import { z } from '@core/commands/schema';
+import { stepKeySchema } from '../shared/schemas';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import type { CadDocument } from '@core/model/types';
 import { convertValue, isUnitFailure } from '@lib/quantity';
@@ -61,6 +62,7 @@ const deviationSchema = z.strictObject({
   signatureId: z.string().min(1).max(256),
   signature: z.unknown(),
   documentUid: z.string().min(1).max(256),
+  stepKey: stepKeySchema.optional(),
 });
 
 const sliceSchema = z

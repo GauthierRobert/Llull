@@ -36,6 +36,7 @@ function regenerateWith(
   let inertReason = 'its params are invalid for that command';
   const warnings: string[] = [];
   const brokenDependents: FeatureStep[] = [];
+  const pendingSigned: FeatureStep[] = [];
   const failures: ReplayFailure[] = [];
   const replayed = replayHistory(doc, newHistory, context.registry, warnings, (event) => {
     noteReplayFailure(failures, event);
@@ -48,6 +49,8 @@ function regenerateWith(
       if (refusal !== undefined && refusal.summary !== '') inertReason = refusal.summary;
     }
     // A step that used to affect entities but now changes nothing lost an input it depended on.
+    // A signed act whose record is no longer kept re-applies nothing on purpose (SIG-REPLAY): pending, not a broken dependent.
+    else if (event.pending !== undefined) pendingSigned.push(event.step);
     else if ((event.step.affected?.length ?? 0) > 0) brokenDependents.push(event.step);
   });
   // Unresolved =expr params are legitimate (the parameter may be defined later); replay_history reports them.
@@ -62,13 +65,18 @@ function regenerateWith(
     brokenDependents.length > 0
       ? ` Warning: ${brokenDependents.length} step(s) no longer change the document (a referenced entity or input is gone): ${brokenDependents.map((step) => `${step.id} (${step.name})`).join(', ')}.`
       : '';
+  const pendingNote =
+    pendingSigned.length > 0
+      ? ` Note: ${pendingSigned.length} signed step(s) re-applied nothing (their signed record is no longer kept) and stay pending until a human signs again: ${pendingSigned.map((step) => `${step.id} (${step.name})`).join(', ')}.`
+      : '';
   const error = replayFailureError(failures);
   return {
     ...changed(
       regenerated,
-      `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}${replayFailuresNote(failures)}`,
+      `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}${pendingNote}${replayFailuresNote(failures)}`,
       regenerated.order,
     ),
+    ...(pendingSigned.length > 0 ? { data: { notReapplied: pendingSigned.map((step) => step.id) } } : {}),
     ...(error ? { error } : {}),
   };
 }

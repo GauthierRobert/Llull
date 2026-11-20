@@ -1,6 +1,7 @@
 /** Access to and validation of the electro-optical slice of the document (`CadDocument.electroOptical`, plugin `physics-electro-optical`). */
 
 import { z } from '@core/commands/schema';
+import { stepKeySchema } from '../shared/schemas';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import type { CadDocument } from '@core/model/types';
@@ -116,6 +117,7 @@ const dispositionSchema = z.strictObject({
   signatureId: z.string().min(1).max(256),
   signature: z.unknown(),
   documentUid: z.string().min(1).max(256),
+  stepKey: stepKeySchema.optional(),
 });
 
 /** A quantity whose unit does not parse or has the wrong dimension (`as` = a reference unit of that dimension). */

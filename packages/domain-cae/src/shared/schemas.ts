@@ -8,3 +8,15 @@ export const quantitySchema = z.object({
 });
 
 export const analysisIdSchema = z.string().describe('Id of the analysis (affected[0] of create_analysis, e.g. an-1.1).');
+
+const STEP_KEY_MAX = 64;
+
+/** The stored `stepKey` of a signed record (`@lib/replaySurvivors`, SIG-REPLAY): the key of the feature step that wrote it. */
+export const stepKeySchema = z.string().min(1).max(STEP_KEY_MAX);
+
+/** Load problems of an optional stored `stepKey` at `at` (the hand-written ledger validators): absent, or text of 1 to 64 characters. */
+export function stepKeyProblems(value: unknown, at: string): string[] {
+  return value === undefined || (typeof value === 'string' && value !== '' && value.length <= STEP_KEY_MAX)
+    ? []
+    : [`${at}.stepKey must be text of at most ${STEP_KEY_MAX} characters`];
+}

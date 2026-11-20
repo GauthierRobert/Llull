@@ -56,6 +56,8 @@ export interface StudyException {
 export interface StudyExceptionRecord extends StudyException {
   readonly analysisId: string;
   readonly studyId: string;
+  /** Key of the feature step that recorded it (SIG-REPLAY, `@lib/replaySurvivors`: seeded only while that step is live); absent on older entries. */
+  readonly stepKey?: string;
 }
 
 export interface ConvergenceStudy<C> {

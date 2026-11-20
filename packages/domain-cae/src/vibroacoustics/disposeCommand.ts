@@ -7,7 +7,8 @@ import { documentIdentity } from '@core/model/documentUid';
 import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import { is3D } from '@core/model/types';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
-import { nonceOf } from '../shared/signedGate';
+import { nonceOf, notReapplied } from '../shared/signedGate';
+import { stepStamp } from '@lib/replaySurvivors';
 import { refuseVac } from './codes';
 import { MAX_JUSTIFICATION, exposureOf, reviewOf, spectrumOf, withReview } from './model';
 import { REVIEW_ACT, exposureFingerprint, reviewDetails } from './review';
@@ -19,8 +20,8 @@ const COMMAND = 'dispose_acoustic_export';
  * @affects doc.vibroacoustics.reviews[exposure] (decision, justification, fingerprint of the exposure as reviewed, signer, signatureId, the verified signature, document uid; affected: [exposure]); never changes the exposure, its spectrum or a number of the package
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); recorded only with a signature verified (and spent last) by `ctx.humanSignature` over sha256 of
  *   (act, exposure, decision, justification, fingerprint, document uid, nonce); it applies only while the fingerprint is unchanged (export_acoustic_load compares it) and in this document; every export re-verifies it
- *   (no port, foreign uid, junk signature: VAC_REVIEW_PENDING stays); a replay honours a recorded step only from a review already in the slice (kept by replaySeed) with the same decision, justification,
- *   fingerprint and uid, its signature re-verified when a port is installed
+ *   (no port, foreign uid, junk signature: VAC_REVIEW_PENDING stays); a replay honours a recorded step only from a review already in the slice (kept by replaySeed while its stamped step is live) with the same decision, justification,
+ *   fingerprint and uid, its signature re-verified when a port is installed; with no review kept for the exposure it is a no-op (pending)
  * @failure no signing port, no signature or one that does not verify (an agent always) -> VAC_HUMAN_GATE; blank justification -> VAC_PARAMS_INVALID; unknown exposure / spectrum -> VAC_EXPOSURE_UNKNOWN / VAC_SPECTRUM_UNKNOWN;
  *   target not a 3D solid (an instance included: the export cannot resolve its faces) -> VAC_EXPOSURE_UNRESOLVED; a document without uid -> VAC_DOCUMENT_UNIDENTIFIED (all refusals, unchanged doc)
  */
@@ -58,6 +59,7 @@ export const disposeAcousticExport = defineCommand({
         'disposing an acoustic load package needs a human-held signature: hand it to the qualified reviewer, do not retry',
         ['confirmation'],
       );
+    if (replayed && reviewOf(doc, name) === undefined) return notReapplied(doc, COMMAND, name);
     if (justification.trim() === '') return fail('VAC_PARAMS_INVALID', 'a disposition needs a justification', ['justification']);
     const exposure = exposureOf(doc, name);
     if (exposure === undefined) return fail('VAC_EXPOSURE_UNKNOWN', `no exposure '${name}'`);
@@ -104,6 +106,7 @@ export const disposeAcousticExport = defineCommand({
       signatureId: gate.signatureId,
       signature: confirmation,
       documentUid: uid,
+      ...stepStamp(ctx),
     };
     return changed(
       withReview(doc, review),

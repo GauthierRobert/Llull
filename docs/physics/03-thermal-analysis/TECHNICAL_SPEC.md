@@ -609,3 +609,7 @@ cases; a signing implementation (09 PLM); the `llull guide` thermal section.
 - **Deck text.** BC names, cavity names / ids, material origin and unverified reasons pass through `commentText`; the cavity keyword uses the
   sanitised upper-case name; `add_cavity_radiation` accepts only `[A-Za-z0-9_]{1,3}`.
 - **Temperatures** of every thermal quantity are bounded to (0, 1e5] K (named guard "llull guard", `shared/quantity.ts`).
+
+### As built (SIG-REPLAY, 2026-11-20)
+
+`dispose_thermal_limit` stamps its signed record with the step that wrote it, and a regeneration keeps a record only while that step is live (suppressed or deleted: pending again). See [SIG-REPLAY](../../decisions/SIG-REPLAY.md).

@@ -5,7 +5,8 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
-import { keptDisposition, verifiedSigner, withDispositionLedgered } from '../shared/dispositionLedger';
+import { keptDisposition, replayedWithoutEntry, verifiedSigner, withDispositionLedgered } from '../shared/dispositionLedger';
+import { notReapplied } from '../shared/signedGate';
 import { analysisIdSchema } from '../shared/schemas';
 import { isProblem, thermalCaseOf, withThermal } from './access';
 import { refuseThermal } from './codes';
@@ -20,7 +21,7 @@ const ROW_PATTERN = /^(.+):(max|min)$/;
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); only with a signature verified by `ctx.humanSignature`
  *   over the payload sha256 of (documentUid, analysisId, rowId, decision, justification, resultsHash) and spent LAST (a refusal never burns it, a retry of a
  *   used one is THM_HUMAN_GATE); the disposition binds to the current results hash and to this document (its uid, recorded with it and re-verified by
- *   check_temperature_limits); a replay honours a recorded step only from `analysis.dispositionLedger` (kept by replaySeed; same case, row, decision,
+ *   check_temperature_limits); a replay honours a recorded step only from `analysis.dispositionLedger` (kept by replaySeed while its stamped step is live, none kept for the row: a no-op, pending; same case, row, decision,
  *   justification, results and this document's uid, its signature re-verified when a port is installed), spends nothing, and a document with another uid loses it
  * @failure a signature is single-use and its payload has no nonce (signing kind `payload`): once the act is undone, the same signature cannot be spent again, so the reviewer re-signs with the justification reworded;
  *   with NO port a replay trusts the ledger (the record of an act a verified human made here); no port, no confirmation or one that does not verify -> THM_HUMAN_GATE (an agent always lands here); a document without a uid (checked after the port) -> THM_DOCUMENT_UNIDENTIFIED; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
@@ -85,6 +86,8 @@ export const disposeThermalLimit = defineCommand({
       justification,
       resultsHash,
     });
+    if (replayedWithoutEntry(doc, ctx, confirmation, { act: 'dispose_thermal_limit', analysisId, rowKey: rowId }))
+      return notReapplied(doc, 'dispose_thermal_limit', rowId);
     // verify only (nothing spent): the signature is spent last, once no other refusal can follow
     const signed = verifiedSigner(port, kept, confirmation, payloadFor, documentIdentity(doc));
     if (signed === null)
@@ -106,12 +109,11 @@ export const disposeThermalLimit = defineCommand({
     const thermal = { ...found.thermal, dispositions: { ...found.thermal.dispositions, [rowId]: disposition } };
     return changed(
       kept === undefined
-        ? withDispositionLedgered(withThermal(doc, found, thermal), {
-            ...disposition,
-            act: 'dispose_thermal_limit',
-            analysisId,
-            rowKey: rowId,
-          })
+        ? withDispositionLedgered(
+            withThermal(doc, found, thermal),
+            { ...disposition, act: 'dispose_thermal_limit', analysisId, rowKey: rowId },
+            ctx,
+          )
         : withThermal(doc, found, thermal),
       `dispose_thermal_limit: '${rowId}' ${decision} by ${signed.signer} (signature ${signed.signatureId}) on results ${resultsHash.slice(0, 12)}.`,
       [rowId],

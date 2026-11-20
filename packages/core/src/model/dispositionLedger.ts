@@ -13,4 +13,6 @@ export interface DispositionLedgerEntry {
   readonly signatureId: string;
   readonly signature: unknown;
   readonly documentUid: string;
+  /** Key of the feature step that recorded it (SIG-REPLAY, `@lib/replaySurvivors`: seeded only while that step is live); absent on older entries. */
+  readonly stepKey?: string;
 }

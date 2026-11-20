@@ -387,3 +387,7 @@ Tests: `tests/unit/inspect/contacts.test.ts` (VC-COR-01), `tests/unit/corrosion/
   - M5 (MIL-STD-889D matrix, SCC, HE: needs the standards);
   - RS-6 VC-COR-17 (Rust);
   - the UI contact overlay and the acceptance dialog.
+
+### As built (SIG-REPLAY, 2026-11-20)
+
+`accept_corrosion_item` stamps its signed record with the step that wrote it, and a regeneration keeps a record only while that step is live (suppressed or deleted: pending again). See [SIG-REPLAY](../../decisions/SIG-REPLAY.md).

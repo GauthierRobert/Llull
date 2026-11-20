@@ -10,6 +10,7 @@ import { vibroacousticsErrors } from '@cae/vibroacoustics/model';
 import { REVIEW_ACT, reviewDetails } from '@cae/vibroacoustics/review';
 import { boxKernel, exposedDocument, refusal } from './boxKernel';
 import { run } from './fixtures';
+import { expectSignedReplayFollowsHistory } from '../../helpers/signedReplay';
 
 /** A port that verifies a signature only when it names the exact payload it was made over (what a real signature does). */
 const port: HumanSignaturePort = {
@@ -228,9 +229,12 @@ describe('dispose_acoustic_export: history replay', () => {
     expect(again.document).toBe(doc);
   });
 
-  it('refuses a forged replayed step, one whose decision differs and a kept record whose signature fails', () => {
+  it('a forged replayed step re-applies nothing; one whose decision differs and a kept record whose signature fails are refused', () => {
     const { doc, before } = accepted();
-    expect(refusal(dispose(before, { confirmation: { verified: true } }, replay))).toBe('VAC_HUMAN_GATE');
+    const forged = dispose(before, { confirmation: { verified: true } }, replay);
+    expect(forged.error).toBeUndefined();
+    expect(forged.document).toBe(before);
+    expect(forged.summary).toContain('not re-applied');
     expect(refusal(dispose(doc, { decision: 'rejected', confirmation: { verified: true } }, replay))).toBe('VAC_HUMAN_GATE');
     const rejecting = { ...replay, humanSignature: { verify: () => null } } as ExecutionContext;
     expect(refusal(dispose(doc, { confirmation: { verified: true } }, rejecting))).toBe('VAC_HUMAN_GATE');
@@ -254,24 +258,66 @@ describe('dispose_acoustic_export: history replay', () => {
     expect(exported(replayed.document).review.status).toBe('accepted');
   });
 
-  // KNOWN GAP (shared by every signed gate with a replaySeed; one fix is scheduled for all of them): replaySeed keeps the record whatever the history
-  // says, so suppressing or deleting the dispose step regenerates a document that still holds the accepted review. Pinned so the fix flips it.
+  // SIG-REPLAY (was a pinned known gap): the seed keeps a review only while the step that recorded it is live.
   it.each([
     ['set_step_suppressed', (stepId: string) => ({ stepId, suppressed: true })],
     ['delete_step', (stepId: string) => ({ stepId })],
-  ] as const)('%s on the dispose step regenerates, and the review survives it (known gap)', (name, params) => {
+  ] as const)('%s on the dispose step regenerates without the review: the package is pending again', (name, params) => {
     const { doc } = accepted();
     const stepId = doc.featureHistory.at(-1)?.id ?? '';
+    expect(doc.vibroacoustics?.reviews?.[EXPOSURE]?.stepKey).toBe(stepId.replace('step-', ''));
     const result = execute(doc, name, params(stepId), signing);
-    expect(result.error).toBeUndefined();
+    expect(result.error, result.summary).toBeUndefined();
     expect(result.summary).toContain('regenerated');
-    expect(result.document.featureHistory.filter((step) => step.name === 'dispose_acoustic_export' && step.suppressed !== true)).toEqual(
-      [],
-    );
-    expect(result.document.vibroacoustics?.reviews?.[EXPOSURE]?.decision).toBe('accepted');
-    expect(exported(result.document).review.status).toBe('accepted');
+    expect(result.document.vibroacoustics?.reviews?.[EXPOSURE]).toBeUndefined();
+    expect(exported(result.document).review.status).toBe('none');
+    expect(codes(exported(result.document))).toContain('VAC_REVIEW_PENDING');
     const again = execute(result.document, 'replay_history', {}, signing);
-    expect(again.document.vibroacoustics?.reviews?.[EXPOSURE]?.decision).toBe('accepted');
+    expect(again.document.vibroacoustics?.reviews?.[EXPOSURE]).toBeUndefined();
+  });
+
+  it('unsuppressing the dispose step does not bring the review back: the replayed step is a no-op until a human signs again', () => {
+    const { doc } = accepted();
+    const outcome = expectSignedReplayFollowsHistory(
+      doc,
+      'dispose_acoustic_export',
+      (next) => next.vibroacoustics?.reviews?.[EXPOSURE],
+      signing,
+    );
+    expect(codes(exported(outcome.restored))).toContain('VAC_REVIEW_PENDING');
+  });
+
+  it('a review recorded before SIG-REPLAY (no step key) still survives a regeneration, as before', () => {
+    const { doc } = accepted();
+    const { stepKey: _stepKey, ...legacy } = doc.vibroacoustics?.reviews?.[EXPOSURE] ?? ({} as never);
+    const model = doc.vibroacoustics;
+    if (model === undefined) throw new Error('no slice');
+    const old: CadDocument = { ...doc, vibroacoustics: { ...model, reviews: { [EXPOSURE]: legacy } } };
+    expect(vibroacousticsErrors({ vibroacoustics: old.vibroacoustics })).toEqual([]);
+    expect(vibroacousticsErrors({ vibroacoustics: doc.vibroacoustics })).toEqual([]);
+    expect(vibroacousticsErrors({ vibroacoustics: { ...model, reviews: { [EXPOSURE]: { ...legacy, stepKey: '' } } } })).not.toEqual([]);
+    const stepId = doc.featureHistory.at(-1)?.id ?? '';
+    const result = execute(old, 'set_step_suppressed', { stepId, suppressed: true }, signing);
+    expect(result.document.vibroacoustics?.reviews?.[EXPOSURE]?.decision).toBe('accepted');
+  });
+
+  it('deleting the exposure, then regenerating, does not fail the replayed dispose step (it re-applies nothing)', () => {
+    const { doc } = accepted();
+    const deleted = execute(doc, 'delete_acoustic_exposure', { name: EXPOSURE }, signing);
+    expect(deleted.error, deleted.summary).toBeUndefined();
+    const replayed = execute(deleted.document, 'replay_history', {}, signing);
+    expect(replayed.error, replayed.summary).toBeUndefined();
+    expect(replayed.summary).not.toMatch(/FAILED/);
+    const boxStep = deleted.document.featureHistory.find((step) => step.name === 'add_box');
+    const edited = execute(
+      deleted.document,
+      'edit_step_params',
+      { stepId: boxStep?.id ?? '', params: { ...(boxStep?.params as object), position: [5, 0, 0] } },
+      signing,
+    );
+    expect(edited.error, edited.summary).toBeUndefined();
+    expect(edited.document.vibroacoustics?.exposures[EXPOSURE]).toBeUndefined();
+    expect(edited.document.vibroacoustics?.reviews).toBeUndefined();
   });
 
   it('the plugin replay seed keeps the reviews and nothing else', async () => {
@@ -281,6 +327,9 @@ describe('dispose_acoustic_export: history replay', () => {
       vibroacoustics: { spectra: {}, spectrumOrder: [], exposures: {}, exposureOrder: [], reviews: doc.vibroacoustics?.reviews },
     });
     expect(vibroacousticsPlugin.document?.replaySeed?.(before)).toEqual({});
+    const stepKey = doc.vibroacoustics?.reviews?.[EXPOSURE]?.stepKey ?? '';
+    expect(vibroacousticsPlugin.document?.replaySeed?.(doc, new Set([stepKey]))).toEqual(vibroacousticsPlugin.document?.replaySeed?.(doc));
+    expect(vibroacousticsPlugin.document?.replaySeed?.(doc, new Set(['1', '2']))).toEqual({});
   });
 });
 
