@@ -74,6 +74,8 @@ function files(): { dir: string; answer: string; expected: string } {
         },
         { id: 'T-2', quantity: 'q', value: 0.32, unit: '-', tolerance: { rel: 1e-4 }, grade: 'A' },
         { id: 'T-3', quantity: 'kPa', value: 14466.57, unit: 'kPa', tolerance: { rel: 0.03 }, grade: 'A' },
+        { id: 'T-4', quantity: 'tbd', value: 'TBD', unit: '-', grade: 'TBD' },
+        { id: 'T-5', quantity: 'grade C', value: 1, unit: '-', tolerance: { rel: 0.01 }, grade: 'C' },
       ],
     }),
   );
@@ -112,6 +114,30 @@ describe('llull compare_expected', () => {
     expect(JSON.parse(out.join(''))).toMatchObject({ ok: false, data: { verdict: 'error', code: 'VNV_RESULT_MISSING' } });
   });
 
+  it('pointers that reach no own value are VNV_RESULT_MISSING: __proto__, constructor, empty token, -0, 01', async () => {
+    const { answer, expected } = files();
+    for (const pointer of [
+      '/__proto__',
+      '/data/constructor',
+      '/data/maxCeeq/',
+      '/data/probes/pr-14.1/history/-0/value',
+      '/data/probes/pr-14.1/history/01/value',
+    ]) {
+      const { io, out } = capture();
+      expect(await runCli(['compare_expected', answer, expected, 'T-2', `pointer=${pointer}`, '--json'], io), pointer).toBe(1);
+      expect(JSON.parse(out.join('')), pointer).toMatchObject({ data: { verdict: 'error', code: 'VNV_RESULT_MISSING' } });
+    }
+  });
+
+  it('a missing value of a TBD or grade-C case is the judge skip (exit 0), not an error', async () => {
+    const { answer, expected } = files();
+    for (const caseId of ['T-4', 'T-5']) {
+      const { io, out } = capture();
+      expect(await runCli(['compare_expected', answer, expected, caseId, 'pointer=/data/nothing', '--json'], io), caseId).toBe(0);
+      expect(JSON.parse(out.join(''))).toMatchObject({ ok: true, data: { verdict: 'skip', code: 'VNV_EXPECTED_TBD' } });
+    }
+  });
+
   it('usage problems exit 2: missing arguments, unknown case, no pointer, unreadable or invalid files', async () => {
     const { dir, answer, expected } = files();
     const bad = path.join(dir, 'bad.json');
@@ -122,6 +148,8 @@ describe('llull compare_expected', () => {
       [['compare_expected', answer, expected, 'T-2'], 'no harness pointer'],
       [['compare_expected', path.join(dir, 'missing.json'), expected, 'T-1'], 'cannot read'],
       [['compare_expected', answer, bad, 'T-1'], 'not an expected_results file'],
+      [['compare_expected', answer, expected, 'T-1', '=x'], 'is not key=value'],
+      [['compare_expected', answer, expected, 'T-1', 'pointr=/data'], 'unknown option pointr'],
     ] as const) {
       const { io, err } = capture();
       expect(await runCli([...argv], io), text).toBe(2);
@@ -146,5 +174,7 @@ describe('pointerGet', () => {
     expect(pointerGet(value, '/x~1y')).toBe(4);
     expect(pointerGet(value, '/a/9/b')).toBeUndefined();
     expect(pointerGet(value, '/a/q')).toBeUndefined();
+    for (const pointer of ['/__proto__', '/constructor', '/a/', '/a/-0/b', '/a/01/b', '/a/length'])
+      expect(pointerGet(value, pointer), pointer).toBeUndefined();
   });
 });

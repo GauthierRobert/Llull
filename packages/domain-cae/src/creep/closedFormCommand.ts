@@ -9,6 +9,7 @@ import { CHECKS, isCheckFailure, runCheck, type CheckFailure, type CreepCheck } 
 import { refuseCrp } from './codes';
 import { creepLawOf, isLawProblem, type CreepLaw } from './law';
 import { inputValue, isInputProblem } from './inputs';
+import { privateLabel, privateLibraryOf, unresolvedStubOf } from './privateLaw';
 
 const NAME = 'creep_closed_form';
 
@@ -50,6 +51,29 @@ function withLaw(
     );
   const entry = Object.hasOwn(doc.materials, material) ? (doc.materials[material] ?? null) : null;
   if (entry === null) return refuseCrp(doc, NAME, 'CRP_LAW_MISSING', `no material '${material}' in the document`, [material], ['material']);
+  const stub = unresolvedStubOf(doc, material);
+  if (stub !== null)
+    return refuseCrp(
+      doc,
+      NAME,
+      'MAT_LIBRARY_UNRESOLVED',
+      `material '${material}' comes from private library '${stub.record.libraryRef.libraryId}', not resolved on this machine (${stub.record.unresolved.reason})`,
+      [material],
+      ['material'],
+    );
+  const library = privateLibraryOf(doc, material);
+  if (library !== null)
+    return {
+      ...refuseCrp(
+        doc,
+        NAME,
+        'CRP_LAW_PRIVATE',
+        `the creep law of '${material}' comes from private ${privateLabel(library)}: its coefficients are not given out`,
+        [material],
+        ['material'],
+      ),
+      data: { check, available: false, redacted: true, code: 'CRP_LAW_PRIVATE', material, library, reviewRequired: true },
+    };
   const law = creepLawOf(entry, material);
   if (isLawProblem(law)) return refuseCrp(doc, NAME, law.code, law.message, [material], ['material']);
   return { inputs: { ...inputs, A: law.A, n: law.n, m: law.m }, law };
@@ -86,7 +110,9 @@ function temperatureGuard(
  *   converted to MPa and s (TR-CRP-12); `unverified` is true when that law's basis is unverified
  * @failure unknown check input missing -> CRP_INPUT_MISSING (names the key); non-finite / wrong dimension / out of domain -> CRP_INPUT_INVALID;
  *   WLF below Tr or C2 + dT <= 0 -> CRP_WLF_OUT_OF_RANGE; material without a creep law -> CRP_LAW_MISSING / CRP_LAW_FORM_UNSUPPORTED;
- *   temperature_K outside the law validity -> CRP_LAW_OUT_OF_RANGE (refusals, unchanged doc)
+ *   temperature_K outside the law validity -> CRP_LAW_OUT_OF_RANGE; material from a private library not on this machine ->
+ *   MAT_LIBRARY_UNRESOLVED; a private-library law -> CRP_LAW_PRIVATE with data { check, available: false, redacted: true } and no A, n, m or
+ *   value (FR-CRP-20) (refusals, unchanged doc)
  */
 export const creepClosedForm = defineCommand({
   name: NAME,
@@ -99,6 +125,8 @@ export const creepClosedForm = defineCommand({
     INPUT_GUIDE +
     ' With material (a document material whose default constitutive set has a creep_norton law) the norton checks read A, n, m from it ' +
     '(converted to MPa and s) and an optional temperature_K input is checked against its validity (CRP_LAW_OUT_OF_RANGE, never extrapolated). ' +
+    'A law from a private material library is refused (CRP_LAW_PRIVATE, data.available false, redacted: true): its coefficients are not given out; ' +
+    'an unresolved private library is MAT_LIBRARY_UNRESOLVED. ' +
     'Returns data { check, values { name: { value, unit } }, formula, inputs, provenance, unverified, unverifiedReasons, warnings }.',
   annotations: { readOnly: true },
   params: z.object({

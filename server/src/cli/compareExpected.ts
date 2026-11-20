@@ -28,24 +28,28 @@ function measuredOf(found: unknown, unit: string): Measured {
   return { value: found as JsonValue, unit };
 }
 
+const OPTION_KEYS: ReadonlySet<string> = new Set(['pointer', 'unit']);
+
 const readJson = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
 
 /**
  * Exit 0 on pass / warn / skip, 1 on fail / error, 2 on a usage problem (missing argument, unreadable file, unknown case, no pointer).
- * @failure a pointer that reaches nothing -> verdict error VNV_RESULT_MISSING, exit 1
+ * @failure a pointer that reaches nothing -> the judge's verdict for no measurement (error VNV_RESULT_MISSING, exit 1; skip for a TBD / grade-C case)
  */
 export function compareExpectedCli(tokens: readonly string[], flags: { readonly json: boolean }, io: CompareIo): number {
   const positional = tokens.filter((token) => !token.includes('='));
-  const source = paramsSource(
-    tokens.filter((token) => token.includes('=')),
-    new Set(['pointer', 'unit']),
-  );
-  const params = source.kind === 'pairs' ? source.params : {};
-  const [answerFile, expectedFile, caseId] = positional;
+  const pairs = tokens.filter((token) => token.includes('='));
   const usage = (why: string): number => {
     io.stderr(`llull compare_expected: ${why}\n${USAGE}`);
     return 2;
   };
+  const malformed = pairs.find((token) => token.startsWith('='));
+  if (malformed !== undefined) return usage(`"${malformed}" is not key=value`);
+  const unknown = pairs.map((token) => token.slice(0, token.indexOf('='))).filter((key) => !OPTION_KEYS.has(key));
+  if (unknown.length > 0) return usage(`unknown option ${unknown.join(', ')} (only pointer= and unit=)`);
+  const source = paramsSource(pairs, OPTION_KEYS);
+  const params = source.kind === 'pairs' ? source.params : {};
+  const [answerFile, expectedFile, caseId] = positional;
   if (answerFile === undefined || expectedFile === undefined || caseId === undefined) return usage('three arguments are required');
   let answer: unknown;
   let expectedRaw: unknown;
@@ -65,10 +69,7 @@ export function compareExpectedCli(tokens: readonly string[], flags: { readonly 
   const found = pointerGet(answer, pointer);
   const unit = typeof params['unit'] === 'string' ? params['unit'] : expected.unit;
   const measured = found === undefined ? null : measuredOf(found, unit);
-  const judgement =
-    measured === null
-      ? { verdict: 'error' as const, code: 'VNV_RESULT_MISSING', message: `nothing at '${pointer}' in ${answerFile}` }
-      : judgeCase(expected, measured);
+  const judgement = judgeCase(expected, measured);
   const summary = `compare_expected ${parsed.data.pack} ${caseId}: ${judgement.verdict}${judgement.code !== undefined ? ` ${judgement.code}` : ''} — ${judgement.message}`;
   io.stdout(
     flags.json

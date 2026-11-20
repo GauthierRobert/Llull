@@ -513,7 +513,7 @@ llull ships NO creep law, NO strain tolerance and NO damage limit: A, n, m with 
 Times are s, min or h; stresses MPa; strain is the equivalent creep strain ceeq (dimensionless). Every report is reviewRequired: "computed by llull, not approved".
 
 1. Hand check first, no solver: \`creep_closed_form\` check=norton_constant_stress | norton_relaxation | bolt_relaxation | thick_cylinder_stationary | beam_stationary | maxwell | kelvin_voigt | sls |
-   prony_relaxation | wlf_shift | convert_norton_a (inputs carry units in the key: sigma_MPa, t_s; with material=NAME A, n, m come from the material's law and temperature_K is range-checked).
+   prony_relaxation | wlf_shift | convert_norton_a (inputs carry units in the key: sigma_MPa, t_s; with material=NAME A, n, m come from the material's law and temperature_K is range-checked; a private-library law is refused, CRP_LAW_PRIVATE).
 2. Law: \`add_material_model\` creep_norton (time hardening; A in any stress / time unit, converted for the card) + an elastic_isotropic model, \`define_constitutive_set\` { elastic, creep }
    makeDefault, \`assign_material\`. Garofalo or strain hardening is CRP_LAW_FORM_UNSUPPORTED; a temperature outside the law validity is CRP_LAW_OUT_OF_RANGE (never extrapolated).
 3. Case: \`create_analysis\` analysisType=creep (CalculiX) → \`set_part_idealization\` → constraints and loads → \`set_creep_step\` duration, cetol (required, CRP_CETOL_INVALID if <= 0), temperature,

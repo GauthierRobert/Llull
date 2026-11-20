@@ -21,7 +21,7 @@ import { holdSets, selectIndices, MAX_HISTORY_POINTS } from './history';
 import { isPartIssue, partLaw } from './readiness';
 import type { CreepLaw } from './law';
 import { pow } from '@lib/pow';
-import { privateLibraryOf, REDACTED_LAW, unresolvedPartMaterials, type PrivateLibrary } from './privateLaw';
+import { privateLabel, privateLibraryOf, REDACTED_LAW, unresolvedPartMaterials, type PrivateLibrary } from './privateLaw';
 
 const sig = (value: number): string => significantNumber(value, 5);
 
@@ -157,7 +157,7 @@ export const creepReport = defineCommand({
     if (analysis.creep === undefined) return fail('CRP_STEP_MISSING', `analysis '${analysis.id}' has no creep step`, 'analysisId');
     const unresolved = unresolvedPartMaterials(doc, Object.keys(analysis.parts));
     if (unresolved.length > 0) {
-      const message = `the creep law of ${unresolved.map((entry) => `'${entry.materialId}' (library '${entry.library?.libraryId ?? '?'}', ${entry.reason})`).join(', ')} comes from a private library not resolved on this machine; run resolve_material_libraries`;
+      const message = `the creep law of ${unresolved.map((entry) => `'${entry.materialId}' (${privateLabel(entry.library)}, ${entry.reason})`).join(', ')} comes from a private library not resolved on this machine; run resolve_material_libraries`;
       return {
         ...fail('MAT_LIBRARY_UNRESOLVED', message, 'analysisId'),
         data: {
@@ -180,7 +180,7 @@ export const creepReport = defineCommand({
     const lengthToAnalysis = toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem);
     const readings = evaluateProbes(analysis, trust.meshArtifact, trust.resultsArtifact, lengthToAnalysis);
     const laws = lawsOf(doc, analysis).map((entry) => ({ ...entry, library: privateLibraryOf(doc, entry.law.materialId) }));
-    const redacted = laws.filter((entry) => entry.library !== null);
+    const redacted = laws.flatMap((entry) => (entry.library === null ? [] : [entry.library]));
     const reasons = [...new Set(laws.flatMap(({ law }) => law.unverifiedReasons))];
     const computed = quickCheck(analysis, summary, laws);
     const quick =
@@ -199,9 +199,7 @@ export const creepReport = defineCommand({
       creep.maxVonMisesEndMPa === undefined ? '' : `max von Mises at the end ${sig(creep.maxVonMisesEndMPa.value)} MPa`,
       typeof quick?.['ratioFeToClosedForm'] === 'number' ? `quick check ratio ${sig(quick['ratioFeToClosedForm'])}` : '',
       reasons.length > 0 ? `UNVERIFIED law (${reasons.join('; ')})` : '',
-      redacted.length > 0
-        ? `law coefficients withheld (private library ${[...new Set(redacted.map((entry) => `'${entry.library?.libraryId ?? '?'}'`))].join(', ')})`
-        : '',
+      redacted.length > 0 ? `law coefficients withheld (private ${[...new Set(redacted.map(privateLabel))].join(', ')})` : '',
     ].filter((part) => part !== '');
     return report(doc, `${command}: '${analysis.id}' ${text.join('; ')}. ${NOT_APPROVED}`, {
       analysisId: analysis.id,
