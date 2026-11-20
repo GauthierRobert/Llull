@@ -170,6 +170,8 @@ function historyProblems(history: ReadonlyArray<unknown>): string[] {
     if (!isRecord(step['params'])) errors.push(`${where}: params must be an object`);
     if (step['affected'] !== undefined && !isStringArray(step['affected'])) errors.push(`${where}: affected must be an array of strings`);
     if (step['suppressed'] !== undefined && typeof step['suppressed'] !== 'boolean') errors.push(`${where}: suppressed must be a boolean`);
+    if (step['mergedStepKeys'] !== undefined && !isStringArray(step['mergedStepKeys']))
+      errors.push(`${where}: mergedStepKeys must be an array of strings`);
   });
   return errors;
 }

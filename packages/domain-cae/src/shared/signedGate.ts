@@ -62,11 +62,14 @@ export function signedState(doc: CadDocument, port: HumanSignaturePort | null, s
  * The result of a REPLAYED signed step (recorded `{ verified: true }`) when the slice holds no record for its subject: the replay seed dropped it
  * (its step was suppressed or deleted, then regenerated) or a later step removed the subject. Nothing is re-applied and nothing fails: the
  * decision stays pending until a human signs again (SIG-REPLAY). A kept record that disagrees with the step is still the gate's refusal.
- * @invariant returns `doc` unchanged (an inert step)
+ * @invariant returns `doc` unchanged (an inert step) with `data.notReapplied: true`, which the history commands report as pending
  */
 export function notReapplied(doc: CadDocument, command: string, subject: string): CommandResult {
-  return noop(
-    doc,
-    `${command}: '${subject}' not re-applied: no signed record of it is kept in this document (its step was suppressed or deleted, or the subject removed); the decision stays pending until a human signs again.`,
-  );
+  return {
+    ...noop(
+      doc,
+      `${command}: '${subject}' not re-applied: no signed record of it is kept in this document (its step was suppressed or deleted, or the subject removed); the decision stays pending until a human signs again.`,
+    ),
+    data: { notReapplied: true },
+  };
 }

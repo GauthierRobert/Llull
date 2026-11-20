@@ -1,6 +1,8 @@
 /** Value validation of the raw `analysis.dispositionLedger` (load path): the margin / thermal-limit dispositions replays re-apply. */
 
 import { isRecord } from '@lib/isRecord';
+import { stepKeyProblems } from './schemas';
+import { appendAll } from '@lib/appendAll';
 
 const ACTS = ['dispose_margin', 'dispose_thermal_limit'];
 const DECISIONS = ['accepted', 'rejected', 'redesign'];
@@ -20,7 +22,7 @@ export function dispositionLedgerErrors(analysis: Record<string, unknown>): stri
     for (const key of ['analysisId', 'rowKey', 'justification', 'resultsHash', 'signer', 'signatureId'])
       if (!text(entry[key])) problems.push(`${at}.${key} must be text`);
     if (typeof entry['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
-    if (entry['stepKey'] !== undefined && !text(entry['stepKey'])) problems.push(`${at}.stepKey must be text`);
+    appendAll(problems, stepKeyProblems(entry['stepKey'], at));
     // no nonce check: a payload-kind signature (margin, thermal) carries none; the replay re-verifies it through the port anyway
     const signature = entry['signature'];
     if (!isRecord(signature) || Object.keys(signature).length === 0) problems.push(`${at}.signature must be a signature object`);

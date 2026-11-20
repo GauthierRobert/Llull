@@ -330,14 +330,18 @@ function withLedgers(doc: CadDocument): CadDocument {
   };
   const analysis = {
     ...doc.analysis,
-    exceptionLedger: [exception, { ...exception, documentUid: 'e'.repeat(32) }],
+    // SIG-REPLAY: one entry of each ledger is stamped with the step that recorded it, one is legacy (no stepKey)
+    exceptionLedger: [
+      { ...exception, stepKey: '7' },
+      { ...exception, documentUid: 'e'.repeat(32) },
+    ],
     fitDispositions: { 'row 1': fit },
     fitLedger: [
-      { ...fit, rowKey: 'row 1' },
+      { ...fit, rowKey: 'row 1', stepKey: '7' },
       { ...fit, rowKey: 'row 1', documentUid: 'e'.repeat(32) },
     ],
     dispositionLedger: [
-      margin,
+      { ...margin, stepKey: '7' },
       { ...margin, act: 'dispose_thermal_limit', rowKey: 'lim-1:max' },
       { ...margin, documentUid: 'e'.repeat(32) },
     ],

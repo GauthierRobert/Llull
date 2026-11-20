@@ -1,5 +1,6 @@
 /** Value validation of the convergence studies of a raw analysis case (load path): ids, order, levels, hashes, named values, exception. */
 
+import { stepKeyProblems } from '../shared/schemas';
 import { isRecord } from '@lib/isRecord';
 import { ACCEPTABLE_CODES } from './studyException';
 import { kindProblem, levelBounds, REFINEMENTS } from './studyKinds';
@@ -140,6 +141,6 @@ export function ledgerErrors(analysis: Record<string, unknown>): string[] {
   return ledger.flatMap((entry, index) => {
     const where = `analysis.exceptionLedger[${index}]`;
     if (!isRecord(entry) || !text(entry['analysisId']) || !text(entry['studyId'])) return [`${where} needs analysisId and studyId`];
-    return exceptionProblems(entry, where, undefined);
+    return [...exceptionProblems(entry, where, undefined), ...stepKeyProblems(entry['stepKey'], where)];
   });
 }

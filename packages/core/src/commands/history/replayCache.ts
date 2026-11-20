@@ -18,6 +18,8 @@ interface ReplayState {
   readonly inert: boolean;
   /** Why the step leading to this state failed (threw, was rejected, or reported a failed plan); absent when it succeeded. */
   readonly failure?: string;
+  /** The step was a signed act re-applying nothing (its record is not kept, SIG-REPLAY): its summary; absent otherwise. */
+  readonly pending?: string;
   /**
    * Present only when the step's `run` read `doc.parameters`: the fingerprint of the table it ran against (the entry is served only for the
    * same table). Absent ⇒ parameter-independent: served for any table, which the replay restores onto the state.

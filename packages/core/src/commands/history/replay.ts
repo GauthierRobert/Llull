@@ -13,7 +13,7 @@ import { kernelRefusal } from '../kernelRefusal';
 import { nextStateKey, replayCacheFor } from './replayCache';
 import { deferralCount } from '../../geometry/mesh/engine';
 import { hashText } from '../../lib/hash';
-import { stepKeyOf } from '../../lib/id';
+import { stepKeysOf } from '../../model/mergedStepKeys';
 import { remapIds } from './regenerate';
 import { mergeReplaySeeds } from './replaySeeds';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
@@ -33,6 +33,8 @@ export interface ReplayStepEvent {
   readonly inert: boolean;
   /** Why the step failed (threw, was rejected, or a plan reported a failure); null when it succeeded. */
   readonly failure: string | null;
+  /** A signed act that re-applied nothing because its record is not kept (`data.notReapplied`, SIG-REPLAY): its summary; absent otherwise. */
+  readonly pending?: string;
 }
 
 /** Why a replayed step failed, or null: a throw, a refusal (`error`) or a `build_project` report with `ok: false`. */
@@ -43,6 +45,17 @@ function failureOf(result: CommandResult | null): string | null {
   if (typeof data === 'object' && data !== null && (data as { ok?: unknown }).ok === false) return result.summary;
   return null;
 }
+
+/** `{ pending: summary }` for a signed step that re-applied nothing (`data.notReapplied: true`), else `{}`. */
+function pendingOf(result: CommandResult | null): { readonly pending?: string } {
+  const data = result?.data;
+  return result !== null && typeof data === 'object' && data !== null && (data as { notReapplied?: unknown }).notReapplied === true
+    ? { pending: result.summary }
+    : {};
+}
+
+/** The `pending` field of a cached state, as an optional property. */
+const cachedPending = (pending: string | undefined): { readonly pending?: string } => (pending === undefined ? {} : { pending });
 
 /** A step that failed during a replay. */
 export interface ReplayFailure {
@@ -98,9 +111,9 @@ export function replayFailureError(failures: readonly ReplayFailure[]): CommandE
     : undefined;
 }
 
-/** Keys (`stepKeyOf`) of the steps of `history` a replay runs (not suppressed). */
+/** Keys (`stepKeyOf`) of the steps of `history` a replay runs (not suppressed), plus the keys a squashed step merged. */
 function liveStepKeys(history: readonly FeatureStep[]): ReadonlySet<string> {
-  return new Set(history.filter((step) => step.suppressed !== true).map((step) => stepKeyOf(step.id)));
+  return new Set(history.filter((step) => step.suppressed !== true).flatMap(stepKeysOf));
 }
 
 /** Empty geometry that keeps the document-level settings and input state of `base` (what no recorded step regenerates). */
@@ -214,11 +227,13 @@ export function replayHistory(
     let parameterFingerprint: string | undefined;
     let inert: boolean;
     let failure: string | null;
+    let pending: { readonly pending?: string };
     if (hit !== undefined && (hit.parameterFingerprint === undefined || hit.parameterFingerprint === inputFingerprint)) {
       doc = { ...hit.doc, ...(hit.parameterFingerprint === undefined ? { parameters: doc.parameters } : {}), featureHistory: history };
       idMap = new Map(hit.idMap);
       inert = hit.inert;
       failure = hit.failure ?? null;
+      pending = cachedPending(hit.pending);
       parameterFingerprint = hit.parameterFingerprint;
     } else {
       const tracking = cache ? trackParameterReads(doc) : null;
@@ -227,6 +242,7 @@ export function replayHistory(
       // Accept the new geometry but keep OUR featureHistory intact.
       inert = result === null || result.document === runDoc;
       failure = failureOf(result);
+      pending = pendingOf(result);
       if (tracking && cache) parameterFingerprint = tracking.wasRead(result ? result.document : doc) ? inputFingerprint : undefined;
       if (result) doc = { ...(tracking ? tracking.restore(result.document) : result.document), featureHistory: history };
       // Input state (L8: only metaHistory commands write the parameter table, configurations and recipes) survives every recorded step,
@@ -239,6 +255,7 @@ export function replayHistory(
           idMap: new Map(idMap),
           inert,
           ...(failure !== null ? { failure } : {}),
+          ...pending,
           ...(parameterFingerprint !== undefined ? { parameterFingerprint } : {}),
         };
         cache?.set(key, state);
@@ -249,7 +266,7 @@ export function replayHistory(
       }
     }
     stateKey = parameterFingerprint !== undefined ? nextStateKey(key, 'parameters', parameterFingerprint, null) : key;
-    onStep?.({ step, rawParams: remapIds(step.params, idMap), params: remapped, before, after: doc, inert, failure });
+    onStep?.({ step, rawParams: remapIds(step.params, idMap), params: remapped, before, after: doc, inert, failure, ...pending });
   }
   // Slices an installed plugin owns as document input state (the PLM record, ...) are re-attached AFTER the steps: carried through them, a release
   // lock would see every regenerated step as an edit of the locked definition.

@@ -542,6 +542,7 @@ export interface FeatureStep {
   label?: string;
   /** `CommandResult.affected` at record time; legacy (v1) replay zips it with replayed ids to remap references. */
   affected?: readonly EntityId[];
+  // mergedStepKeys (squash_steps, SIG-REPLAY): declared in ./mergedStepKeys.ts
 }
 
 /**
