@@ -210,3 +210,14 @@ describe('dimension styles in saved files', () => {
     expect(() => deserializeDocument(envelope({ ...doc, dimensionStyles: { s: { id: 't', name: 'S' } } }))).toThrow(/needs id/);
   });
 });
+
+describe('dimension style ids and the step counter', () => {
+  it('a file whose nextStepNumber is stale still never re-mints a style id', () => {
+    const { doc } = drawing();
+    const created = execute(doc, 'create_dimension_style', { name: 'S' });
+    const id = styleIdOf(created);
+    const stale = { ...created.document, nextStepNumber: 1 };
+    const loaded = deserializeDocument(JSON.stringify({ format: 'llull-document', version: 3, document: stale }));
+    expect(loaded.nextStepNumber).toBeGreaterThan(Number(/-(\d+)\./.exec(id)![1]));
+  });
+});

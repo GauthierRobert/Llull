@@ -10,6 +10,7 @@
 import { existsSync, statSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
+import { getGeometryKernel } from '@core/geometry/kernel';
 import { canonicalJson } from '@lib/canonicalJson';
 import { isRecord } from '@lib/isRecord';
 import { zipStore, type ZipEntry } from '@lib/zip';
@@ -80,7 +81,7 @@ const fail = (code: PackFailureCode, message: string): PackFailure => ({ ok: fal
 /** Asset keys the document's `scan` slice references (sorted, unique); null when the file is not a readable document. */
 function referencedKeys(documentText: string): string[] | null {
   try {
-    const clouds = deserializeDocument(documentText).scan?.clouds ?? {};
+    const clouds = deserializeDocument(documentText, { kernel: getGeometryKernel() }).scan?.clouds ?? {};
     return [...new Set(Object.values(clouds).map((cloud) => cloud.assetKey))].sort();
   } catch {
     return null;
@@ -262,7 +263,7 @@ export function unpackDocument(options: UnpackOptions): UnpackResult {
   const manifest = readManifest(manifestBytes);
   if (typeof manifest === 'string') return fail('SCN_PACK_INVALID', manifest);
   try {
-    deserializeDocument(Buffer.from(documentBytes).toString('utf8'));
+    deserializeDocument(Buffer.from(documentBytes).toString('utf8'), { kernel: getGeometryKernel() });
   } catch {
     return fail('SCN_PACK_INVALID', 'document.llull is not a llull document');
   }

@@ -15,6 +15,7 @@ import { defineConstitutiveSet } from './constitutiveSets';
 import { checkMaterialModels } from './checkMaterialModels';
 import { kernelInfo } from './kernelInfo';
 import { setModelingTolerance } from './modelingTolerance';
+import { setMeshStorage } from './meshStorage';
 import { setSelection } from './setSelection';
 
 export const documentCommands = commandCatalog(
@@ -40,5 +41,6 @@ export const documentCommands = commandCatalog(
   checkMaterialModels,
   kernelInfo,
   setModelingTolerance,
+  setMeshStorage,
   setSelection,
 );

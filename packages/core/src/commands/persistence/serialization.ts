@@ -1,6 +1,7 @@
 /**
  * @affects replaces all entities in the document with the loaded ones
  * @invariant parsed document satisfies CadDocument structural + value constraints
+ * @invariant kernel-optional: a v4 file (`derivedMeshes`) is rebuilt with the context kernel; without one it is refused (KRN_DERIVED_MESH_NO_KERNEL)
  * @failure invalid JSON / wrong format or version / structural or value validation error -> no-op, affected:[]
  */
 
@@ -8,6 +9,7 @@ import { type CadDocument, DOCUMENT_UNITS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, noop } from '../noop';
+import { currentContext } from '../context';
 import { sha256Hex } from '../../lib/sha256';
 import { errorMessage } from '../../lib/errorMessage';
 import { isRecord } from '../../lib/isRecord';
@@ -15,14 +17,19 @@ import { derivedEntityIds, documentExtensions } from '../../plugins/host';
 import { validateDocumentShape, validateDocumentValues } from './validation';
 import { migrateRetiredCommands } from './retiredCommands';
 import { exceedsNestingDepth } from './nestingDepth';
+import type { GeometryKernel } from '../../geometry/kernel';
+import { derivedMeshTableOf, rebuildDerivedMeshes, withoutDerivedMeshes } from './derivedMeshes';
 import { withoutPrivateValues } from '../materials/libraryRecords';
 import { documentJson } from './documentJson';
 
 /** Bump on a breaking field; `migrate()` upgrades older documents. */
 const CURRENT_SCHEMA_VERSION = 3;
 
+/** v4 = v3 plus `derivedMeshes` (kernel-result triangles omitted, `meshStorage: 'recipe'`); written only then, so older readers refuse instead of loading empty meshes. */
+const DERIVED_MESHES_VERSION = 4;
+
 /** v1 files (legacy ids, building entities stored) load unchanged; v2 adds step-scoped ids; v3 adds kernelSettings + blobs (aerospace 01); v1/v2 need no rewrite for v3 (both slices stay absent). */
-const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2, 3]);
+const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2, 3, 4]);
 
 interface SerializeOptions {
   /**
@@ -35,13 +42,18 @@ interface SerializeOptions {
 /**
  * Deterministic `{ format: 'llull-document', version, document }` JSON; derived entities omitted unless `includeDerived`.
  * @invariant values of `private` material libraries are never written: their records are stubs { id, libraryRef, marking } (TR-MAT-31)
+ * @invariant `kernelSettings.meshStorage === 'recipe'` (and not `includeDerived`): kernel-result meshes are written empty and listed in `derivedMeshes` (v4)
  * @invariant a function of the document alone: kernel provenance (`kernelSettings`) is written by the commands that use the exact kernel
  *   (`import_step_exact`, `set_modeling_tolerance`) from their own ctx, never from the ambient kernel at save time
  */
 export function serializeDocument(doc: CadDocument, options: SerializeOptions = {}): string {
-  const document = withoutPrivateValues(options.includeDerived === true ? doc : withoutDerivedEntities(doc));
-  // The envelope `{ format, version, document }` in that key order, the document through the per-part text memo.
-  return `{"format":"llull-document","version":${CURRENT_SCHEMA_VERSION},"document":${documentJson(document)}}`;
+  const full = options.includeDerived === true;
+  const stored = withoutPrivateValues(full ? doc : withoutDerivedEntities(doc));
+  const { document, table } =
+    !full && doc.kernelSettings?.meshStorage === 'recipe' ? withoutDerivedMeshes(stored) : { document: stored, table: null };
+  // The envelope `{ format, version, document[, derivedMeshes] }` in that key order, the document through the per-part text memo.
+  const head = `{"format":"llull-document","version":${table === null ? CURRENT_SCHEMA_VERSION : DERIVED_MESHES_VERSION}`;
+  return `${head},"document":${documentJson(document)}${table === null ? '' : `,"derivedMeshes":${JSON.stringify(table)}`}}`;
 }
 
 export function withoutDerivedEntities(doc: CadDocument): CadDocument {
@@ -86,6 +98,8 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
   const pmi = raw['pmi'];
   for (const table of isRecord(pmi) ? [pmi['items'], pmi['savedViews']] : [])
     for (const id of Object.keys(isRecord(table) ? table : {})) noteStepNumber(STEP_SCOPED_ID.exec(id)?.[1], `pmi id '${id}'`);
+  const styles = raw['dimensionStyles'];
+  for (const id of Object.keys(isRecord(styles) ? styles : {})) noteStepNumber(STEP_SCOPED_ID.exec(id)?.[1], `dimension style id '${id}'`);
   const stored = raw['nextStepNumber'];
   if (stored !== undefined && (typeof stored !== 'number' || !Number.isSafeInteger(stored) || stored < 1))
     throw new Error(`load_document: nextStepNumber must be a safe integer >= 1, got ${String(stored)}.`);
@@ -159,17 +173,23 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, units, displayPrecision, order: repairedOrder(raw), layerOrder: repairedLayerOrder(raw), ...collections };
 }
 
+interface DeserializeOptions {
+  /** Rebuilds the meshes a `meshStorage: 'recipe'` file omits; without it such a file is refused (KRN_DERIVED_MESH_NO_KERNEL). */
+  readonly kernel?: GeometryKernel | null;
+}
+
 /** Far beyond any document a command writes; well below the depth at which `JSON.stringify` overflows the stack. */
 const MAX_NESTING_DEPTH = 1000;
 
 /**
  * Parse and validate a `serializeDocument` string (old files gain defaults via `migrate()`).
+ * @invariant kernel-optional: a v4 file (`derivedMeshes`) needs `options.kernel` to rebuild kernel-result triangles; v1-v3 files never read it
  * @invariant every document a registered command produced reloads and re-serializes equal (tests/unit/persistenceRoundTrip.test.ts); the
  *   feature-history command-name check is skipped while the command table is empty (registry not imported)
  * @failure throws an Error naming the failing field (bad JSON, format, version, structure, values); `load_document` turns it into a no-op
  *   summary
  */
-export function deserializeDocument(json: string): CadDocument {
+export function deserializeDocument(json: string, options: DeserializeOptions = {}): CadDocument {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -184,14 +204,15 @@ export function deserializeDocument(json: string): CadDocument {
   if (parsed['format'] !== 'llull-document')
     throw new Error(`load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`);
   if (!READABLE_VERSIONS.has(parsed['version']))
-    throw new Error(`load_document: unsupported version ${String(parsed['version'])} — expected 1, 2 or ${CURRENT_SCHEMA_VERSION}.`);
+    throw new Error(`load_document: unsupported version ${String(parsed['version'])} — expected 1 to ${DERIVED_MESHES_VERSION}.`);
   const rawDoc = parsed['document'];
   if (!validateDocumentShape(rawDoc))
     throw new Error(
       'load_document: document structure is invalid — missing or malformed required fields ' +
         '(entities, order, layers, layerOrder, selection, camera).',
     );
-  const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrateRetiredCommands(migrate(rawDoc))));
+  const withMeshes = rebuildDerivedMeshes(rawDoc, derivedMeshTableOf(parsed['derivedMeshes']) ?? {}, options.kernel);
+  const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrateRetiredCommands(migrate(withMeshes))));
   const valueErrors = validateDocumentValues(migratedDoc);
   if (valueErrors.length > 0) throw new Error(`load_document: document contains invalid values:\n  ${valueErrors.join('\n  ')}`);
   return migratedDoc as unknown as CadDocument;
@@ -203,7 +224,7 @@ export const loadDocument = defineCommand({
     'Replace the current document with one parsed from a serialized JSON string ' +
     'produced by serializeDocument (envelope format: llull-document v3; v1 and v2 are still read). ' +
     'On parse or validation failure the document is left unchanged.',
-  annotations: { metaHistory: true, idempotent: true, layerManagement: true },
+  annotations: { metaHistory: true, idempotent: true, layerManagement: true, kernelOptional: true },
   params: z.object({
     json: z
       .string()
@@ -213,10 +234,10 @@ export const loadDocument = defineCommand({
           'Must contain a valid CadDocument with entities, order, layers, layerOrder, selection, and camera.',
       ),
   }),
-  run: (doc, { json }): CommandResult => {
+  run: (doc, { json }, ctx): CommandResult => {
     let parsed: CadDocument;
     try {
-      const read = deserializeDocument(json);
+      const read = deserializeDocument(json, { kernel: (ctx ?? currentContext()).kernel });
       // A file without an identity (saved before VIS-ID, or built outside the commands) gets one from its own bytes, so signing on it works.
       parsed = read.uid === undefined ? { ...read, uid: sha256Hex(json).slice(0, 32) } : read;
     } catch (err) {

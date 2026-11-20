@@ -152,7 +152,11 @@ between steps never need rewriting. On top of that:
 - **Constructive vs evaluated.** The definition (history, parameters, constraints,
   domain models) is the source of truth; `entities` and `order` are the evaluated cache.
   Saved files (llull-document version 3) omit plugin-derived geometry and re-derive it on
-  load. Versions 1 and 2 are still read.
+  load. Versions 1 and 2 are still read. Kernel results (`mesh` entities with a `brep` recipe) are
+  derived too, opt-in: `set_mesh_storage recipe` makes a save omit their triangles (envelope version 4,
+  `derivedMeshes`) and the loader rebuilds them from the recipe with the kernel it is given
+  (`KRN_DERIVED_MESH_NO_KERNEL` / `KRN_DERIVED_MESH_UNBUILT` when it cannot). Default `full` keeps the
+  stored triangles, which also serve as the fallback when a kernel cannot rebuild a tree.
 
 ## Geometry kernel
 

@@ -40,7 +40,7 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 - [ ] Named parameters / variables (`set_parameter`) — change a value, model regenerates
 - [ ] Geometric + dimensional constraints + a pure constraint solver
 - [ ] Feature history / timeline: insert, reorder, edit-params, suppress → re-evaluate
-- [ ] Constructive vs evaluated geometry split (`entities` becomes a derived cache)
+- [x] Constructive vs evaluated geometry split (`entities` becomes a derived cache) — plugin-derived entities and, opt-in, kernel results (`set_mesh_storage`)
 - See the `parametric` skill, architecture L8.
 
 ## v0.6 — Measurement & inspection (read-only query tools)
@@ -123,7 +123,7 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 - [x] Step-scoped deterministic ids; replay re-mints identical ids
 - [x] Replay prefix cache; parameter edits regenerate only dependent steps; kernel memoization
 - [x] Derivation guards; saved files omit plugin-derived geometry (llull-document v2)
-- [ ] Kernel (boolean / fillet) mesh results as a derived cache, not stored in files
+- [x] Kernel (boolean / fillet) mesh results as a derived cache, not stored in files — `set_mesh_storage recipe`, file v4 `derivedMeshes`, rebuilt on load
 - [x] Command-log live sync (`/live`); UI bridge retired (the offline outbox was removed in LC1 step 6)
 - [x] Plugins (building, industrial); npm workspaces; tool discovery (then MCP `search_tools` / `enable_toolset`; now `llull search` / `llull list <toolset>`)
 - [x] Every source file under 500 code lines
