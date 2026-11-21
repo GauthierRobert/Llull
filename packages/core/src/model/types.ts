@@ -821,7 +821,11 @@ export interface EdgeRadius {
 export type ShapeRecipe =
   /** A solid entity as authored (primitive, profile solid, or a plain triangle mesh). */
   | { readonly op: 'solid'; readonly entity: Entity }
-  | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe }
+  /**
+   * `many` (union / subtract only): `b` is the balanced union of `many` tool recipes; a kernel with a multi-tool boolean applies the tools in ONE
+   * General Fuse / Cut, every other kernel evaluates `b` as written (ASC M1a).
+   */
+  | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe; readonly many?: number }
   | EdgeBlendNode<ShapeRecipe, EdgeRadius>
   /**
    * A rolling-ball blend between two face sets that need not share an edge (BLD M4): `facesA` / `facesB` are unique face indices of the source,

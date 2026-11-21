@@ -8,6 +8,7 @@ import { type CadDocument, type Entity, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import type { BooleanOp, ShapeRecipe } from '../../model/types';
+import type { GeometryKernel } from '../../geometry/kernel';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
@@ -34,7 +35,7 @@ function enclosesNoVolume(positions: readonly number[], indices: readonly number
   return Math.abs(signedMeshVolume(positions, indices)) <= VANISHED_VOLUME_RATIO * boxVolume;
 }
 
-/** At most this many tool solids in one boolean (a plan step lists them; the kernel unions them as a balanced tree). */
+/** At most this many tool solids in one boolean (a plan step lists them; a kernel without the multi-tool op unions them as a balanced tree). */
 const MAX_TOOLS = 1000;
 
 /**
@@ -55,6 +56,22 @@ function booleanChainDepth(recipe: ShapeRecipe): number {
   let depth = 0;
   for (let node = recipe; node.op === 'boolean'; node = node.a) depth++;
   return depth;
+}
+
+/** ` KRN_TIMEOUT: …` when the kernel stopped at its deadline (the refusal text names the stage reached), else ''. */
+function timeoutNote(refusal: string | null): string {
+  return refusal !== null && refusal.includes('KRN_TIMEOUT')
+    ? ` ${refusal.slice(refusal.indexOf('KRN_TIMEOUT'))} (the kernel stopped at its deadline; raise LLULL_OCC_TIMEOUT_MS or simplify).`
+    : '';
+}
+
+/** How a multi-tool recipe ran: one general fuse / cut, or `KRN_FUSE_FALLBACK` with the balanced tree; '' for a kernel without the report. */
+function fuseNote(kernel: GeometryKernel, recipe: ShapeRecipe): string {
+  const report = kernel.booleanReport?.(recipe) ?? null;
+  if (report === null) return '';
+  if (report.fallback === true)
+    return ` KRN_FUSE_FALLBACK: the general fuse of ${report.tools} tools was refused (${report.reason ?? 'invalid result'}); the balanced tree ran.`;
+  return ` (one general fuse of ${report.tools} tools)`;
 }
 
 /** `'b'` for one tool, `N tools ('b1', …)` for several (summaries). */
@@ -136,13 +153,21 @@ function runBoolean(
   if (!kernel) return noop(doc, kernelUnavailable(opName));
   const recipes = [entA, ...toolEntities].map((operand) => recipeOfPart(doc, kernel, operand));
   const [recipeA, ...toolRecipes] = recipes as ShapeRecipe[];
-  const recipe: ShapeRecipe = { op: 'boolean', boolean: op, a: recipeA as ShapeRecipe, b: balancedUnion(toolRecipes) };
+  // several tools: `many` lets a kernel apply them in ONE General Fuse / Cut; `b` stays the balanced tree every other kernel (and the fallback) evaluates
+  const recipe: ShapeRecipe = {
+    op: 'boolean',
+    boolean: op,
+    a: recipeA as ShapeRecipe,
+    b: balancedUnion(toolRecipes),
+    ...(toolRecipes.length > 1 && op !== 'intersect' ? { many: toolRecipes.length } : {}),
+  };
   const result = evaluateRecipe(kernel, recipe);
   const b = toolLabel(tools);
   if (result === 'refused')
     return noop(
       doc,
       `${opName}: kernel returned null for operands '${a}' and ${b}. The geometry may be degenerate or unsupported.` +
+        timeoutNote(kernel.lastRefusal?.() ?? null) +
         (booleanChainDepth(recipe) > DEEP_RECIPE
           ? ` '${a}' is already the result of ${booleanChainDepth(recipe) - 1} nested booleans: cut patterned tools in one boolean with b as a list of ids.`
           : ''),
@@ -159,7 +184,10 @@ function runBoolean(
     [entA, ...toolEntities],
     (newId, triangles) => `${opName}: merged '${a}' and ${b} into mesh '${newId}' (${triangles} triangles). Operands consumed.`,
   );
-  return { ...committed, summary: committed.summary + orphanedComponentNote(doc, committed.document, [entA, ...toolEntities]) };
+  return {
+    ...committed,
+    summary: committed.summary + orphanedComponentNote(doc, committed.document, [entA, ...toolEntities]) + fuseNote(kernel, recipe),
+  };
 }
 
 type BooleanEngine = 'auto' | 'kernel' | 'mesh';
@@ -195,7 +223,7 @@ export const booleanOperation = defineCommand({
       .union([z.string(), z.array(z.string()).min(1).max(MAX_TOOLS)])
       .describe(
         'Id of the second 3D solid operand (the tool solid for subtract), or a list of tool ids for union / subtract: the tools are ' +
-          'unioned as a balanced tree and applied in ONE boolean — use a list for patterned cuts (coolant channels, bolt holes) instead ' +
+          'unioned (the exact kernel applies them in ONE general fuse / cut, others as a balanced tree) and applied in ONE boolean — use a list for patterned cuts (coolant channels, bolt holes) instead ' +
           'of hundreds of sequential booleans, which nest the recipe deeper each step and slow down quadratically.',
       ),
     engine: z

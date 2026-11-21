@@ -15,9 +15,11 @@ export const STATUS_READY = 3;
 type FaceQueryOperation = `faceQuery.${keyof FaceQueryPort}`;
 export type KernelOperation = keyof GeometryKernel | FaceQueryOperation;
 export type TestHook = '__abort' | '__hang' | '__exitIdle';
+/** Host-to-worker message (no reply): stop the native op that is running (it answers `KRN_TIMEOUT`). */
+export const CANCEL_OPERATION = '__cancel';
 
 export interface KernelRequest {
-  readonly op: KernelOperation | TestHook;
+  readonly op: KernelOperation | TestHook | typeof CANCEL_OPERATION;
   readonly args: readonly unknown[];
 }
 

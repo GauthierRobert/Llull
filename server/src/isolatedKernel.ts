@@ -8,19 +8,35 @@ import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from '
 import { debugWarn } from './debugLog';
 import type { DeformLaw, DeformRegion } from '@core/model/deform';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
-import type { BlendReport, DeformReport, ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
+import type {
+  BlendReport,
+  BooleanReport,
+  DeformReport,
+  ExactMassProperties,
+  ImportShapesResult,
+  KernelInfo,
+} from '@core/geometry/kernelPorts';
 import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
 import type { MeshToBrepResult } from '@core/geometry/kernelMeshBrep';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import { unsupportedOp } from '@core/geometry/operandRecipe';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
-import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './kernelWorkerProtocol';
+import {
+  CANCEL_OPERATION,
+  STATUS_DIED,
+  STATUS_READY,
+  STATUS_REPLY,
+  type KernelOperation,
+  type KernelReply,
+  type TestHook,
+} from './kernelWorkerProtocol';
 
 export interface IsolatedKernelOptions {
   readonly entry: string; // worker entry (nativeKernelWorker.ts/.js)
   readonly execArgv?: readonly string[];
-  readonly callTimeoutMs?: number; // default 60 000
+  readonly callTimeoutMs?: number; // default 60 000: the deadline the sidecar enforces (KRN_TIMEOUT, it stays alive)
+  readonly killGraceMs?: number; // default 5 000: the worker is killed only this long after the deadline (last resort, TR-ASC-04)
   readonly startTimeoutMs?: number; // sidecar start, default 60 000
   readonly testHooks?: boolean; // enables `__abort` / `__hang`
   readonly workerData?: Readonly<Record<string, unknown>>; // extra entry inputs (the sidecar binary path)
@@ -29,6 +45,8 @@ export interface IsolatedKernelOptions {
 export interface IsolatedKernel extends GeometryKernel {
   crashCount(): number; // worker died or was killed mid-call
   forceFailure(hook: TestHook): void;
+  /** Stops the native op that is running (from another thread: a synchronous call blocks this one); it answers KRN_TIMEOUT. */
+  cancel(): void;
   /** Spawn the worker now (idempotent); false + warning when it cannot start. */
   start(): boolean;
   dispose(): void;
@@ -122,6 +140,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
   const { entry } = options;
   const execArgv = options.execArgv !== undefined ? [...options.execArgv] : entry.endsWith('.ts') ? ['--require', 'tsx/cjs'] : undefined;
   const callTimeoutMs = options.callTimeoutMs ?? 60_000;
+  const killAfterMs = callTimeoutMs + (options.killGraceMs ?? 5_000);
   const startTimeoutMs = options.startTimeoutMs ?? 60_000;
   let live: LiveWorker | null = null;
   let crashes = 0;
@@ -142,7 +161,14 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     const { port1, port2 } = new MessageChannel();
     const worker = new Worker(BOOTSTRAP, {
       eval: true,
-      workerData: { ...options.workerData, entry, statusBuffer, port: port2, testHooks: options.testHooks === true },
+      workerData: {
+        ...options.workerData,
+        entry,
+        statusBuffer,
+        port: port2,
+        testHooks: options.testHooks === true,
+        deadlineMs: callTimeoutMs,
+      },
       transferList: [port2],
       ...(execArgv !== undefined ? { execArgv } : {}),
     });
@@ -196,7 +222,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
   const transact = (target: LiveWorker, op: KernelOperation | TestHook, args: readonly unknown[]): KernelReply | null => {
     const { port, status } = target;
     port.postMessage({ op, args });
-    const outcome = Atomics.wait(status, 0, 0, callTimeoutMs);
+    const outcome = Atomics.wait(status, 0, 0, killAfterMs);
     const state = Atomics.load(status, 0);
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
@@ -208,7 +234,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     console.warn(
       state === STATUS_DIED
         ? `[occt] worker aborted during ${op}; restarting it and returning null`
-        : `[occt] ${op} exceeded ${callTimeoutMs} ms; killing the worker and returning null`,
+        : `[occt] ${op} exceeded ${killAfterMs} ms (deadline ${callTimeoutMs} ms + grace); killing the worker and returning null`,
     );
     recycle();
     return null;
@@ -327,6 +353,8 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,
     loadBlob: (sha256, brep) => void blobs.set(sha256, brep),
     blendReport: (recipe) => call('blendReport', [recipe]) as BlendReport | null,
+    booleanReport: (recipe) =>
+      recipe.op === 'boolean' && recipe.many !== undefined ? (call('booleanReport', [recipe]) as BooleanReport | null) : null,
     deformReport: (recipe) => (recipe.op === 'deform' ? (call('deformReport', [recipe]) as DeformReport | null) : null),
     lastRefusal: () => lastEvaluateError,
     importShapes: (format, text, options) => call('importShapes', [format, text, options]) as ImportShapesResult | null,
@@ -334,6 +362,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     info,
     crashCount: () => crashes,
     forceFailure: (hook) => void call(hook, []),
+    cancel: () => live?.port.postMessage({ op: CANCEL_OPERATION, args: [] }),
     start: () => {
       try {
         ensureLive();

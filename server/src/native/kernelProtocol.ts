@@ -39,9 +39,13 @@ export interface NativeInfo {
   readonly ops: readonly string[];
 }
 
-export function encodeRequest(id: number, op: string, args: readonly unknown[]): string {
-  return `${JSON.stringify({ id, op, args })}\n`;
+/** One request line; `deadlineMs` (ASC TR-ASC-04) is how long the sidecar lets the op run before it answers `KRN_TIMEOUT` and stays alive. */
+export function encodeRequest(id: number, op: string, args: readonly unknown[], deadlineMs?: number): string {
+  return `${JSON.stringify({ id, op, args, ...(deadlineMs === undefined ? {} : { deadlineMs }) })}\n`;
 }
+
+/** The cancel message of the host channel: the running op stops at its next progress poll with `KRN_TIMEOUT`. */
+export const CANCEL_LINE = '{"cancel":true}\n';
 
 /** A reply line, or null for anything else on stdout (a stray library print must not break the session). */
 export function parseReplyLine(line: string): NativeReply | null {
@@ -280,7 +284,7 @@ export function nativeArgs(
   features: FeatureLowerings = NO_LOWERINGS,
   wire: WireOptions = {},
 ): readonly unknown[] {
-  if (op === 'evaluate' || op === 'blendReport' || op === 'deformReport') {
+  if (op === 'evaluate' || op === 'blendReport' || op === 'deformReport' || op === 'booleanReport') {
     const recipe = args[0] as ShapeRecipe;
     return [{ key: recipeKey(recipe), recipe: nativeRecipe(recipe, features, wire) }];
   }

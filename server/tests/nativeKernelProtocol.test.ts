@@ -19,6 +19,7 @@ const base64 = (view: Float64Array | Uint32Array): string => Buffer.from(view.bu
 describe('native kernel framing', () => {
   it('writes one JSON line per request and reads replies by id', () => {
     expect(encodeRequest(3, 'evaluate', [1])).toBe('{"id":3,"op":"evaluate","args":[1]}\n');
+    expect(encodeRequest(3, 'evaluate', [1], 250)).toBe('{"id":3,"op":"evaluate","args":[1],"deadlineMs":250}\n');
     expect(parseReplyLine('{"id":3,"result":{"key":"k"}}')).toEqual({ id: 3, result: { key: 'k' } });
     expect(parseReplyLine('{"id":4,"result":null,"error":"NATIVE_UNSUPPORTED: op \'x\'"}')?.error).toMatch(/^NATIVE_UNSUPPORTED/);
   });

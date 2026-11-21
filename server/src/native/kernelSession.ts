@@ -7,7 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { encodeRequest, NATIVE_DIED, parseReplyLine, parseUnmatchedError, type NativeReply } from './kernelProtocol';
+import { CANCEL_LINE, encodeRequest, NATIVE_DIED, parseReplyLine, parseUnmatchedError, type NativeReply } from './kernelProtocol';
 import { nativeRuntimeEnv } from './nativeBinary';
 
 /** The process as the session sees it (a fake in unit tests). */
@@ -19,7 +19,10 @@ export interface KernelChild {
 }
 
 export interface NativeKernelSession {
-  request(op: string, args: readonly unknown[]): Promise<Omit<NativeReply, 'id'>>;
+  /** `deadlineMs`: the sidecar answers `KRN_TIMEOUT` after it (ASC TR-ASC-04); absent = no deadline. */
+  request(op: string, args: readonly unknown[], deadlineMs?: number): Promise<Omit<NativeReply, 'id'>>;
+  /** Stops the op the sidecar is running (it answers `KRN_TIMEOUT`); idle, it does nothing. */
+  cancel(): void;
   alive(): boolean;
   close(): void;
 }
@@ -56,18 +59,26 @@ export function createKernelSession(child: KernelChild): NativeKernelSession {
   });
 
   return {
-    request: (op, args) => {
+    request: (op, args, deadlineMs) => {
       if (exitReason !== null) return Promise.resolve({ result: null, error: `${NATIVE_DIED}: ${exitReason}` });
       const id = nextId++;
       return new Promise((resolve) => {
         pending.set(id, resolve);
         try {
-          child.write(encodeRequest(id, op, args));
+          child.write(encodeRequest(id, op, args, deadlineMs));
         } catch (error) {
           pending.delete(id);
           resolve({ result: null, error: `${NATIVE_DIED}: ${error instanceof Error ? error.message : String(error)}` });
         }
       });
+    },
+    cancel: () => {
+      if (exitReason !== null) return;
+      try {
+        child.write(CANCEL_LINE);
+      } catch {
+        // a dead sidecar settles through its exit event
+      }
     },
     alive: () => exitReason === null,
     close: () => child.kill(),
