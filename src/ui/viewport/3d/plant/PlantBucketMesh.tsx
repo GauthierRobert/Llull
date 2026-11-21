@@ -89,6 +89,7 @@ export function PlantBucketMesh({
       ref={meshRef}
       args={[geometry, material, capacity]}
       count={count}
+      userData={{ instanceIds: bucket.ids }}
       onClick={handleClick}
       raycast={raycast}
       castShadow={bucket.lod <= plantShadowMaxLod}

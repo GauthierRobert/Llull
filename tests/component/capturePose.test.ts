@@ -51,4 +51,14 @@ describe('capturePose (temporary camera of capture_viewport)', () => {
     expect(empty.target).toEqual([0, 0, 0]);
     expect(empty.distance).toBeGreaterThan(0);
   });
+
+  it("ignores what the user's own viewport filter hides", () => {
+    const a = localDispatch('add_box', { size: [10, 10, 10], position: [0, 0, 0] }).affected[0]!;
+    localDispatch('add_box', { size: [10, 10, 10], position: [1000, 0, 0] });
+    const doc = useStore.getState().document;
+    const all = capturePose(request(), doc);
+    const onlyFirst = capturePose(request(), doc, new Set(), new Set([doc.order.find((id) => id !== a)!]));
+    expect(onlyFirst.distance).toBeLessThan(all.distance);
+    expect(onlyFirst.target[0]).toBeCloseTo(0);
+  });
 });

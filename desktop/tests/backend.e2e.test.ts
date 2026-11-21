@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { encodePng } from '@lib/png';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { nativeBinaryPath, nativeInstallHint } from '@server/native/nativeBinary';
@@ -132,7 +133,7 @@ describe('desktop backend', () => {
   });
 
   it('capture_viewport --app: the renderer (here a fake client on the real /viewport/stream) answers, the CLI saves the PNG (VC-ASC-22)', async () => {
-    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 7, 7, 7]);
+    const png = Buffer.from(encodePng(320, 200, new Uint8Array(320 * 200 * 4)));
     const headers = { Authorization: `Bearer ${token}` };
     const ticket = (await (await fetch(`${backend.url}/live/ticket`, { method: 'POST', headers })).json()) as { ticket: string };
     const stream = new AbortController();

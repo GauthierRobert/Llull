@@ -88,7 +88,17 @@ function ComponentBatchMesh({
   );
 
   if (count === 0) return null;
-  return <instancedMesh ref={meshRef} args={[geometry, surface, capacity]} count={count} onClick={handleClick} castShadow receiveShadow />;
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[geometry, surface, capacity]}
+      count={count}
+      userData={{ instanceIds: batch.ids }}
+      onClick={handleClick}
+      castShadow
+      receiveShadow
+    />
+  );
 }
 
 interface ComponentInstancedRendererProps {

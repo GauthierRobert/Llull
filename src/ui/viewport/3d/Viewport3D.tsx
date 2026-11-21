@@ -157,7 +157,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         fadeStrength={1.5}
         position={[0, 0, 0]}
         rotation={GROUND_PLANE_ROTATION}
-        userData={{ noEdges: true }}
+        userData={{ noEdges: true, captureExclude: true }}
         infiniteGrid
       />
 
@@ -168,14 +168,17 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
           </PlantCameraProvider>
         </group>
         <PointClouds />
-        <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
-        <FeatureSessionLayer />
-        <CageEditLayer onDraggingChanged={onDraggingChanged} />
-        <FaceEditLayer />
-        <NurbsNetLayer />
-        <RemotePreviewLayer />
-        <FootprintPreviewLayer />
-        <MeasureBBoxWireframe />
+        {/* Editing helpers, not the model: a capture_viewport frame leaves them out (capture/frameMask.ts). */}
+        <group userData={{ captureExclude: true }}>
+          <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+          <FeatureSessionLayer />
+          <CageEditLayer onDraggingChanged={onDraggingChanged} />
+          <FaceEditLayer />
+          <NurbsNetLayer />
+          <RemotePreviewLayer />
+          <FootprintPreviewLayer />
+          <MeasureBBoxWireframe />
+        </group>
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
         <AeroOverlay />
