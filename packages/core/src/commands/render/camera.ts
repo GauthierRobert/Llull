@@ -83,6 +83,8 @@ const AMBIENT = 0.35;
 /** Key light override of a render (site-context sun): `direction` is the unit vector toward the light in model axes; null = sky light only (sun below the horizon). */
 export interface RenderLight {
   readonly direction: Vec3 | null;
+  /** Present = raster sun shadows (when the sun is up) and the ground plane at `groundElevation` (null = none); see `sunShadows.ts`. */
+  readonly shadows?: { readonly groundElevation: number | null };
 }
 
 /** Lambert-shade `baseColor` (`#rrggbb`) for a face with unit `normal`; returns `rgb(r,g,b)`. Default light unless `light` overrides it. */

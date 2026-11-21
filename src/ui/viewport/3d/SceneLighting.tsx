@@ -35,7 +35,8 @@ function useSceneBounds(): SceneBounds {
 /** Ground contact-shadow patch sized to the scene footprint (see contactShadowPlane.ts). */
 function SceneContactShadows({ opacity, bounds }: { opacity: number; bounds: SceneBounds }): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin), [bounds, renderOrigin]);
+  const groundElevation = useStore((s) => s.document.siteContext?.groundElevation);
+  const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin, groundElevation), [bounds, renderOrigin, groundElevation]);
   const invalidate = useThree((s) => s.invalidate);
   // RenderRig requests a re-bake (moving parts, edits): re-rendering ContactShadows with frames={1} bakes once on the next frame.
   const bakeTick = useSyncExternalStore(subscribeContactBake, getContactBakeTick);
@@ -69,7 +70,8 @@ const NO_RAYCAST = (): void => undefined;
  */
 function GroundShadowCatcher({ opacity, bounds }: { opacity: number; bounds: SceneBounds }): React.ReactElement | null {
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin), [bounds, renderOrigin]);
+  const groundElevation = useStore((s) => s.document.siteContext?.groundElevation);
+  const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin, groundElevation), [bounds, renderOrigin, groundElevation]);
   const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin), [bounds, renderOrigin]);
   if (bounds === null) return null;
   const side = rig.halfExtent * 2;

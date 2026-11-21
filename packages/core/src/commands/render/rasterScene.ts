@@ -11,6 +11,7 @@ import type { RasterScene } from '../../model/raster';
 import { type Camera, type RenderLight, cameraBasis, makeProjector, projectPoint } from './camera';
 import type { Polygon3D, SurfaceShading } from './types';
 import { appendAll } from '../../lib/appendAll';
+import { SHADOW_MAX_POLYGONS, buildShadowMap, fillBounds, groundCells, inShadow } from './sunShadows';
 
 const SUPERSAMPLE = 2;
 /** Above this many output pixels the render is not supersampled (memory and time stay bounded at 2000 × 2000). */
@@ -68,6 +69,26 @@ function rgbOf(color: string): [number, number, number] {
   if (/^[0-9a-fA-F]{6}$/.test(hex)) return [0, 2, 4].map((i) => parseInt(hex.substring(i, i + 2), 16)) as [number, number, number];
   const rgb = /rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color);
   return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : [176, 176, 176];
+}
+
+function centroidOf(verts: readonly Vec3[]): Vec3 {
+  let [x, y, z] = [0, 0, 0];
+  for (const vert of verts) [x, y, z] = [x + vert[0], y + vert[1], z + vert[2]];
+  const n = verts.length || 1;
+  return [x / n, y / n, z / n];
+}
+
+/** The sun's shadow map (sun up, `light.shadows` set, at most SHADOW_MAX_POLYGONS faces) and the ground cells (`groundElevation` set); empty without `light.shadows`. */
+function sunPass(
+  light: RenderLight | undefined,
+  filled: readonly Polygon3D[],
+): { map: ReturnType<typeof buildShadowMap>; ground: Polygon3D[] } {
+  const shadows = light?.shadows;
+  const bounds = shadows === undefined ? null : fillBounds(filled);
+  if (shadows === undefined || bounds === null) return { map: null, ground: [] };
+  const toSun = light?.direction ?? null;
+  const map = toSun !== null && filled.length <= SHADOW_MAX_POLYGONS ? buildShadowMap(filled, toSun) : null;
+  return { map, ground: shadows.groundElevation === null ? [] : groundCells(bounds, shadows.groundElevation) };
 }
 
 type ScreenPoint = readonly [number, number, number];
@@ -150,6 +171,7 @@ export function prepareRasterScene(
   const toLight: Vec3 = light === undefined ? LIGHT : (light.direction ?? [0, 0, 0]);
   const filled = polygons.filter((p) => !p.stroke);
   if (polygons.length === 0) return null;
+  const sun = sunPass(light, filled);
   const samples = supersampleFor(width, height);
   const [w, h] = [width * samples, height * samples];
   const projection =
@@ -170,7 +192,7 @@ export function prepareRasterScene(
       for (const point of loop) points.push(point[0], point[1], point[2]);
     }
   };
-  for (const polygon of filled) {
+  for (const polygon of sun.ground.length === 0 ? filled : [...sun.ground, ...filled]) {
     const ownerKey = polygon.owner ?? '';
     const owner = owners.get(ownerKey) ?? owners.size;
     owners.set(ownerKey, owner);
@@ -191,10 +213,11 @@ export function prepareRasterScene(
     const facingAway = nx * view[0] + ny * view[1] + nz * view[2] > 0;
     const facing: Vec3 = facingAway ? [-nx, -ny, -nz] : polygon.normal;
     const diffuse = Math.max(0, facing[0] * toLight[0] + facing[1] * toLight[1] + facing[2] * toLight[2]);
-    const factor = AMBIENT + (1 - AMBIENT) * diffuse;
+    const shadowed = sun.map !== null && diffuse > 0 && inShadow(sun.map, centroidOf(polygon.verts), facing);
+    const factor = shadowed ? AMBIENT : AMBIENT + (1 - AMBIENT) * diffuse;
     const colour = [r * factor, g * factor, b * factor];
     if (polygon.shading !== undefined) {
-      const spec = light?.direction === null ? 0 : highlight(facing, [-view[0], -view[1], -view[2]], polygon.shading, toLight);
+      const spec = light?.direction === null || shadowed ? 0 : highlight(facing, [-view[0], -view[1], -view[2]], polygon.shading, toLight);
       const metal = unit(polygon.shading.metalness);
       const albedo = [r, g, b];
       for (let k = 0; k < 3; k += 1) colour[k] = Math.min(255, (colour[k] ?? 0) + 255 * spec * tint(metal, albedo[k] ?? 0));

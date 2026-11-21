@@ -16,7 +16,7 @@ import { appendCageNetOverlays, overlayKinds } from './overlayCage';
 import { orderedEntities } from '../entity/entityOps';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
-import { siteLightOf } from './siteLight';
+import { siteLightOf, sunShadowNote } from './siteLight';
 import { surfaceShadingOf } from './surfaceShading';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
 import { is2D } from '../../model/types';
@@ -206,6 +206,12 @@ const renderViewParams = z.object({
       'When true, 2D sketch entities (lines, arcs, circles, polylines, rectangles, text, dimensions...) are neither drawn nor counted in the framing/bounds, ' +
         'so leftover construction sketches used for extrusions do not shrink the 3D part in the frame. Default: false (2D shapes are drawn and framed).',
     ),
+  sunShadows: z
+    .boolean()
+    .optional()
+    .describe(
+      "Raster mode with a site context (set_site_context): draw the sun's shadows (shadow map along the computed sun, none when the sun is below the horizon) and, when the site has groundElevation, a finite ground plane at that height that receives them. Default: true. false = lit by the sun without shadows or ground plane. Without a site context nothing changes.",
+    ),
   showLabels: z
     .boolean()
     .optional()
@@ -256,7 +262,13 @@ function renderOnce(doc: CadDocument, params: RenderViewParams, ctx: ExecutionCo
   if ('code' in setup) return reviewRejection(doc, 'render_view', setup.code, setup.message, [], setup.paths);
   const { perspective, finish } = setup;
   const base = renderDocument(scene, view, width, height, options);
-  const notes = [renderNotes(base, options.cut), siteLightOf(unstyled)?.note ?? ''].filter((n) => n !== '').join(' ');
+  const notes = [
+    renderNotes(base, options.cut),
+    siteLightOf(unstyled)?.note ?? '',
+    sunShadowNote(options.light, base.polygonCount, options.mode !== 'vector'),
+  ]
+    .filter((n) => n !== '')
+    .join(' ');
   const reviewNotes = [styled.summary, ...style.notes, ...(style.box === null ? [] : [`Section box ${style.box.id} applied.`])].filter(
     (n) => n !== '',
   );

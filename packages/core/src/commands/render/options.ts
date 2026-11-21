@@ -17,6 +17,7 @@ interface RenderParams {
   background?: string | undefined;
   maxPolygons?: number | undefined;
   mode?: 'raster' | 'vector' | undefined;
+  sunShadows?: boolean | undefined;
   cut?: { planes: { normal: Vec3; offset: number }[]; mode?: CutSpec['mode'] | undefined; entityIds?: string[] | undefined } | undefined;
 }
 
@@ -68,7 +69,7 @@ export function resolveRenderOptions(doc: CadDocument, params: RenderParams): { 
     };
   }
   const site = siteLightOf(doc);
-  if (site !== null) options.light = site.light;
+  if (site !== null) options.light = params.sunShadows === false ? { direction: site.light.direction } : site.light;
   return { options };
 }
 
