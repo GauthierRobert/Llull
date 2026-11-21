@@ -152,6 +152,18 @@ function blindEntities(part: RoutedPart, line: PipeLine): Entity[] {
   return [cylinder(part, line, FLANGE_LAYER_ID, 'Blind flange', part.centre, mating.direction, thickness, od / 2)];
 }
 
+/** A coupling or union: a cylinder over the row length between the two faces, at the larger of the row `bodyOd` and the pipe outside diameter. */
+function straightEntities(part: RoutedPart, line: PipeLine): Entity[] {
+  if (part.typeKey !== 'coupling' && part.typeKey !== 'union') return [];
+  const frame = axisOf(part.ports);
+  const od = part.dims['outsideDiameter'];
+  if (frame === null || od === undefined) return [];
+  const label = part.typeKey === 'union' ? 'Union' : 'Coupling';
+  return [
+    cylinder(part, line, FITTING_LAYER_ID, label, frame.origin, frame.axis, frame.length, Math.max(part.dims['bodyOd'] ?? od, od) / 2),
+  ];
+}
+
 const singleEntity = (part: RoutedPart, line: PipeLine): Entity[] => {
   const entity = partEntity(part, line);
   return entity === null ? [] : [entity];
@@ -168,6 +180,8 @@ export function partEntities(part: RoutedPart, line: PipeLine): Entity[] {
       return teeEntities(part, line);
     case 'olet':
       return oletEntities(part, line);
+    case 'inline':
+      return straightEntities(part, line);
     case 'cap':
       return capEntities(part, line);
     case 'flange':

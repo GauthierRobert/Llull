@@ -148,6 +148,8 @@ function classOf(part: RoutedPart): { entity: 'IFCPIPESEGMENT' | 'IFCPIPEFITTING
       return { entity: 'IFCPIPEFITTING', type: '.CONNECTOR.' };
     case 'cap':
       return { entity: 'IFCPIPEFITTING', type: '.OBSTRUCTION.' };
+    case 'inline':
+      return part.typeKey === 'coupling' || part.typeKey === 'union' ? { entity: 'IFCPIPEFITTING', type: '.CONNECTOR.' } : null;
     case 'valve':
       return { entity: 'IFCVALVE', type: VALVE_TYPE[part.typeKey] ?? '.NOTDEFINED.' };
     default:

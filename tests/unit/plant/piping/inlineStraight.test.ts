@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
+import { partEntities } from '@aec/plant/piping/geometryInline';
 import { deriveRun } from '@aec/plant/piping/routeParts';
 import { apply, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
@@ -212,5 +213,37 @@ describe('swage inline', () => {
       { runId: 'nope', type: 'swage', dn2: 25, at: { leg: 0, centreDistance: 1 } },
       'RTE_UNKNOWN_RUN',
     );
+  });
+});
+
+describe('coupling and union are drawn (CAT-FU2)', () => {
+  const entitiesOf = (doc: CadDocument, id: string): Array<{ id: string; kind: string; profile?: number[][] }> =>
+    Object.values(doc.entities).filter((entity) => entity.id === id || entity.id.startsWith(`${id}/`)) as never;
+
+  it('has a display cylinder face to face (40 mm long, radius 25 from bodyOd 50), is counted in the takeoff and written to IFC as a connector', () => {
+    const { result } = routed([{ type: 'coupling', at: { leg: 0, centreDistance: 500 } }]);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const doc = result.document;
+    const runId = (result.data as Placed).runId;
+    const parts = derivedOf(doc, runId).parts.filter((part) => part.kind === 'inline');
+    expect(parts.map((part) => part.typeKey)).toEqual(['coupling']);
+    for (const part of parts) {
+      const drawn = entitiesOf(doc, part.id);
+      expect(drawn, part.id).toHaveLength(1);
+      expect(drawn[0]?.kind).toBe('revolution');
+    }
+    const coupling = entitiesOf(doc, (parts[0] as { id: string }).id)[0];
+    expect(coupling?.profile?.map((point) => point[0])).toEqual([0, 25, 25, 0]);
+    expect(coupling?.profile?.[2]?.[1]).toBeCloseTo(40, 6);
+    const takeoff = ok(doc, 'piping_takeoff', {}).data as { counts: Record<string, number> };
+    expect(takeoff.counts).toMatchObject({ coupling: 1 });
+    const ifc = (ok(doc, 'export_ifc', {}).data as { ifc: string }).ifc;
+    expect(ifc.match(/=IFCPIPEFITTING\(.*\.CONNECTOR\.\);/g)?.length).toBe(1);
+    expectPure(doc, () => execute(doc, 'export_ifc', {}));
+    // A union (same part kind, own label) and an instrument (no drawing, no product) from the same derivation.
+    const line = (doc.plant?.piping as PipingModel).lines[(doc.plant?.piping as PipingModel).runs[runId]?.lineId as string] as never;
+    const part = parts[0] as (typeof parts)[number];
+    expect(partEntities({ ...part, typeKey: 'union' }, line)[0]?.name).toMatch(/^Union /);
+    expect(partEntities({ ...part, typeKey: 'instrument' }, line)).toEqual([]);
   });
 });
