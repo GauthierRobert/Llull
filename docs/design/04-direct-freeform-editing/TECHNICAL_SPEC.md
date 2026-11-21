@@ -541,20 +541,20 @@ open cages, `move_faces`, `delete_faces`, `/preview`, bench), and the `freeform`
 
 ### 13.2 Measured (VC results)
 
-| VC           | Result                                                                                                                                                                              |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 01           | lambda(n), n = 3..12, equals the table to 1e-11; valence-5 limit point within 3e-3 and normal within cos > 1 - 3e-3 of the level-6 mesh on an asymmetric bipyramid                    |
+| VC           | Result                                                                                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01           | lambda(n), n = 3..12, equals the table to 1e-11; valence-5 limit point within 3e-3 and normal within cos > 1 - 3e-3 of the level-6 mesh on an asymmetric bipyramid                     |
 | 02 / 03      | corner (0.5, 0.5, 0.5) error 0, face centre (0, 0, 68/81) 4.9e-13, edge midpoint (0, 395/648, 395/648) 4.3e-13, corner normal 3.7e-13 (through `evaluate_subdivision`, 1e-12 rounding) |
-| 04 / 05      | CLI `run baseline_subd_cage_today.json` (native kernel installed, mass from the display mesh): 2.6646247896794573, 8, 6.318191422352206, 6.878201798351067; 9/9 steps ok            |
-| 06           | the 26 world vertices of `cage_edit_cases.json` within 1e-6; volume 6.31819142235 to 6.87820179835 (1e-9 rel)                                                                       |
-| 07           | every edge at s = 1 / 2 / 0.5, level 4: 6.318191422352203 / 7.5641986705638535 / 4.233575762418375 (match the reference to 1e-9 rel)                                                 |
-| 10           | 7 shapes x 21 samples equal `falloff_curves.json` to 1e-11                                                                                                                          |
-| 11           | mirror vertex delta (-0.3, 0.2, 0.4), `check_subdivision` maxDeviation < 1e-12                                                                                                      |
-| 19 / 20 / 21 | V 12 / E 20 / F 10 / Euler 2 each; creased volumes 12, 6.833333333333333, 8 (same through the CLI plan)                                                                             |
-| 27           | codes `DIR_REF_LOST`, `DIR_SHARPNESS_RANGE`, `DIR_ELEMENT_KIND`, `DIR_LOOP_NOT_QUAD` raised with the expected paths                                                                 |
-| 28           | histogram {3: 8}, Euler 2, genus 0, mesh volume 2.6646247896794573, limit estimate 2.6204138 (reference 2.62041911579, 5e-6), `DIR_CHECK_LEVEL_MESH_DEVIATION` warn                  |
-| 30           | `edit_step_params` on the extrude distance keeps the later steps on the same ids; a missing id answers `DIR_REF_LOST` and leaves the history unchanged (deleting a face needs M5)   |
-| 40           | 4 top faces of the seg [2,2,2] box by normal cone; the equator loop has 8 edges                                                                                                     |
+| 04 / 05      | CLI `run baseline_subd_cage_today.json` (native kernel installed, mass from the display mesh): 2.6646247896794573, 8, 6.318191422352206, 6.878201798351067; 9/9 steps ok               |
+| 06           | the 26 world vertices of `cage_edit_cases.json` within 1e-6; volume 6.31819142235 to 6.87820179835 (1e-9 rel)                                                                          |
+| 07           | every edge at s = 1 / 2 / 0.5, level 4: 6.318191422352203 / 7.5641986705638535 / 4.233575762418375 (match the reference to 1e-9 rel)                                                   |
+| 10           | 7 shapes x 21 samples equal `falloff_curves.json` to 1e-11                                                                                                                             |
+| 11           | mirror vertex delta (-0.3, 0.2, 0.4), `check_subdivision` maxDeviation < 1e-12                                                                                                         |
+| 19 / 20 / 21 | V 12 / E 20 / F 10 / Euler 2 each; creased volumes 12, 6.833333333333333, 8 (same through the CLI plan)                                                                                |
+| 27           | codes `DIR_REF_LOST`, `DIR_SHARPNESS_RANGE`, `DIR_ELEMENT_KIND`, `DIR_LOOP_NOT_QUAD` raised with the expected paths                                                                    |
+| 28           | histogram {3: 8}, Euler 2, genus 0, mesh volume 2.6646247896794573, limit estimate 2.6204138 (reference 2.62041911579, 5e-6), `DIR_CHECK_LEVEL_MESH_DEVIATION` warn                    |
+| 30           | `edit_step_params` on the extrude distance keeps the later steps on the same ids; a missing id answers `DIR_REF_LOST` and leaves the history unchanged (deleting a face needs M5)      |
+| 40           | 4 top faces of the seg [2,2,2] box by normal cone; the equator loop has 8 edges                                                                                                        |
 
 Plans on the native CLI: `target_creased_cube_topology.json` steps 0-11 and 14-16 ok (`bridge_cage_faces` is M5); `target_grip_cage_tools.json` runs to the end except step 6: `set_cage_crease { loopFrom:
 [0, 15] }` is refused with `DIR_REF_LOST` because the loop cut just split edge [0, 15] (use a vertex id from `data.newVertices`). Its extrude selects four of the eight top faces (`select_cage_elements`
@@ -617,7 +617,7 @@ net overlays, loop-cut drag, pointer capture: the next agent), the bench of sect
   kernel step without a kernel.
 - **`POST /preview { name, params }`** (`server/src/previewRoutes.ts`, answer built by `@protocol/preview` `previewOf`): runs the command through `runCommandOutcome` on the live document value (commands are pure;
   nothing is written, logged, broadcast or audited) and answers `{ ok, summary, entities[] { id, kind, color, positions (unindexed world triangles, 1e-6), triangleCount, truncated }, replacedIds
-  (consumed or changed live ids), data?, error? }`; more than 150 000 triangles in total are listed without geometry. The command runs synchronously on the one backend thread, so previews cannot overlap and
+(consumed or changed live ids), data?, error? }`; more than 150 000 triangles in total are listed without geometry. The command runs synchronously on the one backend thread, so previews cannot overlap and
   the "one in flight per client" rule needs no code; the shared REST limiter bounds the rate. Cancellation is the client dropping the connection. It uses the mutation guard (same auth as `/command`).
 - **Toolsets**: `freeform` is a real toolset (every tool stays in exactly one): the whole cage family, `edit_nurbs`, `edit_nurbs_surface`, `inspect_nurbs`, `check_surface_quality`, `move_faces`,
   `delete_faces` left `3d` for it; `3d` points to it (`TOOLSET_SEE_ALSO` is now a list). `squash_steps` is in `parametric`. The palette group label for `freeform` is the one line added under `src/ui`
@@ -628,22 +628,22 @@ net overlays, loop-cut drag, pointer capture: the next agent), the bench of sect
 
 ### 14.2 Measured (VC results, tolerance in brackets)
 
-| VC | Result |
-| -- | ------ |
-| 08 | regular 8 x 6 torus -> 192 bicubic patches: max deviation 1.8e-15 [1e-9], 3072 samples; packed: ONE B-spline surface for all 192 quads; a block equals the limit point of every lattice vertex to 1e-12 |
-| 09 | cube: 24 unpacked patches [24]; EV seam gap 0 [0]; tangent break at the 8 valence-3 stars 2.616 deg; max deviation 5.87e-3 (2 x 2 samples; 6.24e-3 with 3 x 3) on a cage of edge 2; G1 with tolerance 2 / 1 / 0.5 / 0.25 deg gives 96 / 384 / 384 / 1536 patches, break 1.149 / 0.496 / 0.496 / 0.211 deg, deviation 2.3e-3 / 9.4e-4 / 9.4e-4 / 3.9e-4 |
-| 12 | curve drag at u = 0.4 by (0, 1, 0): residual 3.3e-16 [1e-12]; poles 0, 5, 6 untouched; rational curve (weight 3 on pole 2): exact to 1e-12 |
-| 13 | surface drag at (0.3, 0.6) by (0, 0, 1): residual 0 [1e-12]; rational patch exact to 1e-12 |
-| 14 | `insert_knot` shape change 1.0e-15 [1e-12 expected 0]; `elevate_degree` is reported the same way; linear U / V falloff weight 0.5 at half the radius |
-| 22 | 3 x 3 x 1 box, centre faces bridged: V 32 E 64 F 32 Euler 0 genus 1; creased volume 8 (1e-12) |
-| 23 | plate with a bore, offset +1: 3717.256661 -> 3497.345175 [3497.34517543, rel 1e-6]; -1 narrows it to radius 2 (volume 4000 - 40 pi) |
-| 24 | translate the top face +2: 1200 [1200]; rotate the +x face 10 deg about its bottom edge: 1088.16349 [1088.16349035, rel 1e-6]; -10 deg: 911.8365 |
-| 25 | fillet r 1 deleted: 997.8539816 -> 1000 [rel 1e-6]; a bore wall deleted: 4000; a boss wall + top deleted: 4037.699 -> 4000 |
-| 26 | `/preview`: the live document (JSON) is identical after the call, no stream frame, no undo entry; the committed `push_pull_face` handle is the UI part (open) |
-| 29 | cube, native kernel: default (`level_mesh`) 2.6646247897 [2.66462478968, 1e-9 rel]; opt-in `limit_patches` 2.6176023467 (0.11 % below the extrapolated limit volume 2.62041: the geometry patches cut the 8 corners slightly) |
-| 33 | slide the mid loop by 0.5: loop at z = +-0.5, creased volume 8 [1e-12]; non-manifold weld of opposite corners: `DIR_WELD_NONMANIFOLD` |
-| 34 | bevel top-front edge, width 0.25: V 10 E 15 F 7, creased volume 7.75 [1e-12] |
-| 35 | delete the top face: 1 boundary loop, Euler 1, no volume; fill n-gon: Euler 2, creased volume 8 [1e-12] |
+| VC  | Result                                                                                                                                                                                                                                                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 08  | regular 8 x 6 torus -> 192 bicubic patches: max deviation 1.8e-15 [1e-9], 3072 samples; packed: ONE B-spline surface for all 192 quads; a block equals the limit point of every lattice vertex to 1e-12                                                                                                                                                |
+| 09  | cube: 24 unpacked patches [24]; EV seam gap 0 [0]; tangent break at the 8 valence-3 stars 2.616 deg; max deviation 5.87e-3 (2 x 2 samples; 6.24e-3 with 3 x 3) on a cage of edge 2; G1 with tolerance 2 / 1 / 0.5 / 0.25 deg gives 96 / 384 / 384 / 1536 patches, break 1.149 / 0.496 / 0.496 / 0.211 deg, deviation 2.3e-3 / 9.4e-4 / 9.4e-4 / 3.9e-4 |
+| 12  | curve drag at u = 0.4 by (0, 1, 0): residual 3.3e-16 [1e-12]; poles 0, 5, 6 untouched; rational curve (weight 3 on pole 2): exact to 1e-12                                                                                                                                                                                                             |
+| 13  | surface drag at (0.3, 0.6) by (0, 0, 1): residual 0 [1e-12]; rational patch exact to 1e-12                                                                                                                                                                                                                                                             |
+| 14  | `insert_knot` shape change 1.0e-15 [1e-12 expected 0]; `elevate_degree` is reported the same way; linear U / V falloff weight 0.5 at half the radius                                                                                                                                                                                                   |
+| 22  | 3 x 3 x 1 box, centre faces bridged: V 32 E 64 F 32 Euler 0 genus 1; creased volume 8 (1e-12)                                                                                                                                                                                                                                                          |
+| 23  | plate with a bore, offset +1: 3717.256661 -> 3497.345175 [3497.34517543, rel 1e-6]; -1 narrows it to radius 2 (volume 4000 - 40 pi)                                                                                                                                                                                                                    |
+| 24  | translate the top face +2: 1200 [1200]; rotate the +x face 10 deg about its bottom edge: 1088.16349 [1088.16349035, rel 1e-6]; -10 deg: 911.8365                                                                                                                                                                                                       |
+| 25  | fillet r 1 deleted: 997.8539816 -> 1000 [rel 1e-6]; a bore wall deleted: 4000; a boss wall + top deleted: 4037.699 -> 4000                                                                                                                                                                                                                             |
+| 26  | `/preview`: the live document (JSON) is identical after the call, no stream frame, no undo entry; the committed `push_pull_face` handle is the UI part (open)                                                                                                                                                                                          |
+| 29  | cube, native kernel: default (`level_mesh`) 2.6646247897 [2.66462478968, 1e-9 rel]; opt-in `limit_patches` 2.6176023467 (0.11 % below the extrapolated limit volume 2.62041: the geometry patches cut the 8 corners slightly)                                                                                                                          |
+| 33  | slide the mid loop by 0.5: loop at z = +-0.5, creased volume 8 [1e-12]; non-manifold weld of opposite corners: `DIR_WELD_NONMANIFOLD`                                                                                                                                                                                                                  |
+| 34  | bevel top-front edge, width 0.25: V 10 E 15 F 7, creased volume 7.75 [1e-12]                                                                                                                                                                                                                                                                           |
+| 35  | delete the top face: 1 boundary loop, Euler 1, no volume; fill n-gon: Euler 2, creased volume 8 [1e-12]                                                                                                                                                                                                                                                |
 
 Plans on the native CLI (`node server/bin/llull.cjs --doc <scratch> run validation/plans/<p>.json --continue`, run from the pack folder), all steps ok: `target_creased_cube_topology` 17/17,
 `target_grip_cage_tools` 11/11, `target_nurbs_point_drag` 7/7, `target_subd_to_nurbs` 7/7 (a `limit_patches` mass step was added for VC-29), `target_brep_face_moves` 17/17.
@@ -674,7 +674,7 @@ reason, then the kernel's), `server/tests/faceMoveReason.test.ts` (native: an of
 
 The refusal `DIR_BEVEL_ADJACENT` is gone: picked edges may share vertices. A vertex with ONE picked edge is split as before (vP, vQ on the two adjacent edges at `width`; a valence-3 end is dropped; a longer or open end keeps a patch polygon). A vertex where **two or more** picked edges meet is planned as a whole (`geometry/subd/bevel.ts` `planCorner`), for an interior vertex of valence 3 or 4:
 
-- The fan of faces around v is walked in winding order (face i holds w_i -> v -> w_{i+1}). Each face gets ONE corner point: between two picked edges the parallelogram completion v + width (w_i - v) + width (w_{i+1} - v) (a cube corner with width 0.25 on a 2-unit cube: (0.5, 0.5, 1), (0.5, 1, 0.5), (1, 0.5, 0.5)); between a picked and a non-picked edge the point `width` along the non-picked edge, ONE vertex shared with the face on the other side of that edge; between two non-picked edges the face keeps v.
+- The fan of faces around v is walked in winding order (face i holds w*i -> v -> w*{i+1}). Each face gets ONE corner point: between two picked edges the parallelogram completion v + width (w*i - v) + width (w*{i+1} - v) (a cube corner with width 0.25 on a 2-unit cube: (0.5, 0.5, 1), (0.5, 1, 0.5), (1, 0.5, 0.5)); between a picked and a non-picked edge the point `width` along the non-picked edge, ONE vertex shared with the face on the other side of that edge; between two non-picked edges the face keeps v.
 - The strip of each picked edge ends on the points of its two faces (interior points of `segments` > 1 are straight between them, as before). The cyclic list of the points, the strip interiors and v (once, where faces between non-picked edges remain) is the vertex **patch**: one face, wound against the faces around it. With no face left between non-picked edges (a cube corner with all three edges, a vertex with all its edges) v is dropped and the patch is a triangle at valence 3 with `segments` 1, a polygon of valence x `segments` points for more (not a quad grid as Blender's vertex mesh makes: an n-gon is a legal cage face, and the strips already round it); with exactly one such face it takes the patch in place of v (v would have valence 2). At valence <= 4 there is never more than one such face, so v never stays in the patch (an earlier "two or more keep v" branch was unreachable and is deleted). Two strips that join the same two corner points (a chain through a valence-3 vertex, or two opposite spokes at valence 4) share ONE set of interior points (cached per unordered pair, the second strip reversed): they are neighbours and the patch loop that would revisit a point is no face (before: each strip minted its own interior points, giving coincident vertex pairs and a zero-area patch at `segments` > 1 in 3,921 of the 4,095 cube subsets).
 - `sharp` goes on the long edges of every strip as before; the sharpness of a non-picked edge that receives points near either end is carried by every piece (an end that left the cage is no node; both ends may insert a point on the same edge). Mirror edges of a symmetric cage are added before the bevel; element ids of surviving vertices and faces are kept.
 - **Refused by name** `DIR_BEVEL_TOO_WIDE` (document unchanged) when the corner points of several bevelled edges cross on one face: after the polygons are built, an edited face is refused when its polygon has no area, its Newell normal turned against the original, or a corner replaced by one point lies across the face centre from its corner (a triangle with three bevelled edges collapses at width 1/3 and is point-reflected above it, the Newell sign alone does not see that); a new face (strip, patch) whose normal opposes the original faces it sits between is refused too (a tetrahedron with all 6 edges: 0.3 accepted, 0.34 and 0.45 refused). A zero-area triangle that closes the end of a bevel on a straight cage edge is flat by the source geometry and is accepted.
@@ -721,12 +721,12 @@ No `tests/bench` harness exists; the repo's timing convention is a unit test wit
 
 Measured (this machine, node, one run): cage preview (`previewCageCommand`, `edit_subdivision_cage`, 3 vertices moved)
 
-| path | before | after | budget |
-| --- | --- | --- | --- |
+| path                                                  | before                          | after                 | budget       |
+| ----------------------------------------------------- | ------------------------------- | --------------------- | ------------ |
 | 386 vertices, level 2 (12 288 triangles, world space) | p50 12.1 / p95 18.8 ms (MISSED) | p50 9.2 / p95 16.4 ms | p95 <= 16 ms |
-| 98 vertices, level 3 | p50 11.3 / p95 14.3 ms | p50 6.4 / p95 8.1 ms | p95 <= 16 ms |
-| `subdivision_to_nurbs`, 386 vertices | p50 166 / p95 247 ms | unchanged | <= 300 ms |
-| `check_subdivision`, 1946 vertices | p50 87 / p95 102 ms | unchanged | <= 1 s |
+| 98 vertices, level 3                                  | p50 11.3 / p95 14.3 ms          | p50 6.4 / p95 8.1 ms  | p95 <= 16 ms |
+| `subdivision_to_nurbs`, 386 vertices                  | p50 166 / p95 247 ms            | unchanged             | <= 300 ms    |
+| `check_subdivision`, 1946 vertices                    | p50 87 / p95 102 ms             | unchanged             | <= 1 s       |
 
 Fix: `subdivisionTriangles` allocated three points per triangle (`add3` per corner) and the preview then transformed every corner again; it now places each
 surface vertex once (`place` parameter) and the triangles share the vertex points. `execute` itself is 1 ms of the 9. The 386-vertex p95 is within noise of
@@ -744,7 +744,7 @@ the volume report and the second topology in a preview, are the levers (not done
 - **Scale and position independent.** The pull towards the geometry patch is `PULL * (pole - start) / extent` with `extent` the bounding-box diagonal of the cage (before: a distance from the origin, so a x1000 cube did not fit at all (2.616 -> 2.597) and a x0.001 cube deviated 3.5x); the finite-difference step is `1e-6 * extent`. A cube scaled by 1000, by 0.001 and moved 500 away gives the same break (to 1e-3 degrees) and the same relative deviation. `PULL` is 0.35 (re-tuned: the old 0.1 was relative to a unit extent).
 - **Creases.** Quads that touch a crease vertex are not fitted and the edges at a crease vertex are not counted in `evEdges` / `maxEvG1Deg` (an intentional crease is not a break; before, 3 creases on the cube took the deviation from 0.0166 to 0.252 and the break stayed at 90 degrees, so `g1ToleranceMet` was false by construction). Creased cube: deviation equal to the plain patches.
 - **Honest report.** The break is measured at 32 stations (odd multiples of 1/64) that the fit does not use (it uses multiples of 1/8); at the fit's own stations it under-reported 2.8x. Dense numbers (same patch counts): cube 2.74 -> 0.17 degrees (deviation 6.24e-3 -> 6.64e-3), box 2x2x2 2.72 -> 0.10 (3.1e-3 -> 4.4e-3), box 3x2x1 2.74 -> 0.14 (3.1e-3 -> 4.8e-3). The deviation rises up to 1.5x on boxes: the fit trades surface position for tangent continuity. The earlier "0.05 degrees" and "2.6" figures are withdrawn.
-- **Cost.** Block Gauss-Seidel (6 sweeps over the quads, each a 12-unknown Levenberg-Marquardt with 3 iterations against the neighbours' current poles; per-quad seam lists) replaces the dense solve per connected star (cylinder cage, 8 / 16 / 24 sides: 2 / 11 / 27.7 s before). Now linear in the quads: 8 sides 0.3 s, 24 sides 0.8 s, 32 sides (320 patches) 1.7 s. A step may not raise the largest normal angle at the 32 off-fit stations by more than 25 % (or 0.5 degrees): without this guard a 32-sided cylinder folded to a 178 degree break (plain 48.8); with it 48.4. High valence stars are barely improved (24 sides 34.7 -> 3.4, 32 sides 48.8 -> 48.4): the one-patch-per-quad construction does not reach G1 there, which only Peters (3n patches per star) would. 
+- **Cost.** Block Gauss-Seidel (6 sweeps over the quads, each a 12-unknown Levenberg-Marquardt with 3 iterations against the neighbours' current poles; per-quad seam lists) replaces the dense solve per connected star (cylinder cage, 8 / 16 / 24 sides: 2 / 11 / 27.7 s before). Now linear in the quads: 8 sides 0.3 s, 24 sides 0.8 s, 32 sides (320 patches) 1.7 s. A step may not raise the largest normal angle at the 32 off-fit stations by more than 25 % (or 0.5 degrees): without this guard a 32-sided cylinder folded to a 178 degree break (plain 48.8); with it 48.4. High valence stars are barely improved (24 sides 34.7 -> 3.4, 32 sides 48.8 -> 48.4): the one-patch-per-quad construction does not reach G1 there, which only Peters (3n patches per star) would.
 - Tests added: scale / position, creased cube, 32-sided cylinder (time and no fold), command-level `DIR_CONVERT_G1_TOLERANCE_NOT_MET` on a 24-sided cylinder. Red-proofs: extent fixed to 1 (4 tests fail), crease exclusion removed (creased test), fit stations moved onto the measurement stations (4), guard removed (cylinder). Not red-proven: the linear cost (the old dense solve would exceed the bound at 32 sides but was not re-run).
 - The perf test asserts p50 against the spec budget; p95 is logged (`LLULL_BENCH_LOG`).
 
@@ -752,16 +752,17 @@ the volume report and the second topology in a preview, are the levers (not done
 
 - **Crease reporting is per edge.** Only the edges that are in `refined.creases` leave `evEdges` / `maxEvG1Deg`; the smooth edges at a crease vertex are listed and counted (before, every edge touching a crease vertex was dropped, so `g1ToleranceMet` could be true with a real break). The quads that touch a crease vertex are still not fitted (fitting them against a crease tripled the deviation, 0.016 -> 0.050), so a real break remains beside a crease and is reported: the creased-cube test asserts a break above 0.2 degrees and the full list of smooth edges. Red-proof: reporting by vertex fails the test.
 - **The fold guard does not ratchet**: a quad's bound is the largest normal angle it had when first visited (or 0.5 degrees), not 1.25 times the previous step's. A 32-sided cylinder now never ends above the plain break (48.8 degrees; the ratcheting guard gave 60.9). Not red-proven separately from the guard test.
+
 #### DES-4c (2026-10-30): the 200-face `move_faces` preview reaches 500 ms / 5 Hz
 
 Two levers on the native path, measured on the real kernel (198-sided prism, 200 faces, offset of the top face, `POST /preview`-equivalent `execute`):
 
-| | first ghost | repeat p50 |
-| --- | --- | --- |
-| before (whole-solid `BRepOffset_MakeOffset`, full report) | 517 ms | 481 ms (2 Hz) |
-| prism routing only | 391 ms | 335 ms |
-| + `preview: true` (no volume report, no topology note) | 300 ms | 239-267 ms |
-| + no `BRepCheck` on the routed result (a solid count instead) | 255 ms | 188-205 ms (about 5 Hz) |
+|                                                               | first ghost | repeat p50              |
+| ------------------------------------------------------------- | ----------- | ----------------------- |
+| before (whole-solid `BRepOffset_MakeOffset`, full report)     | 517 ms      | 481 ms (2 Hz)           |
+| prism routing only                                            | 391 ms      | 335 ms                  |
+| + `preview: true` (no volume report, no topology note)        | 300 ms      | 239-267 ms              |
+| + no `BRepCheck` on the routed result (a solid count instead) | 255 ms      | 188-205 ms (about 5 Hz) |
 
 - **Routing** (`cpp/face_moves.cxx` `square_neighbours`): `move_faces` `offset` of ONE planar face whose every edge neighbour is a plane square to it (|n.m| < 1e-9) or a cylinder whose axis is its normal (bore / boss), with exactly one face across each edge, takes `push_pull` (prism fused / cut). A slanted, curved-other or multi-face neighbour keeps `BRepOffset_MakeOffset`; a prism result that is not one solid falls back to the offset. Equivalence tested against a kernel built before the routing (`server/tests/faceMoveSquareOffset.test.ts`, `LLULL_REFERENCE_KERNEL_BIN`): box top out / in and a 24-gon prism top: volume within 1e-9 relative (and equal to the closed form), same face count, same names. One deliberate difference: the offset renames EVERY face `<name>~offset`, the prism keeps the names (which is what the command's invariant "a moved face keeps its name" says, and it keeps persistent references to the moved face valid); the test checks the names equal the old ones without the suffix. The slanted class (a trapezoid wall) is tested against its closed-form volume. Not covered: a bore-through top (the cylinder case) is routed by the same predicate but has no equivalence test yet.
 - **Preview mode**: `move_faces` and `delete_faces` take `preview: true` (documented as a dry run; the viewport sends it only on the `/preview` request of these two commands, `faceEditActions.ts`): the exact volume report (2 mass-property queries, about 30 ms) and the exact-topology note (one topology query) are skipped; the geometry is the same (tested: same triangle count). The committed command keeps both. Tested on the scripted kernel (`tests/unit/faceMoves.test.ts`) and natively.
@@ -788,14 +789,14 @@ Two levers on the native path, measured on the real kernel (198-sided prism, 200
 
 **Measured** (analytic normals at the 32 off-fit stations; the report's `maxEvG1Deg` uses a finite-difference normal and cannot show below 1e-6 rad; deviation from the limit surface, node, one run):
 
-| cage | plain break | method | break | deviation plain -> G1 | time |
-| --- | --- | --- | --- | --- | --- |
-| cube (24 patches) | 2.742 deg | exact | 2.6e-8 rad (report: 9.9e-7) | 7.4e-3 -> 2.4e-2 | 32 ms (fit: 230 ms, 0.17 deg) |
-| sheared cube | 3.54 deg | exact | 1.3e-6 rad (report) | 8.4e-3 -> 2.7e-2 | 31 ms |
-| cube, one corner pulled out | 2.98 deg | exact | 1.1e-6 rad (report) | 7.9e-3 -> 2.6e-2 | 17 ms |
-| box 2 x 2 x 2 (96) | 2.72 deg | fit (8 groups of 3 quads refused, residual 3.9e-2) | 0.099 deg | 3.7e-3 -> 4.9e-3 | 225 ms |
-| box 3 x 2 x 1 (88) | 2.74 deg | fit (4 groups of 6 refused, 3.6e-2) | 0.14 deg | 3.7e-3 -> 5.2e-3 | 213 ms |
-| cylinder 8 sides (80) | 7.03 deg | fit (2 groups of 24, valences 3 and 8, 4.9e-2) | 0.51 deg | 5.4e-2 -> 5.4e-2 | 374 ms |
+| cage                        | plain break | method                                             | break                       | deviation plain -> G1 | time                          |
+| --------------------------- | ----------- | -------------------------------------------------- | --------------------------- | --------------------- | ----------------------------- |
+| cube (24 patches)           | 2.742 deg   | exact                                              | 2.6e-8 rad (report: 9.9e-7) | 7.4e-3 -> 2.4e-2      | 32 ms (fit: 230 ms, 0.17 deg) |
+| sheared cube                | 3.54 deg    | exact                                              | 1.3e-6 rad (report)         | 8.4e-3 -> 2.7e-2      | 31 ms                         |
+| cube, one corner pulled out | 2.98 deg    | exact                                              | 1.1e-6 rad (report)         | 7.9e-3 -> 2.6e-2      | 17 ms                         |
+| box 2 x 2 x 2 (96)          | 2.72 deg    | fit (8 groups of 3 quads refused, residual 3.9e-2) | 0.099 deg                   | 3.7e-3 -> 4.9e-3      | 225 ms                        |
+| box 3 x 2 x 1 (88)          | 2.74 deg    | fit (4 groups of 6 refused, 3.6e-2)                | 0.14 deg                    | 3.7e-3 -> 5.2e-3      | 213 ms                        |
+| cylinder 8 sides (80)       | 7.03 deg    | fit (2 groups of 24, valences 3 and 8, 4.9e-2)     | 0.51 deg                    | 5.4e-2 -> 5.4e-2      | 374 ms                        |
 
 The price of exactness is position: the minimum-norm solution is 3.3x further from the Catmull-Clark limit surface than the plain patches on the cube (1.2 % of its edge); the fit stayed within 1.1x but is not G1. G0 is untouched in every case (gap 0, boundary poles bit-identical, tested). The "200-face bench" of the task is the `move_faces` preview timing (kernel), unrelated to the cage conversion; no G1 case of it exists.
 
@@ -809,13 +810,13 @@ The first exact solve moved only interior poles and was refused at a valence-4 v
 
 **Measured** (analytic normals for the break; deviation from the limit surface at regular samples, ratio to the plain patches; node, one run):
 
-| cage | patches | plain break | method | exact break | deviation plain -> exact | exact time | fit: break, deviation, time |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| cube | 24 | 2.74 deg | interior poles | 1.5e-6 deg (2.6e-8 rad) | 7.4e-3 -> 2.4e-2 (3.3x) | 67 ms | 0.169 deg, 1.07x, 207 ms |
-| box 2 x 2 x 2 | 96 | 2.72 deg | inner edge poles, 96 free quads | 1.7e-6 deg | 3.7e-3 -> 4.2e-2 (11.3x) | 3.0 s | 0.099 deg, 1.31x, 228 ms |
-| box 3 x 2 x 1 | 88 | 2.74 deg | inner edge poles, 64 free quads | 1.5e-6 deg | 3.7e-3 -> 5.8e-2 (15.5x) | 0.48 s | 0.140 deg, 1.41x, 391 ms |
-| cylinder 8 sides | 80 | 7.03 deg | inner edge poles, 80 free quads | 1.7e-6 deg | 5.4e-2 -> 6.2e-2 (1.15x) | 3.2 s | 0.513 deg, 1.00x, 380 ms |
-| cylinder 24 sides | 240 | 34.7 deg | inner edge poles, 240 free (CG) | 1.7e-6 deg | 1.49e-1 -> 1.57e-1 (1.05x) | 2.8 s | 2.99 deg, 0.96x, 1.2 s |
+| cage              | patches | plain break | method                          | exact break             | deviation plain -> exact   | exact time | fit: break, deviation, time |
+| ----------------- | ------- | ----------- | ------------------------------- | ----------------------- | -------------------------- | ---------- | --------------------------- |
+| cube              | 24      | 2.74 deg    | interior poles                  | 1.5e-6 deg (2.6e-8 rad) | 7.4e-3 -> 2.4e-2 (3.3x)    | 67 ms      | 0.169 deg, 1.07x, 207 ms    |
+| box 2 x 2 x 2     | 96      | 2.72 deg    | inner edge poles, 96 free quads | 1.7e-6 deg              | 3.7e-3 -> 4.2e-2 (11.3x)   | 3.0 s      | 0.099 deg, 1.31x, 228 ms    |
+| box 3 x 2 x 1     | 88      | 2.74 deg    | inner edge poles, 64 free quads | 1.5e-6 deg              | 3.7e-3 -> 5.8e-2 (15.5x)   | 0.48 s     | 0.140 deg, 1.41x, 391 ms    |
+| cylinder 8 sides  | 80      | 7.03 deg    | inner edge poles, 80 free quads | 1.7e-6 deg              | 5.4e-2 -> 6.2e-2 (1.15x)   | 3.2 s      | 0.513 deg, 1.00x, 380 ms    |
+| cylinder 24 sides | 240     | 34.7 deg    | inner edge poles, 240 free (CG) | 1.7e-6 deg              | 1.49e-1 -> 1.57e-1 (1.05x) | 2.8 s      | 2.99 deg, 0.96x, 1.2 s      |
 
 `exactG1Refused` is empty on all of them (it was 8 groups, 4 groups and 2 groups on the box, the box 3 x 2 x 1 and the cylinder). Also exact: the sheared and corner-pulled cubes, a triangular prism, 5- and 6-sided cylinders, a 1 x 1 x 2 box, a 5 x 5 x 5 box and a 16 x 4 cylinder (partial free regions of 96 and 160 quads). Not solved: the pentagonal cap (a valence-5 vertex among valence-3 vertices, group residuals 1.7e-2 and 7.7e-2), which keeps the fit. The report's `maxEvG1Deg` now uses analytic normals (the finite-difference normal floored it at 1e-6 rad and, on prisms and cylinders, read 0.02 to 0.08 degrees of pure differencing noise on exactly G1 patches).
 
@@ -864,11 +865,11 @@ No crease, no change: the cube, boxes 2 x 2 x 2 and 3 x 2 x 1, cylinders of 5 an
 
 **Measured** (`cageToNurbs`, 4 x 4 samples, node, one run; deviation from the limit surface, `fit` is the old tangent-plane fit):
 
-| cage | exact | fit | auto |
-| --- | --- | --- | --- |
-| pentagonal cap (open, 45 quads, valence 5 and 3; boundary = creases) | break 1.7e-6 deg, deviation 2.60e-1, G0 gap 0, `exactG1Refused` EMPTY, 45 free quads, both groups consistent (2.7e-15, 1.5e-14), 234 ms | 0.223 deg, 1.72e-2, 238 ms | fit (exact deviation 15x the fit) |
-| open bowl (box without its top, 20 quads) | 1.5e-6 deg, 9.21e-2, 80 ms (was refused: contradiction) | 0.139 deg, 1.95e-2 | fit |
-| box 2 x 2 x 2 with the top rim a sharp crease loop (96 quads, 8 creases) | 1.5e-6 deg on the smooth edges, crease angle unchanged to 1e-12 (90 degrees), deviation 4.25e-2, 1.25 s | 0.099 deg, 9.48e-3 | fit |
+| cage                                                                     | exact                                                                                                                                   | fit                        | auto                              |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------- |
+| pentagonal cap (open, 45 quads, valence 5 and 3; boundary = creases)     | break 1.7e-6 deg, deviation 2.60e-1, G0 gap 0, `exactG1Refused` EMPTY, 45 free quads, both groups consistent (2.7e-15, 1.5e-14), 234 ms | 0.223 deg, 1.72e-2, 238 ms | fit (exact deviation 15x the fit) |
+| open bowl (box without its top, 20 quads)                                | 1.5e-6 deg, 9.21e-2, 80 ms (was refused: contradiction)                                                                                 | 0.139 deg, 1.95e-2         | fit                               |
+| box 2 x 2 x 2 with the top rim a sharp crease loop (96 quads, 8 creases) | 1.5e-6 deg on the smooth edges, crease angle unchanged to 1e-12 (90 degrees), deviation 4.25e-2, 1.25 s                                 | 0.099 deg, 9.48e-3         | fit                               |
 
 The exact solution of the cap is 15x further from the limit surface than the fit (10 % of its size): `g1Solve: "auto"` keeps the fit unless `tangentToleranceDeg` is tighter than the fit can reach (then the exact solve is the only one that meets it, and it is chosen). `"exact"` gives true G1 with the crease and boundary curves untouched.
 
@@ -891,11 +892,11 @@ on the samples (4 x 4 per free patch, the same samples as the dense path; the gr
 
 **Measured** (node, one run; `cageToNurbs` with `g1Solve: "exact"`, 4 x 4 samples; deviation = `data.maxDeviation`):
 
-| cage | objective start (before) | objective limit (now) | break |
-| --- | --- | --- | --- |
-| cylinder 24 sides (240 quads, 1 group, above 900 unknowns) | deviation 1.566e-1, solve 0.50 s | 6.222e-2 (2.5x nearer the surface), solve 2.76 s | 1.71e-6 deg, unchanged |
-| cylinder 16 sides | 1.284e-1, 0.19 s | 6.222e-2, 1.43 s | 1.91e-6 deg (1.71e-6 before) |
-| box 2 x 2 x 2 (96 quads, dense path) | 4.206e-2 (already `limit`) | identical (dense path untouched) | 1.48e-6 deg |
+| cage                                                       | objective start (before)         | objective limit (now)                            | break                        |
+| ---------------------------------------------------------- | -------------------------------- | ------------------------------------------------ | ---------------------------- |
+| cylinder 24 sides (240 quads, 1 group, above 900 unknowns) | deviation 1.566e-1, solve 0.50 s | 6.222e-2 (2.5x nearer the surface), solve 2.76 s | 1.71e-6 deg, unchanged       |
+| cylinder 16 sides                                          | 1.284e-1, 0.19 s                 | 6.222e-2, 1.43 s                                 | 1.91e-6 deg (1.71e-6 before) |
+| box 2 x 2 x 2 (96 quads, dense path)                       | 4.206e-2 (already `limit`)       | identical (dense path untouched)                 | 1.48e-6 deg                  |
 
 **Cost control (auto path, `toNurbs.ts`):** `g1Solve: "auto"` first builds the exact solve with the nearest-to-start poles on the groups above 900 unknowns (`solveExactG1` option `sparseObjective: "start"`), measures it against the fit and spends the limit-surface objective on them (a second solve, `sparseObjective: "limit"`) only when the start poles are NOT already within max(1.25 x the fit, `deviationTolerance`) of the limit surface (or miss the tangent tolerance). The cylinders measured here are within it (cylinder 24: 0.1566 against a fit at 0.1426), so `auto` keeps `objective "start"` there at 0.5 s instead of 2.8 s; `g1Solve: "exact"` always spends it. The re-solve branch is exercised by hand (a cylinder 24 with `tangentToleranceDeg` 1e-7: 38 s over three refinement levels, exact deviation 0.027), not by a test (too slow).
 **Tests of the hardening** (`g1Sparse.test.ts`, `g1Exact.test.ts`): the group rows re-evaluated (A x - b < 1e-9 x size) on the cylinder 24 through the `onGroup` hook; the sample misfit of the limit solution is 0.53 x that of the start one there (not 0.5); duplicated / dependent rows; determinism; a budget just below the threshold (status ok, objective start, no projection); an ill-conditioned chain (800 unknowns) whose 137-iteration projection is refused by the acceptance gate. Red-proofs: no repair (8 tests fail), no acceptance gate (1), inner iterations forced to 2 (7), no pre-check (1).
@@ -904,3 +905,25 @@ The price is time (about 5x on the cylinders) for a surface 2.5x nearer to the C
 
 **Tests.** `tests/unit/subd/g1Sparse.test.ts` (a 60-unknown system solved by `solveDense` and by `solveSparse` with the same samples: conditions met to 1e-9 and the poles within 2e-3 of the dense ones; the misfit to the samples falls below half the start-objective one; no samples or no work left keeps `"start"`), `g1Exact.test.ts` (the 24-sided cylinder: group `objective: "limit"`, analytic break < 1e-7 rad), `g1Choice.test.ts` (through the command: objective `limit`, deviation < 0.1, break < 1e-5 deg).
 Red-proof: the projection replaced by the identity fails the dense-agreement test. Not built: a warm start of the inner CGLS from the previous projection (the time above would shrink).
+
+#### DES-4c (2026-11-21): direct projector for the limit-surface objective at 5,000 and 20,000 unknowns
+
+**Why.** The projected conjugate gradient above spent 31 projections x up to 400 CGLS iterations per axis inside a 1.5e9 multiply-add budget: it held to about 3,800 unknowns (cylinder of 48 sides, 10 s) and above that (7,680: cylinder 96) the budget left fewer than 20 inner iterations, so the group silently came back with `objective "start"` after the wasted feasibility work. Dense (<= 900) is untouched: its results are bit-identical to before.
+
+**Choice (C7).** TypeScript, not Rust: the rows are a sparse surface-grid graph, so a direct factorisation is cheap enough in-process (no sidecar, no transport). `geometry/subd/g1Factored.ts`: M = A A^T (rows x rows, sparse) ordered by reverse Cuthill-McKee (pseudo-peripheral root, ties by degree then index), factored once by an envelope (skyline) LDL^T; a pivot that cancelled to 1e-12 of its own diagonal (or a row below 1e-8 of the largest norm) is a dependent row and is dropped (the dense path's rule). Then P v = v - A^T M^-1 A v and A^+ r = A^T M^-1 r are two triangular sweeps with one step of iterative refinement. `solveSparse` runs the SAME projected CG (30 outer iterations, ridge 1e-8, samples, repair, acceptance gate) with this exact projector in place of the inner CGLS; the iterative projector remains the fallback when the factorisation does not fit (`solveSparse(..., 'iterative')` forces it: used by the tests of its internals). Deterministic and bit-stable: fixed ordering, fixed loop order, no hash iteration, no `Math.pow`.
+
+**Budget.** The factorisation cost (sum of squared row widths of the envelope) is known before any numeric work; `factorRows` returns null (iterative path) when the envelope exceeds 4e7 entries or factorisation + 3 axes x 34 solves exceed `DIRECT_MAX_WORK` (5e9 multiply-adds after the feasibility iterations; an explicit `maxWork` replaces it, so a tight budget still refuses as before).
+
+**Measured** (node, `solveExactG1` on `cylinderCage(1, 2, sides, 2)` refined once, one group, objective `limit`, whole solve including assembly; machine shared with other lanes so wall times are +-30%):
+
+| unknowns (sides)                | before (CG projector)            | now (direct)  | envelope factor    |
+| ------------------------------- | -------------------------------- | ------------- | ------------------ |
+| 880 (11, dense path, unchanged) | 1.7 s                            | 1.7 s         | -                  |
+| 1,920 (24)                      | 4.1 s                            | 1.0-1.4 s     | 3.3e7 flops, 0.4 s |
+| 5,120 (64)                      | about 20 s (budget edge)         | 5.3-6.9 s     | -                  |
+| 7,680 (96)                      | 15.5 s, objective start (budget) | 4.4 s, limit  | 4.5e8 flops, 0.9 s |
+| 20,480 (256)                    | objective start (budget)         | 11.7 s, limit | 1.4e9 flops, 1.9 s |
+
+The remainder at 20,480 is the unchanged feasibility CGLS (about 5 s, the `objective "start"` solve) and the 3 x 34 envelope solves (2e9 flops). Group residuals stay at 6e-14 of the cage (consistent threshold 1e-9). Cylinder 24 reaches the same deviation as before to the test tolerances (poles agree with the iterative and dense solutions within 2e-3 on the 144-unknown grid test). Not built: skipping the feasibility CGLS through the same factor (would cut the 20,480 case by about 40 %); a fill-reducing ordering better than RCM (minimum degree) for cages whose envelope exceeds 4e7 entries.
+
+**Tests** (`tests/unit/subd/g1Factored.test.ts`, `g1Sparse.test.ts`): direct agrees with dense and iterative on a 144-unknown grid, duplicated / dependent / zero rows dropped, bit-identical repeat, repeated unknowns inside a row, a 5,041-unknown system with the limit objective (conditions < 1e-9, misfit < 0.7 x nearest-to-start), `factorRows` null on empty / over budget and A P v = 0; the ill-conditioned chain that the iterative projection could not keep (acceptance gate) is solved by the direct projector.
