@@ -34,6 +34,34 @@ export interface Selection {
   readonly group: boolean;
 }
 
+function indexError(label: string, count: number, detail: string, line: number): DesignError {
+  return new DesignError(
+    'DESIGN_INDEX_RANGE',
+    line,
+    `${label}[…]: ${detail}`,
+    count === 0 ? `${label} is empty.` : `${label} has ${count} item(s): index 0..${count - 1} or -${count}..-1.`,
+  );
+}
+
+/** `items[index]` (negative counts from the end). @failure non-integer or outside -> DESIGN_INDEX_RANGE */
+export function pickAt<T>(items: readonly T[], label: string, index: number, line: number): T {
+  if (!Number.isInteger(index)) throw indexError(label, items.length, `${index} is not an integer`, line);
+  const item = items[index < 0 ? items.length + index : index];
+  if (item === undefined) throw indexError(label, items.length, `index ${index} is outside the ${items.length} item(s)`, line);
+  return item;
+}
+
+/** `items[from..<to]` / `items[from..to]` (negative counts from the end). @failure empty or outside -> DESIGN_INDEX_RANGE */
+export function pickSlice<T>(items: readonly T[], label: string, from: number, to: number, inclusive: boolean, line: number): T[] {
+  if (!Number.isInteger(from) || !Number.isInteger(to)) throw indexError(label, items.length, `range ${from}..${to} is not integer`, line);
+  const wrap = (value: number): number => (value < 0 ? items.length + value : value);
+  const start = wrap(from);
+  const end = inclusive ? wrap(to) + 1 : wrap(to);
+  if (start < 0 || end > items.length || start >= end)
+    throw indexError(label, items.length, `range ${start}..<${end} is empty or outside 0..<${items.length}`, line);
+  return items.slice(start, end);
+}
+
 /** Apply the selector text to `ids` (`evalInt` evaluates an index expression to a number). */
 export function selectIds(
   ids: readonly string[],

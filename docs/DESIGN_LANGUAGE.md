@@ -100,14 +100,17 @@ examples/         one .lld per toolset (tests/unit/design/examples.test.ts runs 
 
 ```ebnf
 line      = [ statement ] [ "#" comment ] ;                (* "#" starts a comment at line start or after a space *)
-statement = header | param | command | check | for | "}" ;
+statement = header | param | fn | command | check | for | "}" ;
 header    = "design" NAME [ "units=" UNIT ] ;             (* first statement; sets the document unit *)
 param     = "param" NAME "=" expr ;                        (* a default *)
+fn        = "fn" NAME "(" [ NAME [ "=" expr ] { "," NAME [ "=" expr ] } ] ")" "=" vexpr ;   (* top level only; pure *)
 command   = COMMAND [ ALIAS | "_" ] { key "=" value } ;    (* any mutating registered command *)
 for       = "for" NAME "in" expr ".." expr "{" ;           (* inclusive; closed by a "}" line *)
 check     = "check" (METRIC | READ_ONLY_COMMAND) { key "=" value } "expect" OP value [ "±" NUMBER [ "%" | UNIT ] ] ;
 key       = NAME { "." NAME } ;                            (* dotted keys fill object params *)
-value     = NUMBER-or-EXPR | NAME | ALIAS "." SIDE | ALIAS "[" SELECTOR "]" | ALIAS "." ("entity" | "entities") [ "[" SELECTOR "]" ] | "[" value { "," value } "]" | STRING | JSON-object | true | false ;
+value     = NUMBER-or-EXPR | NAME | ALIAS "." SIDE | ALIAS "[" SELECTOR "]" | ALIAS "." ("entity" | "entities") [ "[" SELECTOR "]" ] | "[" value { "," value } "]" | "[" "for" NAME "in" vexpr [ "if" vexpr ] ":" vexpr "]" | "{" key ":" vexpr { "," … } "}" | "(" vexpr ")" | CALL | STRING | true | false ;
+vexpr     = "if" vexpr "then" vexpr "else" vexpr | "let" NAME "=" vexpr "in" vexpr | vexpr (+ - * / == != < <= > >= && || !) vexpr
+          | vexpr ".." vexpr | vexpr "..<" vexpr | vexpr "[" SELECTOR "]" | vexpr "." NAME | CALL | value ;   (* §5.1 *)
 ALIAS     = NAME with optional {expr} placeholders: post{i}
 SELECTOR  = EXPR | EXPR ".." EXPR | EXPR "..<" EXPR ;   (* index (negative counts from the end) | inclusive range | end-exclusive range *)
 OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
@@ -115,7 +118,7 @@ OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
 
 - A `key=value` pair has no spaces outside `( ) [ ] { } "…"`. Expected values and tolerances in a check may have spaces, and
   `[1,2,3]±1%` is accepted.
-- Reserved words: `design param check expect for in`. A contract test checks none is a command name.
+- Reserved words: `design param check expect for in fn`. A value with spaces (`if`, `let`, a call with spaces) is written in parentheses. A contract test checks none is a command name.
 - `expect` on a command line is a syntax error pointing to `check`. A duplicate key is refused.
 
 ## 5. Values: read by the target param's schema
@@ -137,6 +140,39 @@ OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
 - Angles: `45deg`, `0.5rad` only on the params listed in `ANGLE_PARAMS`, whose unit (radians / degrees, checked against the param
   description) the schema does not carry.
 - SI-named params: a param ending in `M` (`throatDiameterM`) takes length literals in metres, `…Mm` in millimetres.
+
+### 5.1 Value expressions (as built M4b)
+
+Every value that is not a plain number, name, anchor or `[…]` list of those is a **value expression**, evaluated per run by one pure
+evaluator (`valueExpr.ts` parser, `valueEval.ts` evaluator) and then bound to the param's zod JSON schema element by element
+(`valueSchema.ts`), so a wrong field is `DESIGN_VALUE_SCHEMA` with its path (`sections[3].span`). The former verbatim JSON branch is gone:
+a JSON literal is an ordinary object / list expression.
+
+| Form | Meaning |
+| --- | --- |
+| `{ key: expr, "key": expr }` | object; bare or quoted keys; values may use parameters, loop variables, aliases, calls |
+| `[a, b]`, `[for k in 0..<n: expr]`, `[for k in r if c: expr]` | list; comprehension over a list, range or alias group (an alias item is one id) |
+| `a..b`, `a..<b` | integer range, inclusive / end-exclusive, a list |
+| `(if c then a else b)`, `(let x = e in body)` | conditional (needs a boolean), local binding |
+| `+ - * /`, `== != < <= > >=`, `&& \|\| !` | numbers; `+` also joins strings; `&&` `\|\|` short-circuit on booleans |
+| `x[i]`, `x[-1]`, `x[a..<b]`, `{…}.key`, `alias.entity` | index (negative from the end), slice, field, alias entity |
+| `len sum concat zip linspace` | list built-ins (`linspace(a, b, n)` includes both ends) |
+| `sin cos … pow sqrt min max mod hypot …` | the numeric functions of `param` expressions; `pow` is `@lib/pow` (never `**`) |
+| `fn name(a, b = 2) = expr` | user function: pure, no commands, no aliases and no loop variables inside, sees only its arguments and the document parameters; recursion is refused before anything runs |
+
+Unit literals (`6mm`, `90deg` where the param has an angle unit) convert at parse time, never inside strings. Aliases in a value: a
+single alias is its id, a group is the list of ids on a list slot and `DESIGN_ALIAS_ARITY` on a one-id slot.
+
+**Limits (named, refusals by name):** `MAX_LIST_ITEMS` 100,000 per list (`DESIGN_LIST_LIMIT`), `MAX_EVAL_STEPS` 2,000,000 expression nodes
+per value and `MAX_CALL_DEPTH` 64 nested calls (`DESIGN_EVAL_LIMIT`), `MAX_EXPR_NESTING` 100 (`DESIGN_SYNTAX`), plus the existing 5000
+commands / 1000 loop iterations. Errors: `DESIGN_EXPR_TYPE` (type mismatch, non-finite result), `DESIGN_INDEX_RANGE`, `DESIGN_FN_ARGS`
+(wrong argument count, unknown function), `DESIGN_FN_RECURSION`, `DESIGN_UNKNOWN_PARAMETER` (unknown name). Loop bounds, `check` numbers and
+expected values may call user functions too.
+
+`expand_design { source? }` (read-only) runs the design on a scratch document and returns `data.lines[] { line, command, alias, params }`,
+the commands in order with their resolved values (default source: the document's design). A design may not call it.
+
+Not built: the `each` form of R4 (use a comprehension) and modules (M4c).
 
 ## 6. Aliases, anchors, placement
 
@@ -208,7 +244,7 @@ CLI: the only addition is the generic `@text:PATH` (`server/src/cli/fileParams.t
 
 Every error names its line (`error.paths = ["line N"]`), the offending text and one fix: `DESIGN_SYNTAX`, `DESIGN_UNKNOWN_COMMAND`
 (+ close names), `DESIGN_UNKNOWN_PARAM` (+ the params), `DESIGN_BAD_VALUE`, `DESIGN_BAD_ENUM` (+ members), `DESIGN_UNKNOWN_ALIAS` /
-`DESIGN_UNKNOWN_ANCHOR` / `DESIGN_UNKNOWN_PARAMETER` (+ close names), `DESIGN_ALIAS_CONSUMED` (+ live heir), `DESIGN_ALIAS_ARITY` / `DESIGN_INDEX_RANGE` / `DESIGN_NO_ENTITY`, `DESIGN_UNIT_NOT_SUPPORTED`,
+`DESIGN_UNKNOWN_ANCHOR` / `DESIGN_UNKNOWN_PARAMETER` (+ close names), `DESIGN_ALIAS_CONSUMED` (+ live heir), `DESIGN_ALIAS_ARITY` / `DESIGN_INDEX_RANGE` / `DESIGN_NO_ENTITY`, `DESIGN_VALUE_SCHEMA` / `DESIGN_EXPR_TYPE` / `DESIGN_LIST_LIMIT` / `DESIGN_EVAL_LIMIT` / `DESIGN_FN_RECURSION` / `DESIGN_FN_ARGS` (§5.1), `DESIGN_UNIT_NOT_SUPPORTED`,
 `DESIGN_LOOP_LIMIT` (1000 iterations per loop, 5000 commands, 1000 checks), `DESIGN_STEP_FAILED` (the command's own refusal and remediation),
 `DESIGN_CHECK_FAILED`, `DESIGN_NO_DESIGN`. A design that runs no command is refused (`DESIGN_SYNTAX`). Any failure leaves the document unchanged. A failure during a regeneration surfaces as
 core's `HIST_STEP_FAILED`, naming the design line.

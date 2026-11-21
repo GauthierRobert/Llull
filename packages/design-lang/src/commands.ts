@@ -12,7 +12,7 @@ import { MM_PER_UNIT } from '@core/model/units';
 import { attempt, DesignError, toCommandError } from './errors';
 import { addedRecordKeys, withoutOwnRecords } from './regenerate';
 import { parseDesign, type Statement } from './parse';
-import { evaluateChecks, runDesign } from './run';
+import { evaluateChecks, runDesign, type TraceLine } from './run';
 import { convertUnits } from './units';
 import type { CheckResult } from './checks';
 
@@ -317,5 +317,43 @@ export const exportDesign = defineCommand({
     const source = sourceOf(step);
     const name = /^\s*design\s+([A-Za-z_]\w*)/m.exec(source)?.[1] ?? 'design';
     return report(doc, `export_design: ${source.split('\n').length} line(s).`, { text: source, fileName: `${name}.lld` });
+  },
+});
+
+/**
+ * @affects nothing — read-only (runs the design on an empty sandbox with the document's units and parameters)
+ * @invariant lists every command the design runs, loops and comprehensions expanded, with the values it resolved
+ * @failure no source and no design -> DESIGN_NO_DESIGN; any design error -> DESIGN_* naming the line
+ */
+export const expandDesign = defineCommand({
+  name: 'expand_design',
+  description:
+    'Show what a .lld design will run: every command in order (loops, comprehensions, functions and aliases expanded) with its resolved ' +
+    "params. Runs it on an empty scratch document (the open document is not touched). Without `source` it expands the document's design. " +
+    'data: { lines: [{ line, command, alias, params }], commands }.',
+  params: z.object({ source: z.string().optional().describe(".lld design source to expand (default: the document's design).") }),
+  annotations: { readOnly: true, requiresKernel: true },
+  run: (doc, { source }, ctx): CommandResult => {
+    const step = designStep(doc);
+    const text = source ?? (step === undefined ? undefined : sourceOf(step));
+    if (text === undefined)
+      return designRejection(
+        doc,
+        'expand_design',
+        new DesignError(
+          'DESIGN_NO_DESIGN',
+          0,
+          'the document has no design and no source was given',
+          'Pass source=… or apply a design first.',
+        ),
+      );
+    const trace: TraceLine[] = [];
+    const run = attempt(() => {
+      const statements = parseDesign(text);
+      const sandbox = { ...createEmptyDocument(), units: doc.units, parameters: doc.parameters };
+      runDesign(prepareInputs(sandbox, statements, {}), statements, ctx, trace);
+    });
+    if (run instanceof DesignError) return designRejection(doc, 'expand_design', run);
+    return report(doc, `expand_design: ${trace.length} command(s).`, { lines: trace, commands: trace.length });
   },
 });

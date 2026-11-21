@@ -8,7 +8,7 @@ import type { CommandDefinition, CommandResult, ParamsSchema } from '@core/comma
 import type { FaceDetail } from '@core/geometry/kernelPorts';
 import { createEmptyDocument } from '@core/model/types';
 import { parseDesign, type Pair } from '@design/parse';
-import { AnchorRef, bindCommand, ExprRef, NameRef, type BoundCommand } from '@design/schemaValue';
+import { AnchorRef, bindCommand, ExprRef, NameRef, ValueExprRef, type BoundCommand } from '@design/schemaValue';
 import { facingFacePoint, sidePoint } from '@design/anchors';
 import { DesignError } from '@design/errors';
 import type { CheckResult } from '@design/checks';
@@ -61,11 +61,11 @@ afterAll(() => setGeometryKernel(null));
 describe('union and untyped params', () => {
   it('picks the union branch from the value shape', () => {
     expect(bind('density=w*2').params['density']).toEqual(new ExprRef('w*2'));
-    expect(bind('density={"value": 1, "unit": "g/cm^3"}').params['density']).toEqual({ value: 1, unit: 'g/cm^3' });
+    expect(bind('density={"value": 1, "unit": "g/cm^3"}').params['density']).toBeInstanceOf(ValueExprRef);
     expect(bind('target=base').params['target']).toEqual(new NameRef('base', true, 'fake.target'));
     expect(bind('target=[a, b]').params['target']).toEqual([
-      new NameRef('a', false, 'fake.target'),
-      new NameRef('b', false, 'fake.target'),
+      new NameRef('a', false, 'fake.target[0]'),
+      new NameRef('b', false, 'fake.target[1]'),
     ]);
     expect(bind('target="x"').params['target']).toBe('x');
     expect(bind('mode=b').params['mode']).toBe('b');

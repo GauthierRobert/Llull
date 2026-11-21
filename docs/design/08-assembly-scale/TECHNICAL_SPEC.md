@@ -386,3 +386,36 @@ parsing and selection), `schemaValue.ts` (`NameRef` carries the param's arity), 
 - **Changed existing tests.** `tests/unit/design/{edgeCases,schemaValue}.test.ts` expect the new `NameRef` fields; `feedback.test.ts`
   expects `DESIGN_INDEX_RANGE` (was `DESIGN_UNKNOWN_ALIAS`) for an index beyond the ids. No `.lld` example or validation plan needed
   an edit.
+
+### 13.3 As built (M4b)
+
+Scope: TR-ASC-13 (value grammar with schema binding, ranges, comprehensions, `if`, `let`, built-ins, functions, `expand_design`).
+Code: `packages/design-lang/src/{valueExpr,valueEval,valueSchema,functions}.ts`; `parse.ts` (`fn` statement, `expr` value node),
+`schemaValue.ts` (`ValueExprRef`), `run.ts` (`valueOf`, `aliasValue`, trace), `commands.ts` (`expand_design`).
+
+- **One step, one evaluator.** Nothing new reaches the document: a value expression is evaluated inside the single `design_source` step
+  (L8) and the command receives plain JSON. The same evaluator serves values, loop bounds, `check` numbers and function bodies.
+  Parameters are read from the document, so `set_parameter` regenerates as before (`readsOf` already matches names in the source).
+- **Binding.** `bindValue` routes `{…}` / `[for …]` nodes, parenthesised `if` / `let` and calls of non-numeric functions to
+  `ValueExprRef { expr, spec, param }`; a number slot whose text fails the old arithmetic parser but parses as a value expression takes
+  the same route. `coerceValue` walks the result against the param's JSON schema (type, enum, `anyOf` first matching branch, array items,
+  object properties, `required`, unknown field refused unless the schema is a free-form record) and reports `DESIGN_VALUE_SCHEMA` with
+  the path. List items carry their index in the path (`sections[1].span`). Alias values: single id, group list on a list slot,
+  `DESIGN_ALIAS_ARITY` on a one-id slot.
+- **Functions.** `buildFunctions` compiles the `fn` lines once per run, refuses duplicates and built-in names (`DESIGN_SYNTAX`) and any
+  cycle in the call graph (`DESIGN_FN_RECURSION`, naming the path) before the first command runs. A body sees its arguments and the document
+  parameters only.
+- **Determinism and bounds.** No clock or randomness; `pow` is `@lib/pow`. Named limits: `MAX_LIST_ITEMS` 100,000 (`DESIGN_LIST_LIMIT`),
+  `MAX_EVAL_STEPS` 2,000,000 and `MAX_CALL_DEPTH` 64 (`DESIGN_EVAL_LIMIT`, new code), `MAX_EXPR_NESTING` 100 (`DESIGN_SYNTAX`).
+- **`expand_design { source? }`.** Read-only, `requiresKernel` (it runs the commands on a scratch document with the document's units and
+  parameters). `data.lines[] { line, command, alias, params }` in execution order; `file` is not reported before modules (M4c). Added to the
+  tool-schema snapshot and `docs/FEATURES.md`.
+- **Validation.** VC-ASC-15 (wing from a comprehension with aliases inside objects, wrong field names its path) and VC-ASC-17 (a
+  comprehension over `fn tip(x)` equals the literal profile point for point) run as unit tests in `tests/unit/design/valueLanguage.test.ts`.
+  No M4b plan file exists in `validation/plans`; VC-ASC-18 / 19 (modules) need M4c.
+- **Existing behaviour changed.** `{…}` values are no longer verbatim JSON: they are checked against the schema (an object with a field the
+  schema does not list is refused) and may use `.lld` values. `parseValue` returns `{ kind: 'expr' }` for them (`parse.test.ts`,
+  `schemaValue.test.ts`, `edgeCases.test.ts` updated); list items carry `key[k]` in their schema key.
+- **Not built.** The `each` form of R4 (a comprehension covers it); `check` of an alias index (`of=part[2]`); modules, namespacing and
+  hashes (M4c).
+
