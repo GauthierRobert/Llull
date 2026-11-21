@@ -6,11 +6,17 @@
  */
 
 import { type ByteView, parseError } from './reader';
+import { readItemVariationStore } from './variation';
 
 const MAX_FEATURES = 256;
 const MAX_LOOKUPS = 1024;
 const MAX_SUBTABLES = 256;
 const X_ADVANCE = 0x0004;
+const X_ADVANCE_DEVICE = 0x0040;
+const VARIATION_INDEX = 0x8000;
+
+/** Delta of a GDEF variation store row at the instance (font units, unrounded). */
+export type KerningDelta = (outer: number, inner: number) => number;
 
 interface PairSubtable {
   readonly view: ByteView;
@@ -28,6 +34,19 @@ const bits = (value: number): number => {
 
 /** Position of the x advance inside a value record of `format`, or -1 when the format has none. */
 const advanceAt = (format: number): number => ((format & X_ADVANCE) === 0 ? -1 : 2 * bits(format & 0x3));
+
+/** The x advance of the value record at `record` (format `format`): the plain value plus, at an instance, the delta of its VariationIndex device table (offset from the pair subtable). */
+function advanceOf(table: PairSubtable, record: number, delta: KerningDelta | null): number {
+  const { view, offset, format1 } = table;
+  const at = advanceAt(format1);
+  let value = at < 0 ? 0 : view.i16(record + at);
+  if (delta !== null && (format1 & X_ADVANCE_DEVICE) !== 0) {
+    const device = view.u16(record + 2 * bits(format1 & 0x3f));
+    if (device !== 0 && view.u16(offset + device + 4) === VARIATION_INDEX)
+      value += Math.round(delta(view.u16(offset + device), view.u16(offset + device + 2)));
+  }
+  return value;
+}
 
 /** Coverage index of `glyph` (0-based), -1 when not covered. */
 function coverageIndex(view: ByteView, offset: number, glyph: number): number {
@@ -81,13 +100,12 @@ function classOf(view: ByteView, offset: number, glyph: number): number {
 }
 
 /** The kerning of one pair subtable: `null` when the subtable says nothing about the pair (the next subtable is tried). */
-function pairValue(table: PairSubtable, left: number, right: number): number | null {
+function pairValue(table: PairSubtable, left: number, right: number, delta: KerningDelta | null): number | null {
   const { view, offset } = table;
   const covered = coverageIndex(view, offset + view.u16(offset + 2), left);
   if (covered < 0) return null;
   const valueSize1 = 2 * bits(table.format1);
   const recordSize = 2 + valueSize1 + 2 * bits(table.format2);
-  const at = advanceAt(table.format1);
   if (table.format === 1) {
     const set = offset + view.u16(offset + 10 + 2 * covered);
     const count = view.u16(set);
@@ -97,7 +115,7 @@ function pairValue(table: PairSubtable, left: number, right: number): number | n
       const mid = (low + high) >> 1;
       const record = set + 2 + recordSize * mid;
       const second = view.u16(record);
-      if (second === right) return at < 0 ? 0 : view.i16(record + 2 + at);
+      if (second === right) return advanceOf(table, record + 2, delta);
       if (second < right) low = mid + 1;
       else high = mid - 1;
     }
@@ -109,7 +127,7 @@ function pairValue(table: PairSubtable, left: number, right: number): number | n
   const class2Count = view.u16(offset + 14);
   if (class1 >= class1Count || class2 >= class2Count) return 0;
   const record = offset + 16 + (class1 * class2Count + class2) * (valueSize1 + 2 * bits(table.format2));
-  return at < 0 ? 0 : view.i16(record + at);
+  return advanceOf(table, record, delta);
 }
 
 function subtableAt(view: ByteView, offset: number): PairSubtable | null {
@@ -137,10 +155,13 @@ function pairSubtables(view: ByteView, lookup: number): PairSubtable[] {
 }
 
 /**
- * Kerning in font units between glyphs `left` and `right`; null `table` or no `kern` feature -> always 0.
+ * Kerning in font units between glyphs `left` and `right`; null `table` or no `kern` feature -> always 0. `delta` (the GDEF variation store at the instance) moves a value by its VariationIndex device table, rounded to a font unit.
  * @failure a feature or lookup list that cannot be walked -> `FontError` WRP_FONT_PARSE at build; a hostile pair offset -> the same error when the pair is first asked
  */
-export function buildGposKerning(table: ByteView | null): ((left: number, right: number) => number) | null {
+export function buildGposKerning(
+  table: ByteView | null,
+  delta: KerningDelta | null = null,
+): ((left: number, right: number) => number) | null {
   if (table === null || table.length < 10 || table.u16(0) !== 1) return null;
   const featureList = table.u16(6);
   const lookupList = table.u16(8);
@@ -170,7 +191,7 @@ export function buildGposKerning(table: ByteView | null): ((left: number, right:
     let total = 0;
     for (const subtables of lookups)
       for (const subtable of subtables) {
-        const value = pairValue(subtable, left, right);
+        const value = pairValue(subtable, left, right, delta);
         if (value !== null) {
           total += value;
           break;
@@ -179,4 +200,16 @@ export function buildGposKerning(table: ByteView | null): ((left: number, right:
     cache.set(key, total);
     return total;
   };
+}
+
+/**
+ * The delta function of the ItemVariationStore of a `GDEF` 1.3 table at `coords`; null when the table is absent, older than 1.3 or has no store (kerning then never varies).
+ * @failure a damaged store -> WRP_FONT_PARSE
+ */
+export function gdefKerningDelta(gdef: ByteView | null, coords: readonly number[]): KerningDelta | null {
+  if (gdef === null || gdef.length < 18 || gdef.u16(0) !== 1 || gdef.u16(2) < 3) return null;
+  const storeAt = gdef.u32(14);
+  if (storeAt === 0) return null;
+  const store = readItemVariationStore(gdef.sub(storeAt, gdef.length - storeAt, 'GDEF store'));
+  return (outer, inner) => store.delta(outer, inner, coords);
 }
