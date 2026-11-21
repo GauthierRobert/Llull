@@ -13,7 +13,7 @@ import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { meshLeafTriangles } from '../../geometry/operandRecipe';
-import { recipeOfPart } from '../../geometry/assemblyParts';
+import { instanceSolids, recipeOfPart } from '../../geometry/assemblyParts';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { KERNEL_MESH_LEAF_CAP } from '../kernelMeshGuard';
 import { noop } from '../noop';
@@ -64,6 +64,20 @@ function toolLabel(tools: readonly string[]): string {
   return `${tools.length} tools (${shown.join(', ')}${tools.length > 3 ? ', …' : ''})`;
 }
 
+/** The solids an operand stands for: itself, or an instance's expanded solids (empty when it has none). */
+function solidsOf(doc: CadDocument, operand: Entity): Entity[] {
+  return operand.kind === 'instance' ? (instanceSolids(doc, operand, 0) ?? []) : [operand];
+}
+
+/** ` Component X now has no instances.` for every component the consumed instances leave without one. */
+function orphanedComponentNote(before: CadDocument, after: CadDocument, consumed: readonly Entity[]): string {
+  const left = new Set(Object.values(after.entities).flatMap((e) => (e.kind === 'instance' ? [e.componentId] : [])));
+  const orphans = [...new Set(consumed.flatMap((e) => (e.kind === 'instance' ? [e.componentId] : [])))].filter(
+    (id) => !left.has(id) && Object.hasOwn(before.components, id),
+  );
+  return orphans.map((id) => ` Component ${id} now has no instances (kept in the document).`).join('');
+}
+
 function runBoolean(
   doc: CadDocument,
   opName: string,
@@ -86,16 +100,28 @@ function runBoolean(
   if (flat !== undefined) return noop(doc, `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`);
   const instanced = ids.find((_, i) => (operands[i] as Entity).kind === 'instance');
   if (instanced !== undefined && engine === 'mesh')
-    return noop(doc, `${opName}: entity '${instanced}' is a component instance; the mesh engine needs solids (use engine "kernel" or explode_instance).`);
+    return noop(
+      doc,
+      `${opName}: entity '${instanced}' is a component instance; the mesh engine needs solids (use engine "kernel" or explode_instance).`,
+    );
   const [entA, ...toolEntities] = operands as [Entity, ...Entity[]];
-  const scans = [entA, ...toolEntities].map((entity) => ({
-    id: entity.id,
-    triangles: entity.kind === 'instance' ? 0 : meshLeafTriangles(recipeOf(entity)),
+  const members = [entA, ...toolEntities].map((operand) => solidsOf(doc, operand));
+  const empty = members.findIndex((solids) => solids.length === 0);
+  if (empty >= 0)
+    return noop(doc, `${opName}: instance '${ids[empty]}' has no buildable solids (missing component, no 3D member or nesting too deep).`);
+  const scans = members.map((solids, i) => ({
+    id: ids[i] as string,
+    triangles: solids.reduce((sum, e) => sum + meshLeafTriangles(recipeOf(e)), 0),
   }));
   const scanTotal = scans.reduce((sum, operand) => sum + operand.triangles, 0);
   const largest = scans.reduce((best, operand) => (operand.triangles > best.triangles ? operand : best));
   const bySize = engine === 'auto' && scanTotal > KERNEL_MESH_LEAF_CAP;
-  const viaMesh = instanced === undefined && (engine === 'mesh' || bySize || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities])));
+  const viaMesh = engine === 'mesh' || bySize || (engine === 'auto' && isTriangleOnly(members.flat()));
+  if (viaMesh && instanced !== undefined)
+    return noop(
+      doc,
+      `${opName}: instance '${instanced}' is built on imported-mesh triangles that the mesh engine would combine, and it takes solids: run explode_instance first, or pass engine "kernel".`,
+    );
   if (viaMesh) {
     const context = ctx ?? currentContext();
     const result = meshBoolean(doc, opName, op, a, tools, context.meshProcessing ?? null, context.meshAssets);
@@ -109,9 +135,6 @@ function runBoolean(
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(opName));
   const recipes = [entA, ...toolEntities].map((operand) => recipeOfPart(doc, kernel, operand));
-  const unbuildable = recipes.findIndex((recipe) => recipe === 'unbuildable');
-  if (unbuildable >= 0)
-    return noop(doc, `${opName}: instance '${ids[unbuildable]}' has no buildable solids (missing component, no 3D member or nesting too deep).`);
   const [recipeA, ...toolRecipes] = recipes as ShapeRecipe[];
   const recipe: ShapeRecipe = { op: 'boolean', boolean: op, a: recipeA as ShapeRecipe, b: balancedUnion(toolRecipes) };
   const result = evaluateRecipe(kernel, recipe);
@@ -129,13 +152,14 @@ function runBoolean(
       doc,
       `${opName}: the result of '${a}' and ${b} has no usable mesh — it is empty (no volume remains, e.g. disjoint solids for an intersection) or its solid could not be meshed closed; operands kept.`,
     );
-  return commitKernelResult(
+  const committed = commitKernelResult(
     doc,
     kernel,
     result,
     [entA, ...toolEntities],
     (newId, triangles) => `${opName}: merged '${a}' and ${b} into mesh '${newId}' (${triangles} triangles). Operands consumed.`,
   );
+  return { ...committed, summary: committed.summary + orphanedComponentNote(doc, committed.document, [entA, ...toolEntities]) };
 }
 
 type BooleanEngine = 'auto' | 'kernel' | 'mesh';
@@ -162,7 +186,7 @@ export const booleanOperation = defineCommand({
     'Triangle-only operands (imported meshes, mesh results with no exact shape) are always combined by the mesh engine under engine "auto" (default; decided from the operands alone, so replay does not depend on the host): ' +
     'the result stays a plain mesh with guaranteed-manifold output and no polyhedral B-rep; engine "kernel" forces the B-rep kernel, engine "mesh" forces the ' +
     'mesh engine (refuses MESH_ENGINE_UNSUPPORTED without one; non-manifold operands refuse MESH_NON_MANIFOLD). ' +
-    'A component instance is a valid operand on the kernel path: it is expanded through its transform to its solids (unioned) at the kernel boundary, and consumed. ' +
+    'A component instance is a valid operand on the kernel path: it is expanded through its transform to its solids (unioned) at the kernel boundary, and consumed (its component stays, even with no instance left). An instance built on imported-mesh triangles that the mesh engine would combine under engine auto is refused by name (explode_instance first). ' +
     SOLID_OPERANDS_NOTE,
   params: z.object({
     op: z.enum(['union', 'subtract', 'intersect']).describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),

@@ -438,6 +438,14 @@ Scope: §4.2, TR-ASC-06 data side (no renderer), §6 interop, decision D1. Code:
   recipes through its transform at the kernel boundary (L9), then the operands are consumed. Triangle-only routing is skipped when an
   instance is present; `engine: "mesh"` with an instance is refused (explode first). Missing component or no 3D member: no-op.
   The old refusal "run explode_instance first" is gone (`tests/unit/boolean.test.ts` updated). The pattern fuse (TR-ASC-05) is M1/native.
+- **Relocation (review fix).** Moving the source into the component is a relocation, not a deletion: `commands/entity/relocateEntity.ts`
+  `relocateEntities` remaps group members, selection, animation targets, `display.materialClassOf`, `exchange.provenance` and the
+  `patternSourceId` of earlier copies to the stand-in instance (only sub-shape constraints / joints are pruned, counted in the summary).
+  `create_component` uses the same helper; a group whose members all move into one component is dissolved and named in the summary.
+  Other commands that held the source id stop resolving it: use instance 0 (stated in the `as` description).
+- **Boolean routing.** Instance operands are scanned through their member solids: under `engine: "auto"` an instance built on
+  triangle-only / over-cap imported meshes (which would go to the mesh engine) is refused by name (`explode_instance` first). Consuming
+  the last instance of a component keeps the component; the summary says `Component X now has no instances (kept in the document)`.
 - **mass / bounds / `check_assembly`** already resolved instances through `instanceExpansion` (`mass_properties`, `instanceBoundsFromDoc`,
   `assemblyParts`); the new test pins mass equality between the two modes. A pattern instance is one part in `check_assembly` (cap
   `MAX_PARTS`) as before.

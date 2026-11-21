@@ -27,7 +27,7 @@ const arrayAsField = z
   .describe(
     '"copies" (default): count-1 independent entity copies. "instances": one component (the source, or the source instance\'s component) ' +
       'and count instances of it (instance 0 replaces the source, new ids in affected): cheap to render, edit the component once to change ' +
-      'all; a boolean accepts an instance as an operand. Needs a 3D solid or an instance as source (else ARRAY_SOURCE_NOT_SOLID).',
+      'all; a boolean accepts an instance as an operand. The source id moves into the component (groups, selection, animations, material class follow instance 0, but downstream references to the source id by other commands stop resolving: use instance 0). Needs a 3D solid or an instance as source (else ARRAY_SOURCE_NOT_SOLID).',
   )
   .optional();
 
