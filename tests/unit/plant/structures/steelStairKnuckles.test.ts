@@ -2,9 +2,11 @@
  * Plant 06 STA-FU2b: turns on `landingEvery` landings (`landingTurn`) and the stringer knuckles at turning landings. Hand numbers: width 800, rise 3000 /
  * riserMax 180 -> 17 risers of h = 176.4706, going 280, landing after riser 9 of 1000 (stations 2240 .. 3240), UPN200 web 8.5 -> stringer centre-lines at
  * +-404.25, flight stringers end at 9h - drop = 1588.235 - 118.204 = 1470.03 (drop = 100 / cos(atan(h / g)) = 100 x 1.18204).
- * Quarter_left: left run (2240,404.25) -> (2435.75,404.25) -> (2435.75,400) = 195.75 + 4.25; right run (2240,-404.25) -> (3244.25,-404.25) -> (3244.25,400)
- * = 1004.25 + 804.25; knuckle total 2008.5 mm. Half_left: left (2240,404.25) -> (2240,429.75) = 25.5 (3 webs across the well); right
- * (2240,-404.25) -> (3240,-404.25) -> (3240,1238.25) -> (2240,1238.25) = 1000 + 1642.5 + 1000; knuckle total 3668 mm.
+ * Every turn closes the chain in z: horizontal runs at that height, then one vertical leg of h = 176.4706 up to the start of the next flight stringer
+ * ((k + 1) h - drop). Quarter_left: left (2240,404.25) -> corner (2435.75,404.25) = 195.75 + leg (inner chain ends at the corner, 4.25 short of the next
+ * stringer); right (2240,-404.25) -> (3244.25,-404.25) -> (3244.25,400) = 1004.25 + 804.25 + leg; total 2004.25 + 2h = 2357.19 mm.
+ * Half_left (far-edge points at beyond + web / 2 = 3244.25): left (2240,404.25) -> (2240,429.75) = 25.5 (3 webs across the well) + leg; right
+ * (2240,-404.25) -> (3244.25,-404.25) -> (3244.25,1238.25) -> (2240,1238.25) = 1004.25 + 1642.5 + 1004.25 + leg; total 3676.5 + 2h = 4029.44 mm.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -72,51 +74,64 @@ describe('stringer knuckles at turning landings', () => {
     expect(layoutOf(undefined).knuckles).toEqual([]);
   });
 
-  it('quarter_left: the stringers go round the landing, 2008.5 mm in four runs at the flight end height', () => {
+  it('quarter_left: horizontal runs at the flight end height, then one riser-high vertical leg per side: 2357.19 mm in five runs', () => {
     const layout = layoutOf('quarter_left');
-    expect(layout.knuckles).toHaveLength(4);
-    expect(layout.knuckleFlights).toEqual([0, 0, 0, 0]);
+    expect(layout.knuckles).toHaveLength(5);
+    expect(layout.knuckleFlights).toEqual([0, 0, 0, 0, 0]);
     expect(layout.knuckles.map((run) => length(run))).toEqual([
       expect.closeTo(195.75, 6),
-      expect.closeTo(4.25, 6),
+      expect.closeTo(H, 6),
       expect.closeTo(1004.25, 6),
       expect.closeTo(804.25, 6),
+      expect.closeTo(H, 6),
     ]);
-    expect(layout.knuckles.every((run) => Math.abs(run.from[2] - (9 * H - DROP)) < 1e-9 && run.to[2] === run.from[2])).toBe(true);
-    expect(knuckleLength('quarter_left')).toBeCloseTo(2008.5, 6);
+    const z0 = 9 * H - DROP;
+    expect(layout.knuckles[0]?.from[2]).toBeCloseTo(z0, 9);
+    expect(layout.knuckles[1]?.to[2]).toBeCloseTo(z0 + H, 9);
+    expect(knuckleLength('quarter_left')).toBeCloseTo(2008.5 - 4.25 + 2 * H, 6);
     expect(layout.knuckles[2]?.to[0]).toBeCloseTo(3244.25, 6);
-    expect(layout.knuckles[3]?.to[1]).toBeCloseTo(400, 6);
+    // the outer leg stands exactly on the start of the next flight stringer; the inner one ends at the corner, one half web (4.25) short of it
+    expect(layout.knuckles[4]?.to).toEqual(layout.stringers[3]?.from);
+    expect(Math.hypot(...[0, 1, 2].map((k) => (layout.knuckles[1]?.to[k] ?? 0) - (layout.stringers[2]?.from[k] ?? 0)))).toBeCloseTo(
+      4.25,
+      6,
+    );
   });
 
-  it('half_left: 25.5 mm across the well on the inner side, round the far edge on the outer: 3668 mm', () => {
+  it('half_left: 25.5 mm across the well on the inner side, the outer one round the far edge (web / 2 past it): 4029.44 mm with the legs', () => {
     const layout = layoutOf('half_left');
     expect(layout.knuckles.map((run) => length(run))).toEqual([
       expect.closeTo(25.5, 6),
-      expect.closeTo(1000, 6),
+      expect.closeTo(H, 6),
+      expect.closeTo(1004.25, 6),
       expect.closeTo(1642.5, 6),
-      expect.closeTo(1000, 6),
+      expect.closeTo(1004.25, 6),
+      expect.closeTo(H, 6),
     ]);
-    expect(knuckleLength('half_left')).toBeCloseTo(3668, 6);
+    expect(knuckleLength('half_left')).toBeCloseTo(25.5 + 1004.25 + 1642.5 + 1004.25 + 2 * H, 6);
   });
 
-  it('every turn: each side is one continuous chain from the end of its flight stringer to the start of the next flight stringer', () => {
+  it('every turn: each side is one gap-free chain from the end of its flight stringer up to the start of the next one, all three coordinates', () => {
     for (const turn of ['quarter_left', 'quarter_right', 'half_left', 'half_right'] as const) {
       const layout = layoutOf(turn);
       const [first, second] = [layout.stringers.slice(0, 2), layout.stringers.slice(2, 4)];
-      const startsAt = (point: readonly number[]): boolean =>
-        first.some((run) => Math.hypot(run.to[0] - point[0]!, run.to[1] - point[1]!) < 1e-6);
-      const endsAt = (point: readonly number[]): boolean =>
-        second.some((run) => Math.hypot(run.from[0] - point[0]!, run.from[1] - point[1]!) < 1e-6);
-      const chains = layout.knuckles.filter((run) => startsAt(run.from));
+      const same = (a: readonly number[], b: readonly number[]): boolean => a.every((v, k) => Math.abs(v - (b[k] ?? NaN)) < 1e-9);
+      const chains = layout.knuckles.filter((run) => first.some((stringer) => same(stringer.to, run.from)));
       expect(chains, turn).toHaveLength(2);
-      expect(
-        layout.knuckles.filter((run) => endsAt(run.to)),
-        turn,
-      ).toHaveLength(2);
       for (let i = 1; i < layout.knuckles.length; i++) {
         const [previous, run] = [layout.knuckles[i - 1], layout.knuckles[i]];
-        if (!startsAt(run?.from ?? []))
-          expect(Math.hypot(...(run?.from ?? []).map((v, k) => v - (previous?.to[k] ?? 0))), turn).toBeLessThan(1e-6);
+        if (!first.some((stringer) => same(stringer.to, run?.from ?? [])))
+          expect(same(run?.from ?? [], previous?.to ?? []), `${turn} ${i}`).toBe(true);
+      }
+      const ends = layout.knuckles.filter(
+        (_run, i) => i === layout.knuckles.length - 1 || first.some((stringer) => same(stringer.to, layout.knuckles[i + 1]?.from ?? [])),
+      );
+      expect(ends, turn).toHaveLength(2);
+      for (const end of ends) {
+        const target = second.find((stringer) => stringer.from[2] === end.to[2] && same(stringer.from, end.to));
+        const inner = turn.startsWith('quarter') && second.every((stringer) => !same(stringer.from, end.to));
+        expect(target !== undefined || inner, `${turn} end`).toBe(true);
+        expect(end.to[2], turn).toBeCloseTo(second[0]?.from[2] as number, 9);
       }
     }
   });
@@ -129,13 +144,13 @@ describe('stringer knuckles at turning landings', () => {
         (line) => line.key === 'steelStair.steel.kg',
       )?.quantity ?? 0;
     const perMetre = findProfile('UPN200')?.massPerMetre ?? 0;
-    expect(steelKg(turned) - steelKg(straight)).toBeCloseTo((2008.5 / 1000) * perMetre, 1);
+    expect(steelKg(turned) - steelKg(straight)).toBeCloseTo(((2008.5 - 4.25 + 2 * H) / 1000) * perMetre, 1);
     const [level] = Object.values(turned.building?.levels ?? {});
     const boxes = (doc: CadDocument): number => stairFlightBoxes(doc, stairOf(doc), level!).length;
-    expect(boxes(turned) - boxes(straight)).toBe(4);
+    expect(boxes(turned) - boxes(straight)).toBe(5);
     const ifc = (doc: CadDocument): string => data<{ ifc: string }>(doc, 'export_ifc', {}).ifc;
     const members = (doc: CadDocument): number => (ifc(doc).match(/\.STRINGER\./g) ?? []).length;
-    expect(members(turned) - members(straight)).toBe(4);
+    expect(members(turned) - members(straight)).toBe(5);
     const meshOf = (doc: CadDocument): number => {
       const stringers = Object.values(doc.entities).find((entity) => entity.kind === 'mesh' && entity.name?.startsWith('Stair stringers'));
       return stringers?.kind === 'mesh' ? stringers.mesh.positions.length : 0;
@@ -211,5 +226,19 @@ describe('landingTurn on landingEvery landings', () => {
       'landingTurn',
     );
     expectPure(built, () => execute(built, 'update_steel_stair', { id: 'steelStair-1', landingEvery: 1100, landingTurn: 'half_left' }));
+  });
+});
+
+describe('update_steel_stair landingEvery keeps or names the turns', () => {
+  it('the same landing count keeps each previous turn; another count drops them and says so in the summary and data.changed', () => {
+    const built = add({ landingEvery: 1100, landingTurn: ['half_right', 'quarter_left'] });
+    const kept = ok(built, 'update_steel_stair', { id: 'steelStair-1', landingEvery: 1100, going: 270 });
+    expect(stairOf(kept.document).landings.map((landing) => landing.turn)).toEqual(['half_right', 'quarter_left']);
+    const dropped = ok(built, 'update_steel_stair', { id: 'steelStair-1', landingEvery: 800 });
+    expect(stairOf(dropped.document).landings.every((landing) => landing.turn === undefined)).toBe(true);
+    expect(dropped.summary).toContain('dropped turns half_right, quarter_left');
+    expect((dropped.data as { changed: string[] }).changed.join(';')).toContain('dropped turns');
+    const straight = ok(add({ landingEvery: 1100 }), 'update_steel_stair', { id: 'steelStair-1', landingEvery: 800 });
+    expect(straight.summary).not.toContain('dropped turns');
   });
 });

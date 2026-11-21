@@ -67,7 +67,7 @@ export interface StairLayout {
   readonly riserFrames: ReadonlyArray<StairFrame>;
   /** Stringer centre-lines: two per flight (left, right of the climb direction). */
   readonly stringers: ReadonlyArray<StairRun>;
-  /** Knuckle runs at turning landings: the stringer of each side follows the landing (horizontal, at the height the flight stringer ends) to the next flight. */
+  /** Knuckle runs at turning landings: the stringer of each side follows the landing (horizontal at the height the flight stringer ends, then one vertical leg of one riser up to the start of the next flight stringer). */
   readonly knuckles: ReadonlyArray<StairRun>;
   /** Flight (index in `flights`) that each knuckle run leaves, same order as `knuckles`. */
   readonly knuckleFlights: ReadonlyArray<number>;
@@ -152,9 +152,13 @@ function knucklePoints(
   const sign = turnSign(landing.turn);
   const start = framePoint(frame, at, offset);
   const end = framePoint(next, beyond, offset);
-  if (!isHalf(landing.turn)) return [start, framePoint(frame, beyond - stair.width / 2 - sign * offset, offset), end];
+  if (!isHalf(landing.turn)) {
+    const corner = framePoint(frame, beyond - stair.width / 2 - sign * offset, offset);
+    return side === sign ? [start, corner] : [start, corner, end];
+  }
   if (side === sign) return [start, end];
-  return [start, framePoint(frame, beyond, offset), framePoint(frame, beyond, sign * halfTurnAxes(stair.width, sizes) - offset), end];
+  const far = beyond + sizes.stringerWeb / 2;
+  return [start, framePoint(frame, far, offset), framePoint(frame, far, sign * halfTurnAxes(stair.width, sizes) - offset), end];
 }
 
 type Path = Pick<StairLayout, 'stations' | 'flights' | 'frames' | 'riserFrames' | 'run' | 'end'>;
@@ -221,6 +225,9 @@ export function layoutSteelStair(stair: LayoutInput, sizes: StairSizes): StairLa
         knuckles.push({ from: [a[0], a[1], z], to: [b[0], b[1], z] });
         knuckleFlights.push(index);
       }
+      const last = points[points.length - 1] as Vec2;
+      knuckles.push({ from: [last[0], last[1], z], to: [last[0], last[1], sz + ((flight.lastRiser + 1) * h - drop)] });
+      knuckleFlights.push(index);
     }
   });
 
