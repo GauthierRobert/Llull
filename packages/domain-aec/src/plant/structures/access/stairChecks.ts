@@ -7,7 +7,7 @@ import type { StaCode } from '../codes';
 import { ruleById, type AccessRule, type RulesetName } from '../rules/ruleTable';
 import { stairGeometryMm } from '../stair/steelStairMeasure';
 import { breachFinding, type Finding } from './finding';
-import { maxOf } from '@lib/arrayExtrema';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Stair quantities in mm / degrees. */
 interface StairMeasures {
@@ -17,6 +17,8 @@ interface StairMeasures {
   readonly pitchDeg: number;
   readonly blondel: number;
   readonly flightRise: number;
+  /** Shortest quarter / half-turn landing along the climb; null when the stair has none (straight landings are not judged). */
+  readonly turnLanding: number | null;
 }
 
 export function stairMeasures(doc: CadDocument, stair: StairElement): StairMeasures {
@@ -31,6 +33,7 @@ export function stairMeasures(doc: CadDocument, stair: StairElement): StairMeasu
     pitchDeg: (Math.atan2(riser, going) * 180) / Math.PI,
     blondel: 2 * riser + going,
     flightRise: longestFlight * riser,
+    turnLanding: null,
   };
 }
 
@@ -38,6 +41,7 @@ export function stairMeasures(doc: CadDocument, stair: StairElement): StairMeasu
 function steelStairMeasures(doc: CadDocument, stair: SteelStairElement): StairMeasures {
   const geometry = stairGeometryMm(doc, stair);
   const cuts = [0, ...stair.landings.map((landing) => landing.afterRiser), stair.riserCount];
+  const turns = stair.landings.filter((landing) => landing.turn !== undefined);
   const longestFlight = maxOf(cuts.slice(1).map((cut, index) => cut - (cuts[index] as number)));
   return {
     riser: geometry.riser,
@@ -46,13 +50,17 @@ function steelStairMeasures(doc: CadDocument, stair: SteelStairElement): StairMe
     pitchDeg: geometry.pitchDeg,
     blondel: geometry.blondel,
     flightRise: longestFlight * geometry.riser,
+    turnLanding: turns.length === 0 ? null : minOf(turns.map((landing) => toMm(doc, landing.length))),
   };
 }
+
+/** Row judged only on the quarter / half-turn landings of steel stairs, so it counts as evaluated only when the checked stairs have one. */
+const TURN_LANDING_RULE = 'OSHA-STR-LANDING';
 
 interface StairCheck {
   readonly ruleId: string;
   readonly code: StaCode;
-  readonly measure: (measures: StairMeasures) => number;
+  readonly measure: (measures: StairMeasures) => number | null;
 }
 
 // prettier-ignore
@@ -64,11 +72,16 @@ const STAIR_CHECKS: readonly StairCheck[] = [
   { ruleId: 'OSHA-STR-TREAD', code: 'STA_STAIR_TREAD', measure: (m) => m.going },
   { ruleId: 'OSHA-STR-ANGLE', code: 'STA_STAIR_ANGLE', measure: (m) => m.pitchDeg },
   { ruleId: 'OSHA-STR-WIDTH', code: 'STA_STAIR_WIDTH', measure: (m) => m.width },
+  { ruleId: TURN_LANDING_RULE, code: 'STA_STAIR_LANDING', measure: (m) => m.turnLanding },
 ];
 
 /** Rows that need data the stair checks do not have, reported as not evaluated rather than silently passed. */
 export const STAIR_RULES_NOT_EVALUATED: ReadonlyArray<{ readonly ruleId: string; readonly reason: string }> = [
-  { ruleId: 'OSHA-STR-LANDING', reason: 'landing depth and width are not evaluated' },
+  {
+    ruleId: 'OSHA-STR-LANDING',
+    reason:
+      'landing depth is evaluated for quarter / half-turn landings of steel stairs only (width = the stair width by construction); straight landings and concrete stairs are not evaluated',
+  },
   { ruleId: 'OSHA-STR-UNIFORM', reason: 'a stair has equal risers and treads by construction' },
 ];
 
@@ -79,14 +92,17 @@ export const CONCRETE_STAIR_HEADROOM_NOT_EVALUATED = {
 } as const;
 
 /** Rows evaluated for the requested rulesets. */
-export const stairRules = (rulesets: readonly RulesetName[]): AccessRule[] =>
-  STAIR_CHECKS.map((check) => ruleById(check.ruleId)).filter((rule) => rulesets.includes(rule.ruleset));
+export const stairRules = (rulesets: readonly RulesetName[], turned: boolean): AccessRule[] =>
+  STAIR_CHECKS.filter((check) => turned || check.ruleId !== TURN_LANDING_RULE)
+    .map((check) => ruleById(check.ruleId))
+    .filter((rule) => rulesets.includes(rule.ruleset));
 
 function findingsOf(measures: StairMeasures, id: string, rulesets: readonly RulesetName[]): Finding[] {
   return STAIR_CHECKS.flatMap((check) => {
     const rule = ruleById(check.ruleId);
     if (!rulesets.includes(rule.ruleset)) return [];
-    const finding = breachFinding(rule, check.code, id, check.measure(measures));
+    const value = check.measure(measures);
+    const finding = value === null ? null : breachFinding(rule, check.code, id, value);
     return finding === null ? [] : [finding];
   });
 }

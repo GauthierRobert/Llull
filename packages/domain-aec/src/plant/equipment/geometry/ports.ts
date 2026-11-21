@@ -7,7 +7,7 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BuildingLevel, BuildingModel, EquipmentElement } from '@aec/building/types';
-import type { EquipmentTemplate, NozzleFacing, NozzleRecord } from '../plantData';
+import type { EquipmentTemplate, NozzleFacing, NozzleKind, NozzleRecord } from '../plantData';
 import { exchangerPlacement } from './exchangerFrame';
 import { aroundXAxis, offsetAlong, point, rad, type NozzlePlacement } from './placement';
 import { tankPlacement } from './tankFrame';
@@ -22,6 +22,8 @@ export interface ConnectionPort {
   readonly tag: string;
   readonly mark: string;
   readonly service?: string;
+  /** `manway` / `nozzle` as stored on the record; absent when the record has none. */
+  readonly kind?: NozzleKind;
   /** Flange face centre, world, document units. */
   readonly position: Vec3;
   /** Unit vector pointing away from the equipment (toward the pipe). */
@@ -142,6 +144,7 @@ export function equipmentPorts(source: BuildingModel | Pick<CadDocument, 'buildi
         tag: element.mark,
         mark: nozzle.mark,
         ...(nozzle.service === undefined ? {} : { service: nozzle.service }),
+        ...(nozzle.kind === undefined ? {} : { kind: nozzle.kind }),
         position: toWorld(element, level, placement.face),
         direction: directionToWorld(element, placement.direction),
         dn: nozzle.dn,

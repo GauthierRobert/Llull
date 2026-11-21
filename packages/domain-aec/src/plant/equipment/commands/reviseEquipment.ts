@@ -260,7 +260,12 @@ export function revisePump(
     if (next === undefined) return record;
     return record.dn === next.dn && record.rating === next.rating
       ? { ...record, location: next.location, projection: next.projection }
-      : { ...next, facing: record.facing, ...(record.service === undefined ? {} : { service: record.service }) };
+      : {
+          ...next,
+          facing: record.facing,
+          ...(record.service === undefined ? {} : { service: record.service }),
+          ...(record.kind === undefined ? {} : { kind: record.kind }),
+        };
   });
   return { template: { ...built.template, defaulted: mergeDefaulted(old.defaulted, built.defaulted, patch) }, nozzles: revised };
 }

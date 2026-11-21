@@ -26,6 +26,13 @@ import { stairQuantities, treadThickness } from '../stair/steelStairMeasure';
 
 const STAIR_TYPES = ['.STRAIGHT_RUN_STAIR.', '.TWO_STRAIGHT_RUN_STAIR.'];
 
+/** Predefined type of a stair with exactly one turning landing; stairs with several landings and a turn stay user defined. */
+function turnType(stair: SteelStairElement): string | undefined {
+  const [only] = stair.landings;
+  if (stair.landings.length !== 1 || only?.turn === undefined) return undefined;
+  return only.turn.startsWith('half') ? '.HALF_TURN_STAIR.' : '.QUARTER_TURN_STAIR.';
+}
+
 /** One steel stair; null when the stringer section or the tread type left the catalogue. */
 export function exportSteelStair(context: Context, doc: CadDocument, stair: SteelStairElement, storeyPlacement: string): Exported | null {
   const { mm, writer } = context;
@@ -74,7 +81,8 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
       ),
     );
   });
-  const type = STAIR_TYPES[stair.landings.length] ?? '.USERDEFINED.';
+  const turned = stair.landings.some((landing) => landing.turn !== undefined);
+  const type = turned ? (turnType(stair) ?? '.USERDEFINED.') : (STAIR_TYPES[stair.landings.length] ?? '.USERDEFINED.');
   const objectType = type === '.USERDEFINED.' ? ifcString('MULTI_FLIGHT_STRAIGHT_STAIR') : '$';
   const ref = writer.add(
     `IFCSTAIR('${context.guid(stair.id)}',$,${ifcString(stair.mark)},$,${objectType},${local},$,${ifcString(stair.id)},${type})`,

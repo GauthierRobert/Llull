@@ -4,7 +4,7 @@ import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { isVec3 } from '@lib/vec3';
 import { headSpecSchema } from './model';
-import { PLANT_EQUIPMENT_SCHEMA } from './plantData';
+import { NOZZLE_KINDS, PLANT_EQUIPMENT_SCHEMA } from './plantData';
 import { exchangerErrors, pumpErrors, supportErrors, tankErrors } from './validateTemplates';
 import { appendAll } from '@lib/appendAll';
 
@@ -50,6 +50,8 @@ function nozzleErrors(nozzle: unknown, at: string): string[] {
   const errors: string[] = [];
   if (typeof nozzle['mark'] !== 'string' || nozzle['mark'] === '') errors.push(`${at}.mark must be a non-empty string`);
   if (typeof nozzle['rating'] !== 'string') errors.push(`${at}.rating must be a string`);
+  if (nozzle['kind'] !== undefined && !NOZZLE_KINDS.some((kind) => kind === nozzle['kind']))
+    errors.push(`${at}.kind must be one of ${NOZZLE_KINDS.join(', ')}`);
   if (nozzle['facing'] !== 'RF' && nozzle['facing'] !== 'FF' && nozzle['facing'] !== 'RTJ')
     errors.push(`${at}.facing must be RF, FF or RTJ`);
   for (const name of ['dn', 'projection', 'neckOutsideDiameter', 'neckWall'])
