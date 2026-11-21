@@ -9,7 +9,7 @@ import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFie
 import { sketchLoop } from './sketchCurves';
 import { allNurbsCurves, exactLoft } from './loftExact';
 import { advancedLoft, loftAdvancedFields, needsAdvancedLoft, sectionCurvesOf } from './loftAdvanced';
-import { polygonLoftRings, polygonSectionsOf, refuseLoftPolygon, vertexCountMismatch } from './loftPolygon';
+import { polygonLoftRings, polygonSectionsOf, vertexCountMismatch } from './loftPolygon';
 import { type SectionSpec, sectionSpecFields, specPolygon } from './sectionSpecs';
 import { alignRing, resampleRing } from '../../geometry/sectionRing';
 import { ringNormal } from '../../geometry/skin';
@@ -76,8 +76,9 @@ function loftRingsOf(placed: readonly PlacedSection[]): Vec3[][] | string {
 /**
  * @affects creates 1 loft entity positioned at the first section's centre
  * @invariant >= 2 sections with distinct centres; rings share point count, winding and start
- * @invariant ruled with every section a polygon -> the vertices are kept (polygon: true), paired by index after seam alignment
- * @failure fewer than 2 / ambiguous / invalid sections, coincident centres, duplicate id -> no-op; polygon sections with different vertex counts -> LOFT_VERTEX_COUNT
+ * @invariant ruled with every section a polygon of the SAME vertex count -> the vertices are kept (polygon: true), paired by index after seam alignment
+ * @invariant ruled polygon sections of DIFFERENT vertex counts -> resampled as before (replay of old histories), summary warns LOFT_VERTEX_COUNT
+ * @failure fewer than 2 / ambiguous / invalid sections, coincident centres, duplicate id -> no-op
  */
 export const loftSections = defineCommand({
   name: 'loft_sections',
@@ -91,7 +92,7 @@ export const loftSections = defineCommand({
     'Sections are resampled to the same point count and aligned so the surface does not twist; ' +
     'ruled: false (default) blends smoothly through all sections, ruled: true joins neighbours with ' +
     'straight lines; with ruled: true and every section a polygon (inline `section` points, or a rectangle / closed-polyline sketch) the vertices are kept exactly (no ' +
-    'resampling, planar or bilinear faces) and paired by index, so all sections need the SAME vertex count (else LOFT_VERTEX_COUNT). Kept exact for the OCC kernel and STEP export (B-spline skin through the sections). ' +
+    'resampling, planar or bilinear faces) and paired by index, so they need the SAME vertex count (with different counts the sections are resampled as in a plain ruled loft and the summary warns LOFT_VERTEX_COUNT). Kept exact for the OCC kernel and STEP export (B-spline skin through the sections). ' +
     'EXACT SECTIONS: when sectionIds are all nurbs_curve entities (create_nurbs_curve, interpolate_curve, airfoil_from_naca ...) every section ' +
     'is lofted as the curve it is - not resampled to 24 points, a sharp trailing edge stays sharp - and a straight edge closes an open ' +
     'curve; all curves need degree 1..3, no weights, the same number of knot spans and the same start point/orientation convention.',
@@ -113,7 +114,7 @@ export const loftSections = defineCommand({
     ruled: z
       .boolean()
       .describe(
-        'true: straight lines between neighbouring sections (polygon sections keep their vertices exactly: equal vertex counts required, LOFT_VERTEX_COUNT otherwise); false (default): smooth blend.',
+        'true: straight lines between neighbouring sections (polygon sections keep their vertices exactly: needs equal vertex counts; otherwise resampled with a LOFT_VERTEX_COUNT warning); false (default): smooth blend.',
       )
       .optional(),
     ...loftAdvancedFields,
@@ -133,17 +134,9 @@ export const loftSections = defineCommand({
     }
     if (sectionIds !== undefined && sections === undefined && allNurbsCurves(doc, sectionIds))
       return exactLoft(doc, sectionIds, ruled, { layerId, color, id: explicitId }, MAX_LOFT_SECTIONS);
-    const polygons = ruled ? polygonSectionsOf(doc, sectionIds, sections, MAX_LOFT_SECTIONS) : null;
-    const mismatch = polygons === null ? null : vertexCountMismatch(polygons);
-    if (mismatch !== null)
-      return refuseLoftPolygon(
-        doc,
-        'loft_sections',
-        'LOFT_VERTEX_COUNT',
-        `section ${mismatch.index} has ${mismatch.count} vertices, section 0 has ${mismatch.expected}: an exact ruled polygon loft pairs vertices by index`,
-        [],
-        [`params.${sectionIds === undefined ? 'sections' : 'sectionIds'}.${mismatch.index}`],
-      );
+    const candidates = ruled ? polygonSectionsOf(doc, sectionIds, sections, MAX_LOFT_SECTIONS) : null;
+    const mismatch = candidates === null ? null : vertexCountMismatch(candidates);
+    const polygons = mismatch === null ? candidates : null;
     const placed = polygons === null ? placedSections(doc, sectionIds, sections) : null;
     if (typeof placed === 'string') return fail(placed);
     const world = polygons !== null ? polygonLoftRings(polygons) : loftRingsOf(placed as PlacedSection[]);
@@ -158,7 +151,10 @@ export const loftSections = defineCommand({
     return commitSolid(
       doc,
       entity,
-      `loft_sections: created ${polygons !== null ? 'exact ruled polygon' : ruled ? 'ruled' : 'smooth'} loft "${id}" through ${rings.length} sections (first-to-last centre ${span.toFixed(3)})`,
+      `loft_sections: created ${polygons !== null ? 'exact ruled polygon' : ruled ? 'ruled' : 'smooth'} loft "${id}" through ${rings.length} sections (first-to-last centre ${span.toFixed(3)})` +
+        (mismatch === null
+          ? ''
+          : `; warning LOFT_VERTEX_COUNT: section ${mismatch.index} has ${mismatch.count} vertices, section 0 has ${mismatch.expected}, so the sections were resampled (vertices not kept); give every polygon section the same vertex count for an exact polygon loft`),
     );
   },
 });

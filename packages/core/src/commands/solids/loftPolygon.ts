@@ -10,7 +10,6 @@ import { toCounterClockwise } from '../../lib/polygon';
 import { alignRing } from '../../geometry/sectionRing';
 import { ringNormal } from '../../geometry/skin';
 import { planeToWorld } from '../../geometry/workPlane';
-import { tableRejection } from '../noop';
 import { sketchLoop } from './sketchCurves';
 import { sectionLoop, type SectionSpec } from './sectionSpecs';
 
@@ -75,14 +74,6 @@ export function polygonSectionsOf(
   }
   return found;
 }
-
-const REMEDIATION: Readonly<Record<string, string>> = {
-  LOFT_VERTEX_COUNT:
-    'give every polygon section the same number of vertices, or use a smooth loft (ruled: false) / coupling arc_length to resample unequal sections',
-};
-
-/** Coded refusal of the polygon loft: unchanged document, `LOFT_VERTEX_COUNT`, the section paths and the one-line fix. */
-export const refuseLoftPolygon = tableRejection(REMEDIATION);
 
 /** The first section whose vertex count differs from section 0, with both counts, or null when all agree. */
 export function vertexCountMismatch(sections: readonly PolygonSection[]): { index: number; count: number; expected: number } | null {

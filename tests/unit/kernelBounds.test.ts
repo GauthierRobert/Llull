@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { kernelEntityBounds } from '@core/geometry/kernelBounds';
-import type { CadDocument, Entity, Vec3 } from '@core/model/types';
+import { kernelFromOps } from '@core/geometry/shapeKernel';
+import { recipeOf } from '@core/geometry/shapeRecipe';
+import type { CadDocument, Entity, ShapeRecipe, Vec3 } from '@core/model/types';
 import { expectPure } from '../helpers/expectNoOp';
 import { build } from '../helpers/addEntity';
 import { fakeKernel, TETRA } from '../helpers/fakeKernel';
@@ -67,15 +69,62 @@ describe('TR-ASC-15 exact bounds of kernel-backed entities', () => {
   });
 
   it('measure_bounding_box: exact with a kernel, conservative without; a combined box is conservative when any entity is', () => {
-    const { doc } = withRing();
+    const { doc, box } = withRing();
     const ctx = { ...defaultContext(), kernel: fakeKernel({ shapeBounds: TIGHT }) };
     const exact = execute(doc, 'measure_bounding_box', { entityId: 'ring' }, ctx);
     expect(exact.data).toMatchObject({ min: TIGHT.min, max: TIGHT.max, size: [2120, 2120, 2000], bounds: 'exact' });
     expect(exact.summary).toContain('(exact)');
-    expect(execute(doc, 'measure_bounding_box', {}, ctx).data).toMatchObject({ bounds: 'conservative' });
+    expect(execute(doc, 'measure_bounding_box', {}, ctx).data).toMatchObject({ bounds: 'exact' });
+    const plain = {
+      ...box,
+      id: 'plain',
+      kind: 'mesh',
+      mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] },
+    } as unknown as Entity;
+    const mixed = { ...doc, entities: { ...doc.entities, plain }, order: [...doc.order, 'plain'] };
+    expect(execute(mixed, 'measure_bounding_box', {}, ctx).data).toMatchObject({ bounds: 'conservative' });
     const none = execute(doc, 'measure_bounding_box', { entityId: 'ring' }, { ...defaultContext(), kernel: null });
     expect(none.data).toMatchObject({ bounds: 'conservative' });
     expect((none.data as { min: number[] }).min).not.toEqual(TIGHT.min);
     expectPure(doc, () => execute(doc, 'measure_bounding_box', { entityId: 'ring' }, ctx));
+  });
+
+  it('box, cylinder and sphere are exact at any rotation (closed-form boxes are tight), also without a kernel', () => {
+    const ctx = { ...defaultContext(), kernel: null };
+    const { doc } = build(
+      ['add_box', { size: [2, 2, 2], position: [0, 0, 0], rotation: [0.3, 0.4, 0.5] }],
+      ['add_cylinder', { radius: 1, height: 4, position: [5, 0, 0], rotation: [0.6, 0, 0] }],
+      ['add_sphere', { radius: 2, position: [9, 0, 0] }],
+    );
+    for (const id of doc.order) expect(execute(doc, 'measure_bounding_box', { entityId: id }, ctx).data).toMatchObject({ bounds: 'exact' });
+  });
+
+  it('a kernel box is memoized per shape: a repeated query does not call the native bounds again', () => {
+    let calls = 0;
+    const { box } = withRing();
+    const shape = { mesh: TETRA };
+    const kernel = kernelFromOps<typeof shape>({
+      solid: () => shape,
+      boolean: () => null,
+      fillet: () => shape,
+      blend: () => null,
+      chamfer: () => null,
+      shell: () => null,
+      place: (s) => s,
+      scale: (s) => s,
+      tessellate: (s) => s.mesh,
+      topology: () => null,
+      exportStep: () => null,
+      release: () => undefined,
+      shapeBounds: () => {
+        calls++;
+        return TIGHT;
+      },
+    });
+    const handle = kernel.evaluate(recipeOf(box) as ShapeRecipe);
+    expect(handle).not.toBeNull();
+    expect(kernel.shapeBounds?.(handle!)).toEqual(TIGHT);
+    expect(kernel.shapeBounds?.(handle!)).toEqual(TIGHT);
+    expect(calls).toBe(1);
   });
 });

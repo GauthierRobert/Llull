@@ -123,6 +123,26 @@ const documentBuild = (records: number): string => {
   return serializeDocument(doc);
 };
 
+/** A saved document with one exact ruled polygon loft, its record changed by `tamper`: the hostile combinations of `polygon: true`. */
+const polygonLoftDocument = (tamper: (record: Record<string, unknown>) => void): string => {
+  const rect = (h: number): number[][] => [
+    [-h, -h],
+    [h, -h],
+    [h, h],
+    [-h, h],
+  ];
+  const made = execute(createEmptyDocument(), 'loft_sections', {
+    ruled: true,
+    sections: [
+      { section: rect(3), center: [0, 0, 0] },
+      { section: rect(1), center: [0, 0, 5] },
+    ],
+  });
+  const saved = JSON.parse(serializeDocument(made.document)) as { document: { entities: Record<string, Record<string, unknown>> } };
+  for (const record of Object.values(saved.document.entities)) tamper(record);
+  return JSON.stringify(saved);
+};
+
 /** A saved document holding one instance array (VIS1), with `tamper` applied to its parsed record: the hostile variants of the packed table. */
 const arrayDocument = (tamper: (record: Record<string, unknown>) => void): string => {
   let doc = createEmptyDocument();
@@ -613,6 +633,10 @@ export const CORE_READERS: readonly HostileReader[] = [
       },
       { name: 'instance array: table as a nested array', input: () => arrayDocument((record) => (record['transforms'] = [[[1]]])) },
       { name: 'instance array: component id __proto__', input: () => arrayDocument((record) => (record['componentId'] = '__proto__')) },
+      { name: 'polygon loft: ruled false', input: () => polygonLoftDocument((record) => (record['ruled'] = false)) },
+      { name: 'polygon loft: closed true', input: () => polygonLoftDocument((record) => (record['closed'] = true)) },
+      { name: 'polygon loft: with exact sections', input: () => polygonLoftDocument((record) => (record['sections'] = [])) },
+      { name: 'polygon loft: with exact faces', input: () => polygonLoftDocument((record) => (record['faces'] = [])) },
       {
         name: 'implicit body: material that is not in the document',
         input: () => implicitBodyDocument((body) => (body['materialId'] = 'ghost')),
