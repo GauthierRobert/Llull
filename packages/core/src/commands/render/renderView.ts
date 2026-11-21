@@ -351,8 +351,19 @@ export const renderView = defineCommand({
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
     'showLabels (entity id/name labels + key-point markers, default off), overlay ("cage": the cage edges and vertices of subdivision solids, "net": the control net of nurbs_surface sheets and the control polygon of nurbs_curve entities, drawn over the picture, not occluded; one kind or an array of both; with `isolate` only the isolated entities; orthographic views only). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
     'Plugin overlay kinds take their options in `overlayOptions` ({ <kind>: options }; per-kind options: see the plugin tool docs); what a kind drew is in data.overlays.<kind>.detail. ' +
-    'OVER BUDGET (the polygon budget decimated or skipped entities of a plain request): the picture is drawn by the open desktop viewport when the host has one (`--app`: all geometry, perspective, app lighting; data.routedTo "viewport"), else by the native GPU raster (data.routedTo "raster"), else the best effort stays with the warning RENDER_BUDGET_EXCEEDED and data.drawnShare (share of polygons drawn) in data.warnings. A routed picture is not a reference: data.deterministic false, no svgSha256; the summary says how it differs. ' +
+    'OVER BUDGET (the polygon budget decimated or skipped entities): a PLAIN request (none of turntable, isolate, section, cut, overlay, viewpointId, colourProfileId / sectionBoxId / review shading, hide2D, mode "vector", projection, fovDeg, title, showLabels, showDimensions or an explicit renderer) is drawn by the open desktop viewport when the host has one (`--app`: all geometry, perspective, app lighting; data.routedTo "viewport"), else by the native GPU raster when the scene has at most 1,000,000 polygons (data.routedTo "raster"; provisional limit), else the best effort stays with the warning RENDER_BUDGET_EXCEEDED and data.drawnShare (share of polygons drawn) in data.warnings. A routed picture is not a reference: data.deterministic false, no svgSha256; the summary says how it differs. Pass renderer "reference" to keep the TypeScript raster (svgSha256) and only the warning. ' +
     'Does NOT modify the document; `affected` is always [].',
   params: renderViewParams,
-  run: (doc, params, ctx): CommandResult => routeOverBudget(doc, params, ctx, renderOnce(doc, params, ctx), renderOnce),
+  run: (doc, params, ctx): CommandResult => {
+    // the host runs a command that waits for a viewport frame twice (pending, then with the frame): the reference render is a pure function of (document, params)
+    const reference = (): CommandResult => renderOnce(doc, params, ctx);
+    const rendered =
+      ctx?.resolveMemo?.once(
+        doc,
+        `render_view:${JSON.stringify(params)}`,
+        reference,
+        (r) => String(r.data === undefined ? '' : (r.data as { svg?: string }).svg).length,
+      ) ?? reference();
+    return routeOverBudget(doc, params, ctx, rendered, renderOnce);
+  },
 });
