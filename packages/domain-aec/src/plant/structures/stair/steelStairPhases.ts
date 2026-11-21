@@ -45,7 +45,7 @@ export function defaultWidthMm(rulesets: ReadonlyArray<RulesetName>): { value: n
 
 /** The stringer profile and tread surface (named defaults recorded on `defaulted`), or the refusal for an unknown or contradictory one. */
 export function stringerAndTread(
-  params: StairParams,
+  params: Pick<StairParams, 'stringerProfile' | 'tread'>,
   fail: Fail,
   defaulted: string[],
 ): Phase<{ stringerProfile: string; tread: SteelStairTread }> {

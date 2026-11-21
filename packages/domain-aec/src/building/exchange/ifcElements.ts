@@ -12,6 +12,7 @@ import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrial
 import { exportOther } from './ifcOtherExport';
 import { exportGrating, exportRailing } from '../../plant/structures/exchange/ifcAccessExport';
 import { exportSteelStair } from '../../plant/structures/exchange/ifcSteelStairExport';
+import { exportRadialStair } from '../../plant/structures/exchange/ifcRadialStairExport';
 import { exportLadder } from '../../plant/structures/exchange/ifcLadderExport';
 import { exportAssembly } from '../../plant/structures/exchange/ifcPlatformExport';
 import { isRackStrut } from '../../plant/structures/rack/rackMeasure';
@@ -85,6 +86,10 @@ export function exportElement(
     }
     case 'steelStair': {
       const exported = exportSteelStair(context, doc, element, storeyPlacement);
+      return exported ? [exported] : [];
+    }
+    case 'radialStair': {
+      const exported = exportRadialStair(context, doc, element, storeyPlacement);
       return exported ? [exported] : [];
     }
     case 'assembly':

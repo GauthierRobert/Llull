@@ -11,6 +11,7 @@ import { ladderQuantities } from '../ladder/ladderMeasure';
 import { platformQuantities } from '../platform/platformMeasure';
 
 import { railingQuantities } from '../railing/railingMeasure';
+import { radialQuantities } from '../radial/radialMeasure';
 import { stairGeometryMm, stairQuantities } from '../stair/steelStairMeasure';
 
 /** Adds `steelStair.<part>.m|ea|kg`, `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg`, `ladder.<part>.ea|m|kg` and `platform.<kind>.ea` lines (an assembly's parts are counted in their own lines; a pipe rack's members are steel members). */
@@ -46,6 +47,15 @@ export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, take
       [['ea', 'count', 1]],
       'platform',
     );
+  for (const stair of elementsOf(building, 'radialStair')) {
+    const quantities = radialQuantities(doc, stair);
+    takeoff.add('radialStair', 'tread', `${stair.form === 'spiral' ? 'Spiral' : 'Winder'} stair treads`, [
+      ['ea', 'count', quantities.treads],
+    ]);
+    takeoff.add('radialStair', 'steel', `${stair.form === 'spiral' ? 'Spiral' : 'Winder'} stair steel`, [
+      ['kg', 'section and treads', quantities.steelKg],
+    ]);
+  }
   for (const stair of elementsOf(building, 'steelStair')) {
     const quantities = stairQuantities(doc, stair);
     takeoff.add('steelStair', 'stringer', 'Steel stair stringers', [['m', 'centre-line length, both sides', quantities.stringerM]]);

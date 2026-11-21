@@ -22,7 +22,7 @@ interface Floor {
   supportingBeams: number;
 }
 interface Steel {
-  loads: { floors: Floor[] };
+  loads: { floors: Floor[]; stairFlights: Array<{ carriedDeadKn: number; carriedImposedKn: number }> };
   warnings: string[];
   members: Array<{ role: string; forces?: { reactionStart?: number; reactionEnd?: number } }>;
 }
@@ -92,10 +92,12 @@ describe('check_steel_members: stair landings', () => {
     expect(execute(doc, 'check_steel_members', { stairLandingLoad: { imposedKPa: 3 } }).rejected).toBe(true);
   });
 
-  it('loading the landing raises the ULS reactions of its beams by 1.35 x dead + 1.5 x 2.4 kN', () => {
+  it('loading the landing (and the flights it carries) raises the ULS reactions by 1.35 x dead + 1.5 x imposed', () => {
     const doc = frame();
-    const gain = reactions(steel(doc, { stairLandingLoad: landing })) - reactions(steel(doc));
-    expect(gain).toBeCloseTo(1.35 * ((0.8 * MASS * GRAVITY) / 1000) + 1.5 * 2.4, 2);
+    const loaded = steel(doc, { stairLandingLoad: landing });
+    const flights = loaded.loads.stairFlights.reduce((sum, f) => sum + 1.35 * f.carriedDeadKn + 1.5 * f.carriedImposedKn, 0);
+    const gain = reactions(loaded) - reactions(steel(doc));
+    expect(gain).toBeCloseTo(1.35 * ((0.8 * MASS * GRAVITY) / 1000) + 1.5 * 2.4 + flights, 2);
   });
 });
 
