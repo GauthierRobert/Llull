@@ -9,6 +9,7 @@ import type { CadDocument, Vec3 } from '../../../model/types';
 import type { ReviewIssue, ViewpointCamera } from '../../../model/review';
 import { escapeXml } from '../../../lib/escapeXml';
 import { toMetres } from '../../../model/units';
+import { documentProjection } from '../../../plugins/host';
 
 export type BcfVersion = '3.0' | '2.1';
 
@@ -157,8 +158,7 @@ function bcfMarkup21Xml(
 }
 
 /**
- * A viewpoint (*.bcfv): selection, default visibility, the `colouring` groups (Coloring, one Color per group) and the camera in metres. Entities carry no IFC GUID in llull yet,
- * so each component is identified by OriginatingSystem "llull" + AuthoringToolId (its entity id).
+ * A viewpoint (*.bcfv): selection, default visibility, the `colouring` groups (Coloring, one Color per group) and the camera in metres. A component is identified by OriginatingSystem "llull" + AuthoringToolId (its entity id) and, when a plugin projection `ifcGuid` knows its IFC GlobalId (the building plugin: the IFC export GlobalId of the owning element), by the `IfcGuid` attribute.
  */
 export function bcfVisualizationXml(
   doc: CadDocument,
@@ -170,7 +170,11 @@ export function bcfVisualizationXml(
   colouring: readonly ViewpointColouring[] = [],
 ): string {
   const metres = (v: Vec3): Vec3 => [toMetres(doc, v[0]), toMetres(doc, v[1]), toMetres(doc, v[2])];
-  const component = (id: string): string => `<Component>${text('OriginatingSystem', 'llull')}${text('AuthoringToolId', id)}</Component>`;
+  const guidOf = documentProjection('ifcGuid');
+  const component = (id: string): string => {
+    const ifc = guidOf?.(doc, id);
+    return `<Component${ifc === undefined ? '' : ` IfcGuid="${escapeXml(ifc)}"`}>${text('OriginatingSystem', 'llull')}${text('AuthoringToolId', id)}</Component>`;
+  };
   const components = selection.map(component).join('');
   const coloring =
     colouring.length === 0

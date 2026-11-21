@@ -36,6 +36,8 @@ export interface DocumentProjections {
   fastenerHole?(doc: CadDocument, ref: FastenerRef): FastenerHoleSize | string;
   /** Number of placed fastener stacks, or undefined when the document has none. */
   fastenerStackCount?(doc: CadDocument): number | undefined;
+  /** IFC GlobalId the IFC export gives the component that owns entity `entityId`, or undefined when no export writes it. */
+  ifcGuid?(doc: CadDocument, entityId: string): string | undefined;
 }
 
 /** A plugin's slice of the document: validation of its data and re-derivation of its geometry. */

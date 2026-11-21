@@ -63,6 +63,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_OPEN_PORT:
     'Name the end (from / to = an equipment tag, a nozzle <tag>:<mark> or a BL-... battery limit) or attach the pipe end to a nozzle, tie-in or run.',
   DAT_INFERRED_NOZZLE: 'Model the nozzle on the equipment (03 EQP add_nozzle) so the nozzle schedule and the IFC ports carry real data.',
+  DAT_NOZZLE_RATING_CLASS:
+    'Use a spec whose flange class equals the nozzle rating, or re-rate the nozzle on the equipment (03 EQP): the flange pair must be one class.',
+  DAT_NOZZLE_RATING_LOW:
+    'Raise the nozzle class (and the line spec), or lower the line design pressure / temperature: the rating at the design temperature is below the design pressure.',
+  DAT_NOZZLE_RATING_UNCHECKED:
+    'Give the line designTempC and designPressureBarG (update_pipeline), a CL<class> nozzle rating and a rating table for the spec material group, then check again.',
   DAT_IFC_SCOPE_OMITTED:
     'Expected for a scoped export_ifc: classify the omitted elements (assign_plant_object) into the scope node, or export the whole document or a higher node.',
   DAT_LINE_SIZE_MISMATCH: 'Make the line nominalSize equal to the DN of its pipe, or re-size the pipe.',
