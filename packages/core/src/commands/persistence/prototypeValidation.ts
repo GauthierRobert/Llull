@@ -1,14 +1,17 @@
-/** Load-time validation of the optional `prototype` field (interference intents, grounded parts, references, dispositions). */
+/** Load-time validation of the optional `prototype` field (interference intents, grounded parts, connection groups, references, dispositions). */
 
 import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isReservedKey } from '../../lib/reservedKey';
-import { DISPOSITION_STATUSES, INTENT_KINDS, REVIEW_CHECKS } from '../../model/prototype';
+import { CONNECTION_CYLINDRICAL, CONNECTION_KINDS, DISPOSITION_STATUSES, INTENT_KINDS, REVIEW_CHECKS } from '../../model/prototype';
 import { referencesProblems } from './engineValidation';
 import { appendAll } from '../../lib/appendAll';
 
 const KINDS: readonly string[] = INTENT_KINDS;
 const STATUSES: readonly string[] = DISPOSITION_STATUSES;
+const CONNECTION_KIND_LIST: readonly string[] = CONNECTION_KINDS;
+const CYLINDRICAL_LIST: readonly string[] = CONNECTION_CYLINDRICAL;
+const MEMBER_KEYS = ['ids', 'patternOf', 'layerId', 'groupId'] as const;
 
 function intentProblem(id: string, intent: unknown): string | null {
   if (!isRecord(intent) || intent['id'] !== id) return `prototype.intents['${id}'] must be an object whose id is '${id}'`;
@@ -22,6 +25,50 @@ function intentProblem(id: string, intent: unknown): string | null {
   if (intent['declaredBy'] !== 'agent' && intent['declaredBy'] !== 'human')
     return `prototype.intents['${id}']: declaredBy must be 'agent' or 'human'`;
   return null;
+}
+
+function membersProblem(at: string, members: unknown): string | null {
+  if (!isRecord(members)) return `${at}: members must be an object`;
+  const present = MEMBER_KEYS.filter((key) => members[key] !== undefined);
+  const [key] = present;
+  if (present.length !== 1 || key === undefined) return `${at}: members must hold exactly one of ${MEMBER_KEYS.join(', ')}`;
+  const value = members[key];
+  if (key === 'ids') return isStringArray(value) && value.length > 0 ? null : `${at}: members.ids must be a non-empty array of strings`;
+  return typeof value === 'string' && value.length > 0 ? null : `${at}: members.${key} must be a non-empty string`;
+}
+
+function detectProblem(at: string, detect: unknown): string | null {
+  if (detect === undefined) return null;
+  if (!isRecord(detect)) return `${at}: detect must be an object`;
+  const { toleranceMm, faceAngleDeg, cylindrical } = detect;
+  if (typeof toleranceMm !== 'number' || !Number.isFinite(toleranceMm) || toleranceMm <= 0) return `${at}: detect.toleranceMm must be > 0`;
+  if (typeof faceAngleDeg !== 'number' || !Number.isFinite(faceAngleDeg) || faceAngleDeg < 0 || faceAngleDeg > 90)
+    return `${at}: detect.faceAngleDeg must be within 0..90`;
+  if (typeof cylindrical !== 'string' || !CYLINDRICAL_LIST.includes(cylindrical))
+    return `${at}: detect.cylindrical must be one of ${CYLINDRICAL_LIST.join(', ')}`;
+  return null;
+}
+
+function connectionProblem(id: string, group: unknown): string | null {
+  const at = `prototype.connections['${id}']`;
+  if (!isRecord(group) || group['id'] !== id) return `${at} must be an object whose id is '${id}'`;
+  if (typeof group['name'] !== 'string') return `${at}: name must be a string`;
+  if (typeof group['kind'] !== 'string' || !CONNECTION_KIND_LIST.includes(group['kind']))
+    return `${at}: kind must be one of ${CONNECTION_KIND_LIST.join(', ')}`;
+  if (typeof group['reason'] !== 'string' || group['reason'].trim().length === 0) return `${at}: reason must be non-empty`;
+  if (group['declaredBy'] !== 'agent' && group['declaredBy'] !== 'user') return `${at}: declaredBy must be 'agent' or 'user'`;
+  return membersProblem(at, group['members']) ?? detectProblem(at, group['detect']);
+}
+
+function connectionsProblems(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!isRecord(value)) return ['prototype.connections must be an object keyed by connection id'];
+  return Object.entries(value).flatMap(([id, group]) => {
+    const problem = isReservedKey(id)
+      ? `prototype.connections: id '${id}' is a reserved JavaScript property name`
+      : connectionProblem(id, group);
+    return problem === null ? [] : [problem];
+  });
 }
 
 /** True when `key` reads `<check>:<code>:<ids>` with a known review check and a non-empty code. */
@@ -65,6 +112,10 @@ export function prototypeProblems(value: unknown): string[] {
     if (problem !== null) errors.push(problem);
   }
   if (new Set(value['grounded']).size !== value['grounded'].length) errors.push('prototype.grounded contains duplicate ids');
-  appendAll(errors, [...referencesProblems(value['references']), ...dispositionsProblems(value['dispositions'])]);
+  appendAll(errors, [
+    ...referencesProblems(value['references']),
+    ...dispositionsProblems(value['dispositions']),
+    ...connectionsProblems(value['connections']),
+  ]);
   return errors;
 }

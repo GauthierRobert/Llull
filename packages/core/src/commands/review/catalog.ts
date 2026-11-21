@@ -3,6 +3,7 @@
 import { commandCatalog } from '../schema';
 import { setReviewDisposition } from './dispositions';
 import { setPartGrounded } from './grounding';
+import { addConnectionGroup, deleteConnectionGroup, setFastener } from './connections';
 import { allowInterference, removeInterferenceIntent } from './intents';
 import { deleteViewpoint, listViewpoints, saveViewpoint } from './viewpoints';
 import { createWalkthrough, deleteWalkthrough } from './walkthroughs';
@@ -19,6 +20,9 @@ export const reviewCommands = commandCatalog(
   allowInterference,
   removeInterferenceIntent,
   setPartGrounded,
+  addConnectionGroup,
+  deleteConnectionGroup,
+  setFastener,
   setReviewDisposition,
   saveViewpoint,
   listViewpoints,

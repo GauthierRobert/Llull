@@ -216,11 +216,12 @@ function loftProblem(v: Record<string, unknown>): string | null {
   return exactSectionsProblem(sections as NurbsCurveData[]);
 }
 
-/** Optional BaseEntity fields (`name`, `tags`, `materialId`, `patternSourceId`) must have their declared types, or null. */
+/** Optional BaseEntity fields (`name`, `tags`, `materialId`, `patternSourceId`, `fastener`) must have their declared types, or null. */
 function baseOptionalProblem(v: Record<string, unknown>): string | null {
   if (v['name'] !== undefined && typeof v['name'] !== 'string') return 'name must be a string';
   if (v['materialId'] !== undefined && typeof v['materialId'] !== 'string') return 'materialId must be a string';
   if (v['patternSourceId'] !== undefined && typeof v['patternSourceId'] !== 'string') return 'patternSourceId must be a string';
+  if (v['fastener'] !== undefined && v['fastener'] !== true) return 'fastener must be true when present';
   const tags = v['tags'];
   if (tags !== undefined && !(Array.isArray(tags) && tags.every((t) => typeof t === 'string'))) return 'tags must be an array of strings';
   return null;

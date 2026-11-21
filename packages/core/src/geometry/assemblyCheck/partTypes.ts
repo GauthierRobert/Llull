@@ -2,6 +2,7 @@
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../../model/types';
 import type { ShapeHandle } from '../kernel';
+import type { RigidFrame } from './rigidFrame';
 
 /** A checked part: a 3D solid entity or an assembly instance (its entities unioned), already built by the kernel. */
 export interface AssemblyPart {
@@ -14,6 +15,9 @@ export interface AssemblyPart {
   /** World bounds of `mesh` (document units); zero box when there is no mesh. */
   readonly min: Vec3;
   readonly max: Vec3;
+  /** Unit-scale instance placement and the key of its component-local recipe (symmetry reduction, pair cache); absent for other parts. */
+  readonly frame?: RigidFrame;
+  readonly localKey?: string;
 }
 
 /** Named tolerances (TECHNICAL_SPEC 5.9). Lengths in document units. */

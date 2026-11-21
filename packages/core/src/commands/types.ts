@@ -8,6 +8,7 @@ import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { GeometryQueryEngine } from '../geometry/geometryQueries';
 import type { SpatialIndexPort } from '../geometry/spatialIndex';
+import type { PairCache } from '../geometry/assemblyCheck/pairCache';
 import type { MeshProcessingEngine } from '../geometry/mesh/engineTypes';
 import type { FieldEngine } from '../geometry/field/engineTypes';
 import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
@@ -282,6 +283,8 @@ export interface ExecutionContext {
   readonly geometryQueries?: GeometryQueryEngine | null;
   /** Instance-BVH builder (plant 09 VIS-M8e; `render_stats`, `check_clashes` broad phase); null/absent = the TypeScript build. */
   readonly spatialIndex?: SpatialIndexPort | null;
+  /** Pair-result cache of `check_assembly` (08 ASC TR-ASC-10), owned by the host so it survives across runs; null/absent = a resolveMemo, else the run's own reuse only. */
+  readonly pairCache?: PairCache | null;
   /** Extra mesh-processing engine (Manifold, native; 07 MSH TR-MSH-02); null/absent = the built-in TypeScript engine alone (ops it lacks refuse with MESH_ENGINE_UNSUPPORTED). */
   readonly meshProcessing?: MeshProcessingEngine | null;
   /** Implicit-field engine (tape evaluation, interval-pruned meshing, measures; 05 IMP TR-IMP-02); null/absent = the built-in TypeScript engine. */
