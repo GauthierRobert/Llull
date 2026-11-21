@@ -128,7 +128,7 @@ describe('solveSparse hardening (budget, dependent rows, determinism, acceptance
     expect(solveSparse(rows, b, start, samples, high)).toMatchObject({ status: 'ok', objective: 'limit' });
   });
 
-  it('a projection too rough to keep the conditions (an ill-conditioned chain, 137 inner iterations where it needs many hundreds) is refused by the acceptance gate: the start solution, objective start', () => {
+  it('the iterative projection too rough to keep the conditions (an ill-conditioned chain, 137 inner iterations where it needs many hundreds) is refused by the acceptance gate: the start solution, objective start', () => {
     const next = sequence(3);
     const n = 800;
     const hidden: Vec3[] = Array.from({ length: n }, () => [next(), next(), next()]);
@@ -149,11 +149,20 @@ describe('solveSparse hardening (budget, dependent rows, determinism, acceptance
       target: [0.2 * next(), 0.2 * next(), 0.2 * next()],
     }));
     const nonzeros = 2 * (n - 1);
-    const rough = solveSparse(rows, b, start, samples, 1e5 * nonzeros);
+    const rough = solveSparse(rows, b, start, samples, 1e5 * nonzeros, 'iterative');
     expect(rough.projectionIterations).toBeGreaterThanOrEqual(20);
     expect(rough).toMatchObject({ status: 'ok', objective: 'start' });
     expect(rough.x).toEqual(solveSparse(rows, b, start, []).x);
     expect(violationOf(rows, b, rough.x)).toBeLessThan(1e-9);
-    expect(solveSparse(rows, b, start, samples)).toMatchObject({ status: 'ok', objective: 'limit', projectionIterations: 400 });
+    expect(solveSparse(rows, b, start, samples, undefined, 'iterative')).toMatchObject({
+      status: 'ok',
+      objective: 'limit',
+      projectionIterations: 400,
+    });
+    // the direct projector (envelope factor of A A^T) has no iteration count to run out of: the same chain gets its limit objective with the conditions kept
+    const direct = solveSparse(rows, b, start, samples);
+    expect(direct).toMatchObject({ status: 'ok', objective: 'limit' });
+    expect(direct.projectionIterations).toBeUndefined();
+    expect(violationOf(rows, b, direct.x)).toBeLessThan(1e-9);
   });
 });
