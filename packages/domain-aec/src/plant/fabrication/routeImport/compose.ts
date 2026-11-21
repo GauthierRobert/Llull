@@ -24,6 +24,7 @@ export interface ComposeInput {
   /** Place the supports of the file (needs a building level). */
   readonly supports: boolean;
   readonly valveType: string;
+  readonly valveTypes: Readonly<Record<string, string>>;
 }
 
 export interface Composed {
@@ -74,8 +75,8 @@ function step(
 const isStep = (value: CommandResult | Applied): value is Applied => 'next' in value;
 
 /** Catalogue type of an inline item: the valve type, a (flat-sided) reducer, or the flanged joint / instrument. */
-function inlineTypeOf(item: PlannedRun['inline'][number], valveType: string): string {
-  if (item.type === 'valve') return valveType;
+function inlineTypeOf(item: PlannedRun['inline'][number], valveType: string, valveTypes: Readonly<Record<string, string>>): string {
+  if (item.type === 'valve') return valveTypes[item.componentId] ?? valveType;
   if (item.type === 'reducer') return item.flat === undefined ? 'reducerConcentric' : 'reducerEccentric';
   return item.type;
 }
@@ -145,14 +146,16 @@ export function composeRoute(original: CadDocument, input: ComposeInput, ctx: Ex
 function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionContext | undefined): Composed | CommandResult {
   const { plan } = input;
   const main = plan.runs[0] as PlannedRun;
-  const reducerInBranch = plan.runs.find((run) => run.parent !== undefined && run.inline.some((item) => item.type === 'reducer'));
+  const reducerInBranch = plan.runs.find(
+    (run) => run.parent !== undefined && run.endPort !== undefined && run.inline.some((item) => item.type === 'reducer'),
+  );
   if (reducerInBranch !== undefined)
     return codedRejection(
       original,
       'import_pcf',
       'ISO_ROUTE_UNSUPPORTED',
-      'as route: a reducer inside a branch cannot be placed (add_branch takes the branch size of its end port)',
-      'Import the line as pcf_line, or edit the PCF.',
+      `as route: ${reducerInBranch.key} has a reducer and ends at a flanged port of the reduced size (add_branch takes the branch size of its end port, so the branch cannot be routed to it)`,
+      'Import the line as pcf_line, or edit the PCF: end the branch open or in a cap, or without the reducer.',
       reducerInBranch.inline.filter((item) => item.type === 'reducer').map((item) => item.componentId),
     );
   const commands: string[] = [];
@@ -183,6 +186,10 @@ function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionC
 
   /** A run that ends in a cap: the spec cap on its end (its length is how far the closed end lies beyond the joint). */
   const closeEnd = (planned: PlannedRun, runId: string): CommandResult | undefined => {
+    if (planned.startCap !== undefined) {
+      const started = run('set_run_end_cap', { runId, end: 'start', cap: true, closure: planned.startCap.kind });
+      if (started.rejected === true) return started;
+    }
     if (planned.cap === undefined) return undefined;
     const capped = run('set_run_end_cap', { runId, end: 'end', cap: true, closure: planned.cap.kind });
     if (capped.rejected === true) return capped;
@@ -228,7 +235,7 @@ function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionC
         [lost.item.componentId],
       );
     const inlineParams = located.map(({ item, at }) => ({
-      type: inlineTypeOf(item, input.valveType),
+      type: inlineTypeOf(item, input.valveType, input.valveTypes),
       ...(item.lengthMm === undefined ? {} : { lengthMm: item.lengthMm }),
       ...(item.endType === undefined ? {} : { endType: item.endType }),
       at,

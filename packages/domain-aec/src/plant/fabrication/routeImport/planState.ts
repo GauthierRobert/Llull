@@ -34,6 +34,8 @@ export interface Walk {
   /** Offset of the actual axis from the stored one (an eccentric reducer upstream on this leg). */
   shift: Vec3;
   cap: PlannedCap | undefined;
+  /** The closure at the start of the main run (its walk begins on the pipe side of it). */
+  startCap: (PlannedCap & { readonly tip: Vec3 }) | undefined;
 }
 
 /** What one component did to the walk: refused, or moved on past its exit (`advance`), or already moved `end` / `key` itself (`again`). */

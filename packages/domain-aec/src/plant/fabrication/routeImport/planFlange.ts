@@ -18,6 +18,12 @@ function valveSet(
   valveFaceKey: string,
 ): { valve: PlannedInline; consumed: string[]; out: NetworkPoint } | RouteRefusal {
   const valve = comp(s, valveIndex);
+  if (valve.type === 'INSTRUMENT' && valve.branch !== undefined)
+    return refuse(
+      'ISO_ROUTE_UNSUPPORTED',
+      `instrument ${valve.id} has a tapping point (BRANCH1-POINT): the RTE cannot branch off an instrument body, so the take-off line cannot be rebuilt (route mode takes an instrument with two end points only)`,
+      [valve.id],
+    );
   const far = otherEnd(valve, valveFaceKey);
   const near = valve.ends.find((bodyEnd) => bodyEnd !== far);
   if (far === undefined || near === undefined || valve.ends.some((valveEnd) => valveEnd.endType !== 'FL'))

@@ -25,6 +25,8 @@ export interface PlannedRun {
    * END-POINTs, a FLANGE-BLIND's outer face).
    */
   readonly cap?: { readonly kind: 'cap' | 'blindFlange'; readonly mouth: Vec3; readonly tip?: Vec3 };
+  /** The main run STARTS closed: the closure's closed end is the free first end of the file (`tip`), the run begins there; `mouth` is where the pipe side begins. */
+  readonly startCap?: { readonly kind: 'cap' | 'blindFlange'; readonly mouth: Vec3; readonly tip: Vec3 };
   /** The run this one branches off (absent for the main run). */
   readonly parent?: string;
   readonly consumed: readonly string[];

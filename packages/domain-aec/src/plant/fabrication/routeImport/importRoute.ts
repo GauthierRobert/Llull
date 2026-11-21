@@ -25,6 +25,8 @@ export interface RouteImportArgs {
   readonly service: string;
   readonly supports: boolean;
   readonly valveType: string;
+  /** Catalogue type of single valves by the COMPONENT-IDENTIFIER of their VALVE record (the others take `valveType`). */
+  readonly valveTypes: Readonly<Record<string, string>>;
   /** Flat side of the eccentric reducers whose end points are on one axis. */
   readonly eccentricFlat: FlatSide | undefined;
   /** Data of the file (counts, pipe lengths, BOM) the import reports for every mode. */
@@ -67,6 +69,24 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
       [],
       ['spec'],
     );
+  // A key is the id the route data reports (`pcf:<line>:<identifier>`) or the bare COMPONENT-IDENTIFIER of the VALVE record.
+  const valveIds = new Map<string, string>();
+  for (const component of file.components)
+    if (component.type === 'VALVE') {
+      valveIds.set(component.id, component.id);
+      valveIds.set(component.id.slice(component.id.lastIndexOf(':') + 1), component.id);
+    }
+  const unknown = Object.keys(args.valveTypes).filter((id) => !valveIds.has(id));
+  if (unknown.length > 0)
+    return refuseIso(
+      doc,
+      'import_pcf',
+      'ISO_PARAM_INVALID',
+      `valveTypes names ${unknown.join(', ')}, which ${unknown.length === 1 ? 'is' : 'are'} not VALVE record(s) of the file`,
+      unknown,
+      ['valveTypes'],
+    );
+  const valveTypes = Object.fromEntries(Object.entries(args.valveTypes).map(([key, type]) => [valveIds.get(key) as string, type]));
   const plan = planRoute(file.components, { eccentricFlat: args.eccentricFlat });
   if (!plan.ok) return refuseIso(doc, 'import_pcf', plan.code, `as route: ${plan.message}`, plan.ids, ['as']);
   if (args.supports && plan.supports.length > 0 && Object.keys(getBuilding(doc).levels).length === 0)
@@ -80,7 +100,15 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
     );
   const composed = composeRoute(
     doc,
-    { plan, lineNumber: args.lineNumber, spec: spec.trim(), service: args.service, supports: args.supports, valveType: args.valveType },
+    {
+      plan,
+      lineNumber: args.lineNumber,
+      spec: spec.trim(),
+      service: args.service,
+      supports: args.supports,
+      valveType: args.valveType,
+      valveTypes,
+    },
     ctx,
   );
   if (!isComposed(composed)) return composed;
@@ -133,9 +161,11 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
       inline: run.inline.map((item) => ({
         type: item.type,
         componentId: item.componentId,
+        ...(item.type === 'valve' ? { valveType: valveTypes[item.componentId] ?? args.valveType } : {}),
         ...(item.flat === undefined ? {} : { eccentric: true }),
       })),
       capped: run.cap !== undefined,
+      ...(run.startCap === undefined ? {} : { startClosure: run.startCap.kind }),
       ...(run.cap === undefined ? {} : { closure: run.cap.kind }),
     })),
     portIds: composed.portIds,

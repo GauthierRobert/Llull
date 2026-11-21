@@ -48,7 +48,7 @@ describe('files written by other tools', () => {
     const result = route(body);
     expect(result.rejected, result.summary).toBeUndefined();
     expect((result.data as { route: { runs: Array<{ inline: Array<{ type: string }> }> } }).route.runs[0]?.inline).toEqual([
-      { type: 'valve', componentId: 'pcf:E-1:2' },
+      { type: 'valve', componentId: 'pcf:E-1:2', valveType: 'valveGate' },
     ]);
     const stem = Object.values(result.document.plant?.piping?.runs ?? {})[0]?.inline?.[0]?.stemDirection;
     expect(stem).toEqual([0, 1, 0]);
@@ -63,6 +63,34 @@ describe('files written by other tools', () => {
     expect(refused.rejected).toBe(true);
     expect(refused.error?.code).toBe('RTE_SPEC_NO_COMPONENT');
     expect(refused.document).toBe(base);
+  });
+
+  it('valveTypes gives single valves their own type (by bare or full id), the others take valveType; an unknown key is refused', () => {
+    const valve = (id: number, a: string, b: string): string =>
+      `VALVE\n    COMPONENT-IDENTIFIER ${id}\n    END-POINT ${a} 100 BW\n    END-POINT ${b} 100 BW\n`;
+    const body =
+      pipe(1, '0.0 0.0 0.0', '1000.0 0.0 0.0') +
+      valve(2, '1000.0 0.0 0.0', '1300.0 0.0 0.0') +
+      pipe(3, '1300.0 0.0 0.0', '2500.0 0.0 0.0') +
+      valve(4, '2500.0 0.0 0.0', '2800.0 0.0 0.0') +
+      pipe(5, '2800.0 0.0 0.0', '3800.0 0.0 0.0');
+    const mixed = route(body, { valveType: 'valveGlobe', valveTypes: { '2': 'valveGate', 'pcf:E-1:4': 'valveGate' } });
+    expect(mixed.rejected, mixed.summary).toBeUndefined();
+    const inline = (mixed.data as { route: { runs: Array<{ inline: Array<{ componentId: string; valveType: string }> }> } }).route.runs[0]
+      ?.inline;
+    expect(inline?.map((item) => [item.componentId, item.valveType])).toEqual([
+      ['pcf:E-1:2', 'valveGate'],
+      ['pcf:E-1:4', 'valveGate'],
+    ]);
+    const onlyOne = route(body, { valveType: 'valveGate', valveTypes: { '4': 'valveGlobe' } });
+    expect(onlyOne.rejected).toBe(true);
+    expect(onlyOne.error?.code).toBe('RTE_SPEC_NO_COMPONENT');
+    const unknown = route(body, { valveTypes: { '9': 'valveBall', '3': 'valveBall' } });
+    expect(unknown.rejected).toBe(true);
+    expect(unknown.error?.code).toBe('ISO_PARAM_INVALID');
+    expect(unknown.summary).toContain('3, 9');
+    expect(unknown.document).toBe(base);
+    expect(execute(base, 'import_pcf', { text: HEADER + body, valveTypes: { '2': 'valveBall' } }).rejected).toBe(true);
   });
 
   it('a field-fit weld (SKEY WF) and a shop weld (SKEY WW): the first is stored as a field-fit weld, the second is derived', () => {
@@ -104,7 +132,7 @@ describe('branches', () => {
     expect(refusedOlet.error?.ids).toEqual(['pcf:E-1:2']);
   });
 
-  it('a reducer inside a branch is refused (the branch end port takes the branch size)', () => {
+  it('a reducer inside an open-ended branch is rebuilt (the branch is routed at its start size, the reducer inserted after it)', () => {
     const line = cs150Line(100, '9101');
     const a = addTie(line.doc, 'RA', [0, 0, 1000], [1, 0, 0], { endType: 'BW' });
     let doc: CadDocument = apply(a.doc, 'route_pipe', {
@@ -125,8 +153,10 @@ describe('branches', () => {
       data<{ files: Array<{ content: string }> }>(doc, 'export_pcf', { lineIds: [line.lineId] }).files[0] as { content: string }
     ).content;
     expect(text).toContain('REDUCER-CONCENTRIC');
-    const result = expectRefusal(cs150Document(), 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
-    expect(result.summary).toContain('reducer inside a branch');
+    const result = execute(cs150Document(), 'import_pcf', { text, as: 'route', spec: 'CS150' });
+    expect(result.rejected, result.summary).toBeUndefined();
+    const runs = (result.data as { route: { runs: Array<{ parent: string | null; inline: Array<{ type: string }> }> } }).route.runs;
+    expect(runs.map((run) => run.inline.map((item) => item.type))).toEqual([[], ['reducer']]);
   });
 
   it('a flanged valve without flanges and a valve set missing its far flange are refused', () => {
