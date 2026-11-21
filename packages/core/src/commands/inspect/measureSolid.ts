@@ -51,7 +51,7 @@ export const measureBoundingBox = defineCommand({
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     "Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d], bounds:'exact'|'conservative' }. Does not modify the document. " +
     'Entity rotation and the sweep angle of a partly turned profile are applied (the AABB wraps the actual geometry). ' +
-    "Under the exact OCC kernel a kernel result, extrusion, revolution, sweep, loft, cone, torus, wedge or pyramid is measured on its exact shape as placed (the tight box, data.bounds 'exact'); a box, cylinder or sphere is always exact (its closed-form box is tight at any rotation); otherwise (no kernel, meshes, instances, 2D shapes, cone / torus / kernel kinds without a kernel) the box wraps the rotated geometry and may exceed it: data.bounds 'conservative' (also when any entity of a combined box is).",
+    "Under the exact OCC kernel a kernel result or an extruded, turned, swept or lofted solid, cone, torus, wedge or pyramid is measured on its exact shape as placed (the tight box, data.bounds 'exact'); a box, cylinder or sphere is always exact (its closed-form box is tight at any rotation); otherwise (no kernel, meshes, instances, 2D shapes, cone / torus / kernel kinds without a kernel) the box wraps the rotated geometry and may exceed it: data.bounds 'conservative' (also when any entity of a combined box is).",
   params: z.object({
     entityId: z.string().optional().describe('Id of the entity whose bounding box to compute. Takes precedence over useSelection.'),
     useSelection: z
