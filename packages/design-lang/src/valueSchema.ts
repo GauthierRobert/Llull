@@ -8,11 +8,24 @@
 
 import type { ParamItemSpec } from '@core/commands/types';
 import { DesignError } from './errors';
-import { RefValue, type Value } from './valueEval';
+import { MAX_EVAL_STEPS, RefValue, type Value } from './valueEval';
 
 interface Site {
   readonly param: string;
   readonly line: number;
+  /** Elements still allowed in this coercion (a list shared by many places is copied into each). */
+  budget: number;
+}
+
+function spend(site: Site, count: number): void {
+  site.budget -= count;
+  if (site.budget < 0)
+    throw new DesignError(
+      'DESIGN_EVAL_LIMIT',
+      site.line,
+      `${site.param} expands to more than ${MAX_EVAL_STEPS} elements`,
+      'A value that repeats a long list is too large: share it by alias or shorten it.',
+    );
 }
 
 const kind = (value: Value): string =>
@@ -40,6 +53,7 @@ function isUntyped(spec: ParamItemSpec): boolean {
 }
 
 function fromRef(ref: RefValue, spec: ParamItemSpec, site: Site, path: string): unknown {
+  spend(site, ref.ids.length);
   if (spec.type === 'array') return [...ref.ids];
   if (spec.type === 'string' && spec.enum === undefined) {
     if (ref.group)
@@ -82,6 +96,7 @@ function fromObject(value: { readonly [key: string]: Value }, spec: ParamItemSpe
 }
 
 function coerce(value: Value, spec: ParamItemSpec, site: Site, path: string): unknown {
+  spend(site, 1);
   if (spec.anyOf !== undefined) {
     let first: DesignError | null = null;
     for (const branch of spec.anyOf) {
@@ -120,6 +135,7 @@ function coerce(value: Value, spec: ParamItemSpec, site: Site, path: string): un
 }
 
 function untyped(value: Value, site: Site, path: string): unknown {
+  spend(site, 1);
   if (Array.isArray(value)) return (value as readonly Value[]).map((item, k) => untyped(item, site, `${path}[${k}]`));
   if (value instanceof RefValue) return value.group ? [...value.ids] : value.ids[0];
   if (value !== null && typeof value === 'object')
@@ -131,5 +147,5 @@ function untyped(value: Value, site: Site, path: string): unknown {
 
 /** `value` as the JSON the param `param` (named in errors) takes under `spec`. */
 export function coerceValue(value: Value, spec: ParamItemSpec, param: string, line: number): unknown {
-  return coerce(value, spec, { param, line }, '');
+  return coerce(value, spec, { param, line, budget: MAX_EVAL_STEPS }, '');
 }

@@ -24,7 +24,7 @@ export class RefValue {
 }
 
 /** A module instance namespace (`fan` of `use "fan.lld" as fan`): `fan.blades` reads its exported alias. */
-export class NamespaceValue {
+class NamespaceValue {
   constructor(readonly path: string) {}
 }
 
@@ -53,6 +53,8 @@ export interface EvalHost {
 export const MAX_LIST_ITEMS = 100_000;
 /** Expression nodes evaluated by one value. */
 export const MAX_EVAL_STEPS = 2_000_000;
+/** Characters of one string value. */
+const MAX_STRING_LENGTH = 100_000;
 /** Nested user-function calls. */
 export const MAX_CALL_DEPTH = 64;
 
@@ -108,7 +110,10 @@ class Evaluator {
 
   private list(value: Value, what: string): readonly Value[] {
     if (Array.isArray(value)) return value as readonly Value[];
-    if (value instanceof RefValue) return value.ids.map((id) => new RefValue([id], false, null));
+    if (value instanceof RefValue) {
+      this.charge(value.ids.length);
+      return value.ids.map((id) => new RefValue([id], false, null));
+    }
     throw this.type(`${what} must be a list, got ${describe(value)}`);
   }
 
@@ -117,13 +122,29 @@ class Evaluator {
       throw this.error('DESIGN_LIST_LIMIT', `${what} would have ${count} items`, `A list holds at most ${MAX_LIST_ITEMS} items.`);
   }
 
-  eval(expr: Expr, scope: Scope | null, fnDepth: number): Value {
-    if (++this.steps > MAX_EVAL_STEPS)
+  /** One budget for steps and cells: building or walking `count` list items costs `count` steps. */
+  private charge(count: number): void {
+    this.steps += count;
+    if (this.steps > MAX_EVAL_STEPS)
       throw this.error(
         'DESIGN_EVAL_LIMIT',
         `the value needs more than ${MAX_EVAL_STEPS} evaluation steps`,
         'Simplify it or shorten its lists.',
       );
+  }
+
+  private checkText(text: string): string {
+    if (text.length > MAX_STRING_LENGTH)
+      throw this.error(
+        'DESIGN_EVAL_LIMIT',
+        `a string would have ${text.length} characters`,
+        `A string holds at most ${MAX_STRING_LENGTH} characters.`,
+      );
+    return text;
+  }
+
+  eval(expr: Expr, scope: Scope | null, fnDepth: number): Value {
+    this.charge(1);
     switch (expr.t) {
       case 'num':
       case 'str':
@@ -196,7 +217,7 @@ class Evaluator {
       return right;
     }
     const right = this.eval(expr.right, scope, fnDepth);
-    if (op === '+' && typeof left === 'string' && typeof right === 'string') return left + right;
+    if (op === '+' && typeof left === 'string' && typeof right === 'string') return this.checkText(left + right);
     if (op === '==' || op === '!=') {
       if ((typeof left === 'object' && left !== null) || (typeof right === 'object' && right !== null))
         throw this.type(`"${op}" compares numbers, strings and booleans, not ${describe(left)}`);
@@ -235,6 +256,7 @@ class Evaluator {
     const to = this.integer(this.eval(expr.to, scope, fnDepth), 'the end of a range');
     const end = expr.inclusive ? to + 1 : to;
     this.checkSize(Math.max(0, end - from), `the range ${from}..${expr.inclusive ? '' : '<'}${to}`);
+    this.charge(Math.max(0, end - from));
     return Array.from({ length: Math.max(0, end - from) }, (_, k) => from + k);
   }
 
@@ -270,7 +292,9 @@ class Evaluator {
     const items = base as readonly Value[];
     if (selector.t === 'range') {
       const [from, to] = this.bounds(selector, scope, fnDepth);
-      return pickSlice(items, label, from, to, selector.inclusive, this.host.line);
+      const slice = pickSlice(items, label, from, to, selector.inclusive, this.host.line);
+      this.charge(slice.length);
+      return slice;
     }
     return pickAt(items, label, this.number(this.eval(selector, scope, fnDepth), 'an index'), this.host.line);
   }
@@ -361,11 +385,14 @@ class Evaluator {
     switch (name) {
       case 'len':
         return typeof args[0] === 'string' ? args[0].length : this.list(args[0] as Value, 'the argument of len()').length;
-      case 'sum':
+      case 'sum': {
+        const items = this.list(args[0] as Value, 'the argument of sum()');
+        this.charge(items.length);
         return this.finite(
-          this.list(args[0] as Value, 'the argument of sum()').reduce<number>((total, v) => total + this.number(v, 'a summand'), 0),
+          items.reduce<number>((total, v) => total + this.number(v, 'a summand'), 0),
           'the sum',
         );
+      }
       case 'concat':
         return this.concat(args);
       case 'zip':
@@ -376,10 +403,12 @@ class Evaluator {
   }
 
   private concat(args: readonly Value[]): Value {
-    if (args.every((a) => typeof a === 'string')) return args.join('');
-    const out = args.flatMap((a) => this.list(a, 'an argument of concat()'));
-    this.checkSize(out.length, 'concat()');
-    return out;
+    if (args.every((a) => typeof a === 'string')) return this.checkText(args.join(''));
+    const lists = args.map((a) => this.list(a, 'an argument of concat()'));
+    const total = lists.reduce((n, l) => n + l.length, 0);
+    this.checkSize(total, 'concat()');
+    this.charge(total);
+    return lists.flat();
   }
 
   private zip(args: readonly Value[]): Value {
@@ -387,6 +416,8 @@ class Evaluator {
     const length = lists[0]?.length ?? 0;
     if (lists.some((l) => l.length !== length))
       throw this.type(`zip() needs lists of one length, got ${lists.map((l) => l.length).join(', ')}`, 'Slice them to one length.');
+    this.checkSize(length, 'zip()');
+    this.charge(length * lists.length);
     return Array.from({ length }, (_, k) => lists.map((l) => l[k] as Value));
   }
 
@@ -396,6 +427,7 @@ class Evaluator {
     const n = this.integer(args[2] as Value, 'the count of linspace()');
     if (n < 1) throw this.type(`linspace() needs a count of at least 1, got ${n}`);
     this.checkSize(n, 'linspace()');
+    this.charge(n);
     return Array.from({ length: n }, (_, k) => (k === n - 1 && n > 1 ? b : a + ((b - a) * k) / Math.max(1, n - 1)));
   }
 }

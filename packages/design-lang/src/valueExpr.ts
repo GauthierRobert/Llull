@@ -14,7 +14,7 @@
 import { DesignError } from './errors';
 import { MM_PER_UNIT } from '@core/model/units';
 import type { CadDocument } from '@core/model/types';
-import { ANGLE_PARAMS } from './units';
+import { ANGLE_PARAMS, siLengthUnit } from './units';
 
 export type Expr =
   | { readonly t: 'num'; readonly v: number }
@@ -39,6 +39,9 @@ const KEYWORDS: readonly string[] = ['for', 'in', 'if', 'then', 'else', 'let', '
 
 /** Parentheses / brackets / `if` / `let` nested deeper than this are refused instead of overflowing the call stack. */
 const MAX_EXPR_NESTING = 100;
+/** Operators / index / member steps in one value: a flat chain this long would overflow the evaluator's stack. */
+const MAX_EXPR_OPERATORS = 1000;
+const FORBIDDEN_KEYS: readonly string[] = ['__proto__', 'constructor', 'prototype'];
 
 interface Token {
   readonly kind: 'num' | 'id' | 'str' | 'op' | 'eof';
@@ -95,7 +98,7 @@ function tokenize(text: string, ctx: ParseContext): Token[] {
       throw fail(ctx, `unexpected character "${text.charAt(at)}" in "${text}"`);
     }
     const g = match.groups;
-    if (g['num'] !== undefined) tokens.push({ kind: 'num', text: g['num'], value: numberToken(g['num'], ctx), at: start });
+    if (g['num'] !== undefined) tokens.push({ kind: 'num', text: g['num'], value: 0, at: start });
     else if (g['id'] !== undefined) tokens.push({ kind: 'id', text: g['id'], value: 0, at: start });
     else if (g['str'] !== undefined) tokens.push({ kind: 'str', text: JSON.parse(g['str']) as string, value: 0, at: start });
     else tokens.push({ kind: 'op', text: g['op'] ?? '', value: 0, at: start });
@@ -107,9 +110,10 @@ function tokenize(text: string, ctx: ParseContext): Token[] {
 class Parser {
   private pos = 0;
   private depth = 0;
+  private operators = 0;
   constructor(
     private readonly tokens: readonly Token[],
-    private readonly ctx: ParseContext,
+    private ctx: ParseContext,
     private readonly source: string,
   ) {}
 
@@ -172,11 +176,17 @@ class Parser {
     });
   }
 
+  private countOperator(): void {
+    if (++this.operators > MAX_EXPR_OPERATORS)
+      throw fail(this.ctx, `more than ${MAX_EXPR_OPERATORS} operators in one value`, 'Split it with let, a function or a list.');
+  }
+
   private binary(next: () => Expr, ops: readonly string[]): Expr {
     let left = next();
     while (this.peek.kind === 'op' && ops.includes(this.peek.text)) {
       const op = this.peek.text;
       this.pos++;
+      this.countOperator();
       left = { t: 'bin', op, left, right: next() };
     }
     return left;
@@ -229,6 +239,7 @@ class Parser {
   private postfix(): Expr {
     let base = this.primary();
     for (;;) {
+      if (this.is('[') || (this.is('.') && this.tokens[this.pos + 1]?.kind === 'id')) this.countOperator();
       if (this.eat('[')) {
         const selector = this.nested(() => this.range());
         this.expect(']');
@@ -242,7 +253,7 @@ class Parser {
 
   private primary(): Expr {
     const t = this.peek;
-    if (t.kind === 'num') return this.advance({ t: 'num', v: t.value });
+    if (t.kind === 'num') return this.advance({ t: 'num', v: numberToken(t.text, this.ctx) });
     if (t.kind === 'str') return this.advance({ t: 'str', v: t.text });
     if (t.kind === 'id') return this.identifier(t);
     if (this.eat('(')) {
@@ -301,9 +312,22 @@ class Parser {
         if (this.is('}')) break;
         const t = this.peek;
         if (t.kind !== 'id' && t.kind !== 'str') throw fail(this.ctx, `expected a key, found "${t.text || 'end of value'}"`);
+        if (FORBIDDEN_KEYS.includes(t.text) || entries.some((e) => e.key === t.text))
+          throw fail(
+            this.ctx,
+            `${FORBIDDEN_KEYS.includes(t.text) ? 'reserved' : 'duplicate'} object key "${t.text}"`,
+            'Use each field name once.',
+          );
         this.pos++;
         this.expect(':');
+        const outer = this.ctx;
+        this.ctx = {
+          ...outer,
+          paramKey: outer.paramKey === null ? null : `${outer.paramKey}.${t.text}`,
+          units: siLengthUnit(t.text) ?? outer.units,
+        };
         entries.push({ key: t.text, value: this.expr() });
+        this.ctx = outer;
       } while (this.eat(','));
     this.expect('}');
     return { t: 'obj', entries };

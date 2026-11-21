@@ -6,7 +6,8 @@
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import { execute } from '@core/commands/registry';
 import { commandError, exportRefusal, noop, rejection, report } from '@core/commands/noop';
-import type { CommandResult } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import { stepIdSource } from '@lib/id';
 import { createEmptyDocument, type CadDocument, type FeatureStep } from '@core/model/types';
 import { MM_PER_UNIT } from '@core/model/units';
 import { attempt, DesignError, toCommandError } from './errors';
@@ -116,6 +117,15 @@ export const designSource = defineCommand({
     };
   },
 });
+
+/** The context of a scratch run: its own ids and no step, so an expansion inside another step never draws that step's ids or provenance. */
+function scratchContext(ctx: ExecutionContext | undefined): ExecutionContext | undefined {
+  if (ctx === undefined) return undefined;
+  const rest: Record<string, unknown> = { ...ctx };
+  delete rest['stepKey'];
+  delete rest['provenanceScope'];
+  return { ...(rest as unknown as ExecutionContext), ids: stepIdSource('expand') };
+}
 
 /** Header `units=` (validated), or null. */
 function headerUnits(statements: readonly Statement[]): CadDocument['units'] | null {
@@ -414,7 +424,7 @@ export const expandDesign = defineCommand({
       for (const [path, body] of Object.entries(modules ?? {})) files[normalizeModulePath(path, 0)] = body;
       const table = loadModules(statements, files);
       const sandbox = { ...createEmptyDocument(), units: doc.units, parameters: doc.parameters };
-      runDesign(prepareInputs(sandbox, statements, {}), statements, ctx, trace, table);
+      runDesign(prepareInputs(sandbox, statements, {}), statements, scratchContext(ctx), trace, table);
     });
     if (run instanceof DesignError) return designRejection(doc, 'expand_design', run);
     return report(doc, `expand_design: ${trace.length} command(s).`, { lines: trace, commands: trace.length });

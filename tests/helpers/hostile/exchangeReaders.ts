@@ -7,6 +7,9 @@ import { parseRecords } from '@lib/step21/records';
 import { summarizeStep21 } from '@lib/step21/summary';
 import { DesignError } from '@design/errors';
 import { parseDesign } from '@design/parse';
+import { buildValueExpr } from '@design/valueExpr';
+import { evaluateValue } from '@design/valueEval';
+import { coerceValue } from '@design/valueSchema';
 import { parseSurvey } from '@aec/civil/survey/surveyParse';
 import { fakeIgesText } from '../fakeXdeKernel';
 import { asText, repeated, type HostileReader } from './types';
@@ -140,6 +143,21 @@ const readDesign = (text: string): unknown => {
   }
 };
 
+/** The `.lld` value pipeline of apply_design / check_design / expand_design (text -> tree -> value -> JSON), without a kernel. */
+const readValue = (text: string): unknown => {
+  try {
+    const expr = buildValueExpr(text, { units: 'mm', paramKey: null, line: 1 });
+    const host = { line: 1, vars: {}, parameters: { w: 2 }, functions: new Map(), alias: () => undefined };
+    return { value: coerceValue(evaluateValue(expr, host), {}, 'value', 1) };
+  } catch (error) {
+    if (error instanceof DesignError) return { refusal: error.message };
+    throw error;
+  }
+};
+
+const doubling = (levels: number): string =>
+  `let a0 = "xxxxxxxxxx" in ${Array.from({ length: levels }, (_, k) => `let a${k + 1} = a${k} + a${k} in `).join('')}len(a${levels})`;
+
 const created = (result: unknown): boolean => (result as { affected: string[] }).affected.length > 0;
 
 export const EXCHANGE_READERS: readonly HostileReader[] = [
@@ -249,5 +267,34 @@ export const EXCHANGE_READERS: readonly HostileReader[] = [
     ],
     read: (input) => readDesign(asText(input)),
     accepts: (result) => Array.isArray(result),
+  },
+  {
+    name: 'design: value language (apply_design, check_design, expand_design)',
+    covers: [
+      'design-lang/src/valueExpr.ts:buildValueExpr',
+      'design-lang/src/valueEval.ts:evaluateValue',
+      'design-lang/src/valueSchema.ts:coerceValue',
+      'apply_design',
+      'check_design',
+      'expand_design',
+    ],
+    input: 'text',
+    build: (records) => `[for i in 0..<${records}: {k: i * w, s: "a" + "b"}]`,
+    nest: (depth) => `${'['.repeat(depth)}1${']'.repeat(depth)}`,
+    maxRecords: 1 << 12,
+    extra: [
+      { name: 'range-bodied comprehension', input: () => 'len([for i in 0..<3000: 0..<100000])' },
+      { name: 'zip bomb', input: () => '[for i in 0..<100000: zip(0..<100000, 0..<100000)][0][0]' },
+      { name: 'sum of a big list in a loop', input: () => 'let a = 0..<100000 in len([for i in 0..<20000: sum(a)])' },
+      { name: 'shared list repeated by coerce', input: () => 'let a = 0..<100000 in [for i in 0..<1000: a]' },
+      { name: 'string doubling', input: () => doubling(30) },
+      { name: 'flat operator chain', input: () => `1${'+1'.repeat(50_000)}` },
+      { name: 'flat index chain', input: () => `[[0]]${'[0]'.repeat(20_000)}` },
+      { name: 'reserved object key', input: () => '{__proto__: 1}' },
+      { name: 'duplicate object key', input: () => '{a: 1, a: 2}' },
+      { name: 'unknown names and calls', input: () => 'zzz(1, qqq.rrr[3])' },
+    ],
+    read: (input) => readValue(asText(input)),
+    accepts: (result) => Array.isArray((result as { value?: unknown }).value),
   },
 ];

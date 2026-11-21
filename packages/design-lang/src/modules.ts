@@ -33,9 +33,9 @@ export interface ModuleDef {
 /** Module path -> parsed module (reachable from the root design only). */
 export type ModuleTable = ReadonlyMap<string, ModuleDef>;
 
-export const MAX_MODULE_FILES = 64;
-export const MAX_MODULE_DEPTH = 8;
-export const MAX_MODULE_BYTES = 262_144;
+const MAX_MODULE_FILES = 64;
+const MAX_MODULE_DEPTH = 8;
+const MAX_MODULE_BYTES = 262_144;
 export const MAX_MODULE_INSTANCES = 256;
 
 const limit = (line: number, detail: string, fix: string): DesignError => new DesignError('DESIGN_MODULE_LIMIT', line, detail, fix);

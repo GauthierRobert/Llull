@@ -5,6 +5,7 @@
  * @failure duplicate or built-in name -> DESIGN_SYNTAX; a cycle -> DESIGN_FN_RECURSION naming it
  */
 
+import { BUILTIN_FUNCTIONS } from '@lib/expression';
 import type { CadDocument } from '@core/model/types';
 import { DesignError } from './errors';
 import type { Statement } from './parse';
@@ -56,4 +57,9 @@ function assertAcyclic(
     state.set(name, 'done');
   };
   for (const name of table.keys()) visit(name, []);
+}
+
+/** True when `text` calls a function the numeric expression parser does not know (a user function or a list built-in). */
+export function usesValueFunctions(text: string): boolean {
+  return [...text.matchAll(/([A-Za-z_]\w*)\s*\(/g)].some((m) => !Object.hasOwn(BUILTIN_FUNCTIONS, m[1] ?? ''));
 }

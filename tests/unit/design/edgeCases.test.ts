@@ -76,11 +76,11 @@ describe('union and untyped params', () => {
 
   it('untyped params read booleans, names, numbers, expressions, text and lists', () => {
     expect(bind('free=true').params['free']).toBe(true);
-    expect(bind('free=name').params['free']).toEqual(new NameRef('name', true, 'fake.free'));
+    expect(bind('free=name').params['free']).toEqual(new NameRef('name', true, 'fake.free', false, true));
     expect(bind('free=2*3').params['free']).toBe(6);
     expect(bind('free=w+1').params['free']).toEqual(new ExprRef('w+1'));
     expect(bind('free="t"').params['free']).toBe('t');
-    expect(bind('free=[1, x]').params['free']).toEqual([1, new NameRef('x', true, 'fake.free')]);
+    expect(bind('free=[1, x]').params['free']).toEqual([1, new NameRef('x', true, 'fake.free', false, true)]);
     expect(bind('flags=[1, "a"]').params['flags']).toEqual([1, 'a']);
   });
 
@@ -91,7 +91,7 @@ describe('union and untyped params', () => {
     expect(code(() => bind('mode=[1]'))).toBe('DESIGN_BAD_ENUM');
     expect(code(() => bind('plain.y=1'))).toBe('DESIGN_UNKNOWN_PARAM');
     expect(bind('plain.x=2').params['plain']).toEqual({ x: 2 });
-    expect(bind('record.L=80 record.H=w').params['record']).toEqual({ L: 80, H: new NameRef('w', true, 'fake.record.H') });
+    expect(bind('record.L=80 record.H=w').params['record']).toEqual({ L: 80, H: new NameRef('w', true, 'fake.record.H', false, true) });
   });
 });
 

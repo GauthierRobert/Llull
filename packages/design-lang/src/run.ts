@@ -18,8 +18,7 @@ import { AnchorRef, bindCommand, EXPRESSION_HELP, ExprRef, NameRef, ValueExprRef
 import { exactFacePoint, frameOf, placementDelta, sidePoint, type Frame } from './anchors';
 import { runCheck, type CheckResult, type CheckScope } from './checks';
 import { convertUnits } from './units';
-import { BUILTIN_FUNCTIONS } from '@lib/expression';
-import { buildFunctions } from './functions';
+import { buildFunctions, usesValueFunctions } from './functions';
 import { coerceValue } from './valueSchema';
 import { evaluateValue, RefValue, type FnDef } from './valueEval';
 import { buildValueExpr } from './valueExpr';
@@ -540,13 +539,8 @@ class DesignRunner implements ModuleHost {
     return coerceValue(evaluateValue(template.expr, host), template.spec, template.param, line);
   }
 
-  /** True when `text` calls a function the numeric expression parser does not know (a user function or a list built-in). */
-  private usesValueFunctions(text: string): boolean {
-    return [...text.matchAll(/([A-Za-z_]\w*)\s*\(/g)].some((m) => !Object.hasOwn(BUILTIN_FUNCTIONS, m[1] ?? ''));
-  }
-
   evaluate(text: string, env: Env, line: number): number {
-    if (this.usesValueFunctions(text)) {
+    if (usesValueFunctions(text)) {
       const expr = buildValueExpr(text, { units: this.doc.units, paramKey: null, line });
       const value = this.valueOf(new ValueExprRef(expr, { type: 'number' }, 'value'), env, line);
       return value as number;
