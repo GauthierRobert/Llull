@@ -158,8 +158,7 @@ function extent(shapes: readonly Shape[]): { min: Vec2; max: Vec2 } {
 }
 
 /**
- * The shapes of a VALID raw definition centred on the middle of their bounding box (`anchor` base: on the middle of their bottom edge, filling the box
- * height 0..2 x target[1]) and scaled uniformly to fit the half extents `target`.
+ * The shapes of a VALID raw definition centred on the middle of their bounding box (`anchor` base: on the middle of their bottom edge, y from 0 up to target[1]: the built-in half height of an actuator is its full height) and scaled uniformly to fit the half extents `target`.
  * @failure zero extent (a point, or a line of no length) -> the reason string
  */
 export function normalise(
@@ -172,10 +171,9 @@ export function normalise(
   const halfW = (max[0] - min[0]) / 2;
   const halfH = (max[1] - min[1]) / 2;
   if (!(halfW > 1e-9 || halfH > 1e-9)) return 'the graphics have no extent (a point or a degenerate line)';
-  const heightFit = anchor === 'base' ? 2 * target[1] : target[1];
   const scale = Math.min(
     halfW > 1e-9 ? target[0] / halfW : Infinity,
-    halfH > 1e-9 ? heightFit / (anchor === 'base' ? 2 * halfH : halfH) : Infinity,
+    halfH > 1e-9 ? target[1] / (anchor === 'base' ? 2 * halfH : halfH) : Infinity,
   );
   const cx = (min[0] + max[0]) / 2;
   const cy = anchor === 'base' ? min[1] : (min[1] + max[1]) / 2;
@@ -191,7 +189,7 @@ export function normalise(
 export function fitsBox(shapes: readonly Shape[], target: readonly [number, number], anchor: 'centre' | 'base' = 'centre'): boolean {
   const { min, max } = extent(shapes);
   const lowest = anchor === 'base' ? 0 : -target[1];
-  const highest = anchor === 'base' ? 2 * target[1] : target[1];
+  const highest = target[1];
   return (
     [min[0], max[0]].every((x) => Math.abs(x) <= target[0] + 1e-6) &&
     [min[1], max[1]].every((y) => y >= lowest - 1e-6 && y <= highest + 1e-6)

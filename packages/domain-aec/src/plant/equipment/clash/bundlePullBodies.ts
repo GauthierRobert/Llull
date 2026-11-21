@@ -2,8 +2,8 @@
  * The tube-bundle pull zone of removable-bundle exchangers (plant 03 EQP-FU2) as a keep-clear body of `check_clashes`, registered through
  * `industrial/clash/clashSources`. The bundle is pulled out of the front (stationary) end along the tube axis: the zone starts at the outer face of
  * the front tubesheet (the channel and cover are taken off first) and runs `bundlePullLength` (tube length + 1 m, the named default of `add_heat_exchanger`)
- * outward (downward for a vertical exchanger), as wide and as high as the shell. Anything that is not the exchanger itself and enters the zone is a `clearance` clash named by the exchanger.
- * @invariant pure, deterministic (element order); fixed-tubesheet exchangers (rear L, M, N) have no zone; units are the document units
+ * outward, as wide and as high as the shell. Anything that is not the exchanger itself and enters the zone is a `clearance` clash named by the exchanger.
+ * @invariant a vertical exchanger (front head at the bottom) has its bundle lifted out of the TOP: the zone starts at the rear end of the shell and runs `bundlePullLength` upward (named assumption, never through the floor); pure, deterministic (element order); fixed-tubesheet exchangers (rear L, M, N) have no zone; units are the document units
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -29,7 +29,7 @@ export function bundlePullBodies(doc: CadDocument): ExternalBody[] {
         id: element.id,
         kind: 'clearance',
         box: {
-          center: toWorld(element, level, axisPoint(geometry, face - pull / 2)),
+          center: toWorld(element, level, axisPoint(geometry, vertical ? geometry.shellTo + pull / 2 : face - pull / 2)),
           axes: [directionToWorld(element, [1, 0, 0]), directionToWorld(element, [0, 1, 0]), [0, 0, 1]],
           half: vertical ? [geometry.outerRadius, geometry.outerRadius, pull / 2] : [pull / 2, geometry.outerRadius, geometry.outerRadius],
         },

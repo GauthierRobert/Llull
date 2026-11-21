@@ -63,6 +63,16 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
     }
     return undefined;
   };
+  const kettleOf = (template: Record<string, unknown>): void => {
+    (template['tema'] as Record<string, unknown>)['shell'] = 'K';
+    template['kettle'] = {
+      enlargedInsideDiameter: 900,
+      enlargedLength: 2000,
+      transitionLength: 300,
+      enlargedThickness: 10,
+      weirHeight: 500,
+    };
+  };
   const tubes = (template: Record<string, unknown>): Record<string, unknown> => template['tubes'] as Record<string, unknown>;
   const side = (template: Record<string, unknown>): Record<string, unknown> => template['design'] as Record<string, unknown>;
   const shell = (template: Record<string, unknown>): Record<string, unknown> => side(template)['shellSide'] as Record<string, unknown>;
@@ -116,6 +126,51 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
       'equipment-1',
       (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['tema'] as Record<string, unknown>)['shell'] = 'K'),
       /kettle is required for the shell letter K/,
+    ],
+    [
+      'K shell whose enlarged cylinder is not larger',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['kettle'] as Record<string, unknown>)['enlargedInsideDiameter'] = 600;
+      },
+      /enlargedInsideDiameter must exceed shellInsideDiameter/,
+    ],
+    [
+      'K shell with a weir above the enlarged shell',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['kettle'] as Record<string, unknown>)['weirHeight'] = 900;
+      },
+      /weirHeight must be below/,
+    ],
+    [
+      'K shell whose enlarged length overruns the shell (restricted length negative)',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['kettle'] as Record<string, unknown>)['enlargedLength'] = 9000;
+      },
+      /leave no restricted cylinder/,
+    ],
+    [
+      'vertical K shell',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        t['orientation'] = 'vertical';
+      },
+      /kettle is horizontal only/,
+    ],
+    [
+      'K shell with a fixed-tubesheet rear',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['tema'] as Record<string, unknown>)['fixedTubesheet'] = true;
+      },
+      /removable-bundle rear/,
     ],
     [
       'K shell with an incomplete kettle',

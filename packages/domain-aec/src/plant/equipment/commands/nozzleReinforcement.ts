@@ -79,7 +79,19 @@ export const nozzleReinforcement = defineCommand({
       | { nozzles: readonly NozzleReinforcement[]; basis: object }
       | { refusal: { code: string; message: string; paths: readonly string[] } } =
       plant.template.kind === 'exchanger'
-        ? (({ nozzles, sides }) => ({ nozzles, basis: { sides } }))(exchangerReinforcement(plant.template, plant.nozzles, options))
+        ? (({ nozzles, sides }) => ({
+            nozzles,
+            basis: {
+              sides,
+              ...(plant.template.kind === 'exchanger' && plant.template.kettle !== undefined
+                ? {
+                    approximations: [
+                      'nozzles on the kettle cone (TEMA K transition): judged as a nozzle of the equivalent cylinder of the local inside diameter and the kettle wall; UG-33 / Appendix 1-5 cone rules are not applied',
+                    ],
+                  }
+                : {}),
+            },
+          }))(exchangerReinforcement(plant.template, plant.nozzles, options))
         : (() => {
             const vessel = vesselReinforcement(plant, options);
             return 'refusal' in vessel
