@@ -10,6 +10,8 @@ import { parseDesign } from '@design/parse';
 import { buildValueExpr } from '@design/valueExpr';
 import { evaluateValue } from '@design/valueEval';
 import { coerceValue } from '@design/valueSchema';
+import { loadModules } from '@design/modules';
+import { runDesign } from '@design/run';
 import { parseSurvey } from '@aec/civil/survey/surveyParse';
 import { fakeIgesText } from '../fakeXdeKernel';
 import { asText, repeated, type HostileReader } from './types';
@@ -158,6 +160,29 @@ const readValue = (text: string): unknown => {
 const doubling = (levels: number): string =>
   `let a0 = "xxxxxxxxxx" in ${Array.from({ length: levels }, (_, k) => `let a${k + 1} = a${k} + a${k} in `).join('')}len(a${levels})`;
 
+/** `{ source, files }` JSON through parse, module loading and a kernel-free run (add_box lines): a DesignError is the documented refusal. */
+const readModules = (text: string): unknown => {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== 'object' || parsed === null) return { refusal: 'not an object' };
+    const { source, files } = parsed as { source?: unknown; files?: unknown };
+    if (typeof source !== 'string' || typeof files !== 'object' || files === null) return { refusal: 'no source / files' };
+    const statements = parseDesign(source);
+    return runDesign(createEmptyDocument(), statements, undefined, undefined, loadModules(statements, files as Record<string, string>));
+  } catch (error) {
+    if (error instanceof DesignError || error instanceof SyntaxError) return { refusal: error.message };
+    throw error;
+  }
+};
+
+const BOX = 'module m() {\n  add_box b size=[1, 1, 1]\n  export b\n}\n';
+const moduleCase = (source: string, files: Record<string, string>): string => JSON.stringify({ source, files });
+const wide = (count: number): string =>
+  moduleCase(
+    Array.from({ length: count }, (_, k) => `use "w${k}.lld" as w${k}`).join('\n'),
+    Object.fromEntries(Array.from({ length: count }, (_, k) => [`w${k}.lld`, BOX])),
+  );
+
 const created = (result: unknown): boolean => (result as { affected: string[] }).affected.length > 0;
 
 export const EXCHANGE_READERS: readonly HostileReader[] = [
@@ -296,5 +321,83 @@ export const EXCHANGE_READERS: readonly HostileReader[] = [
     ],
     read: (input) => readValue(asText(input)),
     accepts: (result) => Array.isArray((result as { value?: unknown }).value),
+  },
+  {
+    name: 'design: run budget (nested loops, near-limit values; apply_design)',
+    covers: [],
+    input: 'text',
+    build: (records) => `for i in 0..${Math.min(records, 60) - 1} {\n  add_box b{i} size=[1, 1, 1]\n}\n`,
+    maxRecords: 60,
+    extra: [
+      {
+        name: 'nested empty loops',
+        input: () => 'for a in 0..999 {\n for b in 0..999 {\n for c in 0..999 {\n for d in 0..999 {\n }\n }\n }\n}\n',
+      },
+      {
+        name: 'many near-limit values',
+        input: () => Array.from({ length: 40 }, (_, k) => `add_box b${k} size=[len([for i in 0..<9000: sum(0..<90)]), 1, 1]`).join('\n'),
+      },
+    ],
+    read: (input) => {
+      try {
+        const statements = parseDesign(asText(input));
+        return runDesign(createEmptyDocument(), statements);
+      } catch (error) {
+        if (error instanceof DesignError) return { refusal: error.message };
+        throw error;
+      }
+    },
+    accepts: (result) => typeof (result as { commands?: number }).commands === 'number',
+  },
+  {
+    name: 'design: modules (loadModules, use ... as ..., apply_design)',
+    covers: ['design-lang/src/modules.ts:loadModules', 'design-lang/src/run.ts:runDesign'],
+    input: 'text',
+    build: (records) => wide(Math.min(records, 60)),
+    maxRecords: 1 << 8,
+    extra: [
+      {
+        name: 'import cycle',
+        input: () =>
+          moduleCase('use "a.lld" as a', {
+            'a.lld': 'module a() {\n  use "b.lld" as b\n}\n',
+            'b.lld': 'module b() {\n  use "a.lld" as a\n}\n',
+          }),
+      },
+      {
+        name: 'depth 9 chain',
+        input: () =>
+          moduleCase(
+            'use "m0.lld" as x',
+            Object.fromEntries(Array.from({ length: 10 }, (_, k) => [`m${k}.lld`, `module m${k}() {\n  use "m${k + 1}.lld" as x\n}\n`])),
+          ),
+      },
+      { name: '65 files', input: () => wide(65) },
+      { name: '300 KB module', input: () => moduleCase('use "big.lld" as b', { 'big.lld': `module big() {\n}\n${'#'.repeat(300_000)}` }) },
+      {
+        name: 'multibyte module over the byte limit',
+        input: () => moduleCase('use "big.lld" as b', { 'big.lld': `module big() {\n}\n# ${'é'.repeat(140_000)}` }),
+      },
+      { name: 'NUL path', input: () => moduleCase('use "a\\u0000.lld" as a', {}) },
+      { name: 'backslash path', input: () => moduleCase('use "a\\\\b.lld" as a', {}) },
+      { name: 'drive-letter path', input: () => moduleCase('use "C:/x.lld" as a', {}) },
+      {
+        name: 'diamond ladder (2^20 instances)',
+        input: () =>
+          moduleCase(
+            'use "d0.lld" as d',
+            Object.fromEntries(
+              Array.from({ length: 21 }, (_, k) => [
+                `d${k}.lld`,
+                k === 20 ? BOX : `module d${k}() {\n  use "d${k + 1}.lld" as l\n  use "d${k + 1}.lld" as r\n}\n`,
+              ]),
+            ),
+          ),
+      },
+      { name: 'many unclosed modules', input: () => moduleCase('use "u.lld" as u', { 'u.lld': 'module u() {\n'.repeat(5000) }) },
+      { name: 'not JSON', input: () => 'use' },
+    ],
+    read: (input) => readModules(asText(input)),
+    accepts: (result) => typeof (result as { commands?: number }).commands === 'number',
   },
 ];

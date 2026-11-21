@@ -23,8 +23,9 @@ import { coerceValue } from './valueSchema';
 import { evaluateValue, RefValue, type FnDef } from './valueEval';
 import { buildValueExpr } from './valueExpr';
 import { splitAliasRef, selectIds } from './aliasRef';
-import { lineRecords, metaHint } from './aliasBinding';
-import { runModule, type ModuleHost, type ModuleInstance, type ModuleScope } from './moduleRun';
+import { anchorHintText, lineRecords, metaHint } from './aliasBinding';
+import { RunBudget } from './budget';
+import { assertFreeName, runModule, type ModuleHost, type ModuleInstance, type ModuleScope } from './moduleRun';
 import type { ModuleTable } from './modules';
 
 type CommandStatement = Extract<Statement, { kind: 'command' }>;
@@ -119,6 +120,7 @@ class DesignRunner implements ModuleHost {
   scope: ModuleScope = { prefix: '', overlay: {}, file: null };
   readonly instances: ModuleInstance[] = [];
   readonly layered = new Set<string>();
+  private readonly budget = new RunBudget();
   /** Entity id -> the line (and alias) that consumed it. */
   private readonly consumed = new Map<string, { line: number; by: string | null }>();
   private readonly bound = new Map<Statement, BoundCommand>();
@@ -207,10 +209,12 @@ class DesignRunner implements ModuleHost {
 
   private bounds(statement: Extract<Statement, { kind: 'for' }>, env: Env): { from: number; to: number } {
     const { line } = statement;
+    this.budget.spend(1, line);
     const from = this.evaluate(convertUnits(statement.from, this.doc, null, line), env, line);
     const to = this.evaluate(convertUnits(statement.to, this.doc, null, line), env, line);
-    if (!Number.isInteger(from) || !Number.isInteger(to))
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to))
       throw new DesignError('DESIGN_BAD_VALUE', line, `loop bounds ${from}..${to} are not integers`, 'Use integer bounds, e.g. 0..n-1.');
+    this.budget.spend(Math.max(0, to - from + 1), line);
     if (to - from + 1 > MAX_ITERATIONS)
       throw new DesignError(
         'DESIGN_LOOP_LIMIT',
@@ -313,12 +317,7 @@ class DesignRunner implements ModuleHost {
 
   /** Why an anchored line may miss its face: the anchor is a bounding-box side, not an exact face. */
   private anchorHint(): string | null {
-    if (this.approximateAnchors.length === 0) return null;
-    return (
-      `${this.approximateAnchors.join(', ')} is the centre of a side of the bounding box (this kernel has no exact faces), which ` +
-      'can miss the face: anchor on the part that owns the face (wall.top rather than body.top), give the point yourself ' +
-      '(face.near=[x, y, z]), or use the OCC kernel (LLULL_KERNEL=occt).'
-    );
+    return anchorHintText(this.approximateAnchors);
   }
 
   /** "Did you mean <alias>?" when a step failed and a plain name in its params is close to a bound alias. */
@@ -385,6 +384,7 @@ class DesignRunner implements ModuleHost {
         'Drop the alias ("_") and refer to what it made by its name, e.g. materialName="steel".',
       );
     const name = this.scope.prefix + alias;
+    if (this.instances.length > 0) assertFreeName(this, name, line, false);
     this.aliases.set(name, { ids, geometry, entities, line, frame: null });
     for (const id of geometry) this.aliasOf.set(id, name);
   }
@@ -531,6 +531,7 @@ class DesignRunner implements ModuleHost {
     const host = {
       line,
       vars: env,
+      budget: this.budget,
       parameters: this.parameterValues(),
       functions: this.functions,
       alias: (name: string, member: 'entity' | 'entities' | null): RefValue | undefined => this.aliasValue(name, member, line),
@@ -540,6 +541,7 @@ class DesignRunner implements ModuleHost {
   }
 
   evaluate(text: string, env: Env, line: number): number {
+    this.budget.spend(1, line);
     if (usesValueFunctions(text)) {
       const expr = buildValueExpr(text, { units: this.doc.units, paramKey: null, line });
       const value = this.valueOf(new ValueExprRef(expr, { type: 'number' }, 'value'), env, line);

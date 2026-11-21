@@ -4,7 +4,8 @@
  * `key=@text:path/to/part.lld` -> the file's UTF-8 text (`apply_design source=@text:part.lld`).
  */
 
-import { dirname, join } from 'node:path';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, join, sep } from 'node:path';
 
 const IMAGE_REF_PREFIX = '@img:';
 const TEXT_REF_PREFIX = '@text:';
@@ -41,6 +42,8 @@ export function resolveFileRefs(params: unknown, readBytes: (path: string) => Bu
 const USE_LINE = /^[ \t]*use[ \t]+"([^"\n]+)"/gm;
 /** Same limit as the design language (`MAX_MODULE_FILES`): more files are left for the pure side to refuse. */
 const MAX_MODULE_FILES = 64;
+/** A module file larger than this (4 x the 256 KB the language accepts, UTF-8 can be 4 bytes a character) is not read. */
+const MAX_MODULE_FILE_BYTES = 4 * 262_144;
 
 /** The key a module path is stored under (`./a//b.lld` -> `a/b.lld`), or null when it could leave the design folder (the design language refuses it by name). */
 function moduleKey(path: string): string | null {
@@ -51,16 +54,21 @@ function moduleKey(path: string): string | null {
 
 /**
  * `apply_design` / `expand_design` with `source=@text:dir/part.lld`: the module files its `use "x.lld"` lines name (transitively, relative to
- * the folder of the design file) added as `modules` { path: text }, so commands stay pure. Unreadable or unsafe paths are left out: the
+ * the folder of the design file) added as `modules` { path: text }, so commands stay pure. Unreadable, oversized or unsafe paths (including symlinks leaving the folder) are left out: the
  * command refuses them by name (DESIGN_MODULE_NOT_FOUND / DESIGN_MODULE_PATH). An explicit `modules` param is kept as is.
  */
-export function withModuleFiles(name: string, raw: unknown, resolved: unknown, readBytes: (path: string) => Buffer): unknown {
+export function withModuleFiles(name: string, raw: unknown, resolved: unknown): unknown {
   if (name !== 'apply_design' && name !== 'expand_design') return resolved;
   if (typeof raw !== 'object' || raw === null || typeof resolved !== 'object' || resolved === null) return resolved;
   const reference = (raw as Record<string, unknown>)['source'];
   const params = resolved as Record<string, unknown>;
   if (typeof reference !== 'string' || !reference.startsWith(TEXT_REF_PREFIX) || params['modules'] !== undefined) return resolved;
-  const root = dirname(reference.slice(TEXT_REF_PREFIX.length));
+  let root: string;
+  try {
+    root = realpathSync(dirname(reference.slice(TEXT_REF_PREFIX.length)));
+  } catch {
+    return resolved;
+  }
   const files: Record<string, string> = {};
   const queue = [String(params['source'] ?? '')];
   for (let text = queue.shift(); text !== undefined; text = queue.shift()) {
@@ -68,7 +76,9 @@ export function withModuleFiles(name: string, raw: unknown, resolved: unknown, r
       const key = moduleKey(match[1] ?? '');
       if (key === null || key in files || Object.keys(files).length >= MAX_MODULE_FILES) continue;
       try {
-        files[key] = readBytes(join(root, key)).toString('utf8');
+        const real = realpathSync(join(root, key));
+        if (!real.startsWith(root + sep) || statSync(real).size > MAX_MODULE_FILE_BYTES) continue;
+        files[key] = readFileSync(real, 'utf8');
         queue.push(files[key]);
       } catch {
         continue;

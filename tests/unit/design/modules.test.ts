@@ -13,11 +13,8 @@ import type { CommandResult } from '@core/commands/types';
 import { sha256Hex } from '@lib/sha256';
 
 const dir = new URL('../../../docs/design/08-assembly-scale/validation/plans/target_v2_modules/', import.meta.url);
-/** The plan without what later milestones build: connection groups (M3) and the geometry-dependent `check max`. */
-const plan = (file: string): string =>
-  readFileSync(new URL(file, dir), 'utf8')
-    .replace(/^\s*add_connection_group.*$/gm, '')
-    .replace(/^check max.*$/gm, '');
+/** The plan without its geometry-dependent `check max` (the fan blade tip is 356 mm on this plan, not 867.5). */
+const plan = (file: string): string => readFileSync(new URL(file, dir), 'utf8').replace(/^check max.*$/gm, '');
 
 beforeAll(async () => {
   setGeometryKernel(await createManifoldKernel());
@@ -48,6 +45,7 @@ describe('engine plan (VC-ASC-18)', () => {
 
   it('runs on the Manifold kernel as ONE design_source step with the modules embedded', () => {
     expect(result.error).toBeUndefined();
+    expect(Object.keys(doc.prototype?.connections ?? {}).length).toBe(3);
     expect(doc.featureHistory.map((s) => s.name)).toEqual(['design_source']);
     const embedded = (doc.featureHistory[0]?.params as { modules: { path: string; sha256: string; text: string }[] }).modules;
     expect(embedded.map((m) => m.path)).toEqual(['fan.lld', 'stage.lld']);
@@ -106,7 +104,7 @@ describe('engine plan (VC-ASC-18)', () => {
   it('expand_design reports the module file of each line, with namespaced aliases', () => {
     const r = execute(doc, 'expand_design', {});
     const lines = (r.data as { lines: { alias: string | null; file: string | null }[] }).lines;
-    expect(lines.some((l) => l.file === null)).toBe(false);
+    expect(lines.some((l) => l.file === null)).toBe(true);
     expect(lines.filter((l) => l.file === 'fan.lld').map((l) => l.alias)).toContain('fan.disk');
     expect(lines.filter((l) => l.file === 'stage.lld')).not.toHaveLength(0);
   });
@@ -256,5 +254,53 @@ describe('refusals by name', () => {
     expect(code(expand({ '/abs.lld': POST }))).toBe('DESIGN_MODULE_PATH');
     expect(code(expand())).toBe('DESIGN_MODULE_NOT_FOUND');
     expect(expand({ 'post.lld': POST }).error).toBeUndefined();
+  });
+
+  it('a bare alias may not reuse a namespace, nor a namespace an alias', () => {
+    refused(`${USE_POST}add_box p size=[1, 1, 1]`, { 'post.lld': POST }, 'MODULE_NAMESPACE');
+    refused('add_box p size=[1, 1, 1]\nuse "post.lld" as p', { 'post.lld': POST }, 'MODULE_NAMESPACE');
+    expect(apply('add_box a size=[1, 1, 1]\nadd_box a size=[2, 1, 1]').error).toBeUndefined();
+  });
+
+  it('module size is counted in UTF-8 bytes', () => {
+    const multibyte = `module big() {\n}\n# ${'é'.repeat(140_000)}`;
+    expect(multibyte.length).toBeLessThan(262_144);
+    refused('use "big.lld" as b', { 'big.lld': multibyte }, 'MODULE_LIMIT');
+  });
+
+  it('diamond imports load each file once', () => {
+    const files = {
+      'top.lld': 'module top() {\n  use "l.lld" as l\n  use "r.lld" as r\n}\n',
+      'l.lld': 'module l() {\n  use "base.lld" as b\n}\n',
+      'r.lld': 'module r() {\n  use "base.lld" as b\n}\n',
+      'base.lld': 'module base() {\n  add_box x size=[1, 1, 1]\n  export x\n}\n',
+    };
+    const r = apply('use "top.lld" as t', files);
+    expect(r.error).toBeUndefined();
+    expect((r.data as { modules: unknown[] }).modules).toHaveLength(4);
+    const names = (r.data as { moduleInstances: { ns: string }[] }).moduleInstances.map((i) => i.ns);
+    expect(names).toEqual(expect.arrayContaining(['t.l.b', 't.r.b']));
+  });
+
+  it('export_design returns the embedded module files', () => {
+    const doc = apply(USE_POST, { 'post.lld': POST }).document;
+    const r = execute(doc, 'export_design', {});
+    expect(r.error).toBeUndefined();
+    expect((r.data as { modules: { path: string; text: string }[] }).modules).toEqual([{ path: 'post.lld', text: POST }]);
+    expect(r.summary).toContain('1 module file(s)');
+    const plain = execute(apply('add_box b size=[1, 1, 1]').document, 'export_design', {});
+    expect((plain.data as { modules: unknown[] }).modules).toEqual([]);
+  });
+});
+
+describe('run budget', () => {
+  it('refuses nested empty loops and many near-limit values by name, with the line', () => {
+    const loops = apply('for a in 0..999 {\n  for b in 0..999 {\n    for c in 0..999 {\n    }\n  }\n}\nadd_box x size=[1, 1, 1]');
+    expect(code(loops)).toBe('DESIGN_EVAL_LIMIT');
+    expect(loops.error?.paths?.[0]).toMatch(/^line \d/);
+    const value = 'len([for i in 0..<9000: sum(0..<90)])';
+    const many = Array.from({ length: 12 }, (_, k) => `add_box b${k} size=[${value}, 1, 1]`).join('\n');
+    expect(code(apply(many))).toBe('DESIGN_EVAL_LIMIT');
+    expect(apply(`add_box one size=[${value}, 1, 1]`).error).toBeUndefined();
   });
 });

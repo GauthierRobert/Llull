@@ -57,6 +57,6 @@ Each FR maps to at least one VC: FR-01→01, 02→02, 03→03/04, 04→05, 05→
 | [`plans/bladed_disk.lld`](plans/bladed_disk.lld) | yes | timing baseline for M1 |
 | [`plans/alias_arity.lld`](plans/alias_arity.lld) | yes (check fails today, as designed) | arity bug reproducer |
 | [`plans/fidelity.lld`](plans/fidelity.lld) | yes | bounding box and ruled loft reproducers |
-| [`plans/target_v2_modules/`](plans/target_v2_modules/) | yes, minus `add_connection_group` (M3), by `tests/unit/design/modules.test.ts` | target syntax for modules, functions, comprehensions, `.entity`, connection groups |
+| [`plans/target_v2_modules/`](plans/target_v2_modules/) | yes (minus its geometry-dependent `check max`), by `tests/unit/design/modules.test.ts` | target syntax for modules, functions, comprehensions, `.entity`, connection groups |
 
 Expected values are indexed in [`expected_results.json`](expected_results.json); sources in [`sources.md`](sources.md).

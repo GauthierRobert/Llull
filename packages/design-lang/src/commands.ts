@@ -364,7 +364,7 @@ export const checkDesign = defineCommand({
 export const exportDesign = defineCommand({
   name: 'export_design',
   description:
-    "Return the document's design source (.lld) verbatim: data { text, fileName } (CLI: --save part.lld). Behind the export gate like " +
+    "Return the document's design source (.lld) verbatim: data { text, fileName, modules[]: { path, text } } (CLI: --save part.lld; the embedded module files are written next to it). Behind the export gate like " +
     'every export (an export-controlled document needs a human confirmation).',
   params: z.object({ confirmExportControlled }),
   annotations: { readOnly: true },
@@ -380,7 +380,12 @@ export const exportDesign = defineCommand({
       );
     const source = sourceOf(step);
     const name = /^\s*design\s+([A-Za-z_]\w*)/m.exec(source)?.[1] ?? 'design';
-    return report(doc, `export_design: ${source.split('\n').length} line(s).`, { text: source, fileName: `${name}.lld` });
+    const modules = embeddedOf(step).map((m) => ({ path: m.path, text: m.text }));
+    return report(
+      doc,
+      `export_design: ${source.split('\n').length} line(s)${modules.length > 0 ? `, ${modules.length} module file(s)` : ''}.`,
+      { text: source, fileName: `${name}.lld`, modules },
+    );
   },
 });
 

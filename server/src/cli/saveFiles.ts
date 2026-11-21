@@ -74,6 +74,17 @@ function relativeParts(name: string): string[] {
   return parts.length > 0 ? parts : [path.basename(name)];
 }
 
+/** Module files of `data.modules` ([{ path, text }], export_design) as output files; none when absent. */
+function moduleFilesOf(data: unknown): OutputFile[] {
+  const modules = isRecord(data) ? data['modules'] : undefined;
+  if (!Array.isArray(modules)) return [];
+  return modules
+    .filter(isRecord)
+    .flatMap((m) =>
+      typeof m['path'] === 'string' && typeof m['text'] === 'string' ? [{ name: m['path'], bytes: Buffer.from(m['text'], 'utf8') }] : [],
+    );
+}
+
 export interface SavedFile {
   readonly path: string;
   readonly bytes: number;
@@ -138,12 +149,16 @@ export function saveDataFiles(data: unknown, target: string, exportDir?: string)
   const targetIsDirectory = files.length > 1 || target.endsWith('/') || (fs.existsSync(target) && fs.statSync(target).isDirectory());
   if (targetIsDirectory) fs.mkdirSync(target, { recursive: true });
   else fs.mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
-  return files.map((file, index) => {
-    const filePath = targetIsDirectory ? path.join(target, ...relativeParts(file.name ?? `file-${index + 1}`)) : target;
+  const write = (file: OutputFile, filePath: string): SavedFile => {
     fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
     fs.writeFileSync(filePath, file.bytes);
     return { path: filePath, bytes: file.bytes.length };
-  });
+  };
+  const saved = files.map((file, index) =>
+    write(file, targetIsDirectory ? path.join(target, ...relativeParts(file.name ?? `file-${index + 1}`)) : target),
+  );
+  const base = targetIsDirectory ? target : path.dirname(target);
+  return [...saved, ...moduleFilesOf(data).map((file) => write(file, path.join(base, ...relativeParts(file.name ?? 'module.lld'))))];
 }
 
 /** `data` with file payloads replaced by a short marker: the agent keeps the metadata, not megabytes of text. */
@@ -155,7 +170,7 @@ export function withoutPayloads(data: unknown): unknown {
     Object.entries(data).map(([key, value]) =>
       payloadKeys.has(key) && typeof value === 'string'
         ? [key, `<${value.length} chars, saved>`]
-        : [key, key === 'files' ? withoutPayloads(value) : value],
+        : [key, key === 'modules' && Array.isArray(value) ? value.map(withoutPayloads) : key === 'files' ? withoutPayloads(value) : value],
     ),
   );
 }

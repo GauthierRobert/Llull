@@ -47,8 +47,9 @@ function usesOf(statements: readonly Statement[]): UseStatement[] {
 
 /** The single module of a module file's statements (the file holds nothing else). */
 function moduleOf(path: string, text: string): ModuleDef {
-  if (text.length > MAX_MODULE_BYTES)
-    throw limit(0, `module ${path} is ${text.length} characters (limit ${MAX_MODULE_BYTES})`, 'Split it into smaller modules.');
+  const bytes = new TextEncoder().encode(text).length;
+  if (bytes > MAX_MODULE_BYTES)
+    throw limit(0, `module ${path} is ${bytes} bytes (limit ${MAX_MODULE_BYTES})`, 'Split it into smaller modules.');
   let statements: Statement[];
   try {
     statements = parseDesign(text);
@@ -83,6 +84,7 @@ export function loadModules(root: readonly Statement[], files: Readonly<Record<s
     );
   const table = new Map<string, ModuleDef>();
   const done = new Set<string>();
+  const started = new Set<string>();
   const visit = (use: UseStatement, stack: readonly string[]): void => {
     const { path, line } = use;
     if (stack.includes(path))
@@ -111,7 +113,8 @@ export function loadModules(root: readonly Statement[], files: Readonly<Record<s
           : 'Pass its text in `modules` { "path": text } (the CLI reads `use` files next to the @text: source).',
       );
     }
-    if (table.size >= MAX_MODULE_FILES) throw limit(line, `more than ${MAX_MODULE_FILES} module files`, 'Merge small modules.');
+    if (started.size >= MAX_MODULE_FILES) throw limit(line, `more than ${MAX_MODULE_FILES} module files`, 'Merge small modules.');
+    started.add(path);
     const def = moduleOf(path, text);
     for (const next of usesOf(def.body)) visit(next, [...stack, path]);
     table.set(path, def);

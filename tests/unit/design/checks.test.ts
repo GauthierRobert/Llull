@@ -131,7 +131,7 @@ describe('export_design', () => {
   it('returns the source verbatim, named after the design', () => {
     const source = 'design flange\n' + BLOCK;
     const r = execute(apply(source).document, 'export_design', {});
-    expect(r.data).toEqual({ text: source, fileName: 'flange.lld' });
+    expect(r.data).toEqual({ text: source, fileName: 'flange.lld', modules: [] });
     expect((execute(apply(BLOCK).document, 'export_design', {}).data as { fileName: string }).fileName).toBe('design.lld');
     expect(execute(createEmptyDocument(), 'export_design', {}).error?.code).toBe('DESIGN_NO_DESIGN');
   });

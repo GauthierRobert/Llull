@@ -556,7 +556,13 @@ host glue `server/src/cli/fileParams.ts` (`withModuleFiles`). Language reference
 - **Limits (named).** 64 files, 8 deep, 256 KB per file, 256 instances (`DESIGN_MODULE_LIMIT`); instances also count toward the 5000-command limit.
 - **Validation.** `tests/unit/design/modules.test.ts` runs `validation/plans/target_v2_modules/engine.lld` (+ `fan.lld`, `stage.lld`) on the Manifold kernel: VC-ASC-18 (modules `fan`, `hpc1`, `hpc2`
   namespaced, own layers and groups, aliases resolve) and VC-ASC-19 (`replay_history` without files gives the identical document; edited file then `apply_design` reports `DESIGN_MODULE_HASH_CHANGED`).
-  The plan runs minus two lines: `add_connection_group` (M3 command not built) and `check max of=fan.blades path=2` (the fan blade tip is 356 mm on this plan, not 867.5: a modeling matter of the plan).
-  The plan's `stage.lld` was corrected to supported syntax: `mod(i, 2)` instead of an `i mod 2` operator, and a closed casing profile (the zigzag alone was collinear).
+  The plan runs whole except `check max of=fan.blades path=2` (the fan blade tip is 356 mm on this plan, not 867.5: a modeling matter of the plan), which the test strips.
+  The plan was corrected to supported syntax: `mod(i, 2)` instead of an `i mod 2` operator, a closed casing profile (the zigzag alone was collinear), and valid
+  `add_connection_group` lines (`name`, `members={ids: concat(…)}` / `{patternOf: blades[0]}`, complete `detect`).
 - **Also changed.** A bare parameter / loop-variable name inside a nested list of a schema-less slot (`profile=[[45, 60], [hubR, 60]]`) now reads as its number (it was the string).
 - **Not built.** Cross-file `fn` sharing, string / bool module params, `check` inside modules, a CLI end-to-end test of `@text:` module discovery (the helper is unit-tested).
+- **Review round (run budget, host, export).** One `RunBudget` (`budget.ts`, 10,000,000 steps) is shared by every value evaluation of a run, charged per expression step,
+  list cell, loop iteration (and per `evaluate`): nested empty loops and many near-limit values give `DESIGN_EVAL_LIMIT` naming the line. Loop bounds must be safe integers (a 1e26 bound looped without advancing).
+  `expand_design`'s scratch context is pinned by a test that passes a caller `stepKey` / ids / provenance scope (goes red without it). Module size counts UTF-8 bytes; files being loaded count toward the 64-file
+  limit; an alias may not equal a module namespace (`DESIGN_MODULE_NAMESPACE`). `export_design` returns `data.modules [{ path, text }]` (the embedded copy) and CLI `--save` writes them next to the design.
+  `withModuleFiles` resolves real paths (a symlink leaving the design folder is skipped) and skips files over 1 MB before reading. Hostile readers: `design: modules` (cycle, depth, 65 files, 300 KB / multibyte, NUL / backslash / drive-letter paths, diamond ladder) and `design: run budget`.
