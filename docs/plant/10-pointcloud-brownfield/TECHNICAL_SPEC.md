@@ -752,25 +752,25 @@ Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_clo
 
 ### 13.3 Validation status
 
-| VC                                                              | Status                                                                                    | Test                                                                                    |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 01–05 E57 inventory, CRC, empty, encodings, pose                | pass                                                                                      | `solver/crates/llull-cloud/tests/e57.rs`; 02, 03 also `server/tests/scanImport.test.ts` |
-| 06–08 LAS / LAZ inventory, LAZ ≡ LAS, header bounds             | pass                                                                                      | `tests/las.rs`                                                                          |
-| 09 large coordinates (bit-exact through the asset)              | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (TS reader)                        |
-| 10 octree / LOD invariants, identical bytes                     | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts`                                    |
-| 11 proprietary refusal                                          | pass                                                                                      | `server/tests/scanImport.test.ts`, `tests/e57.rs`                                       |
-| 12 nearest on the coloured cube                                 | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (registry command)                 |
-| 20a–c cylinders within the CRLB tolerances                      | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
-| 21 DN snap                                                      | pass                                                                                      | `tests/unit/scan/extraction.test.ts`, `server/tests/scanNative.test.ts`                 |
-| 22 ELB-A centreline trace (2 straights, bend R / angle / PI, r) | pass                                                                                      | `tests/trace.rs`, `server/tests/scanNative.test.ts`                                     |
-| 23                                                              | not built (V1)                                                                            | —                                                                                       |
-| 24 slice circle                                                 | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
-| 30 ICP-A                                                        | pass (own seeded 70 % / σ 0.2 mm draw; the pack's numpy draw is not reproducible in Rust) | `tests/registration.rs`                                                                 |
-| 31 TGT-A                                                        | pass                                                                                      | `tests/registration.rs`, `server/tests/scanNative.test.ts`                              |
-| 32 degenerate registrations                                     | pass                                                                                      | `tests/registration.rs`, `tests/unit/scan/registration.test.ts`                         |
-| 40–43 C2M-A, DEV-A, 64-facet bound, CLH-A                       | pass                                                                                      | `tests/compare.rs`, `server/tests/scanNative.test.ts`                                   |
-| 50–52 codes, unverified propagation, review flags               | pass                                                                                      | `tests/unit/scan/*.test.ts`                                                             |
-| 60 (a) reproducibility, (b) GPU clash, (c) GPU deviation        | pass (a re-scoped, decision 1)                                                            | `tests/*.rs`, `tests/gpu_parity.rs`, `server/tests/scanNative.test.ts`                  |
+| VC                                                                | Status                                                                                    | Test                                                                                    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 01–05 E57 inventory, CRC, empty, encodings, pose                  | pass                                                                                      | `solver/crates/llull-cloud/tests/e57.rs`; 02, 03 also `server/tests/scanImport.test.ts` |
+| 06–08 LAS / LAZ inventory, LAZ ≡ LAS, header bounds               | pass                                                                                      | `tests/las.rs`                                                                          |
+| 09 large coordinates (bit-exact through the asset)                | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (TS reader)                        |
+| 10 octree / LOD invariants, identical bytes                       | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts`                                    |
+| 11 proprietary refusal                                            | pass                                                                                      | `server/tests/scanImport.test.ts`, `tests/e57.rs`                                       |
+| 12 nearest on the coloured cube                                   | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (registry command)                 |
+| 20a–c cylinders within the CRLB tolerances                        | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
+| 21 DN snap                                                        | pass                                                                                      | `tests/unit/scan/extraction.test.ts`, `server/tests/scanNative.test.ts`                 |
+| 22 ELB-A centreline trace (2 straights, bend R / angle / PI, r)   | pass                                                                                      | `tests/trace.rs`, `server/tests/scanNative.test.ts`                                     |
+| 23 STL-A steel section (IPE 300 first, h / b ±3 mm, axis, centre) | pass                                                                                      | `tests/steel.rs` (pack file), `tests/unit/scan/steelFit.test.ts`                        |
+| 24 slice circle                                                   | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
+| 30 ICP-A                                                          | pass (own seeded 70 % / σ 0.2 mm draw; the pack's numpy draw is not reproducible in Rust) | `tests/registration.rs`                                                                 |
+| 31 TGT-A                                                          | pass                                                                                      | `tests/registration.rs`, `server/tests/scanNative.test.ts`                              |
+| 32 degenerate registrations                                       | pass                                                                                      | `tests/registration.rs`, `tests/unit/scan/registration.test.ts`                         |
+| 40–43 C2M-A, DEV-A, 64-facet bound, CLH-A                         | pass                                                                                      | `tests/compare.rs`, `server/tests/scanNative.test.ts`                                   |
+| 50–52 codes, unverified propagation, review flags                 | pass                                                                                      | `tests/unit/scan/*.test.ts`                                                             |
+| 60 (a) reproducibility, (b) GPU clash, (c) GPU deviation          | pass (a re-scoped, decision 1)                                                            | `tests/*.rs`, `tests/gpu_parity.rs`, `server/tests/scanNative.test.ts`                  |
 
 ### 13.4 Open questions (§11) decided
 
@@ -911,13 +911,29 @@ timestamps, so the same document and assets give the same archive bytes (tested)
   usage, byte-reproducible packing of two real clouds (CYL-A, CLH-A), unpack into an empty store with the files equal to the source store's, re-unpack ("already there"),
   a bit flip inside the archive, a corrupted block at pack time.
 
+### 13.11 Steel member fit (SCN-V1d, 2026-11-21)
+
+`fit_steel_member` (read-only, toolset `scan`; `scan/steelFitCommand.ts`) runs the native op `steel` (`llull-cloud/src/fit/steel.rs`). The catalogue stays in
+TypeScript: the command sends the outer outline of every profile of `families` (default IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L; FL / RD only when named) in
+metres, and Rust does the numerics. Axis: the largest-variance direction of the region (sign fixed), or `axisHint` (needed for a member shorter than its section
+is deep; no face-plane refinement of the axis is built: PCA only). Section points are projected onto the plane through the centroid (stride subsample to 1 500
+points) and every outline is scored by RMS(min distance point to outline) with the outline centred on the 0.5 % / 99.5 % percentile box of the rotated points,
+over a roll search (coarse 5° on 300 points, golden section ±5° on all) for BOTH viewing directions (the unequal angle is chiral: the second direction reverses
+the axis, so every candidate carries `axisDirection`, `depthDirection`, `widthDirection` with width x depth = axis). A roll is tried only when the rotated extents are
+within 30 % of the outline's. h and b are the rotated extents of the best orientation. The command derives the `add_steel_member` roll from the depth direction with
+the sweep-frame convention (`shared/mesh.ts`) and returns `addSteelMember = { profile, start, end, roll }`. `tw` / `tf` are `null` with a reason (not resolvable
+from a scan below 10 sigma; STL-A does not gate them). Refusals: < 30 points `SCN_FIT_TOO_FEW_POINTS`, section under 1 cm `SCN_FIT_NO_MODEL`, no outline within the
+extent gate `SCN_STEEL_NO_MATCH`; a best score above the inlier band is a warning with the same code (built-up section). Not built: the commit of a steel extraction
+(`commit_asbuilt_extraction` takes pipes only; FR-SCN-15 "optionally create `add_steel_member`" is one `add_steel_member` call on the returned proposal), the
+`$fromStep` binding of plan SC-SCN-05. VC-SCN-23 on the pack file STL-A: IPE 300 first, h / b within 3 mm, axis within 0.26° (asserted), centre within 3 mm.
+
 ### 13.10 Left (V1 remainder, 2026-11-04)
 
 - **COPC export** (§6): not built. The `laz` crate encodes, but a COPC file needs a LAZ 1.4 writer with one variable-size chunk per octree node, the `copc` info VLR and a
   hierarchy EVLR, and the only reader that would prove it valid (PDAL, copc-lib, QGIS) is not available offline; a writer checked only by our own reader could ship files
   other tools reject. It stays a V1 item for a session with a reference reader. **E57 export**: not built (the `e57` crate has a writer, but there is no host surface yet:
   an export tool, its CLI verb and a round trip through an independent reader are one task).
-- `fit_steel_member` (FR-SCN-15, VC-SCN-23), batch extraction (VC-SCN-22 / 23 in parallel over many seeds), global registration (several stations), `commit_slice_geometry`,
+- batch extraction (VC-SCN-22 / 23 in parallel over many seeds), global registration (several stations), `commit_slice_geometry`,
   `llull scan gc`, `$fromStep` plan binding, ZIP64 / streamed archives for packs above 1 GiB.
 
 ## 12. References
