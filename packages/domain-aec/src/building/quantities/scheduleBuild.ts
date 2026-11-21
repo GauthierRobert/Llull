@@ -25,6 +25,7 @@ import {
   ladderScheduleRows,
   platformScheduleRows,
   railingScheduleRows,
+  radialStairScheduleRows,
   steelStairScheduleRows,
 } from '../../plant/structures/quantities/accessTakeoff';
 import { accessScheduleRows } from '../../plant/structures/quantities/accessSchedule';
@@ -51,6 +52,7 @@ export const SCHEDULE_KINDS = [
   'railing',
   'ladder',
   'stair_steel',
+  'stair_radial',
   'platform',
   'access',
 ] as const;
@@ -373,6 +375,11 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
           'Level',
         ],
         rows: steelStairScheduleRows(doc, building),
+      };
+    case 'stair_radial':
+      return {
+        columns: ['Mark', 'Form', 'Risers', 'Rise (mm)', 'Treads', 'Steel (kg)', 'Level'],
+        rows: radialStairScheduleRows(doc, building),
       };
     case 'connection':
       return {

@@ -96,6 +96,7 @@ export const addSpiralStair = defineCommand({
       tread: parts.value.tread,
       levelId: params.levelId,
       geometry,
+      sector: { innerRadius, outerRadius: params.outerRadius, treadAngle: params.treadAngle },
       defaulted,
       extra: {
         columnRadiusMm: round(profile.h / 2, 3),

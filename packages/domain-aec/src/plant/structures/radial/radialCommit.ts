@@ -9,11 +9,10 @@ import { commitBuilding } from '../../../building/evaluate/evaluateElements';
 import { findTwin, samePoint } from '../../../shared/duplicates';
 import { round } from '../../../shared/numeric';
 import { refuse } from '../codes';
-import type { RadialGeometry } from './radialLayout';
+import { MAX_RADIAL_RISERS, type RadialGeometry } from './radialLayout';
 import { radialQuantities } from './radialMeasure';
 
 const MAX_RISE_MM = 30_000;
-const MAX_RISERS = 200;
 
 export const RULES_NOTE =
   'No winder / spiral going, rise or walkline rule is cited in validation/sources.md (OSHA 1910.25 and ISO 14122-3 rows describe straight stairs only), so none is checked: the measures are reported, not judged.';
@@ -34,7 +33,8 @@ export function riseFor(doc: CadDocument, rise: number, riserMax: number, minimu
       ok: false,
       result: fail(`rise ${rise} with riserMax ${riserMax} gives ${riserCount} riser(s): this stair needs ${minimum}+`, ['riserMax']),
     };
-  if (riserCount > MAX_RISERS) return { ok: false, result: fail(`${riserCount} risers: check the units of rise / riserMax`, ['riserMax']) };
+  if (riserCount > MAX_RADIAL_RISERS)
+    return { ok: false, result: fail(`${riserCount} risers: check the units of rise / riserMax`, ['riserMax']) };
   return { ok: true, riseMm, riserCount, riserHeight: rise / riserCount };
 }
 
@@ -52,6 +52,7 @@ export interface RadialSetup {
   readonly tread: SteelStairTread;
   readonly levelId: string | undefined;
   readonly geometry: RadialGeometry;
+  readonly sector?: { innerRadius: number; outerRadius: number; treadAngle: number };
   readonly defaulted: string[];
   /** Form-specific result data and summary text. */
   readonly extra: Record<string, unknown>;
@@ -97,6 +98,7 @@ export function commitRadial(doc: CadDocument, setup: RadialSetup): CommandResul
       tread: setup.tread,
       plates: setup.geometry.plates,
       runs: setup.geometry.runs,
+      ...(setup.sector === undefined ? {} : { sector: setup.sector }),
     }),
   );
   const stairId = added.ids[0] as string;

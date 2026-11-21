@@ -37,7 +37,6 @@ import type { BuildingModel } from './types';
 type Element = BuildingModel['elements'][string];
 
 /** Categories exported as one product seeded by the element id, whenever the element's level is exported. */
-const SINGLE_PRODUCT: ReadonlySet<string> = new Set(['wall', 'column', 'beam', 'room', 'equipment', 'footing', 'assembly']);
 
 /** True when some consecutive pair of `points` (scaled to mm) has a sweep frame, i.e. `sweptSolids` writes a solid. */
 const sweeps = (points: ReadonlyArray<readonly [number, number, number]>, factor: number): boolean =>
@@ -112,6 +111,21 @@ function steelStairSeeds(doc: CadDocument, element: Extract<Element, { category:
   ];
 }
 
+function radialStairSeeds(doc: CadDocument, element: Extract<Element, { category: 'radialStair' }>): string[] {
+  if (findProfile(element.profile) === undefined || !(treadThickness(doc, element.tread) > 0)) return [];
+  const factor = toMm(doc, 1);
+  const sections = element.runs.flatMap((run, index) =>
+    sweepFrame(
+      [run.from[0] * factor, run.from[1] * factor, run.from[2] * factor],
+      [run.to[0] * factor, run.to[1] * factor, run.to[2] * factor],
+      0,
+    ) === null
+      ? []
+      : [partSeed(element.id, 'section', index + 1)],
+  );
+  return [element.id, ...sections, partSeed(element.id, 'flight', 1)];
+}
+
 function buildingStairSeeds(element: Extract<Element, { category: 'stair' }>): string[] {
   const flights = stairFlights(element);
   if (flights.length === 1) return [element.id];
@@ -142,8 +156,17 @@ function plateSeeds(doc: CadDocument, building: BuildingModel, element: Extract<
 export function seedsOf(doc: CadDocument, building: BuildingModel, element: Element, schema: IfcSchemaName): string[] {
   if ('levelId' in element && (building.levels[element.levelId] === undefined || !building.levelOrder.includes(element.levelId))) return [];
   const factor = toMm(doc, 1);
-  if (SINGLE_PRODUCT.has(element.category)) return [element.id];
   switch (element.category) {
+    case 'wall':
+    case 'column':
+    case 'beam':
+    case 'room':
+    case 'equipment':
+    case 'footing':
+    case 'assembly':
+      return [element.id];
+    case 'grid':
+      return [];
     case 'pipeSupport':
       return carrierOfSupport(doc, building, element) === undefined ? [] : [element.id];
     case 'door':
@@ -183,7 +206,12 @@ export function seedsOf(doc: CadDocument, building: BuildingModel, element: Elem
       return ladderSeeds(doc, element);
     case 'steelStair':
       return steelStairSeeds(doc, element);
+    case 'radialStair':
+      return radialStairSeeds(doc, element);
     default:
-      return [];
+      return noSeeds(element);
   }
 }
+
+/** A category of a hand-edited file that no case names: no products. The `never` parameter makes a new category without a case a type error. */
+const noSeeds = (_element: never): string[] => [];

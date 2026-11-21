@@ -18,7 +18,12 @@ interface RadialQuantities {
 
 export function radialQuantities(doc: CadDocument, stair: RadialStairElement): RadialQuantities {
   const metres = toMetres(doc, 1);
-  const treadAreaM2 = stair.plates.reduce((sum, plate) => sum + polygonArea([...plate.corners]), 0) * metres * metres;
+  const { sector } = stair;
+  const plateArea =
+    sector === undefined
+      ? stair.plates.reduce((sum, plate) => sum + polygonArea([...plate.corners]), 0)
+      : 0.5 * sector.treadAngle * (sector.outerRadius ** 2 - sector.innerRadius ** 2) * stair.plates.length;
+  const treadAreaM2 = plateArea * metres * metres;
   const sectionM =
     stair.runs.reduce((sum, run) => sum + Math.hypot(run.to[0] - run.from[0], run.to[1] - run.from[1], run.to[2] - run.from[2]), 0) *
     metres;

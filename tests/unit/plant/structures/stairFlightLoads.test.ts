@@ -35,7 +35,7 @@ const MASS = findGratingType(TYPE)?.massKgM2 ?? 0;
 const UPN = findProfile('UPN200')?.massPerMetre ?? 0;
 const LOAD = { imposedKPa: 3, source: 'project load schedule LS-12 rev B, stair treads and landings' };
 
-const frame = (beams = true): CadDocument => {
+const frame = (beams = true, turn?: string): CadDocument => {
   let doc = apply(createEmptyDocument(), 'set_units', { units: 'mm' });
   doc = apply(doc, 'add_level', { name: 'Grade', elevation: 0, height: 3000 });
   const level = Object.keys(doc.building?.levels ?? {})[0] as string;
@@ -49,7 +49,7 @@ const frame = (beams = true): CadDocument => {
     rise: 3000,
     riserMax: 180,
     going: 280,
-    landings: [{ afterRiser: 9, length: 1000 }],
+    landings: [{ afterRiser: 9, length: 1000, ...(turn === undefined ? {} : { turn }) }],
     tread: { kind: 'grating', gratingType: TYPE },
     levelId: level,
   });
@@ -104,5 +104,143 @@ describe('check_steel_members: stair flights carried to the beams', () => {
     const bad = execute(doc, 'check_steel_members', { stairLandingLoad: { imposedKPa: 3, source: ' ' } });
     expect(bad.document).toBe(doc);
     expect(bad.summary).toContain('stairLandingLoad');
+  });
+});
+
+describe('check_steel_members: stair flights, slab arrival, ties, turns and units', () => {
+  const straight = (beamXs: number[], unit: 'mm' | 'm' = 'mm', landings?: unknown[]): CadDocument => {
+    const k = unit === 'mm' ? 1 : 0.001;
+    let doc = apply(createEmptyDocument(), 'set_units', { units: unit });
+    doc = apply(doc, 'add_level', { name: 'Grade', elevation: 0, height: 3000 * k });
+    const level = Object.keys(doc.building?.levels ?? {})[0] as string;
+    doc = apply(doc, 'add_slab', {
+      boundary: [
+        [4400 * k, -1000 * k],
+        [6400 * k, -1000 * k],
+        [6400 * k, 1000 * k],
+        [4400 * k, 1000 * k],
+      ],
+      offset: 3000 * k,
+      thickness: 200 * k,
+      levelId: level,
+    });
+    for (const x of beamXs)
+      doc = apply(doc, 'add_steel_member', {
+        profile: 'IPE200',
+        role: 'beam',
+        start: [x * k, -900 * k, 2700 * k],
+        end: [x * k, 900 * k, 2700 * k],
+        levelId: level,
+      });
+    return apply(doc, 'add_steel_stair', {
+      start: [0, 0, 0],
+      angle: 0,
+      rise: 3000 * k,
+      riserMax: 180 * k,
+      going: 280 * k,
+      tread: { kind: 'grating', gratingType: TYPE },
+      ...(landings === undefined ? {} : { landings }),
+      levelId: level,
+    });
+  };
+
+  it('a stair arriving on a 200 mm slab carried by IPE beams loads those beams (band from the slab, not the tread) without a false warning', () => {
+    const result = check(straight([4550]), { stairLandingLoad: LOAD });
+    const [flight] = result.loads.stairFlights as [Flight];
+    expect([flight.endsOnBeams, flight.unsupportedEnds]).toEqual([2, 0]);
+    expect(flight.carriedDeadKn).toBeCloseTo(flight.deadKn / 2, 9);
+    expect(result.warnings.join(';')).not.toContain('bear on no beam');
+  });
+
+  it('a stringer end equidistant from two beams splits its load between them', () => {
+    const doc = straight([4430, 4530]);
+    const gains = check(doc, { stairLandingLoad: LOAD }).members.map((m, i) => ({ m, base: check(doc).members[i] }));
+    const gain = gains
+      .filter(({ m }) => m.role === 'beam')
+      .map(
+        ({ m, base }) =>
+          (m.forces?.reactionStart ?? 0) +
+          (m.forces?.reactionEnd ?? 0) -
+          (base?.forces?.reactionStart ?? 0) -
+          (base?.forces?.reactionEnd ?? 0),
+      );
+    expect(gain).toHaveLength(2);
+    expect(gain[0]).toBeGreaterThan(0);
+    expect(gain[0]).toBeCloseTo(gain[1] as number, 6);
+    const tied = check(doc, { stairLandingLoad: LOAD });
+    const [flight] = tied.loads.stairFlights as [Flight];
+    expect(flight.endsOnBeams).toBe(2);
+  });
+
+  it('a metre document gives the same flight loads as the millimetre one', () => {
+    const [mm] = check(straight([4550]), { stairLandingLoad: LOAD }).loads.stairFlights as [Flight];
+    const [metres] = check(straight([4550], 'm'), { stairLandingLoad: LOAD }).loads.stairFlights as [Flight];
+    expect(metres.deadKn).toBeCloseTo(mm.deadKn, 6);
+    expect(metres.carriedImposedKn).toBeCloseTo(mm.carriedImposedKn, 6);
+    expect(metres.endsOnBeams).toBe(2);
+  });
+
+  it('a quarter-turn landing adds the knuckle runs (2004.25 + 2h mm of UPN200) to the dead load of the flight it leaves', () => {
+    const turned = check(frame(), { stairLandingLoad: LOAD });
+    const [plain] = turned.loads.stairFlights as [Flight];
+    const [withKnuckle] = check(frame(true, 'quarter_left'), { stairLandingLoad: LOAD }).loads.stairFlights as [Flight];
+    expect(withKnuckle.deadKn - plain.deadKn).toBeCloseTo(((2004.25 + 2 * H) * UPN * G) / 1e6, 4);
+  });
+
+  it('warns for a first-flight foot on a slab with no beam, but not for one at the lowest level with nothing under it', () => {
+    const build = (z: number): Flight => {
+      let doc = apply(createEmptyDocument(), 'set_units', { units: 'mm' });
+      doc = apply(doc, 'add_level', { name: 'Grade', elevation: 0, height: 3000 });
+      const level = Object.keys(doc.building?.levels ?? {})[0] as string;
+      doc = apply(doc, 'add_slab', {
+        boundary: [
+          [4000, -1000],
+          [6000, -1000],
+          [6000, 1000],
+          [4000, 1000],
+        ],
+        offset: 3000,
+        levelId: level,
+      });
+      doc = apply(doc, 'add_steel_member', {
+        profile: 'IPE200',
+        role: 'beam',
+        start: [9000, -600, 100],
+        end: [9000, 600, 100],
+        levelId: level,
+      });
+      doc = apply(doc, 'add_steel_stair', { start: [4500, 0, z], angle: 0, rise: 1000, riserMax: 180, going: 280, levelId: level });
+      return (check(doc, { stairLandingLoad: LOAD }).loads.stairFlights as [Flight])[0];
+    };
+    expect(build(0).unsupportedEnds).toBe(2);
+    expect(build(3000).unsupportedEnds).toBe(4);
+  });
+
+  it('a stair arriving on a grating panel loads the beams under the panel (band from the bar depth)', () => {
+    let doc = apply(createEmptyDocument(), 'set_units', { units: 'mm' });
+    doc = apply(doc, 'add_level', { name: 'Grade', elevation: 0, height: 3000 });
+    const level = Object.keys(doc.building?.levels ?? {})[0] as string;
+    for (const x of [4450, 4650])
+      doc = apply(doc, 'add_steel_member', {
+        profile: 'IPE200',
+        role: 'beam',
+        start: [x, -900, 2865],
+        end: [x, 900, 2865],
+        levelId: level,
+      });
+    doc = apply(doc, 'add_grating', {
+      gratingType: TYPE,
+      bearingBarDirection: [1, 0],
+      supportedBy: 'beams',
+      bounds: [
+        [4450, -900],
+        [4650, 900],
+      ],
+      topOffset: 3000,
+      levelId: level,
+    });
+    doc = apply(doc, 'add_steel_stair', { start: [0, 0, 0], angle: 0, rise: 3000, riserMax: 180, going: 280, levelId: level });
+    const [flight] = check(doc, { stairLandingLoad: LOAD }).loads.stairFlights as [Flight];
+    expect([flight.endsOnBeams, flight.unsupportedEnds]).toEqual([2, 0]);
   });
 });

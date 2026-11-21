@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { RadialStairElement } from '@aec/building/types';
+import { defaultClassOfElement } from '@aec/plant/display/defaultMaterialClass';
 import { radialStairErrors } from '@aec/plant/structures/radial/radialValidate';
 import { winderWedge } from '@aec/plant/structures/radial/radialLayout';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
@@ -137,7 +138,8 @@ describe('add_spiral_stair', () => {
     const perTread = 0.5 * (900 ** 2 - 84.15 ** 2) * 3 * Math.sin((7.5 * Math.PI) / 180);
     expect(area(stair.plates[0]?.corners ?? [])).toBeCloseTo(perTread, 3);
     const info = result.data as Record<string, number>;
-    expect(info['treadAreaM2']).toBeCloseTo((16 * perTread) / 1e6, 4);
+    expect(info['treadAreaM2']).toBeCloseTo((16 * 0.5 * (Math.PI / 8) * (900 ** 2 - 84.15 ** 2)) / 1e6, 4);
+    expect(info['treadAreaM2']).toBeGreaterThan((16 * perTread) / 1e6);
     expect(info['totalTurnDeg']).toBe(360);
     expect(info['risePerTurnMm']).toBeCloseTo(16 * H, 2);
     expect(info['columnRadiusMm']).toBeCloseTo(84.15, 9);
@@ -193,5 +195,73 @@ describe('radial stair element validation (document load)', () => {
     });
     expect(errors).toHaveLength(7);
     expect(errors.join(' ')).toContain('plates must be treads');
+  });
+});
+
+describe('radial stairs: sector area, move, schedule, clash, material class, riser validation', () => {
+  const add = (name: string, params: Record<string, unknown>): CadDocument => {
+    const f = scene();
+    return apply(f.doc, name, { ...params, levelId: f.grade });
+  };
+
+  it('the spiral tread area is the exact sector 1/2 x angle x (R^2 - r^2), not the 10 degree chord polygon', () => {
+    const f = scene();
+    const info = ok(f.doc, 'add_spiral_stair', { ...SPIRAL, levelId: f.grade }).data as { treadAreaM2: number };
+    expect(info.treadAreaM2).toBeCloseTo((16 * 0.5 * (Math.PI / 8) * (900 ** 2 - 84.15 ** 2)) / 1e6, 4);
+  });
+
+  it('move_building_element shifts plates, runs, start and the evaluated meshes by the delta', () => {
+    for (const doc of [add('add_winder_stair', WINDER), add('add_spiral_stair', SPIRAL)]) {
+      const before = stairOf(doc);
+      const moved = apply(doc, 'move_building_element', { elementIds: ['radialStair-1'], delta: [1000, -250] });
+      const after = stairOf(moved);
+      expect(after.plates[0]?.corners[0]).toEqual([
+        (before.plates[0]?.corners[0]?.[0] as number) + 1000,
+        (before.plates[0]?.corners[0]?.[1] as number) - 250,
+      ]);
+      expect(after.runs[0]?.from).toEqual([
+        (before.runs[0]?.from[0] as number) + 1000,
+        (before.runs[0]?.from[1] as number) - 250,
+        before.runs[0]?.from[2],
+      ]);
+      expect(after.start).toEqual([before.start[0] + 1000, before.start[1] - 250, before.start[2]]);
+      expect(after.plates[0]?.top).toBe(before.plates[0]?.top);
+      const box = (d: CadDocument): number[] => {
+        const entity = Object.values(d.entities).find((e) => e.id === after.entityIds[0] || e.id === before.entityIds[0]);
+        const mesh = (entity as { mesh?: { positions: number[] } } | undefined)?.mesh;
+        return [mesh?.positions[0] ?? NaN, mesh?.positions[1] ?? NaN];
+      };
+      expect(box(moved)[0]).toBeCloseTo((box(doc)[0] as number) + 1000, 6);
+      expect(box(moved)[1]).toBeCloseTo((box(doc)[1] as number) - 250, 6);
+    }
+  });
+
+  it('building_schedule stair_radial lists mark, form, risers, rise, treads, steel and level', () => {
+    const doc = add('add_spiral_stair', SPIRAL);
+    const rows = data<{ rows: Array<Array<string | number>> }>(doc, 'building_schedule', { kind: 'stair_radial' }).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.slice(0, 5)).toEqual(['RS1', 'spiral', 17, 3000, 16]);
+  });
+
+  it('check_clashes sees the stair: a beam through the spiral column clashes with it', () => {
+    let doc = add('add_spiral_stair', SPIRAL);
+    doc = apply(doc, 'add_steel_member', { profile: 'IPE200', role: 'beam', start: [4000, 0, 1500], end: [6000, 0, 1500] });
+    const result = execute(doc, 'check_clashes', {});
+    expect(JSON.stringify(result.data)).toContain('radialStair-1');
+  });
+
+  it('the default material class is galvanized steel', () => {
+    expect(defaultClassOfElement(stairOf(add('add_winder_stair', WINDER)))).toBe('galvanized_steel');
+  });
+
+  it('load validation requires an integer riserCount in 2..200 and one tread per riser but the last, and a sane spiral sector', () => {
+    const stair = stairOf(add('add_spiral_stair', SPIRAL));
+    const raw = JSON.parse(JSON.stringify(stair)) as Record<string, unknown>;
+    expect(radialStairErrors('x', raw)).toEqual([]);
+    for (const riserCount of [2.5, 1e9, 1])
+      expect(radialStairErrors('x', { ...raw, riserCount }).join(' ')).toContain('riserCount must be an integer in 2..200');
+    expect(radialStairErrors('x', { ...raw, riserCount: 20 }).join(' ')).toContain('one tread per riser');
+    expect(radialStairErrors('x', { ...raw, sector: { innerRadius: 5, outerRadius: 1, treadAngle: 1 } }).join(' ')).toContain('sector');
+    expect(radialStairErrors('x', { ...raw, form: 'winder' }).join(' ')).toContain('sector');
   });
 });

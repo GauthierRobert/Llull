@@ -6,6 +6,9 @@
  */
 
 import type { Vec3 } from '@core/model/types';
+import { minOf } from '@lib/arrayExtrema';
+import { arrivalSurface, walkingSurfaces } from '../../plant/structures/ladder/ladderSurface';
+import { findGratingType } from '../../plant/structures/grating/gratingTypes';
 import { polygonArea, projectOntoSegment, type Point2 } from '@lib/polygon';
 import type { SteelStairElement } from '@aec/building/types';
 import { elementsOf } from '../../building/model';
@@ -51,6 +54,7 @@ interface FlightLoadResult {
 }
 
 const END_SHARE = 0.5;
+const TIE = 1e-6;
 
 const mmOf = (run: { readonly from: Vec3; readonly to: Vec3 }): number =>
   Math.hypot(run.to[0] - run.from[0], run.to[1] - run.from[1], run.to[2] - run.from[2]);
@@ -65,14 +69,22 @@ function bearOnBeam(
   loads: [number, number],
 ): boolean {
   const near = nearInPlan(beamsUnder(beams, top - thickness, top), [point], margin);
-  let best: { beam: BeamLoads; t: number; distance: number } | undefined;
-  for (const beam of near) {
-    const hit = projectOntoSegment(point, beam.a, beam.b);
-    if (best === undefined || hit.distance < best.distance) best = { beam, t: hit.t, distance: hit.distance };
-  }
-  if (best === undefined) return false;
-  addPointLoad(best.beam, best.t * best.beam.lengthM * 1000, loads[0], loads[1], true);
+  const hits = near.map((beam) => ({ beam, ...projectOntoSegment(point, beam.a, beam.b) }));
+  if (hits.length === 0) return false;
+  const nearest = minOf(hits.map((hit) => hit.distance));
+  const tied = hits.filter((hit) => hit.distance <= nearest + TIE);
+  for (const { beam, t } of tied) addPointLoad(beam, t * beam.lengthM * 1000, loads[0] / tied.length, loads[1] / tied.length, true);
   return true;
+}
+
+/** The slab or grating panel an end of the stair rests on (within 50 mm in height, 600 mm in plan), with its thickness / bar depth in mm. */
+function surfaceUnder(units: ModelUnits, point: Point2, topMm: number): { id: string; thicknessMm: number } | undefined {
+  const unit = 1 / units.toMm(1);
+  const found = arrivalSurface(walkingSurfaces(units.building), [point[0] * unit, point[1] * unit], topMm * unit, 50 * unit, 600 * unit);
+  const element = found === undefined ? undefined : units.building.elements[found.id];
+  if (element?.category === 'slab') return { id: element.id, thicknessMm: units.toMm(element.thickness) };
+  const type = element?.category === 'grating' ? findGratingType(element.gratingType) : undefined;
+  return element === undefined || type === undefined ? undefined : { id: element.id, thicknessMm: type.barDepthMm };
 }
 
 interface FlightContext {
@@ -115,15 +127,24 @@ function flightReport(context: FlightContext, index: number): StairFlightLoadRep
   let carried = 0;
   let onBeams = 0;
   let unsupported = 0;
+  const lowest = minOf(Object.values(units.building.levels).map((level) => units.elevationMm(level.id)));
   for (const end of ends) {
     const top = elevationMm(stair.levelId) + toMm(stair.start[2] + end.height);
+    const resting = end.riser === flight.firstRiser ? index === 0 : index === layout.flights.length - 1;
     for (const side of [offset, -offset]) {
       const [x, y] = framePoint(frame, layout.stations[end.riser - 1] as number, side);
+      const point: Point2 = [toMm(x), toMm(y)];
+      const surface = resting ? surfaceUnder(units, point, top) : undefined;
       const share = END_SHARE / 2;
-      if (bearOnBeam(beams, [toMm(x), toMm(y)], top, thickness, margin, [deadKn * share, imposedKn * share])) {
+      const bears = bearOnBeam(beams, point, top, surface === undefined ? thickness : surface.thicknessMm, margin, [
+        deadKn * share,
+        imposedKn * share,
+      ]);
+      if (bears) {
         carried += share;
         onBeams += 1;
-      } else if (index > 0 || end.riser !== flight.firstRiser) unsupported += 1;
+      } else if (!(end.riser === flight.firstRiser && index === 0 && (surface === undefined || Math.abs(top - lowest) <= 1)))
+        unsupported += 1;
     }
   }
   return {
@@ -142,7 +163,7 @@ function flightReport(context: FlightContext, index: number): StairFlightLoadRep
 
 /**
  * Flights of every steel stair as point loads on the beams under their stringer ends; nothing without a cited imposed load.
- * @invariant carried load = flight load x (stringer ends on a beam) / 4; the foot of the first flight is not warned (it may stand on grade)
+ * @invariant carried load = flight load x (stringer ends on a beam) / 4; the foot of the first flight is not warned when it is at the lowest level elevation or no slab / grating lies under it; an end bears on the beams under the slab / grating it rests on (its thickness sets the band), else under the tread; a tie splits the load
  */
 export function applyStairFlightLoads(
   units: ModelUnits,
