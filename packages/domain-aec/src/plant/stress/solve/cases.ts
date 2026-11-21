@@ -36,8 +36,11 @@ export function loadCaseProblems(
     names.add(loadCase.name);
     if (loadCase.method !== undefined && (loadCase.combine ?? []).length === 0)
       problems.push([`${path}.method`, `case ${loadCase.name}: method applies to a case with combine terms`]);
-    if (loadCase.method !== undefined && loadCase.method !== 'algebraic' && loadCase.type !== 'OCC')
-      problems.push([`${path}.method`, `${loadCase.type} case ${loadCase.name} combines algebraically; scalar and srss are for OCC cases`]);
+    if (loadCase.method !== undefined && loadCase.method !== 'algebraic' && loadCase.type !== 'OCC' && loadCase.type !== 'EXP')
+      problems.push([
+        `${path}.method`,
+        `${loadCase.type} case ${loadCase.name} is solved from primitives; scalar and srss are for OCC and EXP combinations`,
+      ]);
     if (loadCase.type === 'OCC' && loadCase.combine !== undefined) {
       if (loadCase.basic !== undefined)
         problems.push([`${path}.basic`, `OCC case ${loadCase.name} has combine terms; it has no primitive loads`]);

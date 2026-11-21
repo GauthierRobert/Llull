@@ -4,6 +4,7 @@
  */
 
 import { z } from '@core/commands/schema';
+import { nozzleRuleShape } from '../code/nozzleRule';
 import { RULE_SET_IDS } from '../code/ruleSets';
 
 const finite = z.number().refine(Number.isFinite, 'must be finite');
@@ -79,7 +80,7 @@ export const loadCaseSchema = z.object({
   method: z
     .enum(['algebraic', 'scalar', 'srss'])
     .describe(
-      'How an OCC case combines its terms: algebraic (default) adds the results with their factors and takes the code stress of the sum; scalar adds the code stresses of the terms (sum of |factor| x stress), e.g. S_L(SUS) + S_L(wind) of B31.3 302.3.6; srss takes the square root of the sum of the squares of the term stresses. EXP is always algebraic.',
+      'How an OCC or EXP case combines its terms: algebraic (default) adds the results with their factors and takes the code stress of the sum; scalar adds the code stresses of the terms (sum of |factor| x stress), e.g. S_L(SUS) + S_L(wind) of B31.3 302.3.6; srss takes the square root of the sum of the squares of the term stresses. An EXP case takes the same options: the terms are then separate expansion ranges (each solved case is read as a displacement range S_E from its own state, e.g. two independent thermal cases) whose S_E are added or root-sum-squared, at the element end stations; algebraic (default) subtracts the states first (OPE - SUS).',
     )
     .optional(),
 });
@@ -133,6 +134,7 @@ const SPRING_SERIES = z.string().min(1);
 export const MAX_SPRING_SIZES = 2000;
 export const MAX_SPRING_TABLES = 50;
 export const MAX_SPRINGS = 200;
+export const MAX_NOZZLE_LIMITS = 200;
 
 export const springSizeSchema = z
   .object({
@@ -213,6 +215,15 @@ export const componentSchema = z.object({
   padMm: positive.optional(),
 });
 
+/** The limit of one equipment nozzle (07 PST §5.9): the rule, the port it applies to, the pipe support or restraint holding the pipe at it, an optional frame axis. */
+export const nozzleLimitSchema = z.object({
+  id: z.string().min(1),
+  portId: z.string().min(1),
+  holderId: z.string().min(1),
+  frameX: vec3.optional(),
+  ...nozzleRuleShape,
+});
+
 const recordedSchema = z.object({
   inputHash: z.string().regex(/^[0-9a-f]{64}$/),
   resultHash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -255,6 +266,8 @@ export const stressModelSchema = z.object({
   seismic: z.array(accelerationSchema).max(9),
   springTables: z.array(springTableSchema).max(MAX_SPRING_TABLES),
   springs: z.array(springSelectionSchema).max(MAX_SPRINGS),
+  hotModulus: z.object({ materialId: z.string().min(1) }).optional(),
+  nozzleLimits: z.array(nozzleLimitSchema).max(MAX_NOZZLE_LIMITS).optional(),
   recorded: recordedSchema.optional(),
   approval: approvalSchema.optional(),
 });
@@ -274,4 +287,5 @@ export type StressAcceleration = z.infer<typeof accelerationSchema>;
 export type SpringTable = z.infer<typeof springTableSchema>;
 export type SpringSelection = z.infer<typeof springSelectionSchema>;
 export type StressForce = z.infer<typeof forceSchema>;
+export type NozzleLimit = z.infer<typeof nozzleLimitSchema>;
 export type RecordedResults = z.infer<typeof recordedSchema>;

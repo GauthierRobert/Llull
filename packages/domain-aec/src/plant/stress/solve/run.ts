@@ -6,6 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import type { BuiltModel } from '../model/build';
 import type { OperatingConditions, StressModel } from '../model/schema';
 import { loadCaseProblems } from './cases';
+import { hotModulusOf } from './hotModulus';
 import { solveWithContacts, type ContactOutcome, type GroundSpring } from './nonlinear';
 import { caseLoads } from './primitives';
 import { maxOf } from '@lib/arrayExtrema';
@@ -54,15 +55,18 @@ const DOF_NAMES = ['ux', 'uy', 'uz', 'rx', 'ry', 'rz'] as const;
 const RIGID_FACTOR = 1e4;
 
 /** The frame3d elements of the built model (nominal section at the stated Young's modulus; rigid components stiffened, elastic ones scaled by their stated factor). */
-export function frameElements(built: BuiltModel, conditions: OperatingConditions): FrameElement[] {
+export function frameElements(
+  built: BuiltModel,
+  conditions: OperatingConditions,
+  modulusMPa: number = conditions.material.youngsModulusMPa,
+): FrameElement[] {
   return built.layout.elements.map((element) => ({
     a: element.a,
     b: element.b,
     properties: pipeProperties(
       element.odMm,
       element.wallMm,
-      conditions.material.youngsModulusMPa *
-        (element.component === undefined ? 1 : element.component.rigid ? RIGID_FACTOR : element.component.stiffnessFactor),
+      modulusMPa * (element.component === undefined ? 1 : element.component.rigid ? RIGID_FACTOR : element.component.stiffnessFactor),
       conditions.material.poisson,
     ),
     ...(element.bend === undefined ? {} : { flexibility: element.bend.k }),
@@ -147,7 +151,17 @@ export function solveModel(
   const states = new Map<string, CaseState>();
   for (const loadCase of model.loadCases) {
     if (loadCase.type === 'EXP' || loadCase.combine !== undefined) continue;
-    const loads = caseLoads(doc, built, conditions, loadCase.name, loadCase.basic ?? [], model);
+    const hot = hotModulusOf(doc, model, conditions, loadCase);
+    if (hot !== null && !hot.ok)
+      return { ok: false, code: hot.code, message: `case ${loadCase.name}: ${hot.message}`, ids: [], paths: [hot.path] };
+    const caseFrame = hot === null ? frame : { nodes: frame.nodes, elements: frameElements(built, conditions, hot.modulusMPa) };
+    if (hot !== null)
+      warnings.push({
+        code: 'PST_HOT_MODULUS',
+        message: `case ${loadCase.name}: E = ${hot.modulusMPa.toFixed(0)} MPa at ${hot.tempC} degC instead of the stated ${conditions.material.youngsModulusMPa} MPa${hot.unverified.length > 0 ? ` (unverified: ${hot.unverified.join(', ')})` : ''}`,
+        ids: [],
+      });
+    const loads = caseLoads(doc, built, conditions, loadCase.name, loadCase.basic ?? [], model, hot === null ? undefined : hot.modulusMPa);
     if ('ok' in loads) return { ok: false, code: loads.code, message: loads.message, ids: [], paths: [loads.path] };
     if (loads.unverified.length > 0)
       warnings.push({
@@ -158,7 +172,7 @@ export function solveModel(
     const anchors = built.restraints.anchors.map((anchor) => ({ node: anchor.node, values: loads.prescribed.get(anchor.node) }));
     const { constantEffort, variable } = springSupports(built);
     const load = withHangerLoads(loads.load, constantEffort);
-    const solved = solveWithContacts(frame, anchors, built.restraints.contacts, load, undefined, variable);
+    const solved = solveWithContacts(caseFrame, anchors, built.restraints.contacts, load, undefined, variable);
     if (!solved.ok) {
       const named = solved.dofs.map((dof) => `${nodeId(dof.node)} ${DOF_NAMES[dof.dof]}`);
       return {
