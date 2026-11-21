@@ -120,10 +120,37 @@ describe('layout: quarter and half turns', () => {
     const outer = handrailPath(quarter, SIZES, -1);
     close(outer[9] ?? [], [3244.25, -404.25, 9 * (3000 / 17)]);
     const half = handrailPath({ ...base, landings: [{ afterRiser: 9, length: 1000, turn: 'half_left' }] }, SIZES, 1);
-    expect(half).toHaveLength(19);
-    close(half[9] ?? [], [3240, 404.25, 9 * (3000 / 17)]);
-    close(half[10] ?? [], [3240, 834 - 404.25, 9 * (3000 / 17)]);
-    close(half[11] ?? [], [2240, 834 - 404.25, 10 * (3000 / 17)]);
+    expect(half).toHaveLength(18);
+    // inner (left) rail of a left half turn only crosses the well at the near edge of the landing
+    close(half[8] ?? [], [2240, 404.25, 9 * (3000 / 17)]);
+    close(half[9] ?? [], [2240, 834 - 404.25, 9 * (3000 / 17)]);
+    close(half[10] ?? [], [2240, 834 - 404.25, 10 * (3000 / 17)]);
+    // outer (right) rail goes round the far edge
+    const outerHalf = handrailPath({ ...base, landings: [{ afterRiser: 9, length: 1000, turn: 'half_left' }] }, SIZES, -1);
+    expect(outerHalf).toHaveLength(19);
+    close(outerHalf[9] ?? [], [3240, -404.25, 9 * (3000 / 17)]);
+    close(outerHalf[10] ?? [], [3240, 834 + 404.25, 9 * (3000 / 17)]);
+  });
+
+  it('no rail vertex or segment midpoint lies strictly inside a landing walking rectangle', () => {
+    for (const turn of ['quarter_left', 'quarter_right', 'half_left', 'half_right'] as const) {
+      const stair = { ...base, landings: [{ afterRiser: 9, length: 1000, turn }] };
+      const plate = layoutSteelStair(stair, SIZES).landings[0];
+      const xs = (plate?.corners ?? []).map((c) => c[0]);
+      const ys = (plate?.corners ?? []).map((c) => c[1]);
+      const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+      for (const side of [1, -1] as const) {
+        const path = handrailPath(stair, SIZES, side);
+        const points = path.flatMap((p, i) =>
+          i === 0 ? [p] : [[(p[0] + (path[i - 1]?.[0] ?? 0)) / 2, (p[1] + (path[i - 1]?.[1] ?? 0)) / 2], p],
+        );
+        for (const [x, y] of points as number[][])
+          expect(
+            (x as number) > x0 + 1e-6 && (x as number) < x1 - 1e-6 && (y as number) > y0 + 1e-6 && (y as number) < y1 - 1e-6,
+            `${turn} ${side}: ${x}, ${y}`,
+          ).toBe(false);
+      }
+    }
   });
 });
 
@@ -224,10 +251,19 @@ describe('check_access on turned stairs', () => {
     const narrow = { width: 600, rulesets: ['osha_1910'] };
     const turned = add({ ...STAIR, ...narrow, landings: [{ afterRiser: 9, length: 700, turn: 'quarter_left' }] }).doc;
     const finding = checked(turned, ['osha_1910']).findings.find((item) => item['code'] === 'STA_STAIR_LANDING');
-    expect(finding).toMatchObject({ ruleId: 'OSHA-STR-LANDING', ids: ['steelStair-1'], measured: { value: 700 }, limit: { min: 762 } });
+    expect(finding).toMatchObject({ ruleId: 'OSHA-STR-LANDING', ids: ['steelStair-1'], measured: { value: 600 }, limit: { min: 762 } });
+    const halfTurn = add({ ...STAIR, ...narrow, landings: [{ afterRiser: 9, length: 700, turn: 'half_left' }] }).doc;
+    expect(checked(halfTurn, ['osha_1910']).findings.find((item) => item['code'] === 'STA_STAIR_LANDING')).toMatchObject({
+      measured: { value: 700 },
+    });
     const straight = add({ ...STAIR, ...narrow, landings: [{ afterRiser: 9, length: 700 }] }).doc;
     expect(checked(straight, ['osha_1910']).findings.map((item) => item['code'])).not.toContain('STA_STAIR_LANDING');
-    const long = add({ ...STAIR, ...narrow, landings: [{ afterRiser: 9, length: 800, turn: 'quarter_left' }] }).doc;
+    const long = add({
+      ...STAIR,
+      width: 800,
+      rulesets: ['osha_1910'],
+      landings: [{ afterRiser: 9, length: 800, turn: 'quarter_left' }],
+    }).doc;
     expect(checked(long, ['osha_1910']).findings.map((item) => item['code'])).not.toContain('STA_STAIR_LANDING');
     expect(checked(turned, ['osha_1910']).notEvaluated.map((row) => row.ruleId)).toContain('OSHA-STR-LANDING');
   });
@@ -267,6 +303,48 @@ describe('headroom over the turned flights', () => {
   });
 });
 
+describe('headroom under the stair own higher flights (switchback)', () => {
+  const switchback = (rise: number, riserMax: number): number | null => {
+    const { doc } = add({
+      ...STAIR,
+      rise,
+      riserMax,
+      landings: [
+        { afterRiser: Math.ceil(rise / riserMax / 3), length: 1000, turn: 'half_left' },
+        { afterRiser: 2 * Math.ceil(rise / riserMax / 3), length: 1000, turn: 'half_left' },
+      ],
+    });
+    const answer = data<{
+      stairHeadroom: Array<{ headroomMm: number | null; obstructionId: string | null }>;
+      findings: Array<{ code: string }>;
+    }>(doc, 'check_access', { rulesets: ['iso_14122'], include: ['stairs'] });
+    const report = answer.stairHeadroom[0];
+    expect(answer.findings.some((finding) => finding.code === 'STA_STAIR_HEADROOM')).toBe((report?.headroomMm ?? Infinity) < 2300);
+    if (report?.headroomMm !== null) expect(report?.obstructionId).toBe('steelStair-1');
+    return report?.headroomMm ?? null;
+  };
+
+  it('a short switchback fails: flight 3 is only 12 risers above flight 1', () => {
+    expect(switchback(3000, 180) as number).toBeLessThan(2300);
+  });
+
+  it('a tall switchback passes: 16 risers of 187.5 mm clear 2300 mm over flight 1', () => {
+    expect(switchback(4500, 190) as number).toBeGreaterThanOrEqual(2300);
+  });
+});
+
+describe('load validation of turning landings', () => {
+  it('refuses a landing with a turn shorter than the stair width, naming the field', () => {
+    const { doc } = add(turning('quarter_left'));
+    const broken = structuredClone(doc.building);
+    const element = broken?.elements['steelStair-1'] as unknown as { landings: Array<Record<string, unknown>> };
+    element.landings[0] = { ...element.landings[0], length: 500 };
+    expect(buildingErrors(broken).join(';')).toContain('landings[].length must be at least the stair width');
+    element.landings[0] = { afterRiser: 9, length: 500 };
+    expect(buildingErrors(broken)).toEqual([]);
+  });
+});
+
 describe('plan symbol, access graph and IFC of turned stairs', () => {
   it('the plan symbol draws one outline per footprint region and the landing plate; the arrow follows the last flight', () => {
     const { doc } = add(turning('quarter_left'));
@@ -300,6 +378,14 @@ describe('plan symbol, access graph and IFC of turned stairs', () => {
         ],
       }),
     ).toBe('USERDEFINED');
+    const { doc } = add({
+      ...STAIR,
+      landings: [
+        { afterRiser: 5, length: 1000, turn: 'half_left' },
+        { afterRiser: 12, length: 1000 },
+      ],
+    });
+    expect(data<{ ifc: string }>(doc, 'export_ifc', {}).ifc).toContain("'MULTI_FLIGHT_TURNING_STAIR'");
   });
 });
 

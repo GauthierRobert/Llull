@@ -17,7 +17,7 @@ interface StairMeasures {
   readonly pitchDeg: number;
   readonly blondel: number;
   readonly flightRise: number;
-  /** Shortest quarter / half-turn landing along the climb; null when the stair has none (straight landings are not judged). */
+  /** Shortest quarter / half-turn landing depth (a quarter turn: the lesser of length and width, the depth in both directions of travel); null when the stair has none (straight landings are not judged). */
   readonly turnLanding: number | null;
 }
 
@@ -50,7 +50,12 @@ function steelStairMeasures(doc: CadDocument, stair: SteelStairElement): StairMe
     pitchDeg: geometry.pitchDeg,
     blondel: geometry.blondel,
     flightRise: longestFlight * geometry.riser,
-    turnLanding: turns.length === 0 ? null : minOf(turns.map((landing) => toMm(doc, landing.length))),
+    turnLanding:
+      turns.length === 0
+        ? null
+        : minOf(
+            turns.map((landing) => toMm(doc, landing.turn?.startsWith('quarter') ? Math.min(landing.length, stair.width) : landing.length)),
+          ),
   };
 }
 
