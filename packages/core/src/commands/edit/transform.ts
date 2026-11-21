@@ -10,14 +10,26 @@ import { idPrefixOf, nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from '../limits';
 import { scaleGeometry } from '../../geometry/scaleGeometry';
 import { add3, isVec3, map3, scale3, sub3 } from '../../lib/vec3';
-import { applyMat3, eulerFromMat, matFromAxisAngle, matFromEulerXYZ, mulMat3, unitAxisOrNull } from '../../lib/axisRotation';
+import { applyMat3, eulerFromMat, matFromAxisAngle, type Mat3, matFromEulerXYZ, mulMat3, unitAxisOrNull } from '../../lib/axisRotation';
 import { replaceEntity } from '../entity/entityOps';
 import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
 import { toDegrees } from '../../lib/angle';
+import { arrayAsInstances } from './arrayInstances';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
 
 /** Smallest |angle| (radians) that still spreads array_polar copies apart. */
 const MIN_POLAR_ANGLE = 1e-9;
+
+const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+const arrayAsField = z
+  .enum(['copies', 'instances'])
+  .describe(
+    '"copies" (default): count-1 independent entity copies. "instances": one component (the source, or the source instance\'s component) ' +
+      'and count instances of it (instance 0 replaces the source, new ids in affected): cheap to render, edit the component once to change ' +
+      'all; a boolean accepts an instance as an operand. Needs a 3D solid or an instance as source (else ARRAY_SOURCE_NOT_SOLID).',
+  )
+  .optional();
 
 const arrayCountField = z.number().int().describe('Total number of instances including the original. Must be an integer >= 2.');
 
@@ -167,9 +179,10 @@ export function addCopies(
 }
 
 /**
- * @affects creates count-1 new copies of the source entity
+ * @affects creates count-1 new copies of the source entity (as: "instances": a component + count instances, see arrayInstances)
  * @invariant count >= 2; offset must be finite; each copy k gets position = original.position + k*offset
  * @failure missing id, count < 2, or offset not 3 finite numbers -> no-op, affected:[]
+ * @failure as instances on a non-solid source -> ARRAY_SOURCE_NOT_SOLID
  */
 export const arrayLinear = defineCommand({
   name: 'array_linear',
@@ -181,8 +194,9 @@ export const arrayLinear = defineCommand({
     id: z.string().describe('Id of the entity to array.'),
     count: arrayCountField,
     offset: looseVec3('World-space translation vector [dx, dy, dz] between consecutive instances. All components must be finite numbers.'),
+    as: arrayAsField,
   }),
-  run: (doc, { id, count, offset }): CommandResult => {
+  run: (doc, { id, count, offset, as = 'copies' }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `array_linear: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND)
@@ -191,6 +205,14 @@ export const arrayLinear = defineCommand({
       return noop(
         doc,
         `array_linear: offset must be 3 finite numbers [dx, dy, dz] (got [${(offset as readonly number[]).join(', ')}]); entity ${id} unchanged.`,
+      );
+    if (as === 'instances')
+      return arrayAsInstances(
+        doc,
+        'array_linear',
+        target,
+        Array.from({ length: count - 1 }, (_, i) => ({ turn: IDENTITY, shift: scale3(offset, i + 1) })),
+        `Linear array of ${target.kind} ${id} along [${offset.join(', ')}]`,
       );
     const { document, newIds } = addCopies(
       doc,
@@ -210,6 +232,7 @@ export const arrayLinear = defineCommand({
  * @affects creates count-1 new copies of the source entity arranged around an axis through center
  * @invariant count >= 2; copy k is the source rotated k*(angle/count) about the axis line (position and orientation)
  * @failure missing id, count < 2 or zero-length axis -> no-op, affected:[]
+ * @failure as instances on a non-solid source -> ARRAY_SOURCE_NOT_SOLID
  */
 export const arrayPolar = defineCommand({
   name: 'array_polar',
@@ -236,8 +259,9 @@ export const arrayPolar = defineCommand({
           'Defaults to 2*PI (full 360-degree circle). A partial angle (e.g. PI) fans the instances over that arc.',
       )
       .optional(),
+    as: arrayAsField,
   }),
-  run: (doc, { id, count, center, axis, angle = 2 * Math.PI }): CommandResult => {
+  run: (doc, { id, count, center, axis, angle = 2 * Math.PI, as = 'copies' }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `array_polar: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND)
@@ -259,6 +283,19 @@ export const arrayPolar = defineCommand({
     const offset = sub3(target.position, base);
     const oldMatrix = matFromEulerXYZ(target.rotation);
     const step = angle / count;
+    if (as === 'instances') {
+      const through: Vec3 = zAxis ? [center[0], center[1], 0] : center;
+      return arrayAsInstances(
+        doc,
+        'array_polar',
+        target,
+        Array.from({ length: count - 1 }, (_, i) => {
+          const turn = matFromAxisAngle(unitAxis, (i + 1) * step);
+          return { turn, shift: sub3(through, applyMat3(turn, through)) };
+        }),
+        `Polar array of ${target.kind} ${id} over ${toDegrees(angle).toFixed(1)}° about [${unitAxis.map((c) => +c.toFixed(6)).join(', ')}] through [${center.join(', ')}]`,
+      );
+    }
     const { document, newIds } = addCopies(
       doc,
       target,

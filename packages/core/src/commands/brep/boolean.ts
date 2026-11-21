@@ -12,7 +12,8 @@ import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
-import { meshLeafTriangles, operandRecipe } from '../../geometry/operandRecipe';
+import { meshLeafTriangles } from '../../geometry/operandRecipe';
+import { recipeOfPart } from '../../geometry/assemblyParts';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { KERNEL_MESH_LEAF_CAP } from '../kernelMeshGuard';
 import { noop } from '../noop';
@@ -84,14 +85,17 @@ function runBoolean(
   const flat = ids.find((_, i) => !is3D(operands[i] as Entity));
   if (flat !== undefined) return noop(doc, `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`);
   const instanced = ids.find((_, i) => (operands[i] as Entity).kind === 'instance');
-  if (instanced !== undefined)
-    return noop(doc, `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`);
+  if (instanced !== undefined && engine === 'mesh')
+    return noop(doc, `${opName}: entity '${instanced}' is a component instance; the mesh engine needs solids (use engine "kernel" or explode_instance).`);
   const [entA, ...toolEntities] = operands as [Entity, ...Entity[]];
-  const scans = [entA, ...toolEntities].map((entity) => ({ id: entity.id, triangles: meshLeafTriangles(recipeOf(entity)) }));
+  const scans = [entA, ...toolEntities].map((entity) => ({
+    id: entity.id,
+    triangles: entity.kind === 'instance' ? 0 : meshLeafTriangles(recipeOf(entity)),
+  }));
   const scanTotal = scans.reduce((sum, operand) => sum + operand.triangles, 0);
   const largest = scans.reduce((best, operand) => (operand.triangles > best.triangles ? operand : best));
   const bySize = engine === 'auto' && scanTotal > KERNEL_MESH_LEAF_CAP;
-  const viaMesh = engine === 'mesh' || bySize || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities]));
+  const viaMesh = instanced === undefined && (engine === 'mesh' || bySize || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities])));
   if (viaMesh) {
     const context = ctx ?? currentContext();
     const result = meshBoolean(doc, opName, op, a, tools, context.meshProcessing ?? null, context.meshAssets);
@@ -104,8 +108,12 @@ function runBoolean(
   }
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(opName));
-  const toolRecipe = balancedUnion(toolEntities.map((tool) => operandRecipe(kernel, tool)));
-  const recipe: ShapeRecipe = { op: 'boolean', boolean: op, a: operandRecipe(kernel, entA), b: toolRecipe };
+  const recipes = [entA, ...toolEntities].map((operand) => recipeOfPart(doc, kernel, operand));
+  const unbuildable = recipes.findIndex((recipe) => recipe === 'unbuildable');
+  if (unbuildable >= 0)
+    return noop(doc, `${opName}: instance '${ids[unbuildable]}' has no buildable solids (missing component, no 3D member or nesting too deep).`);
+  const [recipeA, ...toolRecipes] = recipes as ShapeRecipe[];
+  const recipe: ShapeRecipe = { op: 'boolean', boolean: op, a: recipeA as ShapeRecipe, b: balancedUnion(toolRecipes) };
   const result = evaluateRecipe(kernel, recipe);
   const b = toolLabel(tools);
   if (result === 'refused')
@@ -137,7 +145,7 @@ const SOLID_OPERANDS_NOTE =
 
 /**
  * @affects removes entities a and b; creates 1 mesh entity (a ∪ b, a − b or a ∩ b)
- * @invariant both a and b must be 3D solids; subtract keeps a − b
+ * @invariant both a and b must be 3D solids or component instances (kernel path: an instance expands to its unioned solids); subtract keeps a − b
  * @invariant kernel-optional: triangle-only operands or operands built on more than KERNEL_MESH_LEAF_CAP imported-mesh triangles in total (engine "auto", decided from the operands alone so replay is host-independent) or engine "mesh" use ctx.meshProcessing and need no kernel; the kernel path refuses without one
  * @failure triangle-only operands without a mesh engine -> MESH_ENGINE_UNSUPPORTED
  * @failure missing id, 2D operand, same id, kernel absent, empty result or kernel failure -> no-op, affected:[]
@@ -154,6 +162,7 @@ export const booleanOperation = defineCommand({
     'Triangle-only operands (imported meshes, mesh results with no exact shape) are always combined by the mesh engine under engine "auto" (default; decided from the operands alone, so replay does not depend on the host): ' +
     'the result stays a plain mesh with guaranteed-manifold output and no polyhedral B-rep; engine "kernel" forces the B-rep kernel, engine "mesh" forces the ' +
     'mesh engine (refuses MESH_ENGINE_UNSUPPORTED without one; non-manifold operands refuse MESH_NON_MANIFOLD). ' +
+    'A component instance is a valid operand on the kernel path: it is expanded through its transform to its solids (unioned) at the kernel boundary, and consumed. ' +
     SOLID_OPERANDS_NOTE,
   params: z.object({
     op: z.enum(['union', 'subtract', 'intersect']).describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),

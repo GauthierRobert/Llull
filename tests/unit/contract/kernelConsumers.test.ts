@@ -28,6 +28,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'evaluateRecipe',
   'operandRecipe',
   'collectParts', // geometry/assemblyParts
+  'recipeOfPart', // geometry/assemblyParts: an instance's solids as one recipe (boolean operands)
   'kernelContacts', // domain-cae corrosion/exactContacts: AABB contacts resolved through the kernel distance
   'openSolid', // geometry/pmiFeatures
   'createSolidLookup', // pmi/refresh

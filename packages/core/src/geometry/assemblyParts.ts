@@ -55,7 +55,8 @@ function instanceSolids(doc: CadDocument, instance: InstanceEntity, depth: numbe
   return solids;
 }
 
-function recipeOfPart(doc: CadDocument, kernel: GeometryKernel, entity: Entity): ShapeRecipe | 'unbuildable' {
+/** Recipe of an assembly part: a solid's own, an instance's solids unioned through its transform, or 'unbuildable'. */
+export function recipeOfPart(doc: CadDocument, kernel: GeometryKernel, entity: Entity): ShapeRecipe | 'unbuildable' {
   if (entity.kind !== 'instance') return operandRecipe(kernel, entity);
   const solids = instanceSolids(doc, entity as InstanceEntity, 0);
   return (solids === null ? null : unionOf(solids.map((member) => operandRecipe(kernel, member)))) ?? 'unbuildable';

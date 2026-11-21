@@ -419,3 +419,31 @@ Code: `packages/design-lang/src/{valueExpr,valueEval,valueSchema,functions}.ts`;
 - **Not built.** The `each` form of R4 (a comprehension covers it); `check` of an alias index (`of=part[2]`); modules, namespacing and
   hashes (M4c).
 
+
+### 13.4 As built (M2 core) (2026-11-21)
+
+Scope: §4.2, TR-ASC-06 data side (no renderer), §6 interop, decision D1. Code: `packages/core/src/commands/edit/arrayInstances.ts`
+(new), `edit/transform.ts`, `commands/brep/boolean.ts`, `geometry/assemblyParts.ts` (`recipeOfPart` exported).
+
+- **`as: "copies" | "instances"`** on `array_linear` / `array_polar` (default `copies`, D1). `instances` reuses the existing component /
+  instance model (no second one): a solid source moves into a new component (`comp-<step>.<k>`) and is replaced by instance 0 at the
+  identity transform (as `create_component` does); an instance source keeps its component and stays instance 0. Each further member
+  is an `instance` entity placed by the rigid transform `x' = R·x + shift` (linear: R = I; polar: `shift = c - R·c`), rotation
+  `eulerFromMat(R·R_source)`, scale kept, `patternSourceId` = instance 0. Ids come from `nextId`, so replay re-mints the same set (L8).
+  `affected` = every instance id (instance 0 included when the source was a solid). 2D or other non-3D source: coded rejection
+  `ARRAY_SOURCE_NOT_SOLID`. Positions and rotations equal the copies mode to rounding (test).
+- **No stored `PatternInstanceSet` record.** The set is derivable: instances share `componentId` and `patternSourceId`; the feature
+  step already holds the pattern parameters, so a separate record would duplicate them. Add one only if M3 `patternOf` needs it.
+- **`boolean`** accepts instances (in `a` or in the `b` list) on the kernel path: each instance becomes the union of its solids'
+  recipes through its transform at the kernel boundary (L9), then the operands are consumed. Triangle-only routing is skipped when an
+  instance is present; `engine: "mesh"` with an instance is refused (explode first). Missing component or no 3D member: no-op.
+  The old refusal "run explode_instance first" is gone (`tests/unit/boolean.test.ts` updated). The pattern fuse (TR-ASC-05) is M1/native.
+- **mass / bounds / `check_assembly`** already resolved instances through `instanceExpansion` (`mass_properties`, `instanceBoundsFromDoc`,
+  `assemblyParts`); the new test pins mass equality between the two modes. A pattern instance is one part in `check_assembly` (cap
+  `MAX_PARTS`) as before.
+- **Exchange.** `export_gltf instancing: "gpu"` already writes `EXT_mesh_gpu_instancing` (TRANSLATION / ROTATION / SCALE): one node for
+  the whole pattern (test). `export_step_ap242` already plans one shared part per component and one NEXT_ASSEMBLY_USAGE_OCCURRENCE
+  per instance (test with a recording kernel). Needs the native kernel and is NOT verified here (no sidecar in this container): the
+  exact STEP text, and `mapped_item` shape reuse, which is chosen by OCCT's XCAF writer, not by TS code.
+- **Left.** Renderer (InstancedMesh / BatchedMesh / `instanceId` picking, TR-ASC-06) for a later lane; `PatternInstanceSet` /
+  `patternOf` connection members (M3); flipping the default to `instances` (D1) once every command accepts instances; pattern fuse.
