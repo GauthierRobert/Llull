@@ -93,9 +93,9 @@ describeNativeWhen({ capabilities: ['shapeBounds'], label: 'nativeKernelFidelity
     expect(box.max[2]).toBeCloseTo(960 + 520, 6);
   });
 
-  it('a kernel without a loft built from a different vertex count refuses before the kernel is asked', () => {
+  it('a ruled loft of different vertex counts is resampled with a LOFT_VERTEX_COUNT warning (replay of older files)', () => {
     const doc: CadDocument = createEmptyDocument();
-    const refused = execute(doc, 'loft_sections', {
+    const resampled = execute(doc, 'loft_sections', {
       sections: [
         pylonSection(0, 10, 5),
         {
@@ -109,6 +109,11 @@ describeNativeWhen({ capabilities: ['shapeBounds'], label: 'nativeKernelFidelity
       ],
       ruled: true,
     });
-    expect(refused.error?.code).toBe('LOFT_VERTEX_COUNT');
+    expect(resampled.error).toBeUndefined();
+    expect(resampled.summary).toContain('warning LOFT_VERTEX_COUNT');
+    const loft = resampled.document.entities[resampled.affected[0] as string] as LoftEntity;
+    expect(loft.polygon).toBeUndefined();
+    const shape = kernel.evaluate(recipeOf(loft));
+    expect(shape).not.toBeNull();
   });
 });
