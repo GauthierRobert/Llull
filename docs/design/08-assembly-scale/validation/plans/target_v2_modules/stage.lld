@@ -1,4 +1,4 @@
-# Target syntax (M4b/M4c): one compressor stage as a module with typed parameters.
+# One compressor stage as a module with typed parameters.
 module stage(x0: length, hubR: length, tipR: length, rotors: int, stators: int, pitch: length = 25.75) {
   fn r(t) = hubR + t*(tipR - hubR)
   revolve_profile disk profile=[[200, x0-14], [hubR, x0-14], [hubR, x0+14], [200, x0+14]] axis="x"
@@ -7,6 +7,6 @@ module stage(x0: length, hubR: length, tipR: length, rotors: int, stators: int, 
   loft_sections blade sectionIds=[sec.entity, tip.entity]
   array_polar blades id=blade count=rotors center=[0,0,0] axis=[1,0,0] as="instances"
   add_connection_group bladed kind="bolted" members={patternOf: blade} detect={toleranceMm: 0.01} reason="platform on disk rim"
-  revolve_profile casing profile=[for i in 0..<8: [r(1) + (if mod(i, 2) == 0 then 0 else 1.5), x0 - pitch/2 + i*pitch/4]] axis="x"
+  revolve_profile casing profile=concat([for i in 0..<8: [r(1) + (if mod(i, 2) == 0 then 0 else 1.5), x0 - pitch/2 + i*pitch/4]], [[r(1) + 6, x0 + 1.25*pitch], [r(1) + 6, x0 - pitch/2]]) axis="x"
   export disk, blades, casing
 }

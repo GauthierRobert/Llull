@@ -196,7 +196,7 @@ export const applyDesign = defineCommand({
     'Build the model from a .lld design: one line per feature (`<command> <alias> key=value …`, any registered command), `param` ' +
     'defaults, anchors (face=base.top, on=base.top align=back), loops (for i in 0..n-1 { … }) and `check` lines. The design becomes the ' +
     "document's recipe: ONE feature step holding the source, re-run on every regeneration (set_parameter w=100 rebuilds it). A document " +
-    'has one design; applying again replaces it. Fails with the line number on the first failing line (document unchanged). data: ' +
+    'has one design; applying again replaces it. `use "file.lld" as ns with k=v` runs a module file (texts in `modules`, read by the CLI). Fails with the line number on the first failing line (document unchanged). data: ' +
     '{ aliases, checks[] } — checks report, they never fail it (check_design gates). Language: describe_design_syntax.',
   params: z.object({
     source: z.string().describe('.lld design source (CLI: source=@text:part.lld).'),
