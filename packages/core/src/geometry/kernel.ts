@@ -13,6 +13,7 @@ import type { ExchangeWriteRequest, ImportExchangeOptions, ImportExchangeResult 
 import type { MeshToBrepRequest, MeshToBrepResult } from './kernelMeshBrep';
 import type {
   BlendReport,
+  BooleanReport,
   DeformReport,
   ExactMassProperties,
   FaceQueryPort,
@@ -185,6 +186,9 @@ export interface GeometryKernel {
 
   /** Why the exact fillet `recipe` fails: OCCT contour statuses, faulty vertices, 4+ edge vertices (BLD M0); null for other recipes or kernels without diagnostics. */
   blendReport?(recipe: ShapeRecipe): BlendReport | null;
+
+  /** How the multi-tool `boolean` recipe (`many`) ran: one General Fuse / Cut or the balanced-tree fallback (`KRN_FUSE_FALLBACK`); null for other recipes or kernels without the native op. */
+  booleanReport?(recipe: ShapeRecipe): BooleanReport | null;
 
   /** How the exact `deform` recipe built (approximation error, faces split) or why it was refused (DEF_* code); null for other recipes or kernels without the exact warp. */
   deformReport?(recipe: ShapeRecipe): DeformReport | null;

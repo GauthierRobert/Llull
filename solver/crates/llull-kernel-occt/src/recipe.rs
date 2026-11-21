@@ -17,6 +17,7 @@ use std::rc::Rc;
 
 mod face_nodes;
 mod floor;
+mod many;
 mod nodes;
 #[cfg(test)]
 mod nodes_tests;
@@ -56,6 +57,9 @@ pub enum EvalError {
     /// OCCT threw while building: the recipe is refused (cached as null, like any refusal).
     Failure(String),
 }
+
+/// Start of the failure text of an operation stopped by its deadline or a cancel (`KRN_TIMEOUT stage=<s> fraction=<f>`).
+pub const TIMEOUT: &str = "KRN_TIMEOUT";
 
 pub type Evaluated = Result<Option<Rc<Shape>>, EvalError>;
 
@@ -365,6 +369,8 @@ impl Evaluator {
         let built = self.build(recipe);
         match &built {
             Ok(shape) => self.cache.insert(key, shape.clone()),
+            // a deadline / cancel (KRN_TIMEOUT) says nothing about the recipe: the next request builds it again
+            Err(EvalError::Failure(reason)) if reason.starts_with(TIMEOUT) => {}
             Err(EvalError::Failure(reason)) => {
                 self.reasons.insert(key.clone(), reason.clone());
                 self.cache.insert(key, None);
@@ -390,10 +396,13 @@ impl Evaluator {
             },
             "boolean" => {
                 let Some(operation) = recipe.get("boolean").and_then(Value::as_str).and_then(boolean_op) else { return refused() };
-                let Some(a) = self.child(recipe, "a")? else { return refused() };
-                let Some(b) = self.child(recipe, "b")? else { return refused() };
                 // A modelled-thread operand skips UnifySameDomain, (occtThreadMark.ts of the retired kernel).
                 let threaded = ["a", "b"].iter().filter_map(|field| recipe.get(field)).any(nodes::thread_bearing);
+                if let Some(many) = self.boolean_many(recipe, operation, threaded) {
+                    return many;
+                }
+                let Some(a) = self.child(recipe, "a")? else { return refused() };
+                let Some(b) = self.child(recipe, "b")? else { return refused() };
                 shape_of(crate::boolean(operation, &a, &b, !threaded))
             }
             "place" => {

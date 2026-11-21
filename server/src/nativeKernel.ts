@@ -22,6 +22,7 @@ function nativeKernelWorkerEntry(): string | null {
 
 export interface NativeKernelOptions {
   readonly callTimeoutMs?: number;
+  readonly killGraceMs?: number;
   readonly startTimeoutMs?: number;
   readonly testHooks?: boolean;
 }

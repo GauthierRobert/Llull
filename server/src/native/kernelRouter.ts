@@ -18,10 +18,14 @@ export interface KernelRouterDeps {
   /** A live session (the caller respawns a dead sidecar here). */
   readonly session: () => NativeKernelSession;
   readonly native: NativeInfo;
+  /** Milliseconds a native op may run before the sidecar answers `KRN_TIMEOUT` (absent: no deadline). */
+  readonly deadlineMs?: number;
 }
 
 export interface KernelRouter {
   route(request: KernelRequest): Promise<KernelReply>;
+  /** Stops the running native op (it answers `KRN_TIMEOUT`). */
+  cancel(): void;
 }
 
 export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
@@ -80,12 +84,15 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
     if (!nativeOps.has(request.op)) return { result: null, error: `NATIVE_UNSUPPORTED: op ${request.op}` };
     const prepared = await prepareFeatures(request.op, request.args, sourceMesh);
     if ('unsupported' in prepared) return { result: null, error: prepared.unsupported };
-    const reply = await (await nativeSession()).request(request.op, nativeArgs(request.op, request.args, prepared.features, wire));
+    const reply = await (
+      await nativeSession()
+    ).request(request.op, nativeArgs(request.op, request.args, prepared.features, wire), deps.deadlineMs);
     const result = request.op === 'tessellate' ? decodeMesh(reply.result) : reply.result;
     return reply.error === undefined ? { result } : { result, error: reply.error };
   };
 
   return {
+    cancel: () => deps.session().cancel(),
     route: async (request) => {
       try {
         return await route(request);

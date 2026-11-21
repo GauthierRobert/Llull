@@ -25,12 +25,15 @@ pub const UNSUPPORTED: &str = "NATIVE_UNSUPPORTED";
 pub const BAD_REQUEST: &str = "NATIVE_BAD_REQUEST";
 pub const OCC_FAILURE: &str = "NATIVE_OCC_FAILURE";
 pub const PANIC: &str = "NATIVE_PANIC";
+/// The call reached its deadline (request `deadlineMs`) or was cancelled: `KRN_TIMEOUT: stage=<stage> fraction=<0..1>`; the process stays alive.
+pub const TIMEOUT: &str = "KRN_TIMEOUT";
 pub const TESSELLATION_BUDGET: &str = "NATIVE_TESSELLATION_BUDGET";
 /// Same prefix as `SHAPE_NOT_CACHED` in `packages/core/src/geometry/shapeKernel.ts`.
 pub const NOT_CACHED: &str = "shape not cached";
 
 /// Operations answered natively besides `queries::QUERY_OPS`; every other op replies `NATIVE_UNSUPPORTED`.
-pub const OPS: [&str; 8] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep", "blendReport", "deformReport"];
+pub const OPS: [&str; 9] =
+    ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep", "blendReport", "deformReport", "booleanReport"];
 
 /// Every op the session answers (`info().ops`).
 pub fn native_ops() -> Vec<&'static str> {
@@ -111,6 +114,9 @@ fn info() -> Value {
         // output.preserveAnalytic: faces that stayed a plane / cylinder / cone / sphere are rebuilt analytic (the report has `analyticFaces`)
         "deform-analytic",
         "emboss",
+        // a `boolean` node with `many`: one General Fuse / Cut of the tools (`booleanReport` says how it ran); request `deadlineMs` + `{"cancel":true}` stop a
+        // boolean at its next progress poll with KRN_TIMEOUT
+        "booleanMany",
         // tessellate takes a second argument { linearDeflection, angularDeflection }: a sidecar without it would answer the display mesh
         "tessellateOptions",
     ]
@@ -149,7 +155,10 @@ impl Session {
         let id = request.get("id").cloned().unwrap_or(Value::Null);
         let op = request.get("op").and_then(Value::as_str).unwrap_or("").to_string();
         let args = request.get("args").and_then(Value::as_array).cloned().unwrap_or_default();
+        let deadline = request.get("deadlineMs").and_then(Value::as_f64).filter(|ms| ms.is_finite() && *ms > 0.0).unwrap_or(0.0);
+        llull_kernel_occt::set_deadline_ms(deadline);
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.dispatch(&op, &args)));
+        llull_kernel_occt::clear_deadline();
         let reply = outcome.unwrap_or_else(|_| Reply::fail(PANIC, format!("{op} panicked")));
         reply_json(id, reply)
     }
@@ -238,6 +247,7 @@ impl Session {
             "exportStep" => self.export_with(first, "exportStep", export_step),
             "blendReport" => self.blend_report(first),
             "deformReport" => self.deform_report(first),
+            "booleanReport" => self.boolean_report(first),
             other => exchange::dispatch(self, other, args)
                 .or_else(|| meshbrep::dispatch(other, args))
                 .or_else(|| queries::dispatch(self, other, args))
@@ -261,6 +271,17 @@ impl Session {
         match self.evaluator.deform_report(recipe) {
             Ok(report) => Reply::ok(report),
             Err(EvalError::Unsupported(reason)) => Reply::fail(UNSUPPORTED, reason),
+            Err(EvalError::Failure(error)) => Reply::fail(OCC_FAILURE, error),
+        }
+    }
+
+    /// `booleanReport`: how the multi-tool `boolean` handle `{ key, recipe }` ran (ASC M1a): `{ mode, tools, fallback?, code?, reason? }`; null for another node.
+    fn boolean_report(&mut self, handle: &Value) -> Reply {
+        let Some(recipe) = handle.get("recipe") else { return Reply::fail(BAD_REQUEST, "booleanReport expects a { key, recipe } handle") };
+        match self.evaluator.boolean_report(recipe) {
+            Ok(report) => Reply::ok(report),
+            Err(EvalError::Unsupported(reason)) => Reply::fail(UNSUPPORTED, reason),
+            Err(EvalError::Failure(error)) if error.starts_with(TIMEOUT) => timeout_reply(&error),
             Err(EvalError::Failure(error)) => Reply::fail(OCC_FAILURE, error),
         }
     }
@@ -324,12 +345,18 @@ impl Session {
                 self.handles.insert(key, HandleState::Unsupported(reason.clone()));
                 Err(Reply::fail(UNSUPPORTED, reason))
             }
+            Err(EvalError::Failure(error)) if error.starts_with(TIMEOUT) => Err(timeout_reply(&error)),
             Err(EvalError::Failure(error)) => {
                 self.handles.insert(key, HandleState::Built(None));
                 Err(Reply::fail(OCC_FAILURE, error))
             }
         }
     }
+}
+
+/// `KRN_TIMEOUT stage=<s> fraction=<f>` (the facade's text) as the reply `KRN_TIMEOUT: stage=<s> fraction=<f>`.
+fn timeout_reply(error: &str) -> Reply {
+    Reply::fail(TIMEOUT, error.trim_start_matches(TIMEOUT).trim())
 }
 
 fn reply_json(id: Value, reply: Reply) -> Value {
@@ -501,5 +528,44 @@ mod tests {
         assert_eq!(report["result"]["lumps"].as_array().map(Vec::len), Some(1));
         let step = call(&mut session, "exportStep", json!([[{ "key": "a" }]]));
         assert!(step["result"].as_str().unwrap().starts_with("ISO-10303-21;"));
+    }
+    fn drilled_plate(many: bool) -> Value {
+        let cylinder = |k: usize| json!({ "op": "solid", "entity": { "id": "c", "kind": "cylinder", "position": [4.0 * k as f64 + 2.0, 2.0, 0], "rotation": [0, 0, 0], "radius": 1, "height": 6 } });
+        let union = |a: Value, b: Value| json!({ "op": "boolean", "boolean": "union", "a": a, "b": b });
+        let tools = union(union(cylinder(0), cylinder(1)), union(cylinder(2), cylinder(3)));
+        let mut node = json!({ "op": "boolean", "boolean": "subtract", "a": box_recipe(1.0), "b": tools });
+        node["a"]["entity"]["size"] = json!([16, 4, 2]);
+        node["a"]["entity"]["position"] = json!([8, 2, 0]);
+        if many {
+            node["many"] = json!(4);
+        }
+        node
+    }
+
+    #[test]
+    fn a_multi_tool_boolean_reports_how_it_ran_and_matches_the_tree() {
+        let mut session = Session::new();
+        let tree = call(&mut session, "massProperties", json!([{ "key": "tree", "recipe": drilled_plate(false) }]));
+        let many = call(&mut session, "massProperties", json!([{ "key": "many", "recipe": drilled_plate(true) }]));
+        let (a, b) = (tree["result"]["volume"].as_f64().unwrap(), many["result"]["volume"].as_f64().unwrap());
+        assert!((a - b).abs() < 1e-6 * a, "{a} vs {b}");
+        let report = call(&mut session, "booleanReport", json!([{ "key": "many", "recipe": drilled_plate(true) }]));
+        assert_eq!(report["result"]["mode"], "general-fuse", "{report}");
+        assert!(native_ops().contains(&"booleanReport"));
+    }
+
+    #[test]
+    fn a_deadline_answers_krn_timeout_and_the_session_answers_the_next_request() {
+        let mut session = Session::new();
+        let late = session.handle_line(
+            &json!({ "id": 3, "op": "massProperties", "deadlineMs": 0.001, "args": [{ "key": "late", "recipe": drilled_plate(true) }] })
+                .to_string(),
+        );
+        assert_eq!(late["id"], 3);
+        assert!(late["error"].as_str().unwrap().starts_with("KRN_TIMEOUT: stage="), "{late}");
+        assert_eq!(late["result"], Value::Null);
+        // the refusal is not cached: the same handle builds on the next request, which has no deadline
+        let next = call(&mut session, "massProperties", json!([{ "key": "late", "recipe": drilled_plate(true) }]));
+        assert!(next["error"].is_null() && next["result"]["volume"].as_f64().unwrap() > 0.0, "{next}");
     }
 }

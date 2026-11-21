@@ -10,7 +10,7 @@ import { workerData, type MessagePort } from 'node:worker_threads';
 import { debugWarn } from './debugLog';
 import { errorMessage } from '@lib/errorMessage';
 import { isTestHook, runTestHook } from './kernelTestHooks';
-import { STATUS_READY, STATUS_REPLY, type KernelReply, type KernelRequest } from './kernelWorkerProtocol';
+import { CANCEL_OPERATION, STATUS_READY, STATUS_REPLY, type KernelReply, type KernelRequest } from './kernelWorkerProtocol';
 import { parseNativeInfo } from './native/kernelProtocol';
 import { createKernelRouter } from './native/kernelRouter';
 import { createKernelSession, spawnKernelChild, type NativeKernelSession } from './native/kernelSession';
@@ -20,6 +20,8 @@ interface WorkerInit {
   readonly port: MessagePort;
   readonly testHooks: boolean;
   readonly binary: string;
+  /** Milliseconds a native op may run before the sidecar answers `KRN_TIMEOUT` (the proxy kills the worker a grace period later). */
+  readonly deadlineMs?: number;
 }
 
 function signal(status: Int32Array, value: number): void {
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
 
   const router = createKernelRouter({
     native,
+    ...(init.deadlineMs === undefined ? {} : { deadlineMs: init.deadlineMs }),
     session: () => {
       if (!session.alive()) {
         console.warn('[occt-native] the llull-kernel sidecar exited; starting a new one');
@@ -49,6 +52,10 @@ async function main(): Promise<void> {
 
   init.port.on('message', (request: KernelRequest) => {
     const { op } = request;
+    if (op === CANCEL_OPERATION) {
+      router.cancel();
+      return;
+    }
     const answer = isTestHook(op)
       ? new Promise<KernelReply>((resolve) => resolve({ result: runTestHook(op, init.testHooks) }))
       : router.route(request);
