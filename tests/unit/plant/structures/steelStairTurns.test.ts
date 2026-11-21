@@ -302,3 +302,29 @@ describe('plan symbol, access graph and IFC of turned stairs', () => {
     ).toBe('USERDEFINED');
   });
 });
+
+describe('plan symbols: platform below the level, ladder without a cage', () => {
+  it('labels a negative elevation without a plus sign and draws a cage-free ladder without a circle', () => {
+    const f = scene();
+    let doc = apply(f.doc, 'add_access_platform', {
+      bounds: [
+        [0, 0],
+        [3000, 2000],
+      ],
+      topOffset: -500,
+      gratingType: '19-W-4 1-1/4x3/16',
+      bearingBarDirection: [1, 0],
+      levelId: f.grade,
+    });
+    doc = apply(doc, 'add_ladder', {
+      base: [500, -250, -2500],
+      facing: [0, 1],
+      climbHeight: 2000,
+      fallProtection: 'ladder_safety_system',
+      levelId: f.grade,
+    });
+    const svg = data<{ files: Array<{ content: string }> }>(doc, 'export_access_plan', {}).files[0]?.content ?? '';
+    expect(svg).toContain('EL -500<');
+    expect(svg).not.toContain('<circle');
+  });
+});
