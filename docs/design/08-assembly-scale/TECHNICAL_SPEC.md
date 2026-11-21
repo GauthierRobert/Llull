@@ -639,7 +639,12 @@ A prototype was built and measured; its code is not on the branch because it is 
   with `polygon: true` together with `faces`, `sections`, `closed: true` or `ruled !== true` is rejected (persistence guard, hostile-load suite).
 - **Tests.** `tests/unit/kernelBounds.test.ts`, `tests/unit/sweep/loftPolygon.test.ts`, `tests/unit/measure.test.ts`, the guard cases in the hostile-load suite,
   `server/tests/nativeKernelFidelity.test.ts`, `server/tests/kernelLeavesSweeps.test.ts`, `solver/.../bounds_tests.rs`, `recipe/nodes_tests.rs`.
-- **Left.** (1) Sewn-solid validity check and sewing-tolerance clamp (native, pending). (2) Code export (`export_code`) rebuilds ThruSections
-  B-spline sides, so its face types differ from the native planar / bilinear ones. (3) `coupling: 'vertices'` is not on this path. (4) Only
+- **Validity and export (review round).** `outward_solid` runs `BRepCheck_Analyzer` on the sewn solid and returns null when it fails (bow-tie sides from a
+  crossing index pairing), so `recipe/nodes.rs` falls back to the straight-edge ThruSections chains; the sewing tolerance is `max(1e-7 * size, Precision::Confusion())`
+  (tests: a shift-by-two pairing falls back to a valid frustum, a twisted non-planar pair at 1e-3 scale). `export_code` of a ruled polygon loft carries the
+  vertices as a 5th build element (`("loft", label, sections, ruled, polygons)`): the CadQuery / build123d helper `_polygon_loft` mirrors the native
+  construction (planar polygon face when coplanar, else `BRepFill.Face` between the two edges, caps, sewing, validity), falling back to ThruSections; FreeCAD
+  ignores the vertices (Part.makeLoft of the chains) and OpenSCAD exports the mesh. Executed against real CadQuery in `sweepLoftCodeExecution.integration.test.ts`.
+- **Left.** (1) FreeCAD export keeps ThruSections sides. (2) `coupling: 'vertices'` is not on this path. (3) Only
   `measure_bounding_box` uses exact bounds (and `frameOf` through it); the other bounds consumers (§4.5 says "every") keep `entityBoundsInDoc`; widen later.
-  (5) Whole-document cost at 2,450 parts is unmeasured (one `evaluate` + one `shapeBounds` per kernel-backed entity on a cold cache).
+  (4) Whole-document cost at 2,450 parts is unmeasured (one `evaluate` + one `shapeBounds` per kernel-backed entity on a cold cache).
