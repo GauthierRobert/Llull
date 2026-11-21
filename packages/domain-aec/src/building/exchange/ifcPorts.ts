@@ -15,6 +15,7 @@ import { type PlantIfcObject } from '../../plant/data/view';
 import type { Exported } from './ifcElementExport';
 import { addNamedPset, countPredefined, type PlantIfcRun } from './ifcPlant';
 import { sweptSolids } from './ifcIndustrialExport';
+import { distinctPoints, pipeBendSeed, pipeSegmentSeed } from './ifcSeeds';
 import { type Context, circleProfile, framePlacement, ifcReal, ifcString, placement, shape } from './ifcStep';
 
 export type Flow = 'SOURCE' | 'SINK' | 'SOURCEANDSINK';
@@ -113,16 +114,6 @@ export interface PipeIfcInput {
   readonly container: string | null;
 }
 
-/** The pipe's points with consecutive duplicates removed. */
-function distinct(points: readonly Vec3[]): Vec3[] {
-  const kept: Vec3[] = [];
-  for (const point of points) {
-    const last = kept.at(-1);
-    if (last === undefined || len3(sub3(point, last)) > 1e-9) kept.push(point);
-  }
-  return kept;
-}
-
 export function exportPipeProducts(
   context: Context,
   run: PlantIfcRun,
@@ -133,7 +124,7 @@ export function exportPipeProducts(
   input: PipeIfcInput,
 ): Exported[] {
   const { writer, mm } = context;
-  const points = distinct(pipe.points);
+  const points = distinctPoints(pipe.points);
   if (points.length < 2) return [];
   const mm3 = ([x, y, z]: Vec3): Vec3 => [mm(x), mm(y), mm(z)];
   const circle = circleProfile(context, mm(pipe.diameter) / 2);
@@ -161,7 +152,7 @@ export function exportPipeProducts(
   for (let k = 0; k < straights; k++) {
     const start = points[k] as Vec3;
     const end = points[k + 1] as Vec3;
-    const seed = `${pipe.id}:seg:${k}`;
+    const seed = pipeSegmentSeed(pipe.id, k);
     const name = `${input.base}-S${k + 1}`;
     const solids = sweptSolids(context, circle, [mm3(start), mm3(end)]);
     const ref = writer.add(
@@ -177,7 +168,7 @@ export function exportPipeProducts(
     addProduct(ref, seed, mm3(start), mm3(end), k === 0, k === straights - 1);
     if (k === straights - 1) break;
     const vertex = mm3(end);
-    const bendSeed = `${pipe.id}:bend:${k + 1}`;
+    const bendSeed = pipeBendSeed(pipe.id, k + 1);
     const bendName = `${input.base}-B${k + 1}`;
     const bend = writer.add(
       `IFCPIPEFITTING('${context.guid(bendSeed)}',$,${ifcString(bendName)},${ifcString(description)},$,${placement(context, storeyPlacement, ...vertex)},$,${ifcString(bendName)},.BEND.)`,
