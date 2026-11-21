@@ -16,10 +16,15 @@ const unit = (a: Vec3): Vec3 | null => {
   const length = Math.hypot(a[0], a[1], a[2]);
   return length > EPSILON ? [a[0] / length, a[1] / length, a[2] / length] : null;
 };
-/** The part of `a` perpendicular to the unit vector `n`, as a unit vector (null when `a` is along `n`). */
+/** Projected lengths below this fraction of |a| count as "along the axis" (a nozzle a few arc-seconds off vertical is vertical). */
+const ALONG_AXIS = 1e-6;
+
+/** The part of `a` perpendicular to the unit vector `n`, as a unit vector (null when `a` is along `n` within `ALONG_AXIS`). */
 const perpendicular = (a: Vec3, n: Vec3): Vec3 | null => {
   const along = dot(a, n);
-  return unit([a[0] - along * n[0], a[1] - along * n[1], a[2] - along * n[2]]);
+  const rest: Vec3 = [a[0] - along * n[0], a[1] - along * n[1], a[2] - along * n[2]];
+  const length = Math.hypot(rest[0], rest[1], rest[2]);
+  return length > ALONG_AXIS * Math.hypot(a[0], a[1], a[2]) ? [rest[0] / length, rest[1] / length, rest[2] / length] : null;
 };
 
 /**

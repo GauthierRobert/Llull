@@ -18,6 +18,7 @@ import { blindRunSteps } from '../golden/pipingPlansBlind';
 import { cappedRunSteps } from '../golden/pipingPlansCap';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { recordedModel } from '../unit/plant/stress/m3Fixtures';
+import { scene as nozzleScene } from '../unit/plant/stress/nozzleFixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
 import { fixturePcf } from '../unit/plant/fabrication/fabricationFixtures';
 import { addBody, caseParams, metreDocument, ok } from '../unit/aero/cfd/fixtures';
@@ -437,6 +438,23 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     roots: ['plant.stress'],
     build: () => recordedModel().doc,
     query: { name: 'check_pipe_stress', params: (doc) => ({ modelId: first(doc.plant?.stress?.models) }) },
+    mutate: { name: 'update_stress_model', params: (doc) => ({ modelId: first(doc.plant?.stress?.models), name: 'Fuzz' }) },
+  },
+  // a nozzle limit (with frameX) and the hot modulus on a recorded model
+  'pipeStress#nozzle': {
+    roots: ['plant.stress'],
+    build: () => {
+      const s = nozzleScene(true, true);
+      return execute(s.doc, 'set_nozzle_load_limit', {
+        modelId: s.id,
+        portId: 'P-101:N2',
+        holderId: s.restraintId,
+        frameX: [1, 1, 0],
+        standard: 'user',
+        userLimits: { source: 'seed', resultantForce: 1e9 },
+      }).document;
+    },
+    query: { name: 'check_nozzle_loads', params: (doc) => ({ modelId: first(doc.plant?.stress?.models) }) },
     mutate: { name: 'update_stress_model', params: (doc) => ({ modelId: first(doc.plant?.stress?.models), name: 'Fuzz' }) },
   },
   'plant-data': {

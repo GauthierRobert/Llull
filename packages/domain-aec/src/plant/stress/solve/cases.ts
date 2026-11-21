@@ -39,7 +39,7 @@ export function loadCaseProblems(
     if (loadCase.method !== undefined && loadCase.method !== 'algebraic' && loadCase.type !== 'OCC' && loadCase.type !== 'EXP')
       problems.push([
         `${path}.method`,
-        `${loadCase.type} case ${loadCase.name} is solved from primitives; scalar and srss are for OCC and EXP combinations`,
+        `${loadCase.type} case ${loadCase.name} is solved from primitives; scalar and srss are for OCC combinations, scalar for EXP combinations`,
       ]);
     if (loadCase.type === 'OCC' && loadCase.combine !== undefined) {
       if (loadCase.basic !== undefined)
@@ -75,6 +75,20 @@ export function loadCaseProblems(
       if (target === undefined) problems.push([`cases.${index}.combine`, `${loadCase.name} combines unknown case ${term.case}`]);
       else if (target.type === 'EXP')
         problems.push([`cases.${index}.combine`, `${loadCase.name} combines the EXP case ${term.case}; combine OPE / SUS / OCC cases`]);
+      else if (loadCase.type === 'EXP' && loadCase.method === 'srss')
+        problems.push([
+          `cases.${index}.method`,
+          `EXP case ${loadCase.name}: srss of displacement ranges is not conservative for opposite signs; use scalar`,
+        ]);
+      else if (
+        loadCase.type === 'EXP' &&
+        loadCase.method === 'scalar' &&
+        (target.basic ?? []).some((primitive) => !/^[TD][1-9]$/.test(primitive))
+      )
+        problems.push([
+          `cases.${index}.combine`,
+          `EXP case ${loadCase.name} combines by scalar: term ${term.case} must be displacement-only (T / D primitives), not ${(target.basic ?? []).join(', ')}`,
+        ]);
       else if (target.combine !== undefined)
         problems.push([`cases.${index}.combine`, `${loadCase.name} combines the combination ${term.case}; combine solved cases`]);
     }

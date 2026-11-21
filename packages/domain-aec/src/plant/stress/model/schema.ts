@@ -80,7 +80,7 @@ export const loadCaseSchema = z.object({
   method: z
     .enum(['algebraic', 'scalar', 'srss'])
     .describe(
-      'How an OCC or EXP case combines its terms: algebraic (default) adds the results with their factors and takes the code stress of the sum; scalar adds the code stresses of the terms (sum of |factor| x stress), e.g. S_L(SUS) + S_L(wind) of B31.3 302.3.6; srss takes the square root of the sum of the squares of the term stresses. An EXP case takes the same options: the terms are then separate expansion ranges (each solved case is read as a displacement range S_E from its own state, e.g. two independent thermal cases) whose S_E are added or root-sum-squared, at the element end stations; algebraic (default) subtracts the states first (OPE - SUS).',
+      'How an OCC or EXP case combines its terms: algebraic (default) adds the results with their factors and takes the code stress of the sum; scalar adds the code stresses of the terms (sum of |factor| x stress), e.g. S_L(SUS) + S_L(wind) of B31.3 302.3.6; srss takes the square root of the sum of the squares of the term stresses. An EXP case takes only scalar (or the default algebraic): the terms are then separate displacement-only cases (T / D primitives, no W, P, WIN, U or F) read as their own expansion ranges S_E, whose S_E are added with abs(factor) at the element end stations (srss is refused: it under-states opposite-sign ranges); algebraic (default) subtracts the states first (OPE - SUS).',
     )
     .optional(),
 });
@@ -220,7 +220,7 @@ export const nozzleLimitSchema = z.object({
   id: z.string().min(1),
   portId: z.string().min(1),
   holderId: z.string().min(1),
-  frameX: vec3.optional(),
+  frameX: vec3.refine((v) => Math.hypot(v[0], v[1], v[2]) > 0, 'must not be the zero vector').optional(),
   ...nozzleRuleShape,
 });
 
