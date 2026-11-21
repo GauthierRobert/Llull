@@ -17,7 +17,7 @@ export const exportBcfViewpoint = defineCommand({
   name: 'export_bcf_viewpoint',
   description:
     'Export one saved viewpoint (vp-<n>) as a BCF VisualizationInfo XML (*.bcfv: camera in metres, vertical field of view in degrees, the selected entities as ' +
-    'Components with OriginatingSystem "llull" and AuthoringToolId). data { visualizationInfo, camera { projection, cameraViewPointM, cameraDirection, ' +
+    'Components with OriginatingSystem "llull" and AuthoringToolId, plus the IfcGuid the IFC export writes for the element when the entity belongs to a building element). data { visualizationInfo, camera { projection, cameraViewPointM, cameraDirection, ' +
     'cameraUpVector, fieldOfViewDeg | viewToWorldScaleM } }. Read-only. Errors: VIS_VIEWPOINT_NOT_FOUND, MAT_EXPORT_CONTROLLED. import_bcf_viewpoint reads it back.',
   annotations: { readOnly: true },
   params: z.object({ id: z.string().describe('Viewpoint id, e.g. "vp-2" (list_viewpoints).'), confirmExportControlled }),

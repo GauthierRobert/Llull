@@ -176,12 +176,21 @@ export function bcfVisualizationXml(
     return `<Component${ifc === undefined ? '' : ` IfcGuid="${escapeXml(ifc)}"`}>${text('OriginatingSystem', 'llull')}${text('AuthoringToolId', id)}</Component>`;
   };
   const components = selection.map(component).join('');
+  const coloured = new Set<string>();
+  /** A component with an IfcGuid is listed once per viewpoint (the first colour wins): entities of one element share it. */
+  const firstColour = (id: string): boolean => {
+    const ifc = guidOf?.(doc, id);
+    if (ifc === undefined) return true;
+    if (coloured.has(ifc)) return false;
+    coloured.add(ifc);
+    return true;
+  };
   const coloring =
     colouring.length === 0
       ? ''
       : `<Coloring>${colouring
           .map((group) => {
-            const members = group.ids.map(component).join('');
+            const members = group.ids.filter(firstColour).map(component).join('');
             return `<Color Color="${group.colour}">${version === '3.0' ? `<Components>${members}</Components>` : members}</Color>`;
           })
           .join('')}</Coloring>`;

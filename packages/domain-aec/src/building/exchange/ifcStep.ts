@@ -2,7 +2,6 @@ import type { Vec2, Vec3 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
 import { quoteStepString } from '@lib/step21/encode';
 import { round } from '../../shared/numeric';
-export { ifcGuid } from '@lib/ifcGuid';
 
 /** STEP string literal with IFC escapes (\X2\ for non-ASCII). */
 export const ifcString = quoteStepString;

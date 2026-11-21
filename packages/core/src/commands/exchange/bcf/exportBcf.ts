@@ -72,7 +72,7 @@ export const exportBcf = defineCommand({
     'the profile goes out as legend labels of the topic and the warning VIS_BCF_COLOURING_LARGE names the viewpoints. data: { fileName, base64, bytes, sha256, version, topics, ' +
     'viewpoints, snapshots, coloured, warnings } — save with `--save review.bcf`. snapshotRenderer "reference" (default) keeps the archive ' +
     'byte-reproducible; "native" draws the snapshots on the GPU with llull-compute (CLI / desktop only; data.deterministic false). ' +
-    'A component of a building element also carries the IFC GlobalId the IFC export writes for that element (Component IfcGuid); other entities carry only the AuthoringToolId (warning VIS_BCF_GUID_UNMAPPED lists them).Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
+    'A component of a building element also carries the IFC GlobalId the IFC export writes for that element (Component IfcGuid, in the selection and in Coloring, where each GlobalId is listed once per viewpoint, first colour wins); other entities carry only the AuthoringToolId (warning VIS_BCF_GUID_UNMAPPED lists them). Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
   annotations: { readOnly: true },
   params: z.object({
     issueIds: z.array(z.string()).optional().describe('Issues to export (iss-<n>), in this order. Default: every issue.'),
