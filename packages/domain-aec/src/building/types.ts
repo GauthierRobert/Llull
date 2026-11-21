@@ -549,6 +549,8 @@ export interface RadialStairElement extends LevelElementBase {
   tread: SteelStairTread;
   plates: RadialStairPlate[];
   runs: RadialStairRun[];
+  /** Spiral only: the exact sector of every tread (radii in document units, angle in radians), for areas the chord polygons of `plates` underestimate. */
+  sector?: { innerRadius: number; outerRadius: number; treadAngle: number };
 }
 
 /** Generated assemblies (06 STA M6 platforms, M7 pipe racks). */

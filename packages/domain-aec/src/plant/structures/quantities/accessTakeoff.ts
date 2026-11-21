@@ -153,3 +153,19 @@ export function steelStairScheduleRows(doc: CadDocument, building: BuildingModel
     ];
   });
 }
+
+/** Winder / spiral stair schedule: mark, form, risers, rise (mm), treads, steel (kg), level. */
+export function radialStairScheduleRows(doc: CadDocument, building: BuildingModel): Row[] {
+  return elementsOf(building, 'radialStair').map((stair) => {
+    const quantities = radialQuantities(doc, stair);
+    return [
+      stair.mark,
+      stair.form,
+      stair.riserCount,
+      round(toMm(doc, stair.rise), 1),
+      quantities.treads,
+      round(quantities.steelKg, 1),
+      building.levels[stair.levelId]?.name ?? stair.levelId,
+    ];
+  });
+}

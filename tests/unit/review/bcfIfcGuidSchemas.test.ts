@@ -200,7 +200,7 @@ describe('BCF IfcGuid of framing products', () => {
   });
 });
 
-/** The plant fixture plus a curved wall with a door, a straight wall with a window, a slab with an opening, a stair, an access platform (grating, railing, assembly), a steel stair and a ladder. */
+/** The plant fixture plus a curved wall with a door, a straight wall with a window, a slab with an opening, a stair, an access platform (grating, railing, assembly), a steel stair, a ladder, a winder stair and a spiral stair. */
 function completeFixture(): CadDocument {
   let doc = plantWithFrame();
   doc = apply(doc, 'add_curved_wall', { start: [60000, 0], through: [62000, 1000], end: [64000, 0] });
@@ -235,7 +235,25 @@ function completeFixture(): CadDocument {
   });
   const deck = Object.keys(doc.building?.elements ?? {}).find((id) => id.startsWith('assembly')) as string;
   doc = apply(doc, 'add_steel_stair', { start: [76520, 1000, 0], angle: 0, toSurfaceId: deck, riserMax: 180, going: 280 });
-  return apply(doc, 'add_ladder', { base: [81500, -250, 0], facing: [0, 1], attachTo: deck });
+  doc = apply(doc, 'add_ladder', { base: [81500, -250, 0], facing: [0, 1], attachTo: deck });
+  doc = apply(doc, 'add_winder_stair', {
+    start: [90000, 0, 0],
+    rise: 3000,
+    riserMax: 180,
+    going: 280,
+    straightTreads: 3,
+    winders: 3,
+    turn: 'left',
+  });
+  return apply(doc, 'add_spiral_stair', {
+    start: [96000, 0, 0],
+    rise: 3000,
+    riserMax: 180,
+    outerRadius: 900,
+    treadAngle: Math.PI / 8,
+    turn: 'left',
+    columnProfile: 'CHS168.3x6.3',
+  });
 }
 
 const PRODUCT_EXCLUDED =
@@ -263,7 +281,19 @@ describe('BCF IfcGuid covers every product export_ifc writes', () => {
       });
     expect(missing).toEqual([]);
     const categories = new Set(Object.values(doc.building?.elements ?? {}).map((element) => element.category));
-    for (const category of ['curvedWall', 'door', 'window', 'slab', 'stair', 'grating', 'railing', 'ladder', 'steelStair', 'assembly'])
+    for (const category of [
+      'curvedWall',
+      'door',
+      'window',
+      'slab',
+      'stair',
+      'grating',
+      'railing',
+      'ladder',
+      'steelStair',
+      'radialStair',
+      'assembly',
+    ])
       expect(categories.has(category as never), category).toBe(true);
   });
 });

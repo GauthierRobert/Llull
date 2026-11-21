@@ -5,19 +5,34 @@
  * @invariant pure; undefined for categories with no steel / concrete default (walls, doors, rooms, ...)
  */
 
-import type { BuildingElement } from '../../building/types';
+import type { BimCategory, BuildingElement } from '../../building/types';
 
-const BY_CATEGORY: Readonly<Record<string, string>> = {
+const BY_CATEGORY: Readonly<Record<BimCategory, string | undefined>> = {
   grating: 'grating',
   railing: 'galvanized_steel',
   ladder: 'galvanized_steel',
   steelStair: 'galvanized_steel',
+  radialStair: 'galvanized_steel',
   tray: 'galvanized_steel',
   member: 'structural_steel_painted',
   pipeSupport: 'structural_steel_painted',
   connection: 'structural_steel_painted',
   equipment: 'structural_steel_painted',
   pipe: 'carbon_steel_pipe_painted',
+  grid: undefined,
+  wall: undefined,
+  door: undefined,
+  window: undefined,
+  slab: undefined,
+  column: undefined,
+  beam: undefined,
+  stair: undefined,
+  room: undefined,
+  footing: undefined,
+  panel: undefined,
+  plate: undefined,
+  curvedWall: undefined,
+  assembly: undefined,
 };
 
 /** Structural elements take their class from the material text: steel members are painted steel, concrete elements are concrete. */

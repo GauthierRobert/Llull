@@ -146,7 +146,7 @@ function buildingWithPlatforms(): CadDocument {
     bearingBarDirection: [1, 0],
     railing: {},
   });
-  return run(deck.document, 'add_pipe_rack', {
+  const rack = run(deck.document, 'add_pipe_rack', {
     origin: [mm(60000), 0],
     direction: [1, 0],
     length: mm(6000),
@@ -157,6 +157,24 @@ function buildingWithPlatforms(): CadDocument {
     tierBeamProfile: 'IPE200',
     bracingBays: [1],
     bracingProfile: 'L100x10',
+  });
+  const winder = run(rack.document, 'add_winder_stair', {
+    start: [mm(30000), mm(-8000), 0],
+    rise: mm(3000),
+    riserMax: mm(180),
+    going: mm(280),
+    straightTreads: 3,
+    winders: 3,
+    turn: 'left',
+  });
+  return run(winder.document, 'add_spiral_stair', {
+    start: [mm(36000), mm(-8000), 0],
+    rise: mm(3000),
+    riserMax: mm(180),
+    outerRadius: mm(900),
+    treadAngle: Math.PI / 8,
+    turn: 'left',
+    columnProfile: 'CHS168.3x6.3',
   }).document;
 }
 

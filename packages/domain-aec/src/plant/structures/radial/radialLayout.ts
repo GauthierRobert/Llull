@@ -28,6 +28,9 @@ export interface WinderInput {
   readonly stringerDepth: number;
 }
 
+/** Most risers of a radial stair (a larger count is a unit mistake). */
+export const MAX_RADIAL_RISERS = 200;
+
 /** Plan arc step of a sector tread (tessellation of the outline, not an engineering value). */
 const ARC_STEP = Math.PI / 18;
 
