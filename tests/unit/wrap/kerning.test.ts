@@ -9,7 +9,9 @@ import { describe, expect, it } from 'vitest';
 import { parseFont, type ParsedFont } from '@lib/font/font';
 import { layoutText } from '@lib/font/layout';
 import { buildFont, squareContour, type FontSpec, type GlyphSpec } from './fontBuilder';
-import { buildGpos, type GposLookup } from './gposBuilder';
+import { buildGdef, buildGpos, type GposLookup } from './gposBuilder';
+import { GDEF_STORE } from './kernedFont';
+import { variable } from './variableTrueType';
 import { firaBytes } from './fixtures';
 
 interface KerningReference {
@@ -222,5 +224,130 @@ describe('multi-line text (M4)', () => {
       layoutText(fira, 'L', options).glyphs[0]?.loops[0]?.[0]?.from[0] as number,
       9,
     );
+  });
+});
+
+describe('GPOS device deltas at an instance (GDEF 1.3 variation store)', () => {
+  // GDEF_STORE: wght+ region (0, 1, 1); row 0 is the decoy delta (+900, must never apply), rows 1..4: +40, -30, +5, 0
+  const store = GDEF_STORE;
+  const fontBytes = (gpos: readonly number[], gdef: readonly number[] = buildGdef(store)): Uint8Array =>
+    variable({ tables: { GPOS: gpos, GDEF: gdef } });
+  const font = (
+    lookups: readonly GposLookup[],
+    variation: Record<string, number> = {},
+    gdef: readonly number[] = buildGdef(store),
+  ): ParsedFont => {
+    const parsed = parseFont(fontBytes(buildGpos(lookups), gdef), variation);
+    if (!parsed.ok) throw new Error(`${parsed.code}: ${parsed.message}`);
+    return parsed.font;
+  };
+  const at = (lookups: readonly GposLookup[], left: number, right: number): number[] => [
+    font(lookups).kerning(left, right),
+    font(lookups, { wght: 900 }).kerning(left, right),
+    font(lookups, { wght: 650 }).kerning(left, right),
+  ];
+  const pairs = [
+    [1, 2, -80, { outer: 0, inner: 1 }],
+    [1, 3, -80, { outer: 0, inner: 2 }],
+    [1, 4, -80, { outer: 0, inner: 3 }],
+    [2, 1, -80, { ppem: true }],
+    [2, 3, -80, { outer: 0xffff, inner: 0xffff }],
+    [2, 4, -80],
+  ] as const;
+  /** default, wght 900 (scalar 1) and wght 650 (scalar 0.5, rounded half up: +20, -15, +2.5 -> 3) for the pairs above */
+  const EXPECTED = [
+    [-80, -40, -60],
+    [-80, -110, -95],
+    [-80, -75, -77],
+    [-80, -80, -80],
+    [-80, -80, -80],
+    [-80, -80, -80],
+  ];
+  const checkAll = (lookups: readonly GposLookup[]): void =>
+    pairs.forEach(([left, right], k) => expect(at(lookups, left, right), `pair ${left},${right}`).toEqual(EXPECTED[k]));
+
+  it.each([0x44, 0x74, 0x7c, 0xf5])(
+    'format 1, ValueFormat1 %i: the XAdvDevice is found after the placement / placement-device fields; its row moves the kerning, a ppem or 0xFFFF index does not',
+    (valueFormat) => {
+      checkAll([{ type: 2, subtables: [{ format: 1, pairs, valueFormat }] }]);
+      checkAll([{ type: 9, subtables: [{ format: 1, pairs, valueFormat, coverage: 2 }] }]);
+    },
+  );
+
+  it('format 1, ValueFormat1 0x40 alone: no static advance, the device delta alone (+40 at wght 900, +20 at 650)', () => {
+    const lookups: GposLookup[] = [{ type: 2, subtables: [{ format: 1, pairs: [[1, 2, 0, { outer: 0, inner: 1 }]], valueFormat: 0x40 }] }];
+    expect(at(lookups, 1, 2)).toEqual([0, 40, 20]);
+  });
+
+  it('format 2 with ValueFormat2 0x55: the second glyph record is skipped by its size and the first record device moves the class pair', () => {
+    const lookups: GposLookup[] = [
+      {
+        type: 2,
+        subtables: [
+          {
+            format: 2,
+            covered: [1, 2],
+            firstClasses: [
+              [1, 1, 1],
+              [2, 2, 2],
+            ],
+            secondClasses: [
+              [3, 3, 1],
+              [4, 4, 2],
+            ],
+            values: [
+              [0, 0, 0],
+              [0, -80, -80],
+              [0, -80, -80],
+            ],
+            valueFormat1: 0x74,
+            valueFormat2: 0x55,
+            devices: [[], [undefined, { outer: 0, inner: 1 }, { outer: 0, inner: 2 }], [undefined, { ppem: true }, undefined]],
+          },
+        ],
+      },
+    ];
+    expect(at(lookups, 1, 3)).toEqual([-80, -40, -60]);
+    expect(at(lookups, 1, 4)).toEqual([-80, -110, -95]);
+    expect(at(lookups, 2, 3)).toEqual([-80, -80, -80]);
+    expect(at(lookups, 2, 4)).toEqual([-80, -80, -80]);
+  });
+
+  it('a GDEF older than 1.3 or without a store keeps the static value at every instance; a damaged store refuses the instance and never the default', () => {
+    const lookups: GposLookup[] = [{ type: 2, subtables: [{ format: 1, pairs: [pairs[0]], valueFormat: 0x44 }] }];
+    expect(font(lookups, { wght: 900 }, buildGdef(store, 2)).kerning(1, 2)).toBe(-80);
+    expect(font(lookups, { wght: 900 }, []).kerning(1, 2)).toBe(-80);
+    const noStore = buildGdef(store);
+    noStore.splice(14, 4, 0, 0, 0, 0);
+    expect(font(lookups, { wght: 900 }, noStore).kerning(1, 2)).toBe(-80);
+    const damaged = buildGdef(store);
+    damaged.splice(14, 4, 0x7f, 0xff, 0xff, 0xff);
+    expect(font(lookups, {}, damaged).kerning(1, 2)).toBe(-80);
+    expect(parseFont(fontBytes(buildGpos(lookups), damaged), { wght: 900 })).toMatchObject({ ok: false, code: 'WRP_FONT_PARSE' });
+  });
+
+  it('a device offset past the subtable, an inner row past the store and an outer index past the store raise WRP_FONT_PARSE when the pair is asked', () => {
+    const good = buildGpos([{ type: 2, subtables: [{ format: 1, pairs: [pairs[0]], valueFormat: 0x44 }] }]);
+    const kerningOf = (gpos: readonly number[]): number | string => {
+      const parsed = parseFont(fontBytes(gpos), { wght: 900 });
+      if (!parsed.ok) return parsed.code;
+      try {
+        return parsed.font.kerning(1, 2);
+      } catch (error) {
+        return (error as { code?: string }).code ?? 'unexpected';
+      }
+    };
+    expect(kerningOf(good)).toBe(-40);
+    // tail of the table: [device offset u16] [coverage 6 bytes] [decoy block 8] [device block 8: outer, inner, 0x8000, 0]
+    const offset = [...good];
+    offset[good.length - 24] = 0xff;
+    offset[good.length - 23] = 0xff;
+    expect(kerningOf(offset)).toBe('WRP_FONT_PARSE');
+    const inner = [...good];
+    inner[good.length - 6] = 0x7f;
+    expect(kerningOf(inner)).toBe('WRP_FONT_PARSE');
+    const outer = [...good];
+    outer[good.length - 8] = 0x7f;
+    expect(kerningOf(outer)).toBe('WRP_FONT_PARSE');
   });
 });

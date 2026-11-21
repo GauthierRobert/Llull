@@ -10,6 +10,7 @@ Per instance (wght user coordinates) and glyph:
   outlineStatic  the same glyph of the STATIC instance made by `fontTools.varLib.instancer` (coordinates rounded to font units, as when it is compiled)
   advance        `hmtx` of that static instance (HVAR applied and rounded by the instancer)
 kerning        HarfBuzz (uharfbuzz) `kern` feature at the location: x advance of the first glyph with kern minus without, for KERN_PAIRS (GPOS pair adjustment + GDEF variation store)
+kerningSweep   the same for every integer wght 200..900 (index = wght - 200) for SWEEP_PAIRS
 Contours are lists of segments: ["M", x, y] / ["L", x, y] / ["C", x1, y1, x2, y2, x, y] (fontTools RecordingPen, closePath implied).
 """
 
@@ -28,9 +29,10 @@ here = Path(__file__).resolve().parent
 path = Path(sys.argv[1]) if len(sys.argv) > 1 else here / "data/reference/sourcesans3/SourceSans3VF-Italic.otf"
 sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
 
-COORDS = [200, 300, 400, 500, 650, 700, 900]
+COORDS = [200, 225, 300, 349, 356, 400, 500, 650, 700, 900]  # 225 / 349 / 356: where a rounding at the avar input showed
 OUTLINE_CHARS = "HogaAg&f1ß"
-KERN_PAIRS = ["AV", "To", "Te", "Wa", "LT", "r.", "fi", "AT", "P,", "Yo", "ij", "7."]
+KERN_PAIRS = ["AV", "To", "Te", "Wa", "LT", "r.", "fi", "AT", "P,", "Yo", "ij", "7.", "AC", "BY"]
+SWEEP_PAIRS = ["AV", "To", "Wa", "AC", "BY", "P,"]
 ADVANCE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,&@fi"
 
 
@@ -98,6 +100,7 @@ out = {
     "tables": sorted(k for k in font.keys() if k != "GlyphOrder"),
     "glyphIndex": {ch: order.index(names[ch]) for ch in sorted(names)},
     "instances": {},
+    "kerningSweep": {},
 }
 for wght in COORDS:
     static = instancer.instantiateVariableFont(TTFont(path), {"wght": wght})
@@ -111,5 +114,7 @@ for wght in COORDS:
         "outline": {ch: rounded(draw(live, names[ch]), 4) for ch in OUTLINE_CHARS},
         "outlineStatic": {ch: draw(static_set, names[ch]) for ch in OUTLINE_CHARS},
     }
+for pair in SWEEP_PAIRS:
+    out["kerningSweep"][pair] = [kerning_at(hb_font, w, pair) for w in range(200, 901)]  # index = wght - 200
 Path(here / "data/cff2_sourcesans3_italic_refs.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf8")
 print("ok", fontTools.version, sha256)
