@@ -1,0 +1,364 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    200,
+    150,
+    80
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "box"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    300,
+    200,
+    5
+   ],
+   "position": [
+    -50,
+    -25,
+    -5
+   ],
+   "anchor": "min"
+  },
+  "as": "structure"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    400,
+    300,
+    2
+   ],
+   "position": [
+    -100,
+    -75,
+    -7
+   ],
+   "anchor": "min"
+  },
+  "as": "skin"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "strap_cu",
+   "designation": "validation test record",
+   "productForm": "strap",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "define_property_model",
+  "params": {
+   "material": "strap_cu",
+   "model": {
+    "id": "rho_lin",
+    "property": "electricalResistivity",
+    "unit": "ohm*m",
+    "variables": [
+     {
+      "variable": "T",
+      "unit": "degC"
+     }
+    ],
+    "form": {
+     "kind": "linearCoefficient",
+     "variable": "T",
+     "referenceValue": 1.7241e-08,
+     "coefficient": 0.00393,
+     "reference": 20
+    },
+    "validity": [
+     {
+      "variable": "T",
+      "unit": "degC",
+      "data": [
+       -55,
+       150
+      ]
+     }
+    ],
+    "basis": "company",
+    "source": {
+     "citation": "test input of this validation case (not a property claim)"
+    },
+    "preferred": true
+   }
+  }
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "cfrp_skin",
+   "designation": "validation test record",
+   "productForm": "laminate",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "cfrp_skin",
+   "entityIds": [
+    "$skin"
+   ]
+  }
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "white_paint",
+   "designation": "validation test record",
+   "productForm": "coating",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "define_property_model",
+  "params": {
+   "material": "white_paint",
+   "model": {
+    "id": "abs_bol",
+    "property": "absorptivitySolar",
+    "unit": "1",
+    "variables": [],
+    "form": {
+     "kind": "constant",
+     "value": 0.2
+    },
+    "validity": [],
+    "basis": "company",
+    "condition": {
+     "lifeState": "BOL"
+    },
+    "source": {
+     "citation": "test input of this validation case (not a property claim)"
+    },
+    "preferred": true
+   }
+  }
+ },
+ {
+  "command": "define_property_model",
+  "params": {
+   "material": "white_paint",
+   "model": {
+    "id": "eps_ht",
+    "property": "emissivityIr",
+    "unit": "1",
+    "variables": [],
+    "form": {
+     "kind": "constant",
+     "value": 0.9
+    },
+    "validity": [],
+    "basis": "company",
+    "condition": {
+     "opticalKind": "hemispherical_total"
+    },
+    "source": {
+     "citation": "test input of this validation case (not a property claim)"
+    },
+    "preferred": true
+   }
+  }
+ },
+ {
+  "command": "assign_surface_coating",
+  "params": {
+   "entityId": "$skin",
+   "coating": "white_paint"
+  }
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "alodine_test",
+   "designation": "validation test record",
+   "productForm": "coating",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "assign_surface_coating",
+  "params": {
+   "entityId": "$structure",
+   "coating": "alodine_test",
+   "location": "bonded_interface",
+   "electrical": "conductive",
+   "source": {
+    "citation": "test input of this validation case (not a property claim)"
+   }
+  }
+ },
+ {
+  "command": "set_lightning_zone",
+  "params": {
+   "entityId": "$skin",
+   "zone": "2A",
+   "source": {
+    "citation": "zoning drawing of this validation case (test input)"
+   }
+  }
+ },
+ {
+  "command": "set_lightning_zone",
+  "params": {
+   "entityId": "$box",
+   "zone": "3",
+   "source": {
+    "citation": "zoning drawing of this validation case (test input)"
+   }
+  }
+ },
+ {
+  "command": "define_bond_path",
+  "params": {
+   "name": "box_to_structure_hot",
+   "from": "$box",
+   "to": "$structure",
+   "elements": [
+    {
+     "kind": "joint",
+     "resistance": {
+      "value": 0.5,
+      "unit": "mohm"
+     },
+     "source": {
+      "citation": "test input of this validation case (not a property claim)"
+     },
+     "interfaces": [
+      "$box",
+      "$structure"
+     ]
+    },
+    {
+     "kind": "strap",
+     "material": "strap_cu",
+     "length": {
+      "value": 1000,
+      "unit": "mm"
+     },
+     "crossSection": {
+      "value": 10,
+      "unit": "mm^2"
+     }
+    }
+   ],
+   "limit": {
+    "value": 2.5,
+    "unit": "mohm",
+    "ruleId": "bond_class_R_test",
+    "source": {
+     "citation": "rule table entry for this test (unverified)"
+    }
+   },
+   "temperature": {
+    "value": 75,
+    "unit": "degC"
+   }
+  },
+  "as": "p1"
+ },
+ {
+  "command": "check_bonding",
+  "params": {}
+ },
+ {
+  "command": "electrical_resistance",
+  "params": {
+   "material": "strap_cu",
+   "length": {
+    "value": 1,
+    "unit": "m"
+   },
+   "crossSection": {
+    "value": 1,
+    "unit": "mm^2"
+   },
+   "temperature": {
+    "value": 75,
+    "unit": "degC"
+   }
+  }
+ },
+ {
+  "command": "shield_absorption",
+  "params": {
+   "resistivity": {
+    "value": 1.7241e-08,
+    "unit": "ohm*m"
+   },
+   "thickness": {
+    "value": 0.1,
+    "unit": "mm"
+   },
+   "frequency": {
+    "value": 1,
+    "unit": "MHz"
+   },
+   "mur": 1
+  }
+ },
+ {
+  "command": "normal_reflectance",
+  "params": {
+   "n1": 1,
+   "n2": 1.5,
+   "k": 0
+  }
+ },
+ {
+  "command": "optical_balance",
+  "params": {
+   "entityId": "$skin",
+   "solarFlux": {
+    "value": 1361,
+    "unit": "W/m^2"
+   },
+   "radiatingFaces": 1,
+   "incidenceAngle": {
+    "value": 0,
+    "unit": "deg"
+   }
+  }
+ },
+ {
+  "command": "check_surface_properties",
+  "params": {}
+ }
+]

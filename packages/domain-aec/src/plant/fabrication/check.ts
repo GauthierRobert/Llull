@@ -23,6 +23,7 @@ import { nodeKey } from './joints';
 import type { IsoIssue } from './model';
 import { missingSkeyIds } from './pcf/pcfMap';
 import { violationsOf } from './spools';
+import { appendAll } from '@lib/appendAll';
 
 export interface CheckIssue extends IsoIssue {
   readonly lineId: string;
@@ -101,7 +102,7 @@ export function checkLine(doc: CadDocument, lineId: string, options: CheckOption
   ): void => {
     found.push(isoIssue(code, severity, message, ids, paths));
   };
-  found.push(...network.warnings);
+  appendAll(found, network.warnings);
   if (analysis.read.staleWelds.length > 0)
     add(
       'ISO_FIELD_WELD_STALE',

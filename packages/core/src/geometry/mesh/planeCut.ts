@@ -21,7 +21,7 @@ export interface CutResult {
 type Point2 = readonly [number, number];
 
 const unit = (v: Vec3): Vec3 => {
-  const length = Math.hypot(...v);
+  const length = Math.hypot(v[0], v[1], v[2]);
   return [v[0] / length, v[1] / length, v[2] / length];
 };
 

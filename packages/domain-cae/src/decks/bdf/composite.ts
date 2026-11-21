@@ -12,6 +12,7 @@ import { compositePlane, laminaProblem, projectedAxis } from '../../shell/shellD
 import { isLaminateRefusal, laminateOf } from '../../shell/laminate';
 import { cardLines } from './fields';
 import { COMPOSITE_CID_BASE, failed, real, refusal, type Rounding } from './model';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * Cards of one composite shell part: CORD2R, MAT8 per lamina (ids from `nextMid`), PCOMP `pid`.
@@ -52,7 +53,7 @@ export function compositeCards(
     ...axis0.map((c): [number, string] => [c, 'rosette axis']),
   ]);
   if (!Array.isArray(frame)) return frame;
-  lines.push(...cardLines('CORD2R', [String(cid), '', '0.', '0.', '0.', ...frame]));
+  appendAll(lines, cardLines('CORD2R', [String(cid), '', '0.', '0.', '0.', ...frame]));
   const mids = new Map<string, number>();
   const factor = stressPerMpa(ctx.unitSystem);
   for (const ply of plies) {
@@ -72,7 +73,7 @@ export function compositeCards(
       [lamina.density === undefined ? 0 : densityToAnalysis(lamina.density, ctx.doc.units, ctx.unitSystem), 'density'],
     ]);
     if (!Array.isArray(fields)) return fields;
-    lines.push(...cardLines('MAT8', [String(mid), ...fields]));
+    appendAll(lines, cardLines('MAT8', [String(mid), ...fields]));
     comments.push(
       `$ llull: material ${mid} = lamina '${ply.materialName}' (MAT8, ${lamina.G13 === undefined ? 'G1Z = G12, ' : ''}${lamina.G23 === undefined ? 'G2Z = G1Z' : 'G2Z = G23'})`,
     );
@@ -89,7 +90,7 @@ export function compositeCards(
     if (!Array.isArray(fields)) return fields;
     plyFields.push(String(mids.get(ply.materialName) ?? 0), fields[0] ?? '', fields[1] ?? '', 'YES');
   }
-  lines.push(...cardLines('PCOMP', [String(pid), z0, '', '', '', '', '', '', ...plyFields]));
+  appendAll(lines, cardLines('PCOMP', [String(pid), z0, '', '', '', '', '', '', ...plyFields]));
   comments.push(
     `$ llull: property ${pid} = composite part '${laminate.compositePartId}' ${plies.length} plies bottom to top along the element normal, material system CORD2R ${cid}`,
   );

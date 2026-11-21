@@ -10,6 +10,7 @@ import { getCommand } from '@core/commands/registry';
  * `defineCommand(` (a file-level helper) counts for every command of the file.
  */
 const KERNEL_HELPERS: readonly string[] = [
+  'rebuildDerivedMeshes', // commands/persistence/derivedMeshes: re-evaluates omitted kernel-result meshes (load_document is kernelOptional)
   'resolveMassProperties', // geometry/resolveMassProperties: exact mass through ctx.kernel
   'bodyMassProperties', // geometry/bodyMassProperties: rigid-body mass through a kernel
   'runFlight', // domain-dynamics flight/flightRun: the flight model's mass properties through a kernel
@@ -27,6 +28,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'evaluateRecipe',
   'operandRecipe',
   'collectParts', // geometry/assemblyParts
+  'kernelContacts', // domain-cae corrosion/exactContacts: AABB contacts resolved through the kernel distance
   'openSolid', // geometry/pmiFeatures
   'createSolidLookup', // pmi/refresh
   'kernelStampOf', // persistence/kernelStamp
@@ -114,6 +116,7 @@ const KERNEL_HELPERS: readonly string[] = [
 const ALLOWLIST: Readonly<Record<string, string>> = {
   kernel_info: 'its data IS the kernel description (name, version, capabilities): a provenance on top would repeat it',
   set_modeling_tolerance: 'the kernel only names the stamp stored beside the tolerance; no geometry is computed',
+  set_mesh_storage: 'the kernel only names the stamp stored beside the setting; no geometry is computed',
 };
 
 const root = resolve(__dirname, '../../../packages');

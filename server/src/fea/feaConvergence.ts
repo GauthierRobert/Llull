@@ -10,7 +10,7 @@ import { execute } from '@core/commands/registry';
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
-import type { ConvergenceStudyOptions, FeaHost, FeaToolResult } from '@protocol/index';
+import type { ConvergenceStudyOptions, FeaHost, FeaSolveOptions, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import { feaFailure } from './feaCommon';
@@ -23,7 +23,7 @@ export interface FeaConvergenceDeps {
   /** The fea_mesh transport (the real one in the port; a fake in the tests). */
   readonly mesh: (analysisId: string, host: FeaHost) => Promise<FeaToolResult>;
   /** The fea_solve transport. */
-  readonly solve: (analysisId: string, options: { readonly timeoutS?: number }, host: FeaHost) => Promise<FeaToolResult>;
+  readonly solve: (analysisId: string, options: FeaSolveOptions, host: FeaHost) => Promise<FeaToolResult>;
 }
 
 /**

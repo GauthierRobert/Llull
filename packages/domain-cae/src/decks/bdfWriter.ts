@@ -5,8 +5,7 @@
 
 import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
+import { artifactHash } from '../shared/artifactHash';
 import { analysisInputHash } from '../hash/inputHash';
 import { bindingMarker } from '../results/inputBinding';
 import { largest } from '../shared/largest';
@@ -29,6 +28,7 @@ import {
   type Rounding,
 } from './bdf/model';
 import { commentText, linesText } from './format';
+import { appendAll } from '@lib/appendAll';
 
 export type BdfResult = { readonly text: string; readonly warnings: readonly string[] } | DeckRefusal;
 
@@ -96,8 +96,8 @@ export function writeBdf(doc: CadDocument, analysisId: string, mesh: FeMeshArtif
     if (!isCompositePart(ctx, entityId)) continue;
     const laminate = compositeCards(ctx, entityId, pid, nextMid, track);
     if ('code' in laminate) return laminate;
-    properties.lines.push(...laminate.lines);
-    properties.comments.push(...laminate.comments);
+    appendAll(properties.lines, laminate.lines);
+    appendAll(properties.comments, laminate.comments);
     nextMid += laminate.materials;
   }
   const supports = analysis.type === 'modal' && analysis.constraintOrder.length === 0 ? null : constraintCards(ctx, SPC_SET, shells);
@@ -124,11 +124,11 @@ export function writeBdf(doc: CadDocument, analysisId: string, mesh: FeMeshArtif
     for (const [node, component, value] of supports?.enforced ?? []) {
       const displacement = real(value, 'enforced displacement', track);
       if (failed(displacement)) return displacement;
-      enforced.push(...cardLines('SPCD', [String(sid), String(node), String(component), displacement]));
+      appendAll(enforced, cardLines('SPCD', [String(sid), String(node), String(component), displacement]));
     }
-    bulkLoads.push(...found.loads, ...enforced);
-    rigid.push(...found.rigid);
-    comments.push(`$ llull: load case ${index + 1} = '${commentText(name)}' -> LOAD ${sid}`, ...found.comments);
+    appendAll(bulkLoads, [...found.loads, ...enforced]);
+    appendAll(rigid, found.rigid);
+    appendAll(comments, [`$ llull: load case ${index + 1} = '${commentText(name)}' -> LOAD ${sid}`, ...found.comments]);
     control.push(`SUBCASE ${index + 1}`, `  LABEL = ${commentText(name, 60)}`, `  LOAD = ${sid}`);
   }
   const method = analysis.type === 'static' ? [] : eigrl(ctx, track);
@@ -136,7 +136,7 @@ export function writeBdf(doc: CadDocument, analysisId: string, mesh: FeMeshArtif
   if (analysis.type === 'modal') control.push('SUBCASE 1', '  LABEL = modes', `  METHOD = ${METHOD_SET}`);
   if (analysis.type === 'buckling') control.push('SUBCASE 2', '  LABEL = buckling', `  METHOD = ${METHOD_SET}`, '  STATSUB = 1');
   const solution = SOLUTIONS[analysis.type];
-  const meshHash = sha256Hex(canonicalJson(mesh));
+  const meshHash = artifactHash(mesh);
   const inputHash = analysisInputHash(doc, analysisId, 'full');
   const header = [
     `$ llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${inputHash} meshHash ${meshHash}`,

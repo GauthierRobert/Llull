@@ -6,6 +6,7 @@ import { applyEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { mapPoles, mapSurfacePoles } from './curveWarp';
+import { appendAll } from '../../lib/appendAll';
 
 const place =
   (entity: NurbsCurveEntity | NurbsSurfaceEntity | MeshSolidEntity): ((pole: Vec3) => Vec3) =>
@@ -26,6 +27,9 @@ export function worldMeshPositions(entity: MeshSolidEntity): number[] {
   const to = place(entity);
   const out: number[] = [];
   for (let k = 0; k + 2 < entity.mesh.positions.length; k += 3)
-    out.push(...to([entity.mesh.positions[k] as number, entity.mesh.positions[k + 1] as number, entity.mesh.positions[k + 2] as number]));
+    appendAll(
+      out,
+      to([entity.mesh.positions[k] as number, entity.mesh.positions[k + 1] as number, entity.mesh.positions[k + 2] as number]),
+    );
   return out;
 }

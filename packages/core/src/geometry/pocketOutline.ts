@@ -6,6 +6,7 @@ import { arcGeometry, filletClosedPolygon, mapSegment, sampleProfile, segmentPoi
 import { isValidPolygon, projectOntoSegment, toCounterClockwise } from '../lib/polygon';
 import { dot3, len3, sub3 } from '../lib/vec3';
 import { positiveSweep } from '../lib/angle';
+import { minOf } from '../lib/arrayExtrema';
 
 export interface PocketOutline {
   readonly curves: readonly CurveSegment<Vec2>[];
@@ -60,7 +61,7 @@ export function distanceToOutline(curves: readonly CurveSegment<Vec2>[], p: Vec2
     const relative = sub3([p[0], p[1], 0], arc.center);
     const angle = positiveSweep(Math.atan2(dot3(relative, arc.v), dot3(relative, arc.u)));
     const ends = [segment.points[0], segment.points[2]].map((end) => Math.hypot(end[0] - p[0], end[1] - p[1]));
-    best = Math.min(best, angle <= arc.sweep ? Math.abs(len3(relative) - arc.radius) : Math.min(...ends));
+    best = Math.min(best, angle <= arc.sweep ? Math.abs(len3(relative) - arc.radius) : minOf(ends));
   }
   return best;
 }

@@ -4,6 +4,7 @@
  */
 
 import type { Vec3 } from '../../model/vectors';
+import { maxOf } from '../../lib/arrayExtrema';
 
 export class VertexGrid {
   private readonly cell: number;
@@ -28,7 +29,7 @@ export class VertexGrid {
         hi[a] = Math.max(hi[a] as number, positions[3 * v + a] as number);
       }
     this.origin = [lo[0] as number, lo[1] as number, lo[2] as number];
-    const extent = Math.max(...[0, 1, 2].map((a) => (hi[a] as number) - (lo[a] as number)), 0);
+    const extent = Math.max(maxOf([0, 1, 2].map((a) => (hi[a] as number) - (lo[a] as number))), 0);
     this.cell = extent > 0 ? extent / Math.max(1, Math.cbrt(used.length)) : 1;
     for (const v of used) {
       const index = this.indexOf([positions[3 * v] as number, positions[3 * v + 1] as number, positions[3 * v + 2] as number]);
@@ -62,13 +63,13 @@ export class VertexGrid {
       }
     };
     // shells nearer than the occupied box are empty; shells beyond its far corner cannot hold anything
-    const gap = Math.max(
-      ...[0, 1, 2].map((a) =>
+    const gap = maxOf(
+      [0, 1, 2].map((a) =>
         Math.max(0, (this.lowCell[a] as number) - (home[a] as number), (home[a] as number) - (this.highCell[a] as number)),
       ),
     );
-    const reach = Math.max(
-      ...[0, 1, 2].map((a) =>
+    const reach = maxOf(
+      [0, 1, 2].map((a) =>
         Math.max(Math.abs((home[a] as number) - (this.lowCell[a] as number)), Math.abs((this.highCell[a] as number) - (home[a] as number))),
       ),
     );

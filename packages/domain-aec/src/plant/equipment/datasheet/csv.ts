@@ -32,6 +32,8 @@ const NOZZLE_COLUMNS = [
   'flangeUnverified',
   'flangeCatalogRef',
   'flangeSource',
+  'padOutsideDiameterMm',
+  'padThicknessMm',
 ] as const;
 
 /** Keys whose unit is not a camelCase suffix (the exact names the composed queries use). */
@@ -137,6 +139,8 @@ export function nozzlesCsv(sheet: Datasheet): string {
       cell(flange['unverified']),
       cell(flange['catalogRef']),
       cell(flange['source']),
+      cell((nozzle['pad'] as Obj | undefined)?.['outsideDiameterMm']),
+      cell((nozzle['pad'] as Obj | undefined)?.['thicknessMm']),
     ];
   });
   return csvLines(NOZZLE_COLUMNS, guardRows(rows));

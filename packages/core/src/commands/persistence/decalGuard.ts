@@ -6,11 +6,12 @@
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
+import { hypotOf } from '../../lib/hypotOf';
 
 /** Largest mask side the decal producer emits. */
 const MAX_MASK_SIDE = 1024;
 
-const nonZero = (v: unknown): boolean => isVec3(v) && Math.hypot(...(v as readonly number[])) > 1e-12;
+const nonZero = (v: unknown): boolean => isVec3(v) && hypotOf(v as readonly number[]) > 1e-12;
 
 function wrapProblem(wrap: unknown): string | null {
   if (!isRecord(wrap)) return 'wrap must be a cylinder or cone surface';

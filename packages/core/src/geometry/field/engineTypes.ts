@@ -40,7 +40,13 @@ export interface MeshOptions {
 export interface FieldMeshResult {
   readonly ok: true;
   readonly mesh: MeshData;
+  /** `isClosedManifold(mesh)` (`lib/isosurface/measures`): callers take it instead of testing the mesh again. */
   readonly closedManifold: boolean;
+  /**
+   * Signed volume and area of `mesh`, when the engine computed them with it: bit-identical to `meshMeasures(mesh)` (same expressions, triangle
+   * order and `Math.hypot`), so a caller may take them instead of walking the triangles. Absent: the caller measures the mesh itself.
+   */
+  readonly measures?: { readonly volume: number; readonly area: number };
   /** Grid nodes (the budgeted quantity). */
   readonly samples: number;
   /** Nodes actually evaluated (the rest were proved empty / full by interval pruning). */
@@ -174,6 +180,11 @@ export interface FieldEngine {
     readonly maxStoredTriangles?: number;
   };
   evaluate(program: FieldProgram, points: Float64Array, withGradient: boolean): FieldSamples;
+  /**
+   * @invariant `closedManifold` and `measures` describe exactly the returned `mesh`, after every post-pass the engine applies (welding, budget
+   * trimming, ...): they are remembered per mesh and per mesh asset key and answered instead of the mesh (server/tests/fieldNative.test.ts parity
+   * suite is the contract test every engine must pass)
+   */
   mesh(program: FieldProgram, grid: FieldGrid, options: MeshOptions): FieldMeshResult | FieldRefusal;
   measure(program: FieldProgram, grid: FieldGrid, region: FieldProgram | null, request: MeasureRequest): FieldMeasures | FieldRefusal;
   /** Periodic numerical homogenisation of a unit cell on the voxel FE solver; absent in an engine that has none (the TypeScript engine). */

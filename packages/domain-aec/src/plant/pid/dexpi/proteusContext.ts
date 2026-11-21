@@ -7,6 +7,7 @@ import type { Vec2 } from '@core/model/vectors';
 import type { PidItem, PidValue } from '../model';
 import { dexpiIssue, type DexpiIssue, type DexpiSeverity } from './codes';
 import { KNOWN_UNITS } from './proteusClasses';
+import { appendAll } from '@lib/appendAll';
 
 /** What a DEXPI object id stands for once its item exists. */
 export type Ref =
@@ -97,7 +98,7 @@ export function lineCoordinates(ctx: ImportContext, line: XmlElement): Vec2[] {
 /** The points of all `CenterLine` children of `el`, in order (mm). */
 export function centerLinePoints(ctx: ImportContext, el: XmlElement): Vec2[] {
   const points: Vec2[] = [];
-  for (const line of xmlChildren(el, 'CenterLine')) points.push(...lineCoordinates(ctx, line));
+  for (const line of xmlChildren(el, 'CenterLine')) appendAll(points, lineCoordinates(ctx, line));
   return points;
 }
 

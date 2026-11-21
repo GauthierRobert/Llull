@@ -17,6 +17,7 @@ import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { cross3, dot3, len3, normalize3, map3 } from '../../lib/vec3';
 import type { DeformPlan } from './request';
 import { type DeformTarget, type Refusal, defaultTolerance, resolveTargetFrame } from './target';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** The target surface in world coordinates and which side its normal points to. */
 export interface TargetSurface {
@@ -139,8 +140,8 @@ export function planSheetBase(
       paths: ['params.base.sheetId'],
     };
   const range = (read: (c: readonly [number, number, number, number]) => number): [number, number] => [
-    Math.min(...coordinates.map(read)),
-    Math.max(...coordinates.map(read)),
+    minOf(coordinates.map(read)),
+    maxOf(coordinates.map(read)),
   ];
   const xRange: [number, number] =
     period === null

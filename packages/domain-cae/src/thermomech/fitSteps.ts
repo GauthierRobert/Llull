@@ -13,6 +13,7 @@ import { convertTo, failed, toKelvin, type Quantity } from './thermoUnits';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { codedRejection, report } from '@core/commands/noop';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const FORMULA = 'D(T) = D_spec (1 + a_sec (T - T_spec))';
 const MAX_ROWS = 200;
@@ -355,7 +356,7 @@ export function fitReport(basis: FitBasis, params: FitParams, rows: readonly Fit
   const failing = rows.filter((row) => row.code !== undefined);
   const summary =
     `fit_at_temperature: ${rows.length} row(s), nominal ${hole.nominal} ${doc.units}, intent ${intent}${params.intent === undefined ? ' (derived from the limits)' : ''}, ` +
-    `clearance ${Math.min(...rows.map((row) => row.clearance.min)).toPrecision(6)} … ${Math.max(...rows.map((row) => row.clearance.max)).toPrecision(6)} ${doc.units}; ` +
+    `clearance ${minOf(rows.map((row) => row.clearance.min)).toPrecision(6)} … ${maxOf(rows.map((row) => row.clearance.max)).toPrecision(6)} ${doc.units}; ` +
     `${failing.length === 0 ? 'no row violates the intent' : `${failing.length} row(s) flagged ${[...new Set(failing.map((row) => row.code))].join(', ')} (pending human disposition)`}` +
     `${rows.some((row) => row.unverified) ? '; unverified CTE inputs' : ''}; every row needs review by a qualified engineer.`;
   const data = {

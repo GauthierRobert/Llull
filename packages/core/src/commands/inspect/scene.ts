@@ -18,7 +18,7 @@ import {
   type SceneSnapshot,
 } from './sceneTypes';
 import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
-import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing, dimensionText } from '../../geometry/dimensionAnnotation';
+import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing, dimensionStyleOf, dimensionText } from '../../geometry/dimensionAnnotation';
 
 function summarizeDimension(doc: CadDocument, e: DimensionEntity): DimensionSummary {
   const refs = e.entityIds.map((id) => (Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined));
@@ -29,7 +29,8 @@ function summarizeDimension(doc: CadDocument, e: DimensionEntity): DimensionSumm
     entityIds: [...e.entityIds],
     value: drawing ? drawing.value : null,
     unit: e.dimensionKind === 'angular' ? 'deg' : doc.units,
-    text: drawing ? dimensionText(e, drawing.value, doc.displayPrecision) : null,
+    text: drawing ? dimensionText(e, drawing.value, doc.displayPrecision, dimensionStyleOf(doc, e)) : null,
+    ...(e.styleId === undefined ? {} : { styleId: e.styleId }),
   };
 }
 

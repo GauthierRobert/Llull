@@ -12,6 +12,7 @@ import { type AssemblyPart, type CheckTolerances } from './partTypes';
 import { makeItem } from './partValidity';
 import { scale3 } from '../../lib/vec3';
 import { powInt } from '../../lib/powInt';
+import { minOf } from '../../lib/arrayExtrema';
 
 type PairKind = 'hard' | 'containment' | 'touch' | 'clearance';
 
@@ -71,7 +72,7 @@ export function overlapOf(kernel: GeometryKernel, a: AssemblyPart, b: AssemblyPa
     const cross = (extent[(k + 1) % 3] ?? 0) * (extent[(k + 2) % 3] ?? 0);
     return cross > 0 ? analysis.volume / cross : Infinity;
   });
-  return { volume: analysis.volume, depth: Math.min(...depths) };
+  return { volume: analysis.volume, depth: minOf(depths) };
 }
 
 /**

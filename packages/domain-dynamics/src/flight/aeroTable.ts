@@ -4,6 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { hashText } from '@lib/hash';
 import type { AeroTable } from './aeroModel';
+import { minOf } from '@lib/arrayExtrema';
 
 /** One vortex-lattice result row (per angle of attack, for one pivot angle). */
 export interface LatticeRow {
@@ -35,7 +36,7 @@ export function assembleTable(
 ): AssembledTable | null {
   const first = rowsByPivot[0] ?? [];
   const within = first.map((_, a) => clMax === null || rowsByPivot.every((rows) => Math.abs((rows[a] as LatticeRow).cl) <= clMax));
-  const smallest = Math.min(...first.map((row) => Math.abs(row.alphaDeg)));
+  const smallest = minOf(first.map((row) => Math.abs(row.alphaDeg)));
   const centre = first.findIndex((row) => Math.abs(row.alphaDeg) === smallest);
   if (within[centre] !== true) return null;
   let lo = centre;

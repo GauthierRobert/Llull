@@ -22,6 +22,7 @@ import {
 } from '@core/commands/pmi/stackupModel';
 import { feaFailure } from '../fea/feaCommon';
 import { readOutput, withJobFolder, type ComputeRunner } from './computeJob';
+import { maxOf } from '@lib/arrayExtrema';
 
 const TOOL = 'stackup_monte_carlo';
 /** Native cap (`llull_stats::MAX_SAMPLES`, 2^40): chunk counts and the Chan merge products stay exact in f64. */
@@ -74,8 +75,8 @@ function verification(model: StackupModel, native: SamplingStats): Record<string
   return {
     referenceMs: Date.now() - started,
     identical: keys.every((key) => Object.is(reference[key], native[key])),
-    largestRelativeDifference: Math.max(
-      ...keys.map(
+    largestRelativeDifference: maxOf(
+      keys.map(
         (key) => Math.abs(reference[key] - native[key]) / Math.max(Math.abs(reference[key]), Math.abs(native[key]), Number.MIN_VALUE),
       ),
     ),

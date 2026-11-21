@@ -43,14 +43,15 @@ describe('PRB_VARIABLE_NOT_APPLIED warning on a limit state that reads a respons
   });
 });
 
-describe('the result hash exists only for the reviewable study', () => {
+describe('every study option has its own result hash (PRB-b)', () => {
   const doc = rMinusS();
   const run = (extra: Json): ReturnType<typeof execute> =>
     execute(doc, 'run_reliability_study', { limitState: 'g', methods: ['form', 'mc'], seed: 7, samples: 500, ...extra });
+  const hashOf = (extra: Json): unknown => data(run(extra))['resultHash'];
 
-  it('reports one for the defaults', () => {
-    expect(data(run({}))['resultHash']).toMatch(/^[0-9a-f]{64}$/);
-    expect(run({}).summary).not.toContain('No resultHash');
+  it('reports one for the defaults, and the summary names it', () => {
+    expect(hashOf({})).toMatch(/^[0-9a-f]{64}$/);
+    expect(run({}).summary).toContain('resultHash');
   });
 
   it.each([
@@ -58,11 +59,17 @@ describe('the result hash exists only for the reviewable study', () => {
     ['lhs_centred sampling', { sampling: 'lhs_centred' }],
     ['custom maxIterations', { maxIterations: 50 }],
     ['custom tolerance', { tolerance: 1e-6 }],
-  ])('has none, and says why, with %s', (_name, extra) => {
-    const result = run(extra);
-    expect(data(result)['resultHash']).toBeUndefined();
-    expect(result.summary).toContain('No resultHash');
-    expect(result.summary).toContain('lhs sampling');
+  ])('reports a different, reproducible one with %s', (_name, extra) => {
+    expect(hashOf(extra)).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashOf(extra)).toBe(hashOf(extra));
+    expect(hashOf(extra)).not.toBe(hashOf({}));
+    expect(data(run(extra))['resultStudy']).toMatchObject(extra);
+  });
+
+  it('an option no method reads is not part of the study (same result, same hash)', () => {
+    expect(hashOf({ methods: ['form'], sampling: 'mc', seed: 1 })).toBe(hashOf({ methods: ['form'] }));
+    expect(hashOf({ methods: ['fosm'], maxIterations: 5 })).toBe(hashOf({ methods: ['fosm'] }));
+    expect(hashOf({ methods: ['mc', 'form'] })).toBe(hashOf({}));
   });
 });
 

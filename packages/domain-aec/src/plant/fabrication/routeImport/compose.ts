@@ -14,6 +14,7 @@ import { distance3, normalize3, sub3 } from '@lib/vec3';
 import { directionLabel } from '../../piping/legs';
 import { placeableType } from '../supports';
 import type { PlannedPort, PlannedRun, RoutePlan } from './plan';
+import { appendAll } from '@lib/appendAll';
 
 export interface ComposeInput {
   readonly plan: RoutePlan;
@@ -288,7 +289,10 @@ function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionC
       });
       if (placed.rejected === true) return placed;
       const created = (placed.data as { supports?: Array<{ id: string }> } | undefined)?.supports ?? [];
-      supportIds.push(...created.map((entry) => entry.id));
+      appendAll(
+        supportIds,
+        created.map((entry) => entry.id),
+      );
     }
   }
   return { composed: true, document: doc, lineId, runIds, portIds, weldIds, supportIds, droppedSupports, commands, capLengths, plan };

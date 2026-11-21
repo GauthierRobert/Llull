@@ -249,10 +249,23 @@ export interface NozzleFlange {
   readonly source?: string | undefined;
 }
 
+export const NOZZLE_KINDS = ['nozzle', 'manway'] as const;
+export type NozzleKind = (typeof NOZZLE_KINDS)[number];
+
+/** Reinforcing pad of a nozzle (circular plate round the neck, flat: its curvature is not modelled), lengths in document units. */
+export interface NozzlePad {
+  readonly outsideDiameter: number;
+  readonly thickness: number;
+}
+
 export interface NozzleRecord {
   /** Unique per equipment: N1, M1, S1 ... */
   readonly mark: string;
   readonly service?: string;
+  /** `manway` = an access opening a person enters (06 STA reachability reads it); absent or `nozzle` = a process / instrument nozzle. */
+  readonly kind?: NozzleKind;
+  /** Reinforcing pad: geometry, mass and data sheet only; its area (A5) is NOT credited in `nozzle_reinforcement` (no cited source for the A5 formula). */
+  readonly pad?: NozzlePad;
   readonly dn: number;
   /** `CL150` ... `CL2500` or `PN16` ... */
   readonly rating: string;

@@ -12,6 +12,8 @@ files:
   - dist/**
   - assets/**
   - package.json
+  # No runtime node_modules in app.asar: main + preload are bundled (TR-ASC-01); the server ships its own under resources/server.
+  - '!node_modules/**'
 extraResources:
   # llull's own licence (LIC1); third-party notices ship with python/ and native/.
   - from: ../LICENSE

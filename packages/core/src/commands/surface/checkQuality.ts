@@ -18,6 +18,8 @@ import type { ContinuityOrder, ContinuityTolerances, SurfaceAnalysisEngine } fro
 import { currentContext } from '../context';
 import { refuseSrf } from './shared';
 import { sig, sigVec } from './surfaceShared';
+import { maxOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 const LEVELS = ['G0', 'G1', 'G2', 'G3'] as const;
 type Level = (typeof LEVELS)[number];
@@ -201,7 +203,7 @@ export const checkSurfaceQuality = defineCommand({
     const unit = doc.units;
     const placed = sheets.map(placedSurface);
     const size = Math.max(
-      ...placed.map(surfacePoleExtent).flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]]),
+      maxOf(placed.map(surfacePoleExtent).flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]])),
       1e-9,
     );
     const named = (
@@ -234,14 +236,14 @@ export const checkSurfaceQuality = defineCommand({
     const engine = resolveSurfaceAnalysis((ctx ?? currentContext()).surfaceAnalysis);
     const findings: Finding[] = [];
     sheets.forEach((entity, index) =>
-      findings.push(...knotFindings(entity, placed[index] as NurbsSurfaceData, engine, tol, require, samples, unit)),
+      appendAll(findings, knotFindings(entity, placed[index] as NurbsSurfaceData, engine, tol, require, samples, unit)),
     );
     if (sheets.length > 0 && sheets.length <= MAX_SHEETS_FOR_EDGES) {
       const all = placed.map(sidesOf);
       sheets.forEach((entity, i) =>
         (all[i] as ReturnType<typeof sidesOf>).forEach((own, sideIndex) => {
-          const length = Math.max(
-            ...own.points.map((p) =>
+          const length = maxOf(
+            own.points.map((p) =>
               len3([p[0] - (own.points[0] as Vec3)[0], p[1] - (own.points[0] as Vec3)[1], p[2] - (own.points[0] as Vec3)[2]]),
             ),
           );

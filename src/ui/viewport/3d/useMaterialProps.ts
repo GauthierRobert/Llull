@@ -4,7 +4,15 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Material } from '@core/model/types';
 import { type DisplayMode, useViewportStore } from '@ui/store';
-import { SELECTION_EMISSIVE, SELECTION_EMISSIVE_INTENSITY, XRAY_EMISSIVE, XRAY_EMISSIVE_INTENSITY, XRAY_OPACITY } from '../viewportPalette';
+import {
+  SELECTION_EMISSIVE,
+  SELECTION_EMISSIVE_INTENSITY,
+  XRAY_EMISSIVE,
+  XRAY_EMISSIVE_INTENSITY,
+  XRAY_OPACITY,
+  hiddenLineSurface,
+  useViewportPalette,
+} from '../viewportPalette';
 import { displayMetalness } from './displayMetalness';
 
 /** Document-material fields that drive a mesh's PBR surface. */
@@ -48,6 +56,7 @@ export function useMaterialProps({
   ghosted = false,
 }: UseMaterialPropsInput): MaterialProps {
   const displayMode: DisplayMode = useViewportStore((s) => s.displayMode);
+  const { background } = useViewportPalette();
 
   return useMemo((): MaterialProps => {
     const base: MaterialProps = {
@@ -64,7 +73,8 @@ export function useMaterialProps({
       side: THREE.FrontSide,
     };
     if (ghosted) return { ...base, emissiveIntensity: 0, transparent: true, opacity: GHOST_OPACITY, depthWrite: false };
-    if (displayMode === 'wireframe') return { ...base, wireframe: true };
+    // The selection shows as the outline the edge pass draws (forced on in this mode).
+    if (displayMode === 'wireframe') return { ...base, ...hiddenLineSurface(background) };
     if (displayMode === 'xray') {
       const state = selected ? 'selected' : 'idle';
       return {
@@ -82,5 +92,5 @@ export function useMaterialProps({
     return pbrOverride
       ? { ...base, color: pbrOverride.color, roughness: pbrOverride.roughness, metalness: displayMetalness(pbrOverride.metalness) }
       : base;
-  }, [displayMode, selected, color, roughness, metalness, envMapIntensity, pbrOverride, ghosted]);
+  }, [displayMode, selected, color, roughness, metalness, envMapIntensity, pbrOverride, ghosted, background]);
 }

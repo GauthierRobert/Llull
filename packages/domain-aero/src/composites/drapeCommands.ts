@@ -9,6 +9,7 @@ import { type PlyDrapeResult, autoStepLength, drapePly } from './drape/plyDrape'
 import { assessPly, limitsOf } from './drape/producibility';
 import { isUnverified } from '@lib/laminate/provenance';
 import { compositesOf, findPart, findPly, pliesOf } from './state';
+import { minOf } from '@lib/arrayExtrema';
 
 const overrides = {
   stepLength: z
@@ -124,7 +125,7 @@ export const drapePlyCommand = defineCommand({
         },
         limits: { lockingAngleDeg: limits.lock, warningShearDeg: limits.warning ?? null },
         maxShearDeg: sig(worst.maxShearDeg),
-        coverage: sig(Math.min(...drape.pieces.map((piece) => piece.coverage))),
+        coverage: sig(minOf(drape.pieces.map((piece) => piece.coverage))),
         maxShearNode: worst.maxShearNode === null ? null : { ...worst.maxShearNode, point: worst.maxShearNode.point.map(sig) },
         nodesOverWarning,
         nodesOverLock,

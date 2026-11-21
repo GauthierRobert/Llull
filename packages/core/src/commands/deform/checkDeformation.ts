@@ -13,6 +13,7 @@ import type { CommandResult } from '../types';
 import { type DeformAnalysis, analyzeDeformed } from './analysis';
 import { defRejection } from './codes';
 import { deformNodeOf } from './sourceMesh';
+import { appendAll } from '../../lib/appendAll';
 
 type Severity = 'fail' | 'warn';
 
@@ -240,7 +241,7 @@ export const checkDeformation = defineCommand({
       if ('code' in analysis) return defRejection(doc, 'check_deformation', analysis.code, analysis.message, [id], ['params.ids']);
       firstTolerance ??= node.output.tolerance;
       const own = findingsOf(id, entity, analysis, doc.units, { approx, volumeDriftRel, creaseRad });
-      findings.push(...own);
+      appendAll(findings, own);
       if (analysis.unverified) unverifiedIds.push(id);
       if (analysis.path === 'mesh') meshResult = true;
       entities.push({

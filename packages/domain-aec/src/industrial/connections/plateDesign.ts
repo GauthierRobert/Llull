@@ -10,6 +10,7 @@ import { plateDemands } from '../foundations/foundationCombinations';
 import { type FrameLoads } from '../frames/frameModelTypes';
 import { baseReactions } from '../frames/frameModelSolve';
 import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * Sizes every fixed base plate of a level (one catalogue entry per column profile, from the worst demands of all its columns) and stores
@@ -33,7 +34,7 @@ export function designFixedPlates(
     if (!plate || column?.category !== 'member') continue;
     const group = groups.get(column.profile) ?? { plates: [], demands: [] };
     group.plates.push(plate);
-    group.demands.push(...plateDemands(reaction, wind));
+    appendAll(group.demands, plateDemands(reaction, wind));
     groups.set(column.profile, group);
   }
   let next = building;

@@ -11,6 +11,7 @@ import type { Vec3 } from '../../model/vectors';
 import { curveDerivatives, curveDomain } from '../../lib/nurbs/evaluate';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { len3 } from '../../lib/vec3';
+import { appendAll } from '../../lib/appendAll';
 
 export type RbfLaw = Extract<DeformLaw, { kind: 'rbf' }>;
 
@@ -190,8 +191,8 @@ export function fitRbf(requested: ReadonlyArray<RbfConstraint>, smoothing: numbe
   const weights: number[] = [];
   const centres: number[] = [];
   for (let i = 0; i < n; i++) {
-    centres.push(...(constraints[i] as RbfConstraint).at);
-    weights.push(...(rhs[i] as number[]));
+    appendAll(centres, (constraints[i] as RbfConstraint).at);
+    appendAll(weights, rhs[i] as number[]);
   }
   // the tail rows are [a0; a_x; a_y; a_z] with one column per output axis: affine = a0 (3) then rows A (3 x 3)
   const [a0, ax, ay, az] = [rhs[n] as number[], rhs[n + 1] as number[], rhs[n + 2] as number[], rhs[n + 3] as number[]];

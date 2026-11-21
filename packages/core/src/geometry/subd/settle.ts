@@ -11,6 +11,7 @@
 import { type Cage, subdivide } from '../subdivision';
 import { SHARP_MAX } from './sharpness';
 import { pow } from '../../lib/pow';
+import { maxOf } from '../../lib/arrayExtrema';
 
 type SettleSource = Pick<Cage, 'edgeSharpness' | 'vertexSharpness'>;
 
@@ -22,7 +23,7 @@ export function fullSettleLevels(cage: SettleSource): number {
   const finite = [...(cage.edgeSharpness ?? []).map((e) => e.s), ...(cage.vertexSharpness ?? []).map((c) => c.s)].filter(
     (s) => s > 0 && s < SHARP_MAX,
   );
-  return finite.length === 0 ? 0 : Math.ceil(Math.max(...finite));
+  return finite.length === 0 ? 0 : Math.ceil(maxOf(finite));
 }
 
 /** Quads of `cage` refined `levels` times (>= 1): every face, an n-gon included, becomes quads at the first step. */
@@ -41,8 +42,8 @@ export function settleBudgetProblem(cage: SettleSource & Pick<Cage, 'faces'>): s
   const full = fullSettleLevels(cage);
   const fits = settleLevels(cage);
   if (full <= fits) return null;
-  const largest = Math.max(
-    ...[...(cage.edgeSharpness ?? []), ...(cage.vertexSharpness ?? [])].map((e) => e.s).filter((s) => s > 0 && s < SHARP_MAX),
+  const largest = maxOf(
+    [...(cage.edgeSharpness ?? []), ...(cage.vertexSharpness ?? [])].map((e) => e.s).filter((s) => s > 0 && s < SHARP_MAX),
   );
   return (
     `sharpness ${largest} needs ${full} settling levels, ${refinedQuads(cage, full)} quads (budget ${SETTLE_QUAD_BUDGET}); ` +

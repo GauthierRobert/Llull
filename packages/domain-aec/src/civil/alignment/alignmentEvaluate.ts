@@ -12,6 +12,7 @@ import { evaluateCorridor } from '../road/corridorMesh';
 import { stationText } from '../model';
 import { labelHeight, type CivilContext } from '../context';
 import { toMetres } from '@core/model/units';
+import { appendAll } from '@lib/appendAll';
 
 /** Station ticks drawn per alignment at most; the tick spacing grows to stay under it. */
 export const MAX_STATION_TICKS = 500;
@@ -102,7 +103,7 @@ function curveAnnotations(context: CivilContext, alignment: AlignmentObject): En
     };
     const station = (s: number): string => stationText(context.doc, s);
     const place = (p: Vec2): [number, number, number] => [...outward(p), 0];
-    entities.push(
+    appendAll(entities, [
       civilPoint(alignment, `pi${i}`, `${alignment.name} PI`, 'centreline', [element.pi[0], element.pi[1], 0]),
       ...(transition
         ? []
@@ -118,7 +119,7 @@ function curveAnnotations(context: CivilContext, alignment: AlignmentObject): En
             ),
           ]),
       civilText(alignment, `r${i}`, `R=${Number(toMetres(context.doc, element.radius).toFixed(2))}`, 'annotation', place(mid), height),
-    );
+    ]);
   });
   return [...entities, ...spiralAnnotations(context, alignment, elements)];
 }

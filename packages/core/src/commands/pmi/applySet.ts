@@ -27,6 +27,7 @@ import type { CommandResult } from '../types';
 import { type SolidTarget, facesNearField, featureOf, isRefusal, placementFor, solidTarget } from './featureOps';
 import { pmiItems, pmiOf, refuse, withItem } from './pmiOps';
 import { toleranceField, toleranceProblem } from './dimension';
+import { appendAll } from '../../lib/appendAll';
 
 const NO_FACE = 'the feature resolves to no face of the solid';
 
@@ -261,7 +262,7 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
       const problems: string[] = at.faces === null ? [at.why] : [];
       const unmeasured = draft.sizeKind === 'angular' || draft.sizeKind === 'curve_length';
       const { size, count, found } = sizeMeasurement(at.faces, draft);
-      problems.push(...found);
+      appendAll(problems, found);
       const item: SizeDimensionPmi = {
         id,
         kind: 'size_dimension',
@@ -280,7 +281,7 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
       const to = feature(draft.to);
       const problems: string[] = [from, to].filter((side) => side.faces === null).map((side) => side.why);
       const { measured, found } = locationMeasurement(from.faces, to.faces, draft);
-      problems.push(...found);
+      appendAll(problems, found);
       const item: LocationDimensionPmi = {
         id,
         kind: 'location_dimension',

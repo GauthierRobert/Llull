@@ -10,6 +10,7 @@ import { EditMesh, normalOf } from './editMesh';
 import { type Fairing, LIEPA_ALPHA, fairVertices, refinePatch } from './holeRefine';
 import { type LoopGeometry, triangulateLoop } from './holeTriangulate';
 import { buildTopology } from './topology';
+import { hypot3 } from '../../lib/vec3';
 
 export type HoleSelect = 'all' | ReadonlyArray<number> | { readonly near: ReadonlyArray<Vec3> };
 
@@ -89,7 +90,7 @@ function geometryOf(mesh: EditMesh, loop: ReadonlyArray<number>): LoopGeometry {
       const face = mesh.facesOnEdge(a, b)[0];
       if (face === undefined) return null;
       const n = mesh.faceNormal(face);
-      const length = Math.hypot(...n);
+      const length = Math.hypot(n[0], n[1], n[2]);
       return length > 0 ? [n[0] / length, n[1] / length, n[2] / length] : null;
     },
     edgeExists: (a, b) => mesh.facesOnEdge(a, b).length > 0,
@@ -137,7 +138,7 @@ export function fillHoles(positions: ReadonlyArray<number>, triangles: ReadonlyA
       let area = 0;
       for (const f of patchFaces) {
         const [a, b, c] = mesh.corners(f);
-        area += Math.hypot(...normalOf(mesh.p(a), mesh.p(b), mesh.p(c))) / 2;
+        area += hypot3(normalOf(mesh.p(a), mesh.p(b), mesh.p(c))) / 2;
       }
       filled.push({
         loop: index,

@@ -495,7 +495,7 @@ button.rail-more__item:hover {
   flex-direction: column-reverse;
   align-items: flex-start;
   gap: 4px;
-  max-width: max(160px, calc(50% - 390px));
+  max-width: max(160px, calc(50% - 440px));
   font-size: var(--text-xs);
   color: var(--fg-subtle);
   user-select: none;
@@ -655,13 +655,6 @@ button.rail-more__item:hover {
 
   .vp-overlay {
     max-width: calc(50% - var(--space-4));
-  }
-
-  .app-viewport .hint-bar {
-    left: auto;
-    right: var(--space-3);
-    transform: none;
-    max-width: calc(100% - 150px);
   }
 
   .status-bar-bottom__right .status-item:not(:first-child),

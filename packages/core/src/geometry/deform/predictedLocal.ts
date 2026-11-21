@@ -17,6 +17,7 @@ import { featureEdgeLength } from './influence';
 import { fromBoxCoordinates, toBoxCoordinates } from './lattice';
 import type { PredictedVolume } from './predictedVolume';
 import { localDeterminant } from './laws';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const PLACEHOLDER: DeformRegion = { start: -Infinity, end: Infinity, falloff: 'none', beyond: 'rigid' };
 
@@ -91,7 +92,7 @@ function orientedZone(law: Extract<DeformNode['law'], { kind: 'lattice' }>): Zon
   const corners: Vec3[] = [];
   for (const cx of [min[0], max[0]])
     for (const cy of [min[1], max[1]]) for (const cz of [min[2], max[2]]) corners.push(fromBoxCoordinates(law, [cx, cy, cz]));
-  const yz = [1, 2].map((a) => [Math.min(...corners.map((c) => c[a] as number)), Math.max(...corners.map((c) => c[a] as number))] as const);
+  const yz = [1, 2].map((a) => [minOf(corners.map((c) => c[a] as number)), maxOf(corners.map((c) => c[a] as number))] as const);
   const [yRange, zRange] = [yz[0] as readonly [number, number], yz[1] as readonly [number, number]];
   return {
     chord: (y, z) => {

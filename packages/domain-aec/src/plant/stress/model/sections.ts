@@ -1,6 +1,7 @@
 /** Arc length along a centreline and the pipe section that applies there (a reducer changes it, 07 PST M5a). Pure geometry. */
 
 import type { Vec3 } from '@core/model/vectors';
+import { hypot3 } from '@lib/vec3';
 
 export interface Section {
   readonly odMm: number;
@@ -58,7 +59,7 @@ export function pointAtArc(points: readonly Vec3[], atMm: number): Vec3 | null {
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1] as Vec3;
     const b = points[i] as Vec3;
-    const leg = Math.hypot(...sub(b, a));
+    const leg = hypot3(sub(b, a));
     if (remaining <= leg || i === points.length - 1) return lerp(a, b, leg === 0 ? 0 : Math.min(1, remaining / leg));
     remaining -= leg;
   }

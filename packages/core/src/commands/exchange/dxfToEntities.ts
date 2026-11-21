@@ -7,6 +7,7 @@ import { newEntity } from '../entity/newEntity';
 import type { DxfPrimitive } from '../../lib/dxfRead';
 import { polygonArea } from '../../lib/polygon';
 import { regionLoopsIssue } from '../../geometry/region';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Largest deviation from a right angle / equal opposite sides (relative to the side) still read as a rectangle. */
 const RECTANGLE_TOLERANCE = 1e-9;
@@ -60,7 +61,7 @@ function hatchOf(primitive: Extract<DxfPrimitive, { kind: 'hatch' }>, loops: Rea
   if (!primitive.solid) return { pattern: primitive.cross ? 'cross' : 'lines', angle: primitive.angle, spacing: primitive.spacing };
   const xs = loops.flat().map((point) => point[0]);
   const ys = loops.flat().map((point) => point[1]);
-  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const diagonal = Math.hypot(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys));
   return { pattern: 'solid', angle: DEFAULT_HATCH_ANGLE, spacing: diagonal / SOLID_SPACING_DIVISOR };
 }
 

@@ -1,6 +1,6 @@
 /** Run phases of fit_surface_to_mesh (07 MSH FR-MSH-24): region selection, parameterization, sampling, grid fitting and the committed result. */
 
-import { cross3, dot3, sub3 } from '../../lib/vec3';
+import { cross3, dot3, hypot3, sub3 } from '../../lib/vec3';
 import { MAX_SURFACE_POLES } from '../../lib/nurbs/surfaceTypes';
 import { type PatchFit, type RegionFrame, footPoints, fitPatch, regionFrame } from '../../geometry/mesh/surfaceLsq';
 import { type HarmonicMap, parameterStretch } from '../../geometry/mesh/harmonicMap';
@@ -189,7 +189,7 @@ function sampleRegion(mesh: MeshData, faces: readonly number[], harmonic: Harmon
   for (const f of faces) {
     const corners = [0, 1, 2].map((k) => mesh.indices[3 * f + k] as number);
     const [a, b, c] = corners.map(vertex) as [Vec3, Vec3, Vec3];
-    const area = Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / 2;
+    const area = hypot3(cross3(sub3(b, a), sub3(c, a))) / 2;
     for (const v of corners) vertexWeight.set(v, (vertexWeight.get(v) ?? 0) + area / 3);
     measured.push([(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3]);
     if (harmonic !== null) measuredUv.push(meanUv(corners.map(hv)));

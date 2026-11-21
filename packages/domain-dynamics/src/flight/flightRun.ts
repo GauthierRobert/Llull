@@ -26,7 +26,7 @@ import { shortestArc } from './frames';
 import { assessMixer, effectiveness, type MixerRotor } from './mixer';
 import { flightOf, type FlightModel } from './model';
 import { aeroDesignHash } from './aeroTable';
-import { compilePower, type PowerRuntime } from './powerBlock';
+import { compilePower, powertrainDefaulted, type PowerRuntime } from './powerBlock';
 import { staticCoefficients, type RotorRuntime } from './rotorLaw';
 import { isCalm, windSource } from './wind';
 import { RESTING_MEMORY, controllerUpdate } from './controller';
@@ -259,7 +259,7 @@ function defaultedNotes(input: {
     ...(compiled?.aero ?? []).flatMap((entry) => entry.surface.defaulted.map((name) => `aero.${entry.surface.id}.${name}`)),
     ...power.flatMap((feed) => [
       ...feed.battery.defaulted.map((name) => `battery.${feed.battery.id}.${name}`),
-      ...feed.powertrain.defaulted.map((name) => `powertrain.${feed.powertrain.id}.${name}`),
+      ...powertrainDefaulted(feed.powertrain).map((name) => `powertrain.${feed.powertrain.id}.${name}`),
     ]),
   ];
 }

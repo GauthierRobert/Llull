@@ -7,6 +7,7 @@ import { carbonSteelStrain, TABLE_RANGE_C } from '../code/thermalStrain';
 import type { BuiltModel } from '../model/build';
 import { accelerationLoads, weightField, windLoads } from './environment';
 import type { OperatingConditions, StressModel } from '../model/schema';
+import { appendAll } from '@lib/appendAll';
 
 const KELVIN = 273.15;
 const BAR_TO_MPA = 0.1;
@@ -168,7 +169,7 @@ export function caseLoads(
         };
       const strain = thermalStrain(doc, conditions, entry.tempC);
       if (!strain.ok) return strain;
-      unverified.push(...strain.unverified);
+      appendAll(unverified, strain.unverified);
       elements.forEach((_, index) => elemental.push({ element: index, freeStrain: strain.strain }));
       maxTempC = Math.max(maxTempC ?? entry.tempC, entry.tempC);
     } else if (primitive.startsWith('P')) {

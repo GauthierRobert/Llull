@@ -15,6 +15,8 @@ import type { ShapeRecipe } from '../../model/types';
 import { withBlendScaleFloor } from './checkBlendTolerances';
 import type { BlendRow, Contact } from './checkBlendRows';
 import { creaseRowOf, type CreaseWorld } from './checkCornerCrease';
+import { maxOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -42,7 +44,7 @@ export function spokeReachOf(kernel: GeometryKernel, recipe: ShapeRecipe): numbe
     (kernel.blendReport?.(node)?.notes?.corners ?? []).filter((corner) => corner.continuity === 'G2'),
   );
   if (stars.length === 0 || !stars.every((corner) => corner.spokes === 'G2-beyond-reach')) return 0;
-  return Math.max(...stars.map((corner) => corner.spokeReach ?? 0));
+  return maxOf(stars.map((corner) => corner.spokeReach ?? 0));
 }
 
 /** Whether the samples of the seam `edge` of a star run from its vertex (the end that touches a contact edge with a blend or flat face) to the pole, else from the pole. */
@@ -130,7 +132,7 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
   const { kernel, shape, topology, graph, entityId, unit } = world;
   let unverified = 0;
   const longestEdgeOf = (face: number): number =>
-    Math.max(...graph.edgeFaces.flatMap((around, edge) => (around.includes(face) ? [topology.edges[edge]?.length ?? 0] : [])), 0);
+    Math.max(maxOf(graph.edgeFaces.flatMap((around, edge) => (around.includes(face) ? [topology.edges[edge]?.length ?? 0] : []))), 0);
   const isStar = (face: number): boolean => STAR_SUFFIX.test(topology.faces[face]?.name ?? '');
   for (const face of topology.faces) {
     const sources = face.name === undefined ? null : cornerSources(face.name);
@@ -147,7 +149,7 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
       const crease = measured === null ? null : creaseRowOf(world, measured, face.index, edge, cornerTolerances);
       if (crease !== null) {
         contacts.push(crease.contact);
-        findings.push(...crease.findings);
+        appendAll(findings, crease.findings);
         return;
       }
       // G0 over the whole contact (end points included); G1 on the open interior, the end points judged apart (three faces meet there).
@@ -172,8 +174,9 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
       // a spoke of a star is held back: whether its curvature jump is a failure depends on the contacts of the whole sub-patch (below)
       const seam = star && around.every(isStar);
       if (seam) seams.push({ edge, measure: interior, samples: measured ?? [] });
-      findings.push(
-        ...contactFindings(entityId, face.index, edge, interior, cornerTolerances, requireG2, unit).filter(
+      appendAll(
+        findings,
+        contactFindings(entityId, face.index, edge, interior, cornerTolerances, requireG2, unit).filter(
           (found) => found.code !== 'BLD_CHECK_G2_JUMP' || (requireG2 && !seam),
         ),
       );
@@ -198,12 +201,13 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
       for (const seam of seams) {
         const contactEdges = outer.map((contact) => contact.edge);
         const fromVertex = runsFromVertex(topology, seam.edge, contactEdges);
-        findings.push(...spokeFinding(entityId, face.index, seam.edge, seam.samples, spokeReach, fromVertex, cornerTolerances, unit));
+        appendAll(findings, spokeFinding(entityId, face.index, seam.edge, seam.samples, spokeReach, fromVertex, cornerTolerances, unit));
       }
     else if (requireG2)
       for (const seam of seams)
-        findings.push(
-          ...contactFindings(entityId, face.index, seam.edge, seam.measure, cornerTolerances, true, unit).filter(
+        appendAll(
+          findings,
+          contactFindings(entityId, face.index, seam.edge, seam.measure, cornerTolerances, true, unit).filter(
             (found) => found.code === 'BLD_CHECK_G2_JUMP',
           ),
         );

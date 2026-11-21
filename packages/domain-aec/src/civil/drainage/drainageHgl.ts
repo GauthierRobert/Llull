@@ -14,6 +14,7 @@ import type { DrainageCriteria } from './drainageCriteria';
 import type { FlowResult } from './drainageFlow';
 import { manholesUpstreamFirst, pipePlanLength, pipeSlope } from './drainageTopology';
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
 
 const LEVEL_TOLERANCE_M = 1e-6;
 
@@ -74,7 +75,9 @@ export function computeHgl(doc: CadDocument, civil: CivilModel, criteria: Draina
       });
       nodeLevel.set(
         manhole.id,
-        criteria.outfallLevel !== null ? toMetres(doc, criteria.outfallLevel) : Math.max(toMetres(doc, manhole.invertElevation), ...normal),
+        criteria.outfallLevel !== null
+          ? toMetres(doc, criteria.outfallLevel)
+          : Math.max(toMetres(doc, manhole.invertElevation), maxOf(normal)),
       );
       continue;
     }
@@ -95,7 +98,7 @@ export function computeHgl(doc: CadDocument, civil: CivilModel, criteria: Draina
       });
       return hglUpM;
     });
-    nodeLevel.set(manhole.id, Math.max(...levels));
+    nodeLevel.set(manhole.id, maxOf(levels));
   }
   const manholes = new Map<string, ManholeHgl>();
   for (const manhole of civilObjectsOf(civil, 'manhole')) {

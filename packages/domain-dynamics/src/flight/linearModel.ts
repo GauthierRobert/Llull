@@ -1,7 +1,8 @@
 /** Linearisation of a flight vehicle about a trim (13 FLT M5): central-difference Jacobians of the state derivative of trimModel.ts. */
 
 import { elementAt } from '@lib/elementAt';
-import { stateDerivative, type TrimVehicle } from './trimModel';
+import { dampedDerivative, type RateDampingTerm } from './rateDamping';
+import type { TrimVehicle } from './trimModel';
 
 /** Central-difference step per state (m/s, m/s, m/s, rad/s x3, rad x2): small against the scales, large against the round-off of the laws. */
 const STATE_STEPS = [1e-3, 1e-3, 1e-3, 1e-4, 1e-4, 1e-4, 1e-5, 1e-5];
@@ -31,14 +32,19 @@ export interface LinearModel {
   readonly b: number[][];
 }
 
-/** A and B of `vehicle` about the state `x0` with the controls `u0`. */
-export function linearize(vehicle: TrimVehicle, x0: readonly number[], u0: readonly number[]): LinearModel {
-  const a = centralJacobian((x) => stateDerivative(vehicle, x, u0), x0, STATE_STEPS);
+/** A and B of `vehicle` about the state `x0` with the controls `u0`, with the tail-arm rate damping `damping` (none: the airframe laws alone). */
+export function linearize(
+  vehicle: TrimVehicle,
+  x0: readonly number[],
+  u0: readonly number[],
+  damping: readonly RateDampingTerm[] = [],
+): LinearModel {
+  const a = centralJacobian((x) => dampedDerivative(vehicle, damping, x, u0), x0, STATE_STEPS);
   const b =
     vehicle.controls.length === 0
       ? x0.map(() => [])
       : centralJacobian(
-          (u) => stateDerivative(vehicle, x0, u),
+          (u) => dampedDerivative(vehicle, damping, x0, u),
           u0,
           vehicle.controls.map((control) => CONTROL_STEP * (control.max - control.min)),
         );

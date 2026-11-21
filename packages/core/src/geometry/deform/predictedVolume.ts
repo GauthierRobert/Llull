@@ -12,6 +12,7 @@ import type { Vec3 } from '../../model/vectors';
 import { type DeformNode, determinant, localDeterminant, warpOf } from './laws';
 import { orientOutward, signedMeshVolume } from '../meshVolume';
 import { toLocal } from './frame';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Heights integrated per piece: sub-intervals × 3 Gauss points. */
 const SUBINTERVALS = 24;
@@ -119,8 +120,8 @@ export function predictedVolume(source: MeshData, node: Pick<DeformNode, 'law' |
   const spans = new Float64Array(triangles * 2);
   for (let t = 0; t < triangles; t++) {
     const zs = [0, 1, 2].map((k) => heights[indices[t * 3 + k] as number] as number);
-    spans[t * 2] = Math.min(...zs);
-    spans[t * 2 + 1] = Math.max(...zs);
+    spans[t * 2] = minOf(zs);
+    spans[t * 2 + 1] = maxOf(zs);
   }
   let low = Infinity;
   let high = -Infinity;

@@ -3,6 +3,7 @@
 import { isRecord } from '@lib/isRecord';
 import { COMPONENT_TYPES } from '../catalog/types';
 import { CONNECTION_ENDS, CONNECTION_JOINTS, SPEC_STATUSES } from './types';
+import { appendAll } from '@lib/appendAll';
 
 const isSize = (value: unknown): boolean =>
   isRecord(value) && (value['system'] === 'NPS' || value['system'] === 'DN') && typeof value['key'] === 'string';
@@ -60,8 +61,11 @@ function specErrors(id: string, revisions: unknown): string[] {
     if (!Array.isArray(spec['components']) || !Array.isArray(spec['catalogs']))
       errors.push(`${at} must have components and catalogs arrays`);
     if (Array.isArray(spec['components']))
-      errors.push(...spec['components'].flatMap((c: unknown, k) => componentErrors(c, `${at}.components.${k}`)));
-    errors.push(...connectionErrors(spec, at));
+      appendAll(
+        errors,
+        spec['components'].flatMap((c: unknown, k) => componentErrors(c, `${at}.components.${k}`)),
+      );
+    appendAll(errors, connectionErrors(spec, at));
     if (!isRecord(range) || !isSize(range['from']) || !isSize(range['to']))
       errors.push(`${at}.sizeRange must be { from, to } nominal sizes`);
     return errors;

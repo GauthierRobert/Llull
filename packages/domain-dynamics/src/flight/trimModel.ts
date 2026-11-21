@@ -97,7 +97,7 @@ export function trimVehicle(prepared: PreparedVehicle): TrimVehicle | null {
       return index < 0 ? [] : [index];
     });
     const stiffness = own.reduce((sum, index) => sum + thrustPerRpmSquared(rotors[index] as RotorRuntime), 0);
-    const weight = prepared.massKg * Math.hypot(...prepared.gravity);
+    const weight = prepared.massKg * Math.hypot(prepared.gravity[0], prepared.gravity[1], prepared.gravity[2]);
     const guess = stiffness > 0 ? Math.sqrt(weight / stiffness) : 0.5 * (controller.minRpm + controller.maxRpm);
     for (const index of controller.maxRpm > controller.minRpm ? own : []) {
       controls.push({
@@ -144,6 +144,18 @@ export function orientationOf(roll: number, pitch: number): Quaternion {
   return multiplyQuaternion([Math.cos(pitch / 2), 0, -Math.sin(pitch / 2), 0], [Math.cos(roll / 2), Math.sin(roll / 2), 0, 0]);
 }
 
+/** Speed of every rotor (rpm) and pivot of every surface (deg) with the controls `values`: uncontrolled rotors at their own rpm, surfaces at neutral. */
+export function controlSettings(vehicle: TrimVehicle, values: readonly number[]): { rpm: number[]; pivot: number[] } {
+  const rpm = vehicle.rotors.map((rotor) => rotor.rotor.rpm);
+  const pivot = vehicle.aero.map(({ surface }) => neutralPivotDeg(surface));
+  vehicle.targets.forEach((target, i) => {
+    const value = values[i] ?? 0;
+    if (target.kind === 'rotor') rpm[target.index] = value;
+    else pivot[target.index] = value;
+  });
+  return { rpm, pivot };
+}
+
 /** The force and moment of every law at `state` with the controls `values` (rpm / deg, in `vehicle.controls` order); uncontrolled rotors at their own rpm. */
 export function wrenchAt(vehicle: TrimVehicle, state: FlightState, values: readonly number[]): Wrench {
   const orientation = orientationOf(state.roll, state.pitch);
@@ -153,13 +165,7 @@ export function wrenchAt(vehicle: TrimVehicle, state: FlightState, values: reado
     linearVelocity: rotate(orientation, state.velocity),
     angularVelocity: rotate(orientation, state.rates),
   };
-  const rpm = vehicle.rotors.map((rotor) => rotor.rotor.rpm);
-  const pivot = vehicle.aero.map(({ surface }) => neutralPivotDeg(surface));
-  vehicle.targets.forEach((target, i) => {
-    const value = values[i] ?? 0;
-    if (target.kind === 'rotor') rpm[target.index] = value;
-    else pivot[target.index] = value;
-  });
+  const { rpm, pivot } = controlSettings(vehicle, values);
   const rotors = vehicle.rotors.map((rotor, i) => rotorOutput(rotor, body, rpm[i]));
   const aero = vehicle.aero.map((surface, i) => aeroOutput(surface, body, pivot[i] ?? 0));
   const base = vehicle.base({ time: 0, jointPosition: {}, jointVelocity: {}, bodies: { [vehicle.vehicleId]: body } });

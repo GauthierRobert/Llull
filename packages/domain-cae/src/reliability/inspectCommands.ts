@@ -10,9 +10,11 @@ import { isStudyFailure, studyContext } from './context';
 import { momentsOf } from './distributions';
 import { limitStateModelHash } from './modelHash';
 import { reliabilityOf } from './model';
-import { RESULT_FORM_ITERATIONS, RESULT_FORM_TOLERANCE, resultDigest } from './resultHash';
+import { DEFAULT_FORM_ITERATIONS, DEFAULT_FORM_TOLERANCE } from './methodRuns';
+import { DEFAULT_STUDY, defaultStudyDigest } from './resultHash';
 import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
 import { formStudy, monteCarloStudy } from './studies';
+import { appendAll } from '@lib/appendAll';
 
 const DEFAULT_MC_COV_LIMIT = 0.1;
 const DEFAULT_SAMPLES = 10_000;
@@ -74,6 +76,7 @@ export const describeProbabilisticModel = defineCommand({
                   resultHash: accepted.resultHash,
                   seed: accepted.seed,
                   samples: accepted.samples,
+                  study: accepted.study ?? DEFAULT_STUDY,
                 },
         },
       ];
@@ -147,9 +150,9 @@ export const checkProbabilistic = defineCommand({
         items.push(item(context.code, 'error', context.message, 'fix the limit state or its variables', context.ids));
         continue;
       }
-      const form = formStudy(context, false, RESULT_FORM_ITERATIONS, RESULT_FORM_TOLERANCE);
+      const form = formStudy(context, false, DEFAULT_FORM_ITERATIONS, DEFAULT_FORM_TOLERANCE);
       let resultHash: string | null = null;
-      items.push(...((form.data['items'] as Item[] | undefined) ?? []));
+      appendAll(items, (form.data['items'] as Item[] | undefined) ?? []);
       if (params.seed !== undefined) {
         if (context.usesResponses && samples > MAX_RESPONSE_EVALUATIONS)
           items.push(
@@ -163,10 +166,13 @@ export const checkProbabilistic = defineCommand({
           );
         else {
           const study = monteCarloStudy(context, 'lhs', samples, params.seed);
-          resultHash = resultDigest(limitStateModelHash(doc, name) ?? '', params.seed, samples, form.beta, form.pf, study.pf);
+          resultHash = defaultStudyDigest(limitStateModelHash(doc, name) ?? '', params.seed, samples, form.beta, form.pf, study.pf);
           const mc = study.data;
           const standardError = typeof mc['standardError'] === 'number' ? mc['standardError'] : Number.NaN;
-          items.push(...(mc['items'] as Item[]).filter((i) => i.code === 'PRB_PF_BELOW_RESOLUTION' || i.code === 'PRB_RESPONSE_FAILED'));
+          appendAll(
+            items,
+            (mc['items'] as Item[]).filter((i) => i.code === 'PRB_PF_BELOW_RESOLUTION' || i.code === 'PRB_RESPONSE_FAILED'),
+          );
           if (study.pf > 0 && standardError / study.pf > covLimit)
             items.push(
               item(

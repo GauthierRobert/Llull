@@ -14,15 +14,20 @@ import { analysisIdSchema } from '../shared/schemas';
 import { feaTargetSchema, targetProblem, toTarget } from '../shared/target';
 import { refuseFll } from './codes';
 import { flightDesignHash } from './designHash';
-import { chooseInstants, flightInstants, type ChosenInstant, type FlightInstant } from './flightInstants';
+import { DEFAULT_ENVELOPE_TOLERANCE, chooseInstants, flightInstants, type ChosenInstant, type FlightInstant } from './flightInstants';
 import { analysedCentre } from './rigidBalance';
+import { rotorMountMoment, rotorSpins, type RotorSpin } from './rotorTorque';
 import { map3 } from '@lib/vec3';
+import { maxOf, minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 const NEWTON_PER_LBF = 4.4482216152605;
 /** Sampling of the run the instants are read from, Hz (accelerations are central differences of the recorded velocity). */
 const DEFAULT_SAMPLE_RATE = 1000;
 /** Effective sampling below which the finite-difference acceleration can miss the 1e-4 relief gate (about 1e-3 at 200 Hz, 1e-6 at 1 kHz). */
 const LOW_SAMPLE_RATE_HZ = 900;
+/** Most load cases a convex envelope may export (each is one static step of the deck). */
+const MAX_ENVELOPE_CASES = 48;
 /** Standard gravity of a flight document without a dynamics model, m/s^2 (world Z up). */
 const DEFAULT_GRAVITY: Vec3 = [0, 0, -9.80665];
 
@@ -44,6 +49,14 @@ const mountSchema = z.object({
   moment: vec3(
     'Interface moment [mx, my, mz] in the case unit system (N-mm-t-s: N.mm); the target needs a face, an edge or three points.',
   ).optional(),
+  reactionTorque: z
+    .boolean()
+    .optional()
+    .describe(
+      'With rotorId: also apply the rotor torques the flight model puts on the airframe as a moment load at this mount: the reaction -s Q a ' +
+        '(Q = shaft power / (2 pi n) at the instant, a = direction, s = +1 for a ccw rotor, -1 for cw) and the gyroscopic -omega x (I_s 2 pi n s a). ' +
+        'The target needs a face, an edge or three points. Default false.',
+    ),
 });
 
 const stateSchema = z.object({
@@ -64,18 +77,20 @@ function mountLoads(
   instant: FlightInstant | null,
   loadCase: string,
   category: LoadCategory,
-  forceUnit: number,
+  units: MountUnits,
   source: FlightLoadSource,
 ): FeaLoad[] | string {
+  const { forceUnit } = units;
   const base = { loadCase, category, flightSource: source, target: toTarget(mount.target) } as const;
   const out: FeaLoad[] = [];
   let force: Vec3 | undefined = mount.force;
   if (mount.rotorId !== undefined) {
     const direction = mount.direction;
-    if (direction === undefined || !(Math.hypot(...direction) > 0)) return `mount '${mount.name}': rotorId needs a non-zero direction`;
+    if (direction === undefined || !(Math.hypot(direction[0], direction[1], direction[2]) > 0))
+      return `mount '${mount.name}': rotorId needs a non-zero direction`;
     const thrust = instant?.thrustN[mount.rotorId];
     if (thrust === undefined) return `mount '${mount.name}': the run has no thrust of rotor '${mount.rotorId}'`;
-    const length = Math.hypot(...direction);
+    const length = Math.hypot(direction[0], direction[1], direction[2]);
     force = map3(direction, (component) => (thrust * component * forceUnit) / length);
   } else if (mount.direction !== undefined) return `mount '${mount.name}': direction needs a rotorId`;
   if (force === undefined && mount.moment === undefined) return `mount '${mount.name}': give a force, a rotorId + direction, or a moment`;
@@ -88,13 +103,59 @@ function mountLoads(
     if (mount.moment.some((component) => component !== 0))
       out.push({ ...base, id: nextId('fl'), name: `${mount.name} moment`, kind: 'moment', vector: mount.moment });
   }
+  if (mount.reactionTorque === true) {
+    const torque = rotorTorqueLoad(mount, instant, units);
+    if (typeof torque === 'string') return `mount '${mount.name}': ${torque}`;
+    if (torque.some((component) => component !== 0))
+      out.push({ ...base, id: nextId('fl'), name: `${mount.name} rotor torque`, kind: 'moment', vector: torque });
+  }
   return out;
 }
 
-/** Existing loads of the analysis without those exported earlier into `cases` (re-exporting replaces them); a case with other loads is a refusal text. */
-function withoutPrevious(analysis: AnalysisCase, cases: readonly string[]): { loads: Record<string, FeaLoad>; order: string[] } | string {
+/** Analysis-unit conversions of a mount (N -> force unit; N m -> force unit x length unit) and the spin of the flight rotors (null: none read). */
+interface MountUnits {
+  readonly forceUnit: number;
+  readonly momentUnit: number;
+  /** Spins of the flight rotors, the reason they could not be read, or null when no mount asks for a rotor torque. */
+  readonly spins: Readonly<Record<string, RotorSpin>> | string | null;
+}
+
+/** The rotor torque moment of a `reactionTorque` mount in analysis units, or a refusal text. */
+function rotorTorqueLoad(mount: Mount, instant: FlightInstant | null, units: MountUnits): Vec3 | string {
+  const { rotorId, direction, target } = mount;
+  if (rotorId === undefined || direction === undefined) return 'reactionTorque needs a rotorId and its direction';
+  if (countOf(target.facesNear) === 0 && countOf(target.edgesNear) === 0 && countOf(target.pointsNear) < 3)
+    return 'a rotor torque needs a face, an edge or at least three points in its target';
+  if (instant === null) return 'a rotor torque needs a flight instant (scenario), not an explicit state';
+  if (typeof units.spins === 'string') return `the rotor spins could not be read: ${units.spins}`;
+  const spin = units.spins?.[rotorId];
+  if (spin === undefined) return `the flight model has no spin sense of rotor '${rotorId}'`;
+  const length = Math.hypot(direction[0], direction[1], direction[2]);
+  const moment = rotorMountMoment(
+    instant,
+    rotorId,
+    map3(direction, (c) => c / length),
+    spin,
+  );
+  return typeof moment === 'string' ? moment : map3(moment, (c) => c * units.momentUnit);
+}
+
+/**
+ * Existing loads of the analysis without those exported earlier into `cases` (re-exporting replaces them) and without the earlier flight loads of
+ * the same scenario in a case of the same multi-case family (`<base>_hull_*`, `<base>_peak_*`), so a coarser envelope leaves no orphan case;
+ * a case with hand-made loads among `cases` is a refusal text.
+ */
+function withoutPrevious(
+  analysis: AnalysisCase,
+  cases: readonly string[],
+  family: { readonly scenario: string | null; readonly prefixes: readonly string[] },
+): { loads: Record<string, FeaLoad>; order: string[] } | string {
   const loads: Record<string, FeaLoad> = {};
   const order: string[] = [];
+  const sameFamily = (load: FeaLoad): boolean =>
+    family.scenario !== null &&
+    load.flightSource?.scenario === family.scenario &&
+    family.prefixes.some((prefix) => load.loadCase.startsWith(prefix));
   for (const id of analysis.loadOrder) {
     const load = analysis.loads[id];
     if (load === undefined) continue;
@@ -102,6 +163,7 @@ function withoutPrevious(analysis: AnalysisCase, cases: readonly string[]): { lo
       if (load.flightSource === undefined) return `load case '${load.loadCase}' already has hand-made loads: choose another loadCase name`;
       continue;
     }
+    if (sameFamily(load)) continue;
     loads[id] = load;
     order.push(id);
   }
@@ -130,6 +192,62 @@ function readRun(
   return flightInstants(series, doc.dynamics?.gravity ?? DEFAULT_GRAVITY);
 }
 
+/** What `pickInstants` reads of the export params. */
+interface InstantParams {
+  readonly scenario?: string | undefined;
+  readonly at?: number | 'peak_load' | 'envelope' | 'convex_envelope' | undefined;
+  readonly state?: z.output<typeof stateSchema> | undefined;
+  readonly sampleRate?: number | undefined;
+  readonly envelopeTolerance?: number | undefined;
+}
+
+type InstantRefusal = {
+  readonly code: string;
+  readonly message: string;
+  readonly ids: readonly string[];
+  readonly paths: readonly string[];
+};
+
+/** The instants to export: the explicit state, or the chosen instants of the flown scenario with the effective sampling rate. */
+function pickInstants(
+  doc: CadDocument,
+  params: InstantParams,
+  ctx: ExecutionContext | undefined,
+): { readonly chosen: ChosenInstant[]; readonly effectiveHz: number | null } | InstantRefusal {
+  const s = params.state;
+  if (s !== undefined) {
+    const instant: FlightInstant = {
+      index: 0,
+      timeS: 0,
+      accelMps2: s.linearAccel,
+      gravityMps2: s.gravity ?? [0, 0, 0],
+      angularVelocity: s.angularVelocity,
+      angularAccel: s.angularAccel,
+      thrustN: {},
+      rotorRpm: {},
+      shaftPowerW: {},
+    };
+    return { chosen: [{ instant, label: 'state' }], effectiveHz: null };
+  }
+  const scenario = params.scenario ?? '';
+  const instants = readRun(doc, { scenario, sampleRate: params.sampleRate }, ctx);
+  if (typeof instants === 'string') return { code: 'FLL_RUN_FAILED', message: instants, ids: [scenario], paths: [] };
+  const first = minOf(instants.map((instant) => instant.timeS));
+  const at = params.at ?? 'peak_load';
+  const last = maxOf(instants.map((instant) => instant.timeS));
+  if (typeof at === 'number' && at > last + 1e-9)
+    return { code: 'FLL_INSTANT_UNKNOWN', message: `time ${at} s is after the end of the run (${last} s)`, ids: [scenario], paths: ['at'] };
+  const chosen = chooseInstants(instants, at, params.envelopeTolerance);
+  if (chosen.length > MAX_ENVELOPE_CASES)
+    return {
+      code: 'FLL_ENVELOPE_TOO_LARGE',
+      message: `the convex envelope has ${chosen.length} vertex instants at tolerance ${params.envelopeTolerance ?? DEFAULT_ENVELOPE_TOLERANCE} (at most ${MAX_ENVELOPE_CASES} load cases)`,
+      ids: [scenario],
+      paths: ['envelopeTolerance'],
+    };
+  return { chosen, effectiveHz: last > first ? (instants.length - 1) / (last - first) : null };
+}
+
 /**
  * @affects doc.analysis.cases[analysisId].loads (adds, per chosen instant, one inertial load, a gravity load and the mount force / moment loads, ids `fl-<step>.<k>`;
  *   loads exported earlier into the same load case names are replaced)
@@ -146,9 +264,9 @@ export const exportFlightLoads = defineCommand({
     'named mounts. Source: scenario (+ at) flies it with run_flight and reads the series (acceleration and angular acceleration are central ' +
     'differences of the 1 kHz default samples, rotated into the start-attitude model axes: the model axes must be the vehicle axes at t = 0), or an ' +
     'explicit state (m/s^2, rad/s, rad/s^2) without a flight. at = a time in s (nearest sample), "peak_load" (largest specific force |a - g|, ' +
-    'default) or "envelope" (peaks of specific force, angular velocity and angular acceleration: up to three load cases). Each load case gets an ' +
+    'default), "envelope" (peaks of specific force, angular velocity and angular acceleration: up to three load cases) or "convex_envelope" (the vertex instants of the convex hull of the specific force over all samples). Each load case gets an ' +
     'inertial load, a gravity load and one force load per mount: a mount is a target with a fixed force, or a rotorId + direction (force = rotor ' +
-    "thrust at the instant x direction). The deck applies the d'Alembert body force -rho (a + alpha x r + omega x (omega x r)) (uniform part as CalculiX " +
+    "thrust at the instant x direction; reactionTorque adds the rotor reaction and gyroscopic torques as a moment at that mount). The deck applies the d'Alembert body force -rho (a + alpha x r + omega x (omega x r)) (uniform part as CalculiX " +
     'GRAV, rotation about O as CENTRIF, angular acceleration as one GRAV per element). The loads are balanced when the mounts carry m(a - g) ' +
     'and the moments; add set_free_body_support so the model is statically determinate, and check_analysis reports FLL_RELIEF_RESIDUAL when ' +
     'it is not balanced (the supports would then take the difference) and FLL_RUN_STALE when the design changed after the run. Re-exporting ' +
@@ -157,9 +275,20 @@ export const exportFlightLoads = defineCommand({
     analysisId: analysisIdSchema,
     scenario: z.string().optional().describe('Id of the flight scenario to fly (define_flight_scenario). Give this or state.'),
     at: z
-      .union([z.number().min(0), z.enum(['peak_load', 'envelope'])])
+      .union([z.number().min(0), z.enum(['peak_load', 'envelope', 'convex_envelope'])])
       .optional()
-      .describe('With scenario: a time in s from the start, "peak_load" (default) or "envelope".'),
+      .describe(
+        'With scenario: a time in s from the start, "peak_load" (default), "envelope" (three peaks) or "convex_envelope" (one load case per vertex ' +
+          'instant of the convex hull of the specific force a - g over all samples, within envelopeTolerance; cases _hull_1, _hull_2 .. in time order).',
+      ),
+    envelopeTolerance: z
+      .number()
+      .positive()
+      .max(0.5)
+      .optional()
+      .describe(
+        `With at "convex_envelope": a sample whose specific force lies less than this fraction of the specific-force bounding-box diagonal outside the hull of the chosen instants adds no load case. Default ${DEFAULT_ENVELOPE_TOLERANCE}.`,
+      ),
     state: stateSchema.optional().describe('Explicit rigid-body state instead of a scenario (one load case).'),
     referencePoint: vec3(
       'Point O [x, y, z] in document units the acceleration refers to (the vehicle centre of mass). Default: the centre of mass of the analysed parts.',
@@ -195,40 +324,9 @@ export const exportFlightLoads = defineCommand({
     const accelUnit = 1 / factors.metresPerLength;
     const forceUnit = analysis.unitSystem === 'lbf-in-slinch-s' ? 1 / NEWTON_PER_LBF : 1;
     const designHash = flightDesignHash(doc, analysis);
-    let chosen: ChosenInstant[];
-    let effectiveHz: number | null = null;
-    if (params.state !== undefined) {
-      const s = params.state;
-      chosen = [
-        {
-          instant: {
-            index: 0,
-            timeS: 0,
-            accelMps2: s.linearAccel,
-            gravityMps2: s.gravity ?? [0, 0, 0],
-            angularVelocity: s.angularVelocity,
-            angularAccel: s.angularAccel,
-            thrustN: {},
-          },
-          label: 'state',
-        },
-      ];
-    } else {
-      const instants = readRun(doc, { scenario: params.scenario ?? '', sampleRate: params.sampleRate }, ctx);
-      if (typeof instants === 'string') return fail('FLL_RUN_FAILED', instants, [analysisId, params.scenario ?? '']);
-      const first = Math.min(...instants.map((instant) => instant.timeS));
-      const at = params.at ?? 'peak_load';
-      const last = Math.max(...instants.map((instant) => instant.timeS));
-      if (typeof at === 'number' && at > last + 1e-9)
-        return fail(
-          'FLL_INSTANT_UNKNOWN',
-          `time ${at} s is after the end of the run (${last} s)`,
-          [analysisId, params.scenario ?? ''],
-          ['at'],
-        );
-      effectiveHz = last > first ? (instants.length - 1) / (last - first) : null;
-      chosen = chooseInstants(instants, at);
-    }
+    const picked = pickInstants(doc, params, ctx);
+    if ('code' in picked) return fail(picked.code, picked.message, [analysisId, ...picked.ids], picked.paths);
+    const { chosen, effectiveHz } = picked;
     const fromRun = params.scenario !== undefined;
     const base = params.loadCase ?? (fromRun ? `FLT_${sanitize(params.scenario ?? '')}` : 'FLT_state');
     const names = chosen.map((pick) => caseName(base, pick, chosen.length > 1, fromRun));
@@ -236,7 +334,10 @@ export const exportFlightLoads = defineCommand({
       const problem = loadCaseNameProblem(name);
       if (problem !== null) return fail('FEA_LOAD_INVALID', problem, [analysisId], ['loadCase']);
     }
-    const previous = withoutPrevious(analysis, names);
+    const prefixes = [
+      ...new Set(chosen.flatMap((pick) => (pick.label.includes('_') ? [`${base}_${pick.label.split('_')[0] ?? ''}_`] : []))),
+    ];
+    const previous = withoutPrevious(analysis, names, { scenario: fromRun ? (params.scenario ?? null) : null, prefixes });
     if (typeof previous === 'string') return fail('FEA_LOAD_INVALID', previous, [analysisId], ['loadCase']);
     const reference = ((): Vec3 | null => {
       if (params.referencePoint !== undefined) return params.referencePoint;
@@ -250,6 +351,8 @@ export const exportFlightLoads = defineCommand({
         [analysisId],
         ['referencePoint'],
       );
+    const spins = (params.mounts ?? []).some((mount) => mount.reactionTorque === true) ? rotorSpins(doc, ctx) : null;
+    const units: MountUnits = { forceUnit, momentUnit: forceUnit * accelUnit, spins };
     const added: FeaLoad[] = [];
     const summaries: string[] = [];
     const data: Record<string, unknown>[] = [];
@@ -286,12 +389,12 @@ export const exportFlightLoads = defineCommand({
         const problem = targetProblem(doc, analysis, toTarget(mount.target));
         if (problem !== null)
           return fail(problem.code, `mount '${mount.name}': ${problem.message}`, [analysisId, mount.target.entityId], ['mounts']);
-        const made = mountLoads(mount, instant, loadCase, category, forceUnit, source);
+        const made = mountLoads(mount, instant, loadCase, category, units, source);
         if (typeof made === 'string') return fail('FLL_MOUNT_INVALID', made, [analysisId], ['mounts']);
-        loads.push(...made);
+        appendAll(loads, made);
       }
-      added.push(...loads);
-      const norm = (v: Vec3): number => Math.hypot(...v);
+      appendAll(added, loads);
+      const norm = (v: Vec3): number => Math.hypot(v[0], v[1], v[2]);
       summaries.push(
         `'${loadCase}'${fromRun ? ` at t = ${Number(instant.timeS.toPrecision(5))} s` : ''}: |a| ${Number(norm(instant.accelMps2).toPrecision(4))} m/s^2, |omega| ${Number(norm(instant.angularVelocity).toPrecision(4))} rad/s, |alpha| ${Number(norm(instant.angularAccel).toPrecision(4))} rad/s^2, ${loads.length} load(s)`,
       );

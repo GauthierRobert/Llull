@@ -9,6 +9,7 @@ import type { CageState } from './cageState';
 import { edgeKey } from './edgeKey';
 import { mintElementId } from './elements';
 import { type CageTopology, neighbourVertices } from './topology';
+import { spliceAll } from '../../lib/spliceAll';
 
 export interface Ring {
   /** Crossed edges, oriented so that consecutive strip quads are [s_j, t_j, t_(j+1), s_(j+1)]. */
@@ -100,7 +101,7 @@ export function cutRing(state: CageState, ring: Ring, fractions: readonly number
     const row = rows[j] as number[];
     for (let i = 0; i + 1 < row.length; i++) split.push([row[i] as number, row[i + 1] as number, sharpness]);
   }
-  state.sharp.splice(0, state.sharp.length, ...split);
+  spliceAll(state.sharp, 0, state.sharp.length, split);
   const extra: number[][] = [];
   ring.faces.forEach((f, j) => {
     const [row, next] = [rows[j] as number[], rows[(j + 1) % rows.length] as number[]];

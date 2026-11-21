@@ -8,6 +8,7 @@ import { idOrNext } from '@lib/explicitId';
 import { flightOf, idTakenInDynamicsOrFlight, ISA_SEA_LEVEL_DENSITY, type Rotor, type RotorCoefficients } from '../flight/model';
 import { dynamicsOf } from './bodies';
 import { compileRotor, rotorOutput } from '../flight/rotorLaw';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Why `bodyId` cannot carry a flight load (missing or fixed), or null. */
 function bodyProblem(doc: CadDocument, bodyId: string): string | null {
@@ -43,6 +44,7 @@ const tableSchema = z
  * @affects adds 1 rotor to doc.flight.rotors (affected: [rotorId])
  * @invariant body is a non-fixed rigid body; axis non-zero; exactly one of (static pair + source) or table; table J strictly increasing
  * @invariant the rotor acts only through simulate_motion (and the commands that run it): thrust along the body-fixed axis, J from the body state
+ * @invariant bladeCount (optional, whole 1..64) is stored only: no flight law reads it; check_rotor_resonance takes its blade-passing order from it
  * @failure unknown / fixed body, zero axis, both or neither coefficient forms, half a static pair, unsorted table, taken id -> no-op;
  *          missing or empty source -> FLT_TABLE_SOURCE_MISSING
  */
@@ -94,13 +96,22 @@ export const addRotor = defineCommand({
       .describe(
         'Moment of inertia of the spinning parts (blades, hub, motor bell) about the axis, kg·m²; default 0 = no gyroscopic torque.',
       ),
+    bladeCount: z
+      .number()
+      .int()
+      .min(1)
+      .max(64)
+      .optional()
+      .describe(
+        'Number of blades (whole, 1..64). Not used by the flight physics; stored for check_rotor_resonance (the blade-passing excitation order). Default: not stated.',
+      ),
     id: z.string().optional().describe('Optional explicit rotor id (shares the id space of the dynamics records).'),
   }),
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'add_rotor');
     const problem = bodyProblem(doc, params.body);
     if (problem !== null) return fail(problem);
-    if (Math.hypot(...params.axis) < 1e-12) return fail('axis must be non-zero');
+    if (Math.hypot(params.axis[0], params.axis[1], params.axis[2]) < 1e-12) return fail('axis must be non-zero');
     const { table, thrustCoefficient: ct, powerCoefficient: cp } = params;
     if (table !== undefined && (ct !== undefined || cp !== undefined))
       return fail('give the static pair (thrustCoefficient + powerCoefficient) OR table, not both');
@@ -137,6 +148,7 @@ export const addRotor = defineCommand({
       coefficients,
       airDensity: params.airDensity ?? ISA_SEA_LEVEL_DENSITY,
       spinInertiaKgM2: params.spinInertiaKgM2 ?? 0,
+      ...(params.bladeCount === undefined ? {} : { bladeCount: params.bladeCount }),
     };
     const atRest = rotorOutput(compileRotor(rotor, [0, 0, 0], 1), {
       position: [0, 0, 0],
@@ -148,7 +160,7 @@ export const addRotor = defineCommand({
     const law =
       coefficients.kind === 'static'
         ? `static Ct ${format(coefficients.thrustCoefficient)} / Cp ${format(coefficients.powerCoefficient)}`
-        : `table of ${js.length} points (grade ${coefficients.grade}), J ${format(Math.min(...js))} to ${format(Math.max(...js))}`;
+        : `table of ${js.length} points (grade ${coefficients.grade}), J ${format(minOf(js))} to ${format(maxOf(js))}`;
     const gyro =
       rotor.spinInertiaKgM2 > 0
         ? `spinning inertia ${format(rotor.spinInertiaKgM2)} kg·m²`
@@ -156,7 +168,7 @@ export const addRotor = defineCommand({
     return changed(
       { ...doc, flight: { ...flight, rotors: { ...flight.rotors, [rotorId]: rotor } } },
       `add_rotor: '${rotorId}' on body '${rotor.bodyId}' — D ${format(rotor.diameter)} m at ${format(rotor.rpm)} rpm, ${rotor.spin}, axis [${rotor.axis.join(', ')}], ` +
-        `${law} (${source}), ${gyro}; at rest thrust ${format(atRest.thrust)} N, torque ${format(atRest.torque)} N·m, power ${format(atRest.power)} W.`,
+        `${law} (${source}), ${gyro}${rotor.bladeCount === undefined ? '' : `, ${rotor.bladeCount} blades`}; at rest thrust ${format(atRest.thrust)} N, torque ${format(atRest.torque)} N·m, power ${format(atRest.power)} W.`,
       [rotorId],
     );
   },

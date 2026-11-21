@@ -5,6 +5,7 @@ import type { Vec2 } from '@core/model/types';
 import { clipToConvex, isConvex, unionPolygons } from '@lib/polygonBoolean';
 import { offsetPolygon, pointInPolygon, polygonArea, segmentsIntersect } from '@lib/polygon';
 import { boundaryDistance, insideOrOn } from './geometry2d';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface BlendedPly {
   /** Index in the master sequence (0 = tool side). */
@@ -113,7 +114,7 @@ const coversFace = (union: readonly (readonly Vec2[])[], outline: readonly Vec2[
  * @failure a stack that does not embed in the master -> CMP_ZONES_NOT_BLENDABLE (both zones named); equally thick distinct maxima -> CMP_ZONES_EQUAL_THICKNESS_CONFLICT; cover plies not in every zone -> CMP_COVER_PLIES_DROPPED
  */
 export function blendZones(zones: readonly Zone[], part: CompositePart, rules: PlyDropRules, plyThickness: number): BlendResult {
-  const longest = Math.max(...zones.map((zone) => zone.angles.length));
+  const longest = maxOf(zones.map((zone) => zone.angles.length));
   const thickest = zones.filter((zone) => zone.angles.length === longest);
   const masterZone = thickest[0] as Zone;
   const conflicting = thickest.find((zone) => !sameStack(zone.angles, masterZone.angles));
@@ -207,7 +208,7 @@ export function blendZones(zones: readonly Zone[], part: CompositePart, rules: P
     const zs = support[members[0] as number] as Zone[];
     const union = unionPolygons(zs.map((zone) => zone.boundary));
     if (coversFace(union, part.outline)) continue;
-    const needed = Math.max(...members.map((index) => rankOf.get(index) as number)) * step;
+    const needed = maxOf(members.map((index) => rankOf.get(index) as number)) * step;
     const others = [...zones.filter((zone) => !key.split('|').includes(zone.id)).map((zone) => zone.boundary), part.outline];
     let worst: RampConflict | null = null;
     const touches = (point: Vec2): boolean => union.some((polygon) => boundaryDistance(point, polygon) <= 1e-6);
@@ -217,7 +218,7 @@ export function blendZones(zones: readonly Zone[], part: CompositePart, rules: P
         if (edge.some(touches)) continue;
         for (const point of edge) {
           if (union.some((polygon) => pointInPolygon(point, polygon))) continue;
-          const available = Math.min(...union.map((polygon) => boundaryDistance(point, polygon)));
+          const available = minOf(union.map((polygon) => boundaryDistance(point, polygon)));
           if (available < needed - 1e-9 && (worst === null || available < worst.available))
             worst = { zoneIds: zs.map((zone) => zone.id), needed, available, location: point };
         }

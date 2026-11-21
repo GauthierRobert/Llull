@@ -16,7 +16,7 @@ External facts: [sources.md](sources.md). Derived numbers:
 | `generate_corrosion_reference.py` | Stdlib generator; byte-identical re-runs checked 2026-10-15; `--check` | complete |
 | `expected_results.json` | 26 cases VC-COR-01…16 | generated |
 | `plans/contact_boxes_current.json` | The plate + block geometry; uses only existing commands (`add_box` with `anchor:"min"`, `measure_bounding_box`); not executed in this session (CLI dependencies not installed) | current commands |
-| `plans/galvanic_plate_check_proposed.json` | Proposed end-to-end plan: materials, groups, environment, `find_contacts`, check, isolation, re-check | proposed |
+| `plans/galvanic_plate_check.plan.json` | End-to-end plan: materials, groups, environment, `find_contacts`, check, isolation, re-check, remove isolation, cadmium plating (small anode), CSV report; golden `tests/golden/corPlans.test.ts` | current commands (COR-b) |
 
 ## Validation cases
 
@@ -60,7 +60,7 @@ is therefore "fail by the screening rule, remedies: …", and a human decides �
 
 ```bash
 python3 -I generate_corrosion_reference.py --check
-llull run plans/galvanic_plate_check_proposed.json --doc /tmp/cor.llull.json --json > out.json
+llull run plans/galvanic_plate_check.plan.json --doc /tmp/cor.llull.json --json > out.json
 # assert: find_contacts step pairs[0].kind == "face", areaMm2 == 1800 (VC-COR-01.1)
 # assert: first check item code == "COR_GALVANIC_INCOMPATIBLE", inputs.differenceV == 0.6 (VC-COR-02.2)
 # assert: last check item status == "pass_isolated", reviewRequired == true (VC-COR-08)

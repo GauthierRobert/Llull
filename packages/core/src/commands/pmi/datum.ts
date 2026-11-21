@@ -5,6 +5,7 @@ import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { facesNearField, featureOf, isRefusal, placementField, placementFor, resolveOn, solidTarget } from './featureOps';
 import { REVIEW_REQUIRED, nextDatumLabel, pmiItems, refuse, withItem } from './pmiOps';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const DATUM_SURFACES: readonly string[] = ['plane', 'cylinder', 'cone', 'sphere'];
 const LABEL = /^[A-Z]{1,2}$/;
@@ -111,7 +112,7 @@ export const addDatumTarget = defineCommand({
     if (targetKind === 'area' && areaSize === undefined)
       return refuse(doc, 'add_datum_target', 'GDT_ZONE_NON_POSITIVE', 'an area target needs areaSize > 0', [], ['areaSize']);
     const used = items.flatMap((item): number[] => (item.kind === 'datum_target' && item.label === label ? [item.targetNumber] : []));
-    const number = targetNumber ?? Math.max(0, ...used) + 1;
+    const number = targetNumber ?? Math.max(0, maxOf(used)) + 1;
     if (used.includes(number))
       return refuse(doc, 'add_datum_target', 'GDT_DATUM_DUPLICATE', `target ${label}${number} already exists`, [], ['targetNumber']);
     const resolved = resolveOn(doc, 'add_datum_target', target, facesNear, 'facesNear');

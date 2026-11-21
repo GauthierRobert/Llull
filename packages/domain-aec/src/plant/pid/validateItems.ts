@@ -13,6 +13,7 @@ import {
   PID_ITEM_KINDS,
   PID_SIGNAL_KINDS,
 } from './model';
+import { appendAll } from '@lib/appendAll';
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isVec2 = (value: unknown): boolean => Array.isArray(value) && value.length === 2 && value.every(isFiniteNumber);
@@ -214,12 +215,12 @@ function baseErrors(item: Record<string, unknown>, path: string, sheets: Record<
     if (item[field] !== undefined && typeof item[field] !== 'string') errors.push(`${path}.${field} must be a string`);
   if (!isRecord(item['attributes'])) errors.push(`${path}.attributes must be an object`);
   else {
-    errors.push(...reservedKeys(item['attributes'], `${path}.attributes`));
-    for (const [name, value] of Object.entries(item['attributes'])) errors.push(...valueErrors(value, `${path}.attributes.${name}`));
+    appendAll(errors, reservedKeys(item['attributes'], `${path}.attributes`));
+    for (const [name, value] of Object.entries(item['attributes'])) appendAll(errors, valueErrors(value, `${path}.attributes.${name}`));
   }
   if (item['passthrough'] !== undefined && !isStringRecord(item['passthrough']))
     errors.push(`${path}.passthrough must map strings to strings`);
-  errors.push(...reservedKeys(item['passthrough'], `${path}.passthrough`));
+  appendAll(errors, reservedKeys(item['passthrough'], `${path}.passthrough`));
   return errors;
 }
 
@@ -278,9 +279,9 @@ export function itemErrors(raw: Record<string, unknown>, sheets: Record<string, 
     }
     if (item['id'] !== key) errors.push(`${path}.id must equal its key`);
     const shape = baseErrors(item, path, sheets);
-    errors.push(...shape);
-    if (shape.length === 0) errors.push(...kindErrors(item, path, items, sheets, members));
+    appendAll(errors, shape);
+    if (shape.length === 0) appendAll(errors, kindErrors(item, path, items, sheets, members));
   }
-  errors.push(...parentCycleErrors(items));
+  appendAll(errors, parentCycleErrors(items));
   return errors;
 }

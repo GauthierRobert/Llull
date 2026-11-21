@@ -4,7 +4,7 @@
  * loops, gears and a parent that moves all change it, by factors of 10 or more, and it varies with the configuration. I_eff is therefore
  * measured: a unit generalised force on the servo's DOF changes the constrained acceleration (constraint forces included) by
  * e^T M_c^-1 e = 1 / I_eff, with M_c^-1 = M^-1 - M^-1 J^T (J M^-1 J^T)^-1 J M^-1 the inverse mass matrix projected on the equality
- * constraints, so two forward passes give it: I_eff = 1 / (qacc[dof](F + 1) - qacc[dof](F)). The gains are then kp = I_eff · wn^2 and
+ * constraints, so two forward passes give it (the second one only from the acceleration stage on): I_eff = 1 / (qacc[dof](F + 1) - qacc[dof](F)). The gains are then kp = I_eff · wn^2 and
  * kv = 2 I_eff · wn with wn the model's `naturalFrequency`, which pins the servo pole at wn · dt for every configuration.
  * Dry friction is left out of the measurement (its limits are zeroed for the two passes and restored): a stuck joint is an inequality row
  * that, at the 0.9999 impedance, holds the DOF rigidly and reads as an inertia up to 10^4 times the true one, and a row toggling between
@@ -19,6 +19,8 @@ const CAP = 10;
 import type { SimulationModel } from '@core/dynamics/physicsEngine';
 import type { MjData, MjModel, MujocoModule } from './bindings';
 
+/** `mjSTAGE_VEL`: `mj_forwardSkip` keeps what depends on positions and velocities (kinematics, inertia, collisions, constraint rows, bias forces). */
+const STAGE_VELOCITY = 2;
 /** Parameters per actuator in actuator_gainprm / actuator_biasprm. */
 const PARAMETERS = 10;
 
@@ -61,7 +63,8 @@ export function createServoSchedule(
       if (!scheduled[i] || dof === undefined || gain === undefined) return;
       const held = data.qfrc_applied[dof] ?? 0;
       data.qfrc_applied[dof] = held + 1;
-      mujoco.mj_forward(mjModel, data);
+      // Positions and velocities did not change since the pass above: only the acceleration stage (applied force, constraint solve) reruns.
+      mujoco.mj_forwardSkip(mjModel, data, STAGE_VELOCITY, 1);
       data.qfrc_applied[dof] = held;
       const response = (data.qacc[dof] ?? 0) - (rest[i] ?? 0);
       if (!(response > 0) || !Number.isFinite(response)) return;

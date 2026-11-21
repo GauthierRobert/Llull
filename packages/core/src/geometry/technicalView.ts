@@ -24,6 +24,7 @@ import {
   featureEdges,
   weldTolerance,
 } from './viewProjection';
+import { appendAll } from '../lib/appendAll';
 
 /** DXF / CAD layers of a technical view, one per line type. */
 export const TECHNICAL_LAYERS = { visible: 'OBJ-VISIBLE', hidden: 'OBJ-HIDDEN', center: 'OBJ-CENTER', cut: 'OBJ-CUT' } as const;
@@ -132,9 +133,9 @@ export function technicalView(
     // Visible first: a hidden run coinciding with a visible one is not drawn (visible lines win).
     const drawn = new Set<string>();
     const tolerance = (cached[index] as SolidFaces).tolerance;
-    primitives.push(...lines(edgeRuns.visible, 'visible', drawn, tolerance));
-    if (!sectioned) primitives.push(...lines(edgeRuns.hidden, 'hidden', drawn, tolerance));
-    primitives.push(...centerLinePrimitives(entity, doc, frame, TECHNICAL_LAYERS.center, cutDepth));
+    appendAll(primitives, lines(edgeRuns.visible, 'visible', drawn, tolerance));
+    if (!sectioned) appendAll(primitives, lines(edgeRuns.hidden, 'hidden', drawn, tolerance));
+    appendAll(primitives, centerLinePrimitives(entity, doc, frame, TECHNICAL_LAYERS.center, cutDepth));
     if (primitives.length > 0) drawings.push({ entityId: entity.id, primitives });
   });
   return drawings;

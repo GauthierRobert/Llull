@@ -5,6 +5,7 @@ import { isRecord } from '@lib/isRecord';
 import { isVec3 } from '@lib/vec3';
 import type { AircraftFrame } from '@aero/surfacing/types';
 import { frameViolation } from './aircraftFrame';
+import { appendAll } from '@lib/appendAll';
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -83,7 +84,7 @@ function bodyErrors(key: string, raw: unknown): string[] {
     errors.push(`${at}.controlCurveIds must be a list of ids`);
   if (!isNumber(raw['degreeV'])) errors.push(`${at}.degreeV must be a number`);
   if (!isText(raw['entityId'])) errors.push(`${at}.entityId must be text`);
-  errors.push(...frameErrors(raw['frame'], `${at}.frame`));
+  appendAll(errors, frameErrors(raw['frame'], `${at}.frame`));
   return errors;
 }
 

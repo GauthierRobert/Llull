@@ -2,6 +2,8 @@
 
 import { PRINT_PATTERNS } from '@core/model/printIdealization';
 import { isRecord } from '@lib/isRecord';
+import { hypotOf } from '@lib/hypotOf';
+import { appendAll } from '@lib/appendAll';
 
 const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
 /** Case types the printed idealization is written for (a linear elastic deck). */
@@ -52,17 +54,17 @@ function printErrorsOf(entityId: string, print: unknown, where: string): string[
     !Array.isArray(axis) ||
     axis.length !== 3 ||
     !axis.every((c) => typeof c === 'number' && Number.isFinite(c)) ||
-    Math.abs(Math.hypot(...(axis as number[])) - 1) > 1e-9
+    Math.abs(hypotOf(axis as number[]) - 1) > 1e-9
   )
     errors.push(`${at}.layerAxis must be a unit vector of three finite numbers`);
   const coupon = print['coupon'];
   if (!isRecord(coupon) || !['E_xyMpa', 'E_zMpa', 'uts_xyMpa', 'uts_zMpa'].every((key) => positive(coupon[key])))
     errors.push(`${at}.coupon needs E_xyMpa, E_zMpa, uts_xyMpa and uts_zMpa as numbers > 0`);
-  else errors.push(...sourceErrors(coupon['source'], `${at}.coupon`));
+  else appendAll(errors, sourceErrors(coupon['source'], `${at}.coupon`));
   const exponent = print['exponent'];
   if (!isRecord(exponent) || !positive(exponent['value']) || (exponent['basis'] !== 'given' && exponent['basis'] !== 'fit'))
     errors.push(`${at}.exponent needs value > 0 and basis given | fit`);
-  else errors.push(...sourceErrors(exponent['source'], `${at}.exponent`));
+  else appendAll(errors, sourceErrors(exponent['source'], `${at}.exponent`));
   return errors;
 }
 
@@ -84,7 +86,7 @@ export function printErrors(raw: Record<string, unknown>): string[] {
       if (new Set(order).size !== order.length) errors.push('analysis.printCouponOrder lists an id twice');
       for (const id of keys) {
         if (!order.includes(id)) errors.push(`analysis.printCoupons.${id} is missing from printCouponOrder`);
-        errors.push(...couponErrors(id, coupons[id]));
+        appendAll(errors, couponErrors(id, coupons[id]));
       }
     }
   }
@@ -106,7 +108,7 @@ export function printErrors(raw: Record<string, unknown>): string[] {
       const part = Object.hasOwn(parts, entityId) ? parts[entityId] : undefined;
       if (!isRecord(part) || part['kind'] !== 'solid')
         errors.push(`${where}: printed names '${entityId}', which is not a solid part of the case`);
-      errors.push(...printErrorsOf(entityId, print, where));
+      appendAll(errors, printErrorsOf(entityId, print, where));
     }
   }
   return errors;

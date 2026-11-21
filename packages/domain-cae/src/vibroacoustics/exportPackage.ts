@@ -3,6 +3,7 @@
 import { bandRows } from './bandReport';
 import { unverifiedItem, type VacItem } from './codes';
 import { energySumDb, overallPressurePa } from './math/levels';
+import type { PackageReview } from './review';
 import type { AcousticExposure, AcousticSpectrum } from './types';
 
 /** Fixed precision of exported areas (mm^2) and centroids (mm): the kernel build must not change a saved package. */
@@ -36,29 +37,37 @@ export interface AcousticLoadPackage {
   readonly faces: readonly (ExposedFace & { readonly rmsForceN: number | null })[];
   readonly totalAreaMm2: number;
   readonly totalRmsForceN: number | null;
-  readonly provenance: { readonly source: AcousticSpectrum['source']; readonly documentHash: string };
+  readonly provenance: {
+    readonly source: AcousticSpectrum['source'];
+    readonly documentHash: string;
+    /** The llull version of the host that ran the export (`ctx.hostVersion`); null when the caller is not a llull host (in-process tests, a bare execute). */
+    readonly llullVersion: string | null;
+  };
   readonly unverified: boolean;
   readonly reviewRequired: true;
   readonly reviewReason: string;
+  readonly review: PackageReview;
   readonly items: readonly VacItem[];
 }
 
-const reviewPending: VacItem = {
-  code: 'VAC_REVIEW_PENDING',
-  severity: 'warning',
-  message: 'this package has no reviewer disposition; it feeds a qualification analysis',
-  remediation: 'a qualified reviewer must confirm the spectrum, the field type and the faces before the package is used',
-};
+/** What the export command adds to the geometry: the review state (and its item), the document hash and the host version. */
+export interface PackageContext {
+  readonly review: PackageReview;
+  readonly reviewItem: VacItem | null;
+  readonly documentHash: string;
+  readonly llullVersion: string | null;
+}
 
 /**
  * @invariant face areas and centroids are rounded to 1e-6 (mm^2, mm); bands in ascending exactMidHz; psdPa2PerHz band-averaged one-sided Pa^2/Hz; rmsForceN = overall rms pressure (Pa) x area (m^2) for a diffuse field
- *   (uniform rms pressure, spatial correlation not modelled), null for a progressive field (the incidence is not applied); unverified = the spectrum is not grade A
+ *   (uniform rms pressure, spatial correlation not modelled), null for a progressive field (the incidence is not applied); unverified = the spectrum is not grade A;
+ *   items carry VAC_REVIEW_PENDING / VAC_REVIEW_REJECTED from the review state, nothing for a confirmed acceptance (reviewRequired stays true: the package kind always needs one)
  */
 export function acousticLoadPackage(
   exposure: AcousticExposure,
   spectrum: AcousticSpectrum,
   faces: readonly ExposedFace[],
-  documentHash: string,
+  context: PackageContext,
 ): AcousticLoadPackage {
   const levels = spectrum.bands.map((band) => band.splDb);
   const pRmsPa = overallPressurePa(levels);
@@ -87,10 +96,11 @@ export function acousticLoadPackage(
     faces: rounded.map((face) => ({ ...face, rmsForceN: rmsForceOf(face.areaMm2) })),
     totalAreaMm2,
     totalRmsForceN: rmsForceOf(totalAreaMm2),
-    provenance: { source: spectrum.source, documentHash },
+    provenance: { source: spectrum.source, documentHash: context.documentHash, llullVersion: context.llullVersion },
     unverified: spectrum.unverified,
     reviewRequired: true,
     reviewReason: 'acoustic environment for qualification analysis',
-    items: [...(spectrum.unverified ? [unverifiedItem(spectrum.name)] : []), reviewPending],
+    review: context.review,
+    items: [...(spectrum.unverified ? [unverifiedItem(spectrum.name)] : []), ...(context.reviewItem === null ? [] : [context.reviewItem])],
   };
 }

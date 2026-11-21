@@ -30,6 +30,7 @@ import {
 } from '../common/profileGroups';
 import { type PurlinRow } from './purlinModel';
 import { checkPurlins } from './purlinCheckRun';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /**
  * Next heavier secondary-steel profile: the next cold-formed C by mass, then the lightest IPE with a larger plastic modulus than the C's
@@ -134,7 +135,7 @@ function reseatResized(
   const members = elementsOf(building, 'member');
   const rafters = members.filter((member) => member.role === 'rafter');
   const xs = members.flatMap((member) => [member.start[0], member.end[0]]);
-  const centre = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const centre = (minOf(xs) + maxOf(xs)) / 2;
   let next = building;
   for (const id of resizedIds) {
     const member = building.elements[id];

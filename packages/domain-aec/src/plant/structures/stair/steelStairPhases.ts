@@ -3,7 +3,7 @@
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { fromMm, toMm } from '@core/model/units';
-import type { SteelStairLanding, SteelStairTread } from '@aec/building/types';
+import type { SteelStairLanding, SteelStairTread, SteelStairTurn } from '@aec/building/types';
 import type { resolveLevel } from '../../../building/model';
 import { round } from '../../../shared/numeric';
 import { findProfile } from '../../../steel/profiles';
@@ -118,6 +118,16 @@ export function riseOf(doc: Parameters<typeof fromMm>[0], params: StairParams, r
   return proceed({ surfaces, named, target, riseValue, riserCount, riserHeight: riseValue / riserCount });
 }
 
+/** A landing record from its parameters: the length defaults to `fallback`, `turn` is kept only when given. */
+export const landingOf = (
+  landing: { afterRiser: number; length?: number | undefined; turn?: SteelStairTurn | undefined },
+  fallback: number,
+): SteelStairLanding => ({
+  afterRiser: landing.afterRiser,
+  length: landing.length ?? fallback,
+  ...(landing.turn === undefined ? {} : { turn: landing.turn }),
+});
+
 /** The clear width and the landings (explicit, or splitting the rise into equal flights); named defaults go on `defaulted`; bad landings are refused. */
 export function landingsOf(
   doc: Parameters<typeof fromMm>[0],
@@ -136,8 +146,7 @@ export function landingsOf(
   const landingLength = params.landingLength ?? Math.max(width, mm(oshaLanding));
 
   let cuts: SteelStairLanding[] = [];
-  if (params.landings !== undefined)
-    cuts = params.landings.map((landing) => ({ afterRiser: landing.afterRiser, length: landing.length ?? landingLength }));
+  if (params.landings !== undefined) cuts = params.landings.map((landing) => landingOf(landing, landingLength));
   else if (params.landingEvery !== undefined) {
     const flights = Math.ceil(riseValue / params.landingEvery - 1e-9);
     const perFlight = Math.ceil(riserCount / flights);
@@ -145,6 +154,15 @@ export function landingsOf(
   }
   if (cuts.some((landing) => landing.length === landingLength) && cuts.length > 0 && params.landingLength === undefined)
     defaulted.push(`landing length ${round(toMm(doc, landingLength), 1)} mm (max of width and the OSHA landing row)`);
+  const narrow = cuts.find((landing) => landing.turn !== undefined && landing.length < width);
+  if (narrow !== undefined)
+    return stop(
+      fail(
+        'STA_INVALID_GEOMETRY',
+        `the ${narrow.turn} landing after riser ${narrow.afterRiser} is ${round(toMm(doc, narrow.length), 1)} mm long, less than the stair width ${round(toMm(doc, width), 1)} mm: a turning landing needs length >= width`,
+        ['landings'],
+      ),
+    );
   const flights = stairFlights(riserCount, cuts);
   if (
     cuts.some((landing, index) => index > 0 && landing.afterRiser <= (cuts[index - 1] as SteelStairLanding).afterRiser) ||
@@ -167,15 +185,13 @@ export function arrivalOf(
   resolution: Resolved,
   rise: RiseSetup,
   cuts: readonly SteelStairLanding[],
-  angle: number,
+  top: Vec2,
   fail: Fail,
 ): Phase<{ arrival: Surface | undefined; runPlan: number }> {
   const { level } = resolution;
-  const [sx, sy, sz] = params.start;
+  const sz = params.start[2];
   const mm = (value: number): number => fromMm(doc, value);
   const runPlan = rise.riserCount - 1 - cuts.length;
-  const run = runPlan * params.going + cuts.reduce((sum, landing) => sum + landing.length, 0);
-  const top: Vec2 = [sx + Math.cos(angle) * run, sy + Math.sin(angle) * run];
   const departure = level.elevation + sz;
   const reached = nearestSurface(rise.named, top);
   if (rise.target !== undefined && reached !== undefined && distanceToRing(top, reached.ring) > mm(ARRIVAL_REACH_MM))

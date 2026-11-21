@@ -7,13 +7,14 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
+import { getGeometryKernel } from '@core/geometry/kernel';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { writeFileKeepingBackup } from './writeFileAtomic';
 
 /** The document stored at `docPath`; an empty document when the file does not exist yet. */
 export function readDocumentFile(docPath: string): CadDocument {
   if (!fs.existsSync(docPath)) return createEmptyDocument();
-  return deserializeDocument(fs.readFileSync(docPath, 'utf8'));
+  return deserializeDocument(fs.readFileSync(docPath, 'utf8'), { kernel: getGeometryKernel() });
 }
 
 /** What the file looked like when it was loaded or last saved: a save checks it before replacing the file (DSF_SAVE_CONFLICT). */

@@ -7,6 +7,7 @@
 
 import type { Vec3 } from '../../model/vectors';
 import { normalOf } from './editMesh';
+import { hypot3 } from '../../lib/vec3';
 
 /** Largest loop (edges) triangulated by the O(n^3) program. */
 const DP_LOOP_LIMIT = 120;
@@ -24,7 +25,7 @@ export interface LoopTriangulation {
 }
 
 const unitOrNull = (n: Vec3): Vec3 | null => {
-  const length = Math.hypot(...n);
+  const length = Math.hypot(n[0], n[1], n[2]);
   return length > 1e-300 ? [n[0] / length, n[1] / length, n[2] / length] : null;
 };
 
@@ -65,7 +66,7 @@ function dynamicProgram(loop: ReadonlyArray<number>, geometry: LoopGeometry): Lo
         const total =
           (area[i * n + m] as number) +
           (area[m * n + k] as number) +
-          Math.hypot(...normalOf(point[k] as Vec3, point[m] as Vec3, point[i] as Vec3)) / 2;
+          hypot3(normalOf(point[k] as Vec3, point[m] as Vec3, point[i] as Vec3)) / 2;
         if (angle < bestAngle - ANGLE_TIE || (angle <= bestAngle + ANGLE_TIE && total < bestArea)) {
           best = m;
           bestAngle = angle;
@@ -99,8 +100,8 @@ function greedyEars(loop: ReadonlyArray<number>, geometry: LoopGeometry): LoopTr
     const [pa, pb, pc] = [geometry.position(a), geometry.position(b), geometry.position(c)];
     const u: Vec3 = [pa[0] - pb[0], pa[1] - pb[1], pa[2] - pb[2]];
     const v: Vec3 = [pc[0] - pb[0], pc[1] - pb[1], pc[2] - pb[2]];
-    const lu = Math.hypot(...u);
-    const lv = Math.hypot(...v);
+    const lu = Math.hypot(u[0], u[1], u[2]);
+    const lv = Math.hypot(v[0], v[1], v[2]);
     return lu * lv > 0 ? angleBetween([u[0] / lu, u[1] / lu, u[2] / lu], [v[0] / lv, v[1] / lv, v[2] / lv]) : Math.PI;
   };
   while (ring.length > 3) {
@@ -110,7 +111,7 @@ function greedyEars(loop: ReadonlyArray<number>, geometry: LoopGeometry): LoopTr
       const [a, b, c] = [ring[(i + ring.length - 1) % ring.length], ring[i], ring[(i + 1) % ring.length]] as [number, number, number];
       if (geometry.edgeExists(a, c)) continue;
       const normal = normalOf(geometry.position(c), geometry.position(b), geometry.position(a));
-      if (Math.hypot(...normal) < 1e-300) continue;
+      if (Math.hypot(normal[0], normal[1], normal[2]) < 1e-300) continue;
       const angle = cornerAngle(a, b, c);
       if (angle < bestAngle) {
         bestAngle = angle;
@@ -127,7 +128,7 @@ function greedyEars(loop: ReadonlyArray<number>, geometry: LoopGeometry): LoopTr
     ring.splice(best, 1);
   }
   const [a, b, c] = ring as [number, number, number];
-  if (Math.hypot(...normalOf(geometry.position(c), geometry.position(b), geometry.position(a))) < 1e-300) return null;
+  if (hypot3(normalOf(geometry.position(c), geometry.position(b), geometry.position(a))) < 1e-300) return null;
   triangles.push([c, b, a]);
   return { triangles, method: 'greedy' };
 }

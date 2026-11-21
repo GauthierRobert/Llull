@@ -11,6 +11,7 @@ import { fixed, refuser } from '../result';
 import { findRadiusRow, resolveK } from '../rules';
 import { applyFlange } from './flange';
 import { insideRadiusOf, isRefusal, partContext } from '../partLookup';
+import { maxOf } from '@lib/arrayExtrema';
 
 type Face = 'top' | 'bottom' | 'mid';
 
@@ -151,8 +152,8 @@ export const addContourFlange = defineCommand({
     for (let i = 1; i < turns.length; i++) {
       const parent = flatOf(current, flats[i - 1] as string);
       if (parent === undefined) break;
-      const width = Math.max(...parent.outline.map((point) => point[0]));
-      const length = Math.max(...parent.outline.map((point) => point[1]));
+      const width = maxOf(parent.outline.map((point) => point[0]));
+      const length = maxOf(parent.outline.map((point) => point[1]));
       const line: readonly [Vec2, Vec2] = [
         [0, length],
         [width, length],

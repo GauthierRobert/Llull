@@ -13,13 +13,15 @@ import { fromMm, toMm } from '@core/model/units';
 import { pointInPolygon } from '@lib/polygon';
 import type { BuildingModel, SteelStairElement } from '@aec/building/types';
 import { elementsOf } from '../../../building/model';
-import { accessLinks, hostedRailings, type Hosted } from '../clash/structuresClashBodies';
+import { accessLinks, hostedRailings, stairFlightBoxes, type Hosted } from '../clash/structuresClashBodies';
+import { boxExtent } from '../../../industrial/clash/clashBoxes';
 import { boxFootprint } from '../ladder/boxFootprint';
 import { ruleById, type AccessRule, type RulesetName } from '../rules/ruleTable';
-import { directionOf, layoutSteelStair } from '../stair/steelStairLayout';
+import { directionOf, framePoint, layoutSteelStair } from '../stair/steelStairLayout';
 import { stairSizes } from '../stair/steelStairMeasure';
 import { breachFinding, type Finding } from './finding';
 import { allCandidates, verticalSpan, type Candidate } from './obstructions';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Sample spacing along and across the stair, mm. */
 const SAMPLE_MM = 50;
@@ -100,30 +102,18 @@ export function stairHeadroom(
   const exclude = new Set(accessLinks(doc, building, stair, context.hosted));
   const candidates = context.candidates.filter((candidate) => !exclude.has(candidate.id) && !exclude.has(candidate.group));
   const slabs = context.slabs.filter((slab) => !exclude.has(slab.id));
-  const { stations, run } = layoutSteelStair(stair, stairSizes(doc, stair));
-  const { forward, left } = directionOf(stair.angle);
+  const { stations, regions, frames } = layoutSteelStair(stair, stairSizes(doc, stair));
+  // The stair's own flights two or more above the sampled one hang over it (a switchback): the next flight is the one it leaves to, not an obstruction.
+  const own = stairFlightBoxes(doc, stair, level).map(({ flight, box }) => ({
+    flight,
+    id: stair.id,
+    group: stair.id,
+    box,
+    ...boxExtent(box),
+  }));
   const base = level.elevation + stair.start[2];
   const [step, touch] = [fromMm(doc, SAMPLE_MM), fromMm(doc, TOUCH_MM)];
-  const at = (station: number, side: number): Vec2 => [
-    stair.start[0] + forward[0] * station + left[0] * side,
-    stair.start[1] + forward[1] * station + left[1] * side,
-  ];
-  // Obstructions whose plan extent meets the stair plan: their edges (in stair coordinates) join the sample positions, so a narrow one is never missed.
-  const corners = [at(0, -stair.width / 2), at(run, -stair.width / 2), at(run, stair.width / 2), at(0, stair.width / 2)];
-  const [minX, maxX] = [Math.min(...corners.map((c) => c[0])), Math.max(...corners.map((c) => c[0]))];
-  const [minY, maxY] = [Math.min(...corners.map((c) => c[1])), Math.max(...corners.map((c) => c[1]))];
-  const near = candidates.filter((c) => c.max[0] >= minX && c.min[0] <= maxX && c.max[1] >= minY && c.min[1] <= maxY);
-  const alongEdges: number[] = [];
-  const acrossEdges: number[] = [];
-  for (const candidate of near)
-    for (const [x, y] of boxFootprint(candidate.box).ring) {
-      const [dx, dy] = [x - stair.start[0], y - stair.start[1]];
-      alongEdges.push(dx * forward[0] + dy * forward[1]);
-      acrossEdges.push(dx * left[0] + dy * left[1] + stair.width / 2);
-    }
   const inset = fromMm(doc, 0.01);
-  const alongs = positions(run, step, alongEdges, inset);
-  const acrosses = positions(stair.width, step, acrossEdges, inset);
   let least = Infinity;
   let obstruction: string | null = null;
   const consider = (id: string, pitch: number, low: number, high: number): void => {
@@ -131,18 +121,47 @@ export function stairHeadroom(
     const gap = Math.max(0, low - pitch);
     if (gap < least) [least, obstruction] = [gap, id];
   };
-  for (const station of alongs) {
-    const pitch = base + pitchHeight(stair, stations, station);
-    for (const across of acrosses) {
-      const [x, y] = at(station, across - stair.width / 2);
-      for (const candidate of near) {
-        if (x < candidate.min[0] || x > candidate.max[0] || y < candidate.min[1] || y > candidate.max[1]) continue;
-        const span = verticalSpan(candidate.box, x, y);
-        if (span !== null) consider(candidate.id, pitch, span[0], span[1]);
+  for (const region of regions) {
+    const {
+      frame,
+      from,
+      to,
+      across: [lo, hi],
+    } = region;
+    const { forward, left } = directionOf(frame.angle);
+    const at = (station: number, side: number): Vec2 => framePoint(frame, from + station, side);
+    const length = to - from;
+    // Obstructions whose plan extent meets the region: their edges (in region coordinates) join the sample positions, so a narrow one is never missed.
+    const corners = [at(0, lo), at(length, lo), at(length, hi), at(0, hi)];
+    const [minX, maxX] = [minOf(corners.map((c) => c[0])), maxOf(corners.map((c) => c[0]))];
+    const [minY, maxY] = [minOf(corners.map((c) => c[1])), maxOf(corners.map((c) => c[1]))];
+    const lastFlight = frames.lastIndexOf(frame);
+    const above = own.filter((part) => part.flight >= lastFlight + 2);
+    const near = [...candidates, ...above].filter((c) => c.max[0] >= minX && c.min[0] <= maxX && c.max[1] >= minY && c.min[1] <= maxY);
+    const origin = at(0, 0);
+    const alongEdges: number[] = [];
+    const acrossEdges: number[] = [];
+    for (const candidate of near)
+      for (const [x, y] of boxFootprint(candidate.box).ring) {
+        const [dx, dy] = [x - origin[0], y - origin[1]];
+        alongEdges.push(dx * forward[0] + dy * forward[1]);
+        acrossEdges.push(dx * left[0] + dy * left[1] - lo);
       }
-      for (const slab of slabs)
-        if (pointInPolygon([x, y], slab.ring) && !slab.openings.some((opening) => pointInPolygon([x, y], opening)))
-          consider(slab.id, pitch, slab.bottom, slab.top);
+    const alongs = positions(length, step, alongEdges, inset);
+    const acrosses = positions(hi - lo, step, acrossEdges, inset);
+    for (const station of alongs) {
+      const pitch = base + pitchHeight(stair, stations, from + station);
+      for (const across of acrosses) {
+        const [x, y] = at(station, lo + across);
+        for (const candidate of near) {
+          if (x < candidate.min[0] || x > candidate.max[0] || y < candidate.min[1] || y > candidate.max[1]) continue;
+          const span = verticalSpan(candidate.box, x, y);
+          if (span !== null) consider(candidate.id, pitch, span[0], span[1]);
+        }
+        for (const slab of slabs)
+          if (pointInPolygon([x, y], slab.ring) && !slab.openings.some((opening) => pointInPolygon([x, y], opening)))
+            consider(slab.id, pitch, slab.bottom, slab.top);
+      }
     }
   }
   return { stairId: stair.id, headroomMm: obstruction === null ? null : toMm(doc, least), obstructionId: obstruction };

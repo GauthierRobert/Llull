@@ -83,7 +83,7 @@ const plus = (p: Int3, axis: number, length: number): Int3 => {
 
 /** Axis index of a unit axis direction, or null. */
 function axisIndex(direction: Vec3): number | null {
-  const length = Math.hypot(...direction);
+  const length = Math.hypot(direction[0], direction[1], direction[2]);
   if (!(length > 0)) return null;
   for (let axis = 0; axis < 6; axis++) {
     const v = AXIS_VECTORS[axis] as Int3;

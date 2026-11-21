@@ -16,6 +16,7 @@ import { wrapRejection } from './codes';
 import { namedDefault, wrapData } from './conventions';
 import { isRejection, openSolid, type SolidSession } from './faceSession';
 import { continuousUv, curveSamples, snapChainEnds } from './splitChains';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const MAX_CURVES = 500;
 
@@ -76,7 +77,7 @@ function attemptChain(session: SolidSession, face: number, curve: NurbsCurveData
   });
   const image = session.query.evaluateFace(session.shape, face, middles);
   if (image === null) return { code: 'WRP_SPLIT_FIT_FAILED', message: 'the kernel could not evaluate the face along the fitted curve' };
-  const deviation = Math.max(...image.map((e) => closestOnCurve(curve, e.point).distance));
+  const deviation = maxOf(image.map((e) => closestOnCurve(curve, e.point).distance));
   if (deviation > 0.1 * tolerance)
     return {
       code: 'WRP_SPLIT_FIT_FAILED',
@@ -137,7 +138,7 @@ function groupByFace(
     const hits = session.query.distance(session.shape, open ? samples.slice(1, -1) : samples);
     if (hits === null) return fail('WRP_KERNEL_BUILD_FAILED', 'the kernel could not measure the curve against the faces', [item.id]);
     const faces = new Set(hits.map((hit) => hit.face));
-    const farthest = Math.max(...hits.map((hit) => hit.distance));
+    const farthest = maxOf(hits.map((hit) => hit.distance));
     const face = hits[0]?.face ?? -1;
     if (faces.size !== 1 || face < 0 || farthest > Math.max(tolerance, 10 * item.fit))
       return fail(

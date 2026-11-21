@@ -13,6 +13,8 @@ import { surfaceDerivatives, surfaceDomain } from './surface';
 import { surfaceSample } from './surfaceCurvature';
 import type { NurbsSurfaceData } from './surfaceTypes';
 import type { NurbsCurveData } from './types';
+import { maxOf, minOf } from '../arrayExtrema';
+import { hypotOf } from '../hypotOf';
 
 const liftWeights = (curve: NurbsCurveData): NurbsCurveData => ({ ...curve, weights: curve.poles.map(() => 1) });
 
@@ -48,7 +50,7 @@ export function arcLengthFit(curve: NurbsCurveData, count: number): { fit: Nurbs
   const fitted = interpolatePoints(points, { degree: 3, parameterization: 'uniform' });
   if ('code' in fitted) return fitted.message;
   const middles = arcLengthSamples(curve, 2 * count).points.filter((_, k) => k % 2 === 1);
-  const deviation = Math.max(...middles.map((p) => closestOnCurve(fitted.curve, p).distance));
+  const deviation = maxOf(middles.map((p) => closestOnCurve(fitted.curve, p).distance));
   return { fit: fitted.curve, deviation };
 }
 
@@ -126,9 +128,9 @@ export function sheetDiagonal(surface: NurbsSurfaceData): number {
   const poles = surface.poles.flat();
   const extent = [0, 1, 2].map((axis) => {
     const values = poles.map((pole) => pole[axis] as number);
-    return Math.max(...values) - Math.min(...values);
+    return maxOf(values) - minOf(values);
   });
-  return Math.hypot(...extent);
+  return hypotOf(extent);
 }
 
 /** Largest angle (radians) between the rulings at neighbouring samples along u: how much the rulings twist from one to the next. */

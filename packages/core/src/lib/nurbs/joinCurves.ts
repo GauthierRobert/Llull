@@ -6,6 +6,8 @@ import { elevateDegree } from './edit';
 import { curveDomain } from './evaluate';
 import { compressKnots, expandKnots } from './knotVector';
 import type { NurbsCurveData } from './types';
+import { maxOf } from '../arrayExtrema';
+import { appendAll } from '../appendAll';
 
 /**
  * The curves (non-rational, consecutive ends coincident) as one curve whose parameter runs [0, 1], each piece taking its share of the total
@@ -15,7 +17,7 @@ import type { NurbsCurveData } from './types';
 export function joinCurves(curves: ReadonlyArray<NurbsCurveData>): NurbsCurveData | string {
   if (curves.length === 1) return curves[0] as NurbsCurveData;
   if (curves.some((curve) => curve.weights !== undefined)) return 'rational curves cannot be joined';
-  const degree = Math.max(...curves.map((curve) => curve.degree));
+  const degree = maxOf(curves.map((curve) => curve.degree));
   const raised: NurbsCurveData[] = [];
   for (const curve of curves) {
     const edit = curve.degree < degree ? elevateDegree(curve, degree - curve.degree) : curve;
@@ -33,10 +35,10 @@ export function joinCurves(curves: ReadonlyArray<NurbsCurveData>): NurbsCurveDat
     const mapped = expandKnots(curve.knots, curve.multiplicities).map((knot) => start + ((knot - a) / (b - a)) * (end - start));
     if (index === 0) {
       full = mapped.slice(0, mapped.length - degree - 1);
-      poles.push(...curve.poles);
+      appendAll(poles, curve.poles);
     } else {
       full = [...full, ...new Array<number>(degree).fill(start), ...mapped.slice(degree + 1, mapped.length - degree - 1)];
-      poles.push(...curve.poles.slice(1));
+      appendAll(poles, curve.poles.slice(1));
     }
     start = end;
   });

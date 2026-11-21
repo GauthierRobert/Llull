@@ -10,6 +10,7 @@ import { fastenerModel, withFasteners } from './fastenerDoc';
 import { decodeWithGrammar, type FieldValues } from './partNumber';
 import { listedLengthTicks } from './selectCore';
 import { ticksToInches, toTicks } from './units';
+import { appendAll } from '@lib/appendAll';
 
 const FAMILY_KINDS = ['bolt', 'hi_lok_pin', 'solid_rivet', 'blind_rivet', 'lockbolt', 'nut', 'washer', 'collar', 'insert'] as const;
 
@@ -65,7 +66,7 @@ export const importFastenerCatalog = defineCommand({
     file.data.families.forEach((raw, index) => {
       const checked = checkFamily(raw, `catalog.families.${index}`);
       if ('family' in checked) families.push(checked.family);
-      else issues.push(...checked.issues);
+      else appendAll(issues, checked.issues);
     });
     if (issues.length > 0) return issueResult(doc, issues);
     const licensed = families.filter((family) => family.licence === 'licensed-no-redistribution').map((family) => family.id);

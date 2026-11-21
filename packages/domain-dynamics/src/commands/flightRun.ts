@@ -112,7 +112,7 @@ export const runFlightCommand = defineCommand({
     'defaulted inputs (unverified). With a powertrain (add_battery + add_flight_powertrain) every rotor it feeds draws its motor current from the ' +
     'pack each step: data.battery[powertrainId] gives the state of charge, charge in mAh, energy in Wh, mean / peak / final current, the lowest ' +
     'terminal voltage (sag), motor current peak against the datasheet limit, peak throttle, the cut-off time (the motors then stop: warning ' +
-    'FLT_BATTERY_CUTOFF) and enduranceS (the cut-off time, or an ESTIMATE: the run time plus what the final current still allows, optimistic on a sloping OCV curve or constant-power load; estimate_endurance integrates the discharge properly). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
+    'FLT_BATTERY_CUTOFF) and enduranceS (the cut-off time, or an ESTIMATE: the run time plus what the final current still allows, optimistic on a sloping OCV curve or constant-power load; estimate_endurance integrates the discharge properly); with a motor datasheet carrying `thermal`, motorThermal gives each winding temperature (peak / final, FLT_MOTOR_OVERTEMP over maxWindingC; detail "series" adds windingC). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
     'position offset, set-point, velocity, attitude, tilt, body rates, wind and per-rotor rpm / thrust / power. A closed loop tilting past ' +
     '90° or a NaN state is refused as FLT_DIVERGED with the time. The vehicle is ONE free rigid body: a body with other bodies jointed below it is refused (FLT_VEHICLE_MULTIBODY: a pivoting wing is an aero surface with a pivot servo, generate_aero_table); aero surfaces (generate_aero_table) act with their table at the local flow and pivot angle (data.aero[surfaceId]: alpha range, pivot, lift / drag, peak lift, share of steps outside the table, FLT_AERO_OUTSIDE_TABLE; a table made on another design of its body warns FLT_AERO_TABLE_STALE and is unverified); a rotor layout whose mixer is nearly singular is refused (FLT_MIXER_ILL_CONDITIONED). Use flight_report for a PASS / MARGINAL / FAIL verdict.',
   params: z.object({
@@ -161,6 +161,13 @@ const limitsSchema = z
       .max(1)
       .optional()
       .describe('Least battery state of charge (0..1) left at the end of a run with a powertrain. Default 0.2.'),
+    minEnduranceS: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        'Least battery endurance, s (data.battery[].enduranceS: the cut-off time, or the estimate at the final current). No default: checked (battery_endurance_s, FLT_ENDURANCE_SHORT when below) only when given.',
+      ),
   })
   .optional()
   .describe('Named limits of the verdict; each omitted one takes its default (listed in data.limitsDefaulted).');
@@ -180,7 +187,8 @@ export const flightReportCommand = defineCommand({
     'Verdict of a flight scenario (13 FLT): runs it exactly as run_flight and judges the numbers against named limits, each overridable: ' +
     'thrust_margin >= 0.3 (1 - weight / max thrust), saturation_fraction <= 0.05, max_attitude_deg <= 45, final_position_error_m <= 0.1, ' +
     'recovery_time_s <= 5 (largest recovery after a set-point change or gust; an event that never recovers fails), battery_final_soc >= 0.2 ' +
-    '(only with a powertrain; a battery cut-off adds a failing battery_cutoff check). Each check is PASS, ' +
+    '(only with a powertrain; a battery cut-off adds a failing battery_cutoff check); with limits.minEnduranceS the shortest pack endurance ' +
+    'battery_endurance_s >= it (FLT_ENDURANCE_SHORT); with a motor thermal datasheet motor_winding_c <= maxWindingC. Each check is PASS, ' +
     'MARGINAL (passes within 10 % of its limit), FAIL or not_applicable (e.g. thrust margin of an open-loop flight); verdict FAIL on any ' +
     'failure or a divergence (thrust axis past 90°), MARGINAL on any marginal check, else PASS. data.hover: total final shaft power, ' +
     'momentum-theory ideal power T^1.5 / sqrt(2ρA) summed over the rotors and the figure of merit (ideal / shaft) — meaningful once the ' +
@@ -217,6 +225,7 @@ export const flightReportCommand = defineCommand({
     const { metrics } = flown;
     const given = params.limits ?? {};
     const limitsDefaulted = (Object.keys(DEFAULT_FLIGHT_LIMITS) as (keyof FlightLimits)[]).filter((key) => given[key] === undefined);
+    // minEnduranceS has no default: it is in `limits` only when given
     const limits: FlightLimits = {
       ...DEFAULT_FLIGHT_LIMITS,
       ...Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined)),

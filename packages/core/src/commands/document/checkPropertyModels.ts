@@ -9,6 +9,7 @@ import { samplePoints } from '../../model/propertyTabulate';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
+import { appendAll } from '../../lib/appendAll';
 
 const DISCONTINUITY_TOL = 1e-3;
 const FIT_POOR = 0.05;
@@ -125,7 +126,7 @@ export const checkPropertyModels = defineCommand({
       };
       for (const model of material.propertyModels ?? []) {
         const id = `${materialName}/${model.id}`;
-        items.push(...discontinuities(record, model, tolerance));
+        appendAll(items, discontinuities(record, model, tolerance));
         const reasons = modelUnverifiedReasons(model);
         if (reasons.length > 0) unverified.push({ id, reasons });
         if (model.validity.some((range) => range.equation === undefined)) {

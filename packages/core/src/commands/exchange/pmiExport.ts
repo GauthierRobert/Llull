@@ -15,6 +15,7 @@ import { operandRecipe } from '../../geometry/operandRecipe';
 import { pmiItems } from '../pmi/pmiOps';
 import { toExchangePmi } from '../pmi/xcafMapping';
 import type { ExchangePlan } from './stepPlan';
+import { appendAll } from '../../lib/appendAll';
 
 export interface PmiWriteReport {
   readonly requested: number;
@@ -75,9 +76,9 @@ export function attachPmi(
       return resolved === null || isFeatureProblem(resolved) ? [] : resolved.faces.map((face) => face.index);
     };
     const mapped = toExchangePmi(group, facesOf);
-    written.push(...mapped.written);
-    skipped.push(...mapped.skipped);
-    lossy.push(...mapped.lossy);
+    appendAll(written, mapped.written);
+    appendAll(skipped, mapped.skipped);
+    appendAll(lossy, mapped.lossy);
     const key = productOf.get(entityId);
     if (mapped.pmi !== null && key !== undefined) attached.set(key, mapped.pmi);
   }

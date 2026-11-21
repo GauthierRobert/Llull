@@ -31,21 +31,40 @@ const B64_VALUES: Int8Array = (() => {
 
 /** `text` is not valid base64. */
 export function base64ToUint8Array(text: string): Uint8Array | null {
-  if (text.length % 4 !== 0) return null;
+  const length = text.length;
+  if (length % 4 !== 0) return null;
   const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0;
-  const dataLength = text.length - padding;
-  const bytes = new Uint8Array((text.length / 4) * 3 - padding);
-  let triple = 0;
+  const bytes = new Uint8Array((length / 4) * 3 - padding);
+  // Whole groups of four characters -> three bytes; the last group is handled apart when it is padded.
+  const whole = padding === 0 ? length : length - 4;
   let out = 0;
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    const value = i < dataLength && code < 128 ? (B64_VALUES[code] ?? -1) : i < dataLength ? -1 : 0;
-    if (value < 0) return null;
-    triple = (triple << 6) | value;
-    if (i % 4 === 3) {
-      for (const shift of [16, 8, 0]) if (out < bytes.length) bytes[out++] = (triple >> shift) & 0xff;
-      triple = 0;
-    }
+  for (let i = 0; i < whole; i += 4) {
+    const c0 = text.charCodeAt(i);
+    const c1 = text.charCodeAt(i + 1);
+    const c2 = text.charCodeAt(i + 2);
+    const c3 = text.charCodeAt(i + 3);
+    if ((c0 | c1 | c2 | c3) > 127) return null;
+    const triple =
+      ((B64_VALUES[c0] as number) << 18) |
+      ((B64_VALUES[c1] as number) << 12) |
+      ((B64_VALUES[c2] as number) << 6) |
+      (B64_VALUES[c3] as number);
+    // A character outside the alphabet is -1: every bit set, so the sign survives the shifts and the ors.
+    if (triple < 0) return null;
+    bytes[out] = triple >> 16;
+    bytes[out + 1] = triple >> 8;
+    bytes[out + 2] = triple;
+    out += 3;
+  }
+  if (padding > 0) {
+    const c0 = text.charCodeAt(length - 4);
+    const c1 = text.charCodeAt(length - 3);
+    const c2 = padding === 1 ? text.charCodeAt(length - 2) : 65;
+    if ((c0 | c1 | c2) > 127) return null;
+    const triple = ((B64_VALUES[c0] as number) << 18) | ((B64_VALUES[c1] as number) << 12) | ((B64_VALUES[c2] as number) << 6);
+    if (triple < 0) return null;
+    bytes[out] = triple >> 16;
+    if (padding === 1) bytes[out + 1] = triple >> 8;
   }
   return bytes;
 }

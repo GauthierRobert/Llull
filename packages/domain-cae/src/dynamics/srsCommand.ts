@@ -8,6 +8,7 @@ import { refuseDyn } from './codes';
 import { historyProblem } from './libraryCommands';
 import { halfSineSrs, historySrs, octaveFrequencies, type SrsValue } from './math/srs';
 import { libraryOf } from './store';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Sampling guard (TR-DYN-51): dt <= 1 / (SAMPLES_PER_PERIOD fMax). */
 const SAMPLES_PER_PERIOD = 10;
@@ -57,7 +58,7 @@ export const shockResponseSpectrum = defineCommand({
     else return fail('FEA_PARAM_INVALID', 'give frequenciesHz, or 0 < fMinHz <= fMaxHz (and octaveFraction >= 1)', 'frequenciesHz');
     if (frequencies.length === 0 || frequencies.length > MAX_FREQUENCIES || frequencies.some((f) => !(f > 0 && Number.isFinite(f))))
       return fail('FEA_PARAM_INVALID', `1 to ${MAX_FREQUENCIES} frequencies, each > 0`, 'frequenciesHz');
-    const top = Math.max(...frequencies);
+    const top = maxOf(frequencies);
     let spectrum: (fn: number) => SrsValue;
     let sampling: string;
     if (input.kind === 'half_sine') {

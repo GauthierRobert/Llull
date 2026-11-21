@@ -210,12 +210,12 @@ describe('check_nonlinear', () => {
     expect(codes(execute(bar.doc, 'check_nonlinear', { analysisId: bar.analysisId }))).not.toContain('NLS_MATERIAL_MODEL_UNVERIFIED');
   });
 
-  it('on verified results reports the snap-back indicator and the guardrails not evaluated', () => {
+  it('on verified results reports the snap-back indicator, and no plastic-zone item without a PE field', () => {
     const turning = solvedPull(LOADS, [0.002, 0.004, 0.003, 0.0025, 0.002]);
     const result = check(turning);
     expect(codes(result)).toContain('NLS_SNAP_BACK_DETECTED');
     expect((result.data as Data).state).toBe('solved');
-    expect((result.data as Data).notes.join()).toContain('not evaluated');
+    expect(codes(result).filter((code) => /^NLS_(STRAIN_|MESH_PLASTIC)/.test(code))).toEqual([]);
     const plain = check(solvedPull(LOADS));
     expect(codes(plain)).not.toContain('NLS_SNAP_BACK_DETECTED');
   });

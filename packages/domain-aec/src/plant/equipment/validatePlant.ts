@@ -4,8 +4,9 @@ import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { isVec3 } from '@lib/vec3';
 import { headSpecSchema } from './model';
-import { PLANT_EQUIPMENT_SCHEMA } from './plantData';
+import { NOZZLE_KINDS, PLANT_EQUIPMENT_SCHEMA } from './plantData';
 import { exchangerErrors, pumpErrors, supportErrors, tankErrors } from './validateTemplates';
+import { appendAll } from '@lib/appendAll';
 
 function vesselErrors(template: Record<string, unknown>, at: string): string[] {
   const errors: string[] = [];
@@ -49,10 +50,19 @@ function nozzleErrors(nozzle: unknown, at: string): string[] {
   const errors: string[] = [];
   if (typeof nozzle['mark'] !== 'string' || nozzle['mark'] === '') errors.push(`${at}.mark must be a non-empty string`);
   if (typeof nozzle['rating'] !== 'string') errors.push(`${at}.rating must be a string`);
+  if (nozzle['kind'] !== undefined && !NOZZLE_KINDS.some((kind) => kind === nozzle['kind']))
+    errors.push(`${at}.kind must be one of ${NOZZLE_KINDS.join(', ')}`);
   if (nozzle['facing'] !== 'RF' && nozzle['facing'] !== 'FF' && nozzle['facing'] !== 'RTJ')
     errors.push(`${at}.facing must be RF, FF or RTJ`);
   for (const name of ['dn', 'projection', 'neckOutsideDiameter', 'neckWall'])
     if (!isPositiveNumber(nozzle[name])) errors.push(`${at}.${name} must be a number > 0`);
+  const pad = nozzle['pad'];
+  if (pad !== undefined) {
+    if (!isRecord(pad) || !isPositiveNumber(pad['outsideDiameter']) || !isPositiveNumber(pad['thickness']))
+      errors.push(`${at}.pad needs outsideDiameter and thickness > 0`);
+    else if (isPositiveNumber(nozzle['neckOutsideDiameter']) && pad['outsideDiameter'] <= nozzle['neckOutsideDiameter'])
+      errors.push(`${at}.pad.outsideDiameter must exceed neckOutsideDiameter`);
+  }
   const flange = nozzle['flange'];
   if (!isRecord(flange) || !isPositiveNumber(flange['outsideDiameter']) || !isPositiveNumber(flange['thickness']))
     errors.push(`${at}.flange needs outsideDiameter and thickness > 0`);
@@ -76,9 +86,9 @@ export function plantDataErrors(key: string, plant: unknown): string[] {
   const kind = isRecord(template) ? template['kind'] : undefined;
   const check = typeof kind === 'string' ? checks.get(kind) : undefined;
   if (!isRecord(template) || check === undefined) errors.push(`${at}.template.kind must be vessel, exchanger, tank, pump or block`);
-  else if (check !== null) errors.push(...check(template, `${at}.template`));
+  else if (check !== null) appendAll(errors, check(template, `${at}.template`));
   if (!Array.isArray(plant['nozzles'])) errors.push(`${at}.nozzles must be an array`);
-  else plant['nozzles'].forEach((nozzle, index) => errors.push(...nozzleErrors(nozzle, `${at}.nozzles.${index}`)));
+  else plant['nozzles'].forEach((nozzle, index) => appendAll(errors, nozzleErrors(nozzle, `${at}.nozzles.${index}`)));
   if (plant['design'] !== undefined && !isRecord(plant['design'])) errors.push(`${at}.design must be an object`);
   return errors;
 }

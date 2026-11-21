@@ -5,6 +5,7 @@ import type { RegionHatch } from '../model/regionHatch';
 import { pointInPolygon, polygonArea, projectOntoSegment, segmentsIntersect } from '../lib/polygon';
 import { cappedHatch } from '../lib/hatch';
 import { chainMoments } from './chainMoments';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 type Loop = ReadonlyArray<Vec2>;
 
@@ -65,7 +66,7 @@ export interface LoopBox {
 export function loopBounds(loop: Loop): LoopBox {
   const xs = loop.map(([x]) => x);
   const ys = loop.map(([, y]) => y);
-  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+  return { minX: minOf(xs), minY: minOf(ys), maxX: maxOf(xs), maxY: maxOf(ys) };
 }
 
 /** True when the boxes, each grown by `margin`, overlap. */
@@ -123,7 +124,7 @@ export function loopContact(a: Loop, b: Loop, tolerance: number): 'cross' | 'tou
 
 /** Distance from `point` to the boundary of `loop`. */
 export function distanceToLoop(point: Vec2, loop: Loop): number {
-  return Math.min(...loop.map((_, i) => projectOntoSegment(point, ...edgeOf(loop, i)).distance));
+  return minOf(loop.map((_, i) => projectOntoSegment(point, ...edgeOf(loop, i)).distance));
 }
 
 /** Two edges sharing a vertex that fold back onto each other (a spike): collinear and leaving the vertex in the same direction. */

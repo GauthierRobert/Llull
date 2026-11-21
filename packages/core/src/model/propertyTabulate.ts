@@ -6,6 +6,7 @@
 import { evaluateForm, isFormFailure, type Point } from './propertyForms';
 import type { PropertyForm, PropertyModel, PropertyVariable } from './propertyModel';
 import { pow } from '../lib/pow';
+import { appendAll } from '../lib/appendAll';
 
 export const SOLVER_TABLE_REL_TOL = 1e-3;
 const SOLVER_TABLE_MAX_POINTS = 500;
@@ -30,13 +31,21 @@ export function curveOf(
 function breakpoints(form: PropertyForm, variable: PropertyVariable, a: number, b: number): number[] {
   const found: number[] = [];
   const walk = (f: PropertyForm): void => {
-    if (f.kind === 'table1d' && f.variable === variable) found.push(...f.points.map(([x]) => x));
+    if (f.kind === 'table1d' && f.variable === variable)
+      appendAll(
+        found,
+        f.points.map(([x]) => x),
+      );
     if (f.kind === 'table2d') {
-      if (f.x.variable === variable) found.push(...f.xs);
-      if (f.y.variable === variable) found.push(...f.ys);
+      if (f.x.variable === variable) appendAll(found, f.xs);
+      if (f.y.variable === variable) appendAll(found, f.ys);
     }
     if (f.kind === 'piecewise') {
-      if (f.variable === variable) found.push(...f.segments.map((segment) => segment.upTo));
+      if (f.variable === variable)
+        appendAll(
+          found,
+          f.segments.map((segment) => segment.upTo),
+        );
       f.segments.forEach((segment) => walk(segment.form));
     }
     if (f.kind === 'product') f.factors.forEach(walk);

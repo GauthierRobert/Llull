@@ -9,6 +9,7 @@ import { loadCaseProblems } from './cases';
 import { hotModulusOf } from './hotModulus';
 import { solveWithContacts, type ContactOutcome, type GroundSpring } from './nonlinear';
 import { caseLoads } from './primitives';
+import { maxOf } from '@lib/arrayExtrema';
 
 export const SOLVER_VERSION = 'frame3d-1 contacts-1';
 
@@ -218,13 +219,13 @@ export function solveModel(
       reactions: mix((s) => s.reactions),
       elementForces: mix((s) => s.elementForces),
       uniform: mix((s) => s.uniform),
-      pressureBar: expansion ? 0 : Math.max(0, ...terms.map(({ state }) => state.pressureBar)),
+      pressureBar: expansion ? 0 : Math.max(0, maxOf(terms.map(({ state }) => state.pressureBar))),
       maxTempC: terms.reduce<number | null>(
         (largest, { state }) => (state.maxTempC === null ? largest : Math.max(largest ?? state.maxTempC, state.maxTempC)),
         null,
       ),
-      residual: Math.max(0, ...terms.map(({ state }) => state.residual)),
-      iterations: Math.max(0, ...terms.map(({ state }) => state.iterations)),
+      residual: Math.max(0, maxOf(terms.map(({ state }) => state.residual))),
+      iterations: Math.max(0, maxOf(terms.map(({ state }) => state.iterations))),
       contacts: [],
       ...(method === 'algebraic' ? {} : { combination: { method, terms } }),
     });

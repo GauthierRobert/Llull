@@ -12,6 +12,8 @@ import type { OperatingConditions } from '../model/schema';
 import type { CaseState } from '../solve/run';
 import { computeAllowables } from './allowables';
 import { powInt } from '@lib/powInt';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 export interface StressRow {
   readonly case: string;
@@ -177,7 +179,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
           }
           const sustained = Math.max(
             sustainedAtNode.get(node ?? '') ?? 0,
-            ...[element.a, element.b].map((n) => sustainedAtNode.get(nodeId(n)) ?? 0),
+            maxOf([element.a, element.b].map((n) => sustainedAtNode.get(nodeId(n)) ?? 0)),
           );
           const allowed = computeAllowables(set, {
             ScMPa: material.ScMPa,
@@ -258,9 +260,9 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
   // OPE reports displacements and loads; the code limits apply to the sustained, occasional and expansion states
   for (const state of states)
     if (state.type === 'SUS' || state.type === 'OCC' || state.type === 'HYD')
-      rows.push(...(state.combination === undefined ? evaluate(state, false) : combined(state)));
+      appendAll(rows, state.combination === undefined ? evaluate(state, false) : combined(state));
   for (const state of states)
-    if (state.type === 'EXP') rows.push(...(state.combination === undefined ? evaluate(state, true) : combined(state)));
+    if (state.type === 'EXP') appendAll(rows, state.combination === undefined ? evaluate(state, true) : combined(state));
   return {
     rows,
     occasionalMPa: base.occasionalMPa,

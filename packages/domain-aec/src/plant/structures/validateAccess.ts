@@ -4,12 +4,13 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { isStringArray } from '@lib/isStringArray';
 import { isVec3 } from '@lib/vec3';
-import type { RailingElement } from '@aec/building/types';
+import { STEEL_STAIR_TURNS, type RailingElement } from '@aec/building/types';
 import { findProfile } from '../../steel/profiles';
 import { findGratingType } from './grating/gratingTypes';
 import { platformParamsValid } from './platform/platformSpec';
 import { rackParamsValid } from './rack/rackSpec';
 import { railingStructureProblem } from './railing/railingValidate';
+import { appendAll } from '@lib/appendAll';
 
 const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
 
@@ -85,10 +86,20 @@ function steelStairErrors(key: string, element: Record<string, unknown>): string
         landing['afterRiser'] <= riserCount - 2 &&
         (index === 0 || landing['afterRiser'] > ((landings[index - 1] as Record<string, unknown>)['afterRiser'] as number)) &&
         isFiniteNumber(landing['length']) &&
-        landing['length'] > 0,
+        landing['length'] > 0 &&
+        (landing['turn'] === undefined || STEEL_STAIR_TURNS.some((turn) => turn === landing['turn'])),
     );
   if (!landingsValid)
-    errors.push(`building element ${key}: landings must be ascending { afterRiser, length } leaving flights of 2+ risers`);
+    errors.push(
+      `building element ${key}: landings must be ascending { afterRiser, length, turn? (quarter_left, quarter_right, half_left, half_right) } leaving flights of 2+ risers`,
+    );
+  const width = element['width'];
+  if (
+    landingsValid &&
+    isFiniteNumber(width) &&
+    (landings as Array<Record<string, unknown>>).some((landing) => landing['turn'] !== undefined && (landing['length'] as number) < width)
+  )
+    errors.push(`building element ${key}: landings[].length must be at least the stair width on a turning landing (turn set)`);
   if (element['arrivalSurfaceId'] !== undefined && typeof element['arrivalSurfaceId'] !== 'string')
     errors.push(`building element ${key}: arrivalSurfaceId must be a string`);
   return errors;
@@ -157,14 +168,14 @@ export function accessElementErrors(key: string, element: Record<string, unknown
     }
     if (element['role'] !== 'guardrail' && element['role'] !== 'handrail')
       errors.push(`building element ${key}: role must be guardrail or handrail`);
-    errors.push(...railingOpeningErrors(key, element['openings']), ...railingHostErrors(key, element['host'], elements));
+    appendAll(errors, [...railingOpeningErrors(key, element['openings']), ...railingHostErrors(key, element['host'], elements)]);
     if (errors.length === 0) {
       const problem = railingStructureProblem(element as unknown as RailingElement);
       if (problem !== null) errors.push(`building element ${key}: ${problem.message}`);
     }
   }
-  if (category === 'ladder') errors.push(...ladderErrors(key, element));
-  if (category === 'steelStair') errors.push(...steelStairErrors(key, element));
-  if (category === 'assembly') errors.push(...assemblyErrors(key, element, elements));
+  if (category === 'ladder') appendAll(errors, ladderErrors(key, element));
+  if (category === 'steelStair') appendAll(errors, steelStairErrors(key, element));
+  if (category === 'assembly') appendAll(errors, assemblyErrors(key, element, elements));
   return errors;
 }

@@ -8,7 +8,7 @@ import { useNurbsNetStore } from '@ui/store/nurbsNetStore';
 import { usePreviewStore } from '@ui/store/previewStore';
 import { useRemotePreviewStore } from '@ui/store/remotePreviewStore';
 import { endRemotePreview } from '@ui/preview/remote/remotePreviewSession';
-import { FaceEditBar } from '@ui/viewport/3d/faceEdit/FaceEditBar';
+import { FaceEditBar, FaceEditStart } from '@ui/viewport/3d/faceEdit/FaceEditBar';
 import { cancelFaceDrag, commitFaceDrag, updateFaceDrag } from '@ui/viewport/3d/faceEdit/faceEditActions';
 import { NurbsNetBar } from '@ui/viewport/3d/nurbsNet/NurbsNetBar';
 import { cancelPoleDrag, commitPoleDrag, updatePoleDrag } from '@ui/viewport/3d/nurbsNet/netActions';
@@ -169,9 +169,15 @@ describe('FaceEditBar', () => {
   it('offers Edit faces for a selected exact solid and switches the operation', () => {
     const { id } = dispatchEntity('add_box', { size: [2, 2, 2] });
     act(() => useStore.getState().select([id]));
-    render(<FaceEditBar />);
+    render(
+      <>
+        <FaceEditStart />
+        <FaceEditBar />
+      </>,
+    );
     fireEvent.click(screen.getByText('Edit faces'));
     expect(useFaceEditStore.getState().active).toBe(true);
+    expect(screen.queryByText('Edit faces')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }));
     expect(useFaceEditStore.getState().op).toBe('draft');
     expect(screen.getByRole('button', { name: 'Draft' }).getAttribute('aria-pressed')).toBe('true');
@@ -189,7 +195,12 @@ describe('FaceEditBar', () => {
       ],
     });
     act(() => useStore.getState().select([id]));
-    const { container } = render(<FaceEditBar />);
+    const { container } = render(
+      <>
+        <FaceEditStart />
+        <FaceEditBar />
+      </>,
+    );
     expect(container.firstChild).toBeNull();
   });
 });

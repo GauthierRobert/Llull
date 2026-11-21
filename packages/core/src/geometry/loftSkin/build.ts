@@ -21,6 +21,7 @@ import { coupleSections } from './coupling';
 import { achievedAngle, endData, type EndContext } from './ends';
 import { alignSections, centrelineSections, sectionNormal, seamTwist, windSections } from './sections';
 import type { EndRequest, LoftBuilt, LoftIssue, LoftOptions, LoftReport } from './types';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 const MAX_REFINEMENTS = 3;
 
@@ -145,7 +146,7 @@ function sectionDeviation(faces: readonly NurbsSurfaceData[], sections: readonly
     const [a, b] = curveDomain(section);
     for (let s = 0; s <= 24; s++) {
       const point = evaluateCurve(section, a + ((b - a) * s) / 24);
-      worst = Math.max(worst, Math.min(...faces.map((face, i) => closestOnSurface(face, point, probes[i]).distance)));
+      worst = Math.max(worst, minOf(faces.map((face, i) => closestOnSurface(face, point, probes[i]).distance)));
     }
   }
   return worst;
@@ -269,7 +270,7 @@ function skinnedLoft(
     fitDeviation: coupled.fitDeviation,
     seamTwistMaxRad,
     guideDeviation: null,
-    closureJumpRad: options.closed ? Math.max(...faces.map(closureJump)) : null,
+    closureJumpRad: options.closed ? maxOf(faces.map(closureJump)) : null,
   };
   return { faces, sections, report };
 }

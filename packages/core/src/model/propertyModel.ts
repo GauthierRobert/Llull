@@ -60,6 +60,14 @@ export type PropertyForm =
     }
   | { readonly kind: 'polynomial'; readonly variable: PropertyVariable; readonly coefficients: readonly number[]; readonly origin?: number }
   | { readonly kind: 'log10Polynomial'; readonly variable: PropertyVariable; readonly coefficients: readonly number[] }
+  /** y = referenceValue (1 + coefficient (x - reference)): a linear temperature coefficient such as rho(T) = rho0 (1 + alpha (T - T0)); `coefficient` is per unit of the variable's unit. */
+  | {
+      readonly kind: 'linearCoefficient';
+      readonly variable: PropertyVariable;
+      readonly referenceValue: number;
+      readonly coefficient: number;
+      readonly reference: number;
+    }
   | { readonly kind: 'nistRational'; readonly coefficients: readonly number[] }
   | {
       readonly kind: 'arrhenius';
@@ -104,7 +112,12 @@ export interface PropertyCondition {
   readonly opticalKind?: 'hemispherical_total' | 'normal_total';
   /** Beginning or end of life of an `absorptivitySolar` model (PHY-15). */
   readonly lifeState?: 'BOL' | 'EOL';
+  /** Standard test method the value was measured with, as a token (e.g. ASTM_E595, ECSS_Q_ST_70_02; PHY-14 outgassing data). */
+  readonly testMethod?: string;
 }
+
+/** A test-method token: a letter or digit, then letters, digits, `_`, `.` or `-`; at most 64 characters. */
+export const TEST_METHOD_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 
 export interface PropertyUncertainty {
   readonly kind: 'fitErrorVsData' | 'measurement' | 'statistical';
@@ -158,6 +171,7 @@ export function formVariables(form: PropertyForm): PropertyVariable[] {
     case 'table1d':
     case 'polynomial':
     case 'log10Polynomial':
+    case 'linearCoefficient':
     case 'powerLaw':
       return [form.variable];
     case 'piecewise':

@@ -11,6 +11,13 @@ export function positiveInteger(raw: string | undefined, fallback: number): numb
   return Number.isFinite(value) && value >= 1 ? value : fallback;
 }
 
+/** A whole number >= 0 parsed from `raw` (fractions floored), else `fallback` (unset, empty, negative, garbage). */
+export function nonNegativeInteger(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const value = Math.floor(Number(raw));
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
 /** `LLULL_EXCHANGE_DIR` resolved to an absolute path; null when unset or empty. */
 export function exchangeDirOf(env: NodeJS.ProcessEnv = process.env): string | null {
   const configured = env['LLULL_EXCHANGE_DIR'];

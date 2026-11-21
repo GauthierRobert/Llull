@@ -12,6 +12,7 @@ import { closestOnCurve } from './closest';
 import { evaluateCurve } from './evaluate';
 import { compressKnots } from './knotVector';
 import type { NurbsCurveData } from './types';
+import { maxOf } from '../arrayExtrema';
 
 const FOOT_POINT_LIMIT = 2000;
 
@@ -96,7 +97,7 @@ function fitPoles(points: ReadonlyArray<Vec3>, t: ReadonlyArray<number>, degree:
 /** Distance statistics of `curve` against the ordered `points` sampled at `t`. */
 function deviations(curve: NurbsCurveData, points: ReadonlyArray<Vec3>, t: ReadonlyArray<number>): { parametric: number; rms: number } {
   const gaps = points.map((point, k) => distance3(evaluateCurve(curve, t[k] as number), point));
-  return { parametric: Math.max(...gaps), rms: Math.sqrt(gaps.reduce((sum, gap) => sum + gap * gap, 0) / gaps.length) };
+  return { parametric: maxOf(gaps), rms: Math.sqrt(gaps.reduce((sum, gap) => sum + gap * gap, 0) / gaps.length) };
 }
 
 /**
@@ -142,7 +143,7 @@ export function approximatePoints(points: ReadonlyArray<Vec3>, options: Approxim
   const distances = points.length > FOOT_POINT_LIMIT ? null : points.map((point) => closestOnCurve(best.curve, point).distance);
   return {
     curve: best.curve,
-    maxDeviation: distances === null ? best.parametric : Math.max(...distances),
+    maxDeviation: distances === null ? best.parametric : maxOf(distances),
     parametricDeviation: best.parametric,
     rmsDeviation: distances === null ? best.rms : Math.sqrt(distances.reduce((sum, value) => sum + value * value, 0) / distances.length),
   };

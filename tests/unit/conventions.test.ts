@@ -262,8 +262,21 @@ describe('CONVENTIONS_GUIDE nonlinear static section (PHY-05 M4, AF-03)', () => 
     ])
       expect(section).toContain(command);
     expect(section).toContain('not approved');
-    for (const code of ['NLS_ARC_LENGTH_UNSUPPORTED', 'NLS_CURVE_STALE', 'NLS_LIMIT_NOT_REACHED', 'FEA_HUMAN_GATE'])
+    for (const code of [
+      'NLS_ARC_LENGTH_UNSUPPORTED',
+      'NLS_CURVE_STALE',
+      'NLS_LIMIT_NOT_REACHED',
+      'FEA_HUMAN_GATE',
+      'NLS_STRAIN_BEYOND_CURVE',
+      'NLS_STRAIN_EXCEEDS_ELONGATION',
+      'NLS_MESH_PLASTIC_ADEQUACY',
+    ])
       expect(section).toContain(code);
+  });
+
+  it('states that nonlinear summary load cases are named step <n> (by position)', () => {
+    expect(section).toMatch(/`step 1`, `step 2`/);
+    expect(section).toContain('loadCase":"step 2"');
   });
 });
 
@@ -285,9 +298,50 @@ describe('CONVENTIONS_GUIDE acoustics section (PHY-20 M2, AF-03)', () => {
       'delete_acoustic_exposure',
       'check_acoustic_handoff',
       'export_acoustic_load',
+      'dispose_acoustic_export',
     ])
       expect(section).toContain(command);
-    for (const text of ['20 micropascal', 'VAC_OUT_OF_SCOPE', 'KRN_NO_EXACT_KERNEL', 'reviewRequired', 'VAC_FIELD_UNSET'])
+    for (const text of ['20 micropascal', 'VAC_OUT_OF_SCOPE', 'KRN_NO_EXACT_KERNEL', 'reviewRequired', 'VAC_FIELD_UNSET', 'VAC_HUMAN_GATE'])
       expect(section).toContain(text);
+  });
+});
+
+describe('CONVENTIONS_GUIDE electro-optical section (PHY-15)', () => {
+  const section = (CONVENTIONS_GUIDE.split(/## \d+\. Electrical bonding, coatings and optical balance/)[1] ?? '').split('\n## ')[0] ?? '';
+  it('exists and names only registered commands, including every PHY-15 command', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(section.length).toBeGreaterThan(0);
+    const named = [...section.matchAll(/`([a-z_]+)`/g)].map((match) => match[1] ?? '');
+    for (const name of named) expect(getCommand(name), name).toBeDefined();
+    for (const name of ['set_lightning_zone', 'check_bonding', 'dispose_bond_check', 'optical_balance', 'electrical_resistance'])
+      expect(named).toContain(name);
+  });
+  it('states that no limit, flux or zone is a default and names the human gate', () => {
+    for (const text of [/NO bond limit/, /NO solar flux/, /NO lightning zone/, /EOP_HUMAN_GATE/, /linearCoefficient/])
+      expect(section).toMatch(text);
+  });
+});
+
+describe('CONVENTIONS_GUIDE creep section (PHY-11)', () => {
+  const section = (CONVENTIONS_GUIDE.split(/## \d+\. Creep and relaxation: Norton hold/)[1] ?? '').split('\n## ')[0] ?? '';
+  it('exists and names only registered commands, including every PHY-11 command', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(section.length).toBeGreaterThan(0);
+    const named = [...section.matchAll(/`([a-z_]+)`/g)].map((match) => match[1] ?? '');
+    for (const name of named) expect(getCommand(name), name).toBeDefined();
+    for (const name of ['creep_closed_form', 'set_creep_step', 'delete_creep_step', 'check_creep', 'creep_report'])
+      expect(named).toContain(name);
+  });
+  it('states that no law or tolerance is a default, the increment control, the licensed-data rule and the compare harness', () => {
+    for (const text of [
+      /NO creep law/,
+      /CRP_INCREMENT_UNBOUNDED/,
+      /maxIncrement/,
+      /MAT_LIBRARY_UNRESOLVED/,
+      /redacted: true/,
+      /llull compare_expected/,
+      /reviewRequired/,
+    ])
+      expect(section).toMatch(text);
   });
 });

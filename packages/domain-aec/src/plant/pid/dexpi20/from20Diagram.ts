@@ -5,6 +5,7 @@ import type { Vec2 } from '@core/model/vectors';
 import { PAPER_MM } from '@core/model/sheet';
 import { decodeName } from './names20';
 import { dataOf, referenceIds } from './syn';
+import { appendAll } from '@lib/appendAll';
 
 export interface Placement {
   readonly at: Vec2;
@@ -105,7 +106,7 @@ export function readDiagram(diagram: XmlElement | undefined): DiagramFacts {
       });
     }
     const children: XmlElement[] = [];
-    for (const components of xmlChildren(element, 'Components')) children.push(...xmlChildren(components, 'Object'));
+    for (const components of xmlChildren(element, 'Components')) appendAll(children, xmlChildren(components, 'Object'));
     for (let index = children.length - 1; index >= 0; index--) stack.push({ element: children[index] as XmlElement, represents, special });
   }
   for (const connector of connectors) {
@@ -123,7 +124,7 @@ function descendants(root: XmlElement, type: string): XmlElement[] {
   for (let node = stack.pop(); node !== undefined; node = stack.pop()) {
     if (xmlAttr(node, 'type') === type) found.push(node);
     const children: XmlElement[] = [];
-    for (const components of xmlChildren(node, 'Components')) children.push(...xmlChildren(components, 'Object'));
+    for (const components of xmlChildren(node, 'Components')) appendAll(children, xmlChildren(components, 'Object'));
     for (let index = children.length - 1; index >= 0; index--) stack.push(children[index] as XmlElement);
   }
   return found;

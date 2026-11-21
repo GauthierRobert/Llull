@@ -10,6 +10,7 @@ import { developedHoleRadius, lipGeometry } from './formGeometry';
 import { childBends, flatOf, formsOf, hemsOf, joggleNodes } from './graph';
 import { mergePolygons } from './outline';
 import { type ResolvedK, resolveK } from './rules';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface UnfoldedBend {
   readonly id: string;
@@ -182,7 +183,7 @@ export function unfoldPart(part: SheetMetalPart, rule: SheetMetalRule): FlatPatt
   if (merged === null) return null;
   const xs = merged.outer.map((point) => point[0]);
   const ys = merged.outer.map((point) => point[1]);
-  const min: Vec2 = [Math.min(...xs), Math.min(...ys)];
+  const min: Vec2 = [minOf(xs), minOf(ys)];
   const holeArea = cutouts.reduce(
     (sum, cutout) => sum + (cutout.circle !== undefined ? Math.PI * cutout.circle.radius ** 2 : polygonArea(cutout.points)),
     0,
@@ -205,7 +206,7 @@ export function unfoldPart(part: SheetMetalPart, rule: SheetMetalRule): FlatPatt
     joggles,
     hems,
     forms,
-    extents: [Math.max(...xs) - min[0], Math.max(...ys) - min[1]],
+    extents: [maxOf(xs) - min[0], maxOf(ys) - min[1]],
     min,
     area: polygonArea(merged.outer) - holeArea - merged.holes.reduce((sum, hole) => sum + polygonArea(hole), 0),
   };

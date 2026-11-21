@@ -3,6 +3,7 @@
 import { escapeXml } from '@lib/escapeXml';
 import { n, svgPoints } from '@core/geometry/drawingSvg';
 import { niceStep } from '@lib/niceStep';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 type Point = readonly [number, number];
 
@@ -63,8 +64,8 @@ export function svgDocument(width: number, height: number, body: ReadonlyArray<s
 
 /** Vertical extent of a long-section plot: `rangeM` of `levels` padded 10% (min 0.5 m) each side, and the top level `zTop`. */
 export function levelFrame(levels: readonly number[]): { rangeM: number; zTop: number } {
-  const gridMin = Math.min(...levels);
-  const gridMax = Math.max(...levels);
+  const gridMin = minOf(levels);
+  const gridMax = maxOf(levels);
   const pad = Math.max((gridMax - gridMin) * 0.1, 0.5);
   return { rangeM: gridMax - gridMin + 2 * pad, zTop: gridMax + pad };
 }

@@ -9,6 +9,7 @@ import type { FeatureFrame, HoleKind, ThreadSpec } from '../model/features';
 import { countersinkDepth } from '../lib/holeMath';
 import { frameToWorld } from './featureFrame';
 import type { FeatureRecipe } from './featureLowering';
+import { appendAll } from '../lib/appendAll';
 
 /** The `feature` nodes of `recipe`, source-most first (what a boolean subtract keeps: its minuend only). */
 export function featureNodes(recipe: ShapeRecipe): FeatureRecipe[] {
@@ -104,7 +105,7 @@ export function authoredFeatures(recipe: ShapeRecipe): { holes: MachinedHole[]; 
   const holes: MachinedHole[] = [];
   const pockets: MachinedPocket[] = [];
   featureNodes(recipe).forEach((node, ordinal) => {
-    if (node.feature === 'hole') holes.push(...holesOf(node, ordinal));
+    if (node.feature === 'hole') appendAll(holes, holesOf(node, ordinal));
     else if (node.feature === 'pocket')
       pockets.push({
         id: `pocket-${ordinal}`,

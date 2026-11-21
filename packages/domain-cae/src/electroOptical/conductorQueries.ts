@@ -53,10 +53,7 @@ function resistivityInput(
   return {
     rho: found.rho,
     source: found.provenance,
-    temperatureModel:
-      params.temperature === undefined
-        ? 'none (constant model or no temperature given)'
-        : 'PHY-01 model evaluated at the given temperature',
+    temperatureModel: found.temperatureModel,
     unverified: found.unverified ? found.reasons.map((reason) => `${params.material}: ${reason}`) : [],
   };
 }
@@ -87,14 +84,14 @@ const RHO_PARAMS = {
 
 /**
  * @affects nothing; read-only, document returned unchanged, affected: []
- * @invariant R_dc = rho L / A; delta = sqrt(rho / (pi f mu0 mur)) with mu0 = 4 pi 1e-7 N/A^2 named; round wire R_ac/R_dc ~ r / (2 delta) valid when r/delta >= 5 (approximate: true otherwise; for r/delta < 1 the ratio is 1, DC regime); the linear temperature-coefficient model is not built
+ * @invariant R_dc = rho L / A; delta = sqrt(rho / (pi f mu0 mur)) with mu0 = 4 pi 1e-7 N/A^2 named; round wire R_ac/R_dc ~ r / (2 delta) valid when r/delta >= 5 (approximate: true otherwise; for r/delta < 1 the ratio is 1, DC regime); rho(T) from the material's model (a linearCoefficient model gives rho0 (1 + alpha (T - T0)); a constant model reports temperatureModel 'none')
  * @failure neither / both of material and resistivity, a non-positive input or unit of the wrong dimension -> EOP_PARAMS_INVALID / EOP_UNITS_MISMATCH; no resistivity model -> EOP_RESISTIVITY_UNAVAILABLE; radius without frequency -> EOP_PARAMS_INVALID (all refusals, unchanged doc)
  */
 export const electricalResistance = defineCommand({
   name: 'electrical_resistance',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'DC resistance of a straight conductor R = rho L / A, with rho from a material electricalResistivity model (evaluated at `temperature`) or given directly. With frequency it adds the skin depth (mur REQUIRED then: state 1 for a non-magnetic conductor) ' +
+    'DC resistance of a straight conductor R = rho L / A, with rho from a material electricalResistivity model (evaluated at `temperature`; a linearCoefficient model is rho0 (1 + alpha (T - T0))) or given directly. With frequency it adds the skin depth (mur REQUIRED then: state 1 for a non-magnetic conductor) ' +
     'delta = sqrt(rho / (pi f mu0 mur)) (mu0 = 4 pi 1e-7 N/A^2); with frequency and radius (round wire) the AC/DC ratio r / (2 delta), flagged approximate unless r/delta >= 5 and reported as 1 (DC regime) when r/delta < 1. ' +
     'Returns data { dcOhm, rho, temperatureModel, skinDepthM?, rOverDelta?, acOverDc?, validity?, mur? (with frequency), mu0?, formula, provenance, unverified, unverifiedReasons }. llull ships no resistivity values.',
   params: z.object({

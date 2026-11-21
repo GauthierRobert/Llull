@@ -9,8 +9,9 @@ import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { checkedRows } from './checkBonding';
 import { refuseEop } from './codes';
 import { DISPOSE_ACT, dispositionDetails } from './gate';
-import { nonceOf } from '../shared/signedGate';
-import { dispositionOf, electroOpticalOf, withElectroOptical } from './model';
+import { nonceOf, notReapplied } from '../shared/signedGate';
+import { stepStamp } from '@lib/replaySurvivors';
+import { EOP_LIMITS, dispositionOf, electroOpticalOf, withElectroOptical } from './model';
 import { DISPOSITIONS, type BondDisposition } from './types';
 
 const COMMAND = 'dispose_bond_check';
@@ -19,7 +20,7 @@ const COMMAND = 'dispose_bond_check';
  * @affects doc.electroOptical.dispositions[pathId] (decision, justification, inputsHash of the path as checked, signer, signatureId, the verified signature, document uid; affected: [pathId]); never changes a row's status or number
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); recorded only with a signature verified (and spent last) by `ctx.humanSignature` over sha256 of
  *   (act, path id, decision, justification, inputsHash, document uid, nonce); it applies only while the path is unchanged (check_bonding compares inputsHash) and in this document; with no signing port a replay trusts the kept record only for the replay itself: every later check_bonding re-verifies it and, with no port, reports it unconfirmed (never accepted); a replay honours a recorded step only from a
- *   disposition already in the slice (kept by replaySeed) with the same decision, justification, inputsHash and uid
+ *   disposition already in the slice (kept by replaySeed while its stamped step is live; none kept: a no-op, pending) with the same decision, justification, inputsHash and uid
  * @failure no signing port, no signature or one that does not verify (an agent always) -> EOP_HUMAN_GATE; unknown path -> EOP_PATH_NOT_FOUND; a passing path -> EOP_NOTHING_TO_DISPOSE; blank justification -> EOP_PARAMS_INVALID;
  *   a document without uid -> EOP_DOCUMENT_UNIDENTIFIED (all refusals, unchanged doc)
  */
@@ -32,7 +33,10 @@ export const disposeBondCheck = defineCommand({
   params: z.object({
     pathId: z.string().describe('Bond path id from check_bonding.'),
     decision: z.enum(DISPOSITIONS).describe("The reviewer's decision."),
-    justification: z.string().describe('Mandatory engineering justification (non-empty).'),
+    justification: z
+      .string()
+      .max(EOP_LIMITS.justification)
+      .describe(`Mandatory engineering justification (non-empty, at most ${EOP_LIMITS.justification} characters).`),
     confirmation: z
       .unknown()
       .optional()
@@ -46,6 +50,7 @@ export const disposeBondCheck = defineCommand({
     const replayed = ctx?.replaying === true && isRecordedConfirmation(confirmation);
     if (!replayed && (port === null || confirmation === undefined || typeof confirmation !== 'object' || confirmation === null))
       return fail('EOP_HUMAN_GATE', 'disposing a bond check needs a human-held signature: hand it to the qualified reviewer, do not retry');
+    if (replayed && dispositionOf(doc, pathId) === undefined) return notReapplied(doc, COMMAND, pathId);
     if (justification.trim() === '') return fail('EOP_PARAMS_INVALID', 'a disposition needs a justification');
     const rows = checkedRows(doc, [pathId], ctx);
     if (!Array.isArray(rows)) return rows;
@@ -83,6 +88,7 @@ export const disposeBondCheck = defineCommand({
       signatureId: gate.signatureId,
       signature: confirmation,
       documentUid: uid,
+      ...stepStamp(ctx),
     };
     return changed(
       withElectroOptical(doc, { dispositions: { ...electroOpticalOf(doc).dispositions, [pathId]: disposition } }),

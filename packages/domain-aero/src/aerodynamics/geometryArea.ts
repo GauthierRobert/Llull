@@ -48,7 +48,11 @@ export function geometryArea(
   resolution: number = DEFAULT_RESOLUTION,
 ): GeometryAreaResult {
   const direction = (flowDirection ?? DEFAULT_FLOW_DIRECTION) as Vec3;
-  if (!direction.every(Number.isFinite) || !(Math.hypot(...direction) > 0) || !(resolution >= 50 && resolution <= 2000))
+  if (
+    !direction.every(Number.isFinite) ||
+    !(Math.hypot(direction[0], direction[1], direction[2]) > 0) ||
+    !(resolution >= 50 && resolution <= 2000)
+  )
     return {
       ok: false,
       code: 'AER_PARAM_INVALID',

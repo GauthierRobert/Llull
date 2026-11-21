@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
@@ -92,6 +92,64 @@ describe('FeArtifactStore', () => {
     store.alias(key, sha256Hex('nothing stored here'));
     expect(store.get(key)).toBeNull();
     expect(() => store.alias('bad', hash)).toThrow(/sha256/);
+  });
+});
+
+describe('FeArtifactStore verified memory (PERF1)', () => {
+  const fileOf = (hash: string): string => path.join(dir, `${hash}.json.gz`);
+  const other: FeResultsArtifact = { ...results, inputHash: 'memory' };
+
+  it('writes the canonical text, so the bytes of the file hash to its name', () => {
+    const store = createFeArtifactStore(dir);
+    const hash = store.put(other);
+    expect(sha256Hex(gunzipSync(readFileSync(fileOf(hash))).toString('utf8'))).toBe(hash);
+  });
+
+  it('serves the same verified object while the file is unchanged and tells its hash', () => {
+    const store = createFeArtifactStore(dir);
+    const hash = store.put(other);
+    const first = store.get(hash);
+    expect(first).toEqual(other);
+    expect(store.get(hash)).toBe(first);
+    expect(first === null ? null : store.hashOf?.(first)).toBe(hash);
+    expect(store.hashOf?.({ ...other })).toBeNull();
+  });
+
+  it('never serves a remembered artifact whose file was removed, replaced or forged', () => {
+    const store = createFeArtifactStore(dir);
+    const artifact: FeResultsArtifact = { ...results, inputHash: 'replaced' };
+    const hash = store.put(artifact);
+    expect(store.get(hash)).toEqual(artifact);
+    writeFileSync(fileOf(hash), gzipSync(JSON.stringify({ ...artifact, solverVersion: '9.99' })));
+    expect(store.get(hash)).toBeNull();
+    rmSync(fileOf(hash));
+    expect(store.get(hash)).toBeNull();
+    expect(store.put(artifact)).toBe(hash);
+    expect(store.get(hash)).toEqual(artifact);
+  });
+
+  it('reads a file written before PERF1 (plain JSON, keys in any order)', () => {
+    const artifact = { ...results, inputHash: 'legacy' };
+    const hash = sha256Hex(canonicalJson(artifact));
+    writeFileSync(fileOf(hash), gzipSync(JSON.stringify(artifact)));
+    const store = createFeArtifactStore(dir);
+    expect(store.get(hash)).toEqual(artifact);
+    expect(store.get(hash)).toBe(store.get(hash));
+  });
+
+  it('keeps nothing in memory with LLULL_FEA_MEMORY_MB=0 and evicts the least recently used first', () => {
+    const none = createFeArtifactStore(dir, { LLULL_FEA_MEMORY_MB: '0' });
+    const hash = none.put(other);
+    expect(none.get(hash)).toEqual(other);
+    expect(none.get(hash)).not.toBe(none.get(hash));
+    const big = (tag: string): FeResultsArtifact => ({ ...results, inputHash: tag.repeat(700_000) });
+    const small = createFeArtifactStore(dir, { LLULL_FEA_MEMORY_MB: '1' });
+    const first = small.put(big('a'));
+    const kept = small.get(first);
+    const second = small.put(big('b'));
+    expect(small.get(second)).toBe(small.get(second));
+    expect(small.get(first)).not.toBe(kept);
+    expect(small.get(first)).toEqual(kept);
   });
 });
 

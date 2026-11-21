@@ -19,6 +19,7 @@ import {
   tipMachItems,
   usedEffortItems,
 } from './dynamicsSimChecks';
+import { appendAll } from '@lib/appendAll';
 
 const NAME = 'check_dynamics';
 const DEFAULT_DURATION = 2;
@@ -115,7 +116,7 @@ export function dynamicsCheck(
   const stat = staticChecks(doc, ctx?.kernel ?? null);
   const items: ReviewItem[] = [...stat.items];
   let engine: string | undefined;
-  if (!stat.simulatable.ok) items.push(...notRunItems(stat.simulatable.why, false));
+  if (!stat.simulatable.ok) appendAll(items, notRunItems(stat.simulatable.why, false));
   else {
     const common = {
       duration: params.duration ?? DEFAULT_DURATION,
@@ -129,7 +130,7 @@ export function dynamicsCheck(
         ctx,
       );
     const run = asRun(first.data);
-    if (run === null) items.push(...notRunItems(reasonOf(first.summary), stat.simulatable.loops > 0));
+    if (run === null) appendAll(items, notRunItems(reasonOf(first.summary), stat.simulatable.loops > 0));
     else {
       engine = run.engine;
       // refine as far as the finest allowed step allows; only a run already at (within 25 % of) that floor has nothing to compare with
@@ -137,7 +138,7 @@ export function dynamicsCheck(
       const atFloor = run.timestep <= MIN_TIMESTEP * 1.25;
       const second = atFloor ? null : simulateMotion.run(doc, { ...common, detail: 'series', energy: true, timestep: half }, ctx);
       const fine = second === null ? null : asRun(second.data);
-      items.push(
+      appendAll(items, [
         ...loopDriftItem(run),
         energyItem(run),
         atFloor
@@ -145,7 +146,7 @@ export function dynamicsCheck(
           : timestepItem(run, fine, second !== null && fine === null ? reasonOf(second.summary) : null),
         ...tipMachItems(run),
         ...usedEffortItems(Object.values(dynamics.motors), run),
-      );
+      ]);
     }
   }
   const result = reviewResult('dynamics', items, provenance(engine), {

@@ -12,6 +12,7 @@ import { evaluateSweep, pathLength, type SweepShape } from './evaluate';
 import { pathBendAt } from './pathCurvature';
 import { transformPoint } from './sectionTransform';
 import { orientedFrames, type SweepFrame } from './frames';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Volume when it has a closed form, else null (stations, stretch, non-round sections, fixed sections on a non-monotone path). */
 export function sweepAnalyticVolume(sweep: SweepShape): number | null {
@@ -46,7 +47,7 @@ function fixedVolume(sweep: SweepShape, area: number): number | null {
 /** True when `profile` (straight edges only) is centred on the path: its area centroid lies within 1e-9 of its extent from the section origin. */
 function centred(profile: ReadonlyArray<Vec2>): boolean {
   const [cx, cy] = polygonCentroid(profile);
-  const extent = Math.max(...profile.map(([x, y]) => Math.hypot(x, y)), 1e-12);
+  const extent = Math.max(maxOf(profile.map(([x, y]) => Math.hypot(x, y))), 1e-12);
   return Math.hypot(cx, cy) <= 1e-9 * extent;
 }
 

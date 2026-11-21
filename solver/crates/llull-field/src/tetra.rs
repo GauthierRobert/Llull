@@ -170,12 +170,13 @@ pub fn extract(
     Ok((IsoMesh { positions: builder.positions, indices: builder.indices }, stats))
 }
 
-/// Every directed edge occurs exactly once and so does its reverse.
+/// Every directed edge occurs exactly once and so does its reverse: the answer of `isClosedManifold` (`measures.ts`) for the same mesh, which
+/// the TypeScript side takes instead of sorting the edges again (so also false where its edge keys would leave the exact integers, 2^53 - 1).
 pub fn is_closed_manifold(vertices: usize, indices: &[u32]) -> bool {
-    if !indices.len().is_multiple_of(3) {
+    let v = vertices as u64;
+    if !indices.len().is_multiple_of(3) || v.saturating_mul(v) >= (1 << 53) - 1 {
         return false;
     }
-    let v = vertices as u64;
     let mut keys: Vec<u64> = Vec::with_capacity(indices.len());
     for triangle in indices.chunks_exact(3) {
         for e in 0..3 {
@@ -237,5 +238,12 @@ mod tests {
         assert!(!is_closed_manifold(3, &[0, 1]));
         assert!(!is_closed_manifold(4, &[0, 1, 2, 0, 1, 2]), "duplicate directed edges");
         assert!(is_closed_manifold(4, &[0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3]), "a tetrahedron");
+    }
+
+    #[test]
+    fn a_vertex_count_whose_edge_keys_leave_the_exact_integers_answers_false_as_the_typescript_test_does() {
+        let tetrahedron = [0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3];
+        assert!(is_closed_manifold(94_906_265, &tetrahedron), "94906265^2 < 2^53 - 1");
+        assert!(!is_closed_manifold(94_906_266, &tetrahedron), "94906266^2 >= 2^53 - 1");
     }
 }

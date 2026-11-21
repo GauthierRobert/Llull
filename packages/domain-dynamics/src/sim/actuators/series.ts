@@ -4,6 +4,7 @@ import type { SimulationTrace } from '@core/dynamics/physicsEngine';
 import { RAD_PER_S_PER_RPM } from '../forceLaws';
 import type { DriveRuntime } from './block';
 import { AUX } from './controller';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface DriveSeries {
   readonly times: number[];
@@ -65,7 +66,7 @@ export function trackingOf(run: DriveRuntime, trace: SimulationTrace): Tracking 
   return {
     unit: run.loop.quantity === 'position' ? 'rad' : 'rad/s',
     rmsError: Math.sqrt(errors.reduce((sum, e) => sum + e * e, 0) / errors.length),
-    peakError: Math.max(...errors.map(Math.abs)),
-    range: Math.max(...reference) - Math.min(...reference),
+    peakError: maxOf(errors.map(Math.abs)),
+    range: maxOf(reference) - minOf(reference),
   };
 }

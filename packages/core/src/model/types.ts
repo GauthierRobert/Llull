@@ -25,13 +25,11 @@ import type { ReviewModel } from './review';
 import type { DisplayModel } from './display';
 import type { CurveSegment } from './curve';
 import type { RegionHatch } from './regionHatch';
-import type { CompositesModel } from './composites';
 import type { DocumentExtensions } from './documentExtensions';
 import type { DocumentKernelSettings } from './documentKernelSettings';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { MaterialFinish } from './materialFinish';
 export { FINISH_PATTERNS, type FinishPattern, type MaterialFinish } from './materialFinish';
-import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams, PartRef } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { HelixDefinition } from '../lib/helix/types';
@@ -41,6 +39,7 @@ import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
+import type { DimensionStyleFields } from './dimensionStyle';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -410,6 +409,8 @@ export interface DimensionEntity extends BaseEntity {
   label?: string;
   /** Drawn after the computed value, e.g. '±0.1', '+0.05/-0.02' or 'H7'. Ignored when `label` is set. */
   tolerance?: string;
+  /** Key of `CadDocument.dimensionStyles` (text height, arrows, extension lines, number format); absent = renderer defaults. */
+  styleId?: string;
 }
 
 /**
@@ -542,6 +543,7 @@ export interface FeatureStep {
   label?: string;
   /** `CommandResult.affected` at record time; legacy (v1) replay zips it with replayed ids to remap references. */
   affected?: readonly EntityId[];
+  // mergedStepKeys (squash_steps, SIG-REPLAY): declared in ./mergedStepKeys.ts
 }
 
 /**
@@ -633,7 +635,7 @@ export interface DriveRelation {
 }
 
 /** Document units default to 'mm'; every map/list below is initialized empty by createEmptyDocument. */
-export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields, DocumentExtensions {
+export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields, DimensionStyleFields, DocumentExtensions {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
   order: EntityId[];
@@ -704,10 +706,10 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   /** Imported material libraries by id (08 MAT M3); absent until `import_material_library`. */
   materialLibraries?: Record<string, MaterialLibraryEntry>;
   /** Absent until the first composites command (plugin composites, 06 CMP). */
-  composites?: CompositesModel;
+  composites?: import('./composites').CompositesModel;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
-  sheetMetal?: SheetMetalModel;
-  /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`) are inherited. */
+  sheetMetal?: import('./sheetMetal').SheetMetalModel;
+  /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`), dimension styles (`DimensionStyleFields`) are inherited. */
 }
 
 export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode };

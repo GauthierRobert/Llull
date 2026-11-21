@@ -7,6 +7,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
+import { getGeometryKernel } from '@core/geometry/kernel';
 import { writeDocumentFile } from '../documentFile';
 import { vaultDirOf } from '../plm/vault/location';
 import {
@@ -88,7 +89,7 @@ function runCheckOut(vault: Vault, args: ParsedArgv, io: VaultCliIo, now: Date):
 function runCheckIn(vault: Vault, args: ParsedArgv, io: VaultCliIo, now: Date): number {
   const file = cliTarget(args, io.env).doc;
   if (!existsSync(file)) throw new VaultUsage(`no document at ${file}; pass --doc FILE.`);
-  const result = checkIn(vault, deserializeDocument(readFileSync(file, 'utf8')), holderOf(args, io), now);
+  const result = checkIn(vault, deserializeDocument(readFileSync(file, 'utf8'), { kernel: getGeometryKernel() }), holderOf(args, io), now);
   writeDocumentFile(file, result.document);
   print(
     io,

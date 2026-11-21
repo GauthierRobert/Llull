@@ -15,6 +15,8 @@ import type { NurbsSurfaceData as SurfaceData } from '../lib/nurbs/surfaceTypes'
 import { cross3, dot3, normalize3 } from '../lib/vec3';
 import { displacement, type ChartPlacement, type ChartResult, type FaceChart } from './chartFrame';
 import type { FaceQueryPort } from './kernelPorts';
+import { maxOf, minOf } from '../lib/arrayExtrema';
+import { hypotOf } from '../lib/hypotOf';
 
 type PortSurface = NonNullable<ReturnType<FaceQueryPort['bspline']>>;
 
@@ -95,9 +97,9 @@ export function buildFreeformChart(
   const east = normalize3(anchor.su);
   const north = normalize3(cross3(outward === undefined ? normal : normalize3(outward), east));
   const poles: Vec3[] = data.poles.flat();
-  const lo = [0, 1, 2].map((a) => Math.min(...poles.map((p) => p[a] as number)));
-  const hi = [0, 1, 2].map((a) => Math.max(...poles.map((p) => p[a] as number)));
-  const diagonal = Math.hypot(...[0, 1, 2].map((a) => (hi[a] as number) - (lo[a] as number)));
+  const lo = [0, 1, 2].map((a) => minOf(poles.map((p) => p[a] as number)));
+  const hi = [0, 1, 2].map((a) => maxOf(poles.map((p) => p[a] as number)));
+  const diagonal = hypotOf([0, 1, 2].map((a) => (hi[a] as number) - (lo[a] as number)));
   // the steps follow the sharpest curvature at the anchor as well as the size of the face: h <= 0.05 / |kappa|max (principal curvatures of the first and second forms)
   const second = [dot3(anchor.suu, normal), dot3(anchor.suv, normal), dot3(anchor.svv, normal)] as const;
   const trace = (anchor.e * second[2] - 2 * anchor.f * second[1] + anchor.g * second[0]) / anchor.det;

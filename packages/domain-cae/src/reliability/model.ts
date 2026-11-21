@@ -6,6 +6,7 @@ import { isRecord } from '@lib/isRecord';
 import { isReservedKey } from '@lib/reservedKey';
 import { distributionIssue } from './distributions';
 import { cholesky } from '@lib/denseLinalg';
+import { isValidResultStudy } from './studySchema';
 
 const EMPTY: ReliabilityModel = { variables: {}, variableOrder: [], limitStates: {}, limitStateOrder: [] };
 
@@ -75,6 +76,7 @@ export const responseOf = (doc: CadDocument, name: string): Response | undefined
 function acceptanceErrors(slice: Record<string, unknown>): string[] {
   const valid = (entry: unknown, limitState: boolean): boolean =>
     isRecord(entry) &&
+    (entry['study'] === undefined || isValidResultStudy(entry['study'])) &&
     isString(entry['modelHash']) &&
     isString(entry['resultHash']) &&
     typeof entry['seed'] === 'number' &&

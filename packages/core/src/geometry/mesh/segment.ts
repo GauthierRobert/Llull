@@ -114,7 +114,7 @@ export function segmentMesh(mesh: MeshData, params: SegmentParams): Segmentation
     ];
     const [ux, uy, uz, vx, vy, vz] = [b[0] - a[0], b[1] - a[1], b[2] - a[2], c[0] - a[0], c[1] - a[1], c[2] - a[2]];
     const n: Vec3 = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
-    const length = Math.hypot(...n);
+    const length = Math.hypot(n[0], n[1], n[2]);
     normals.push(length > 0 ? [n[0] / length, n[1] / length, n[2] / length] : [0, 0, 0]);
     areas.push(length / 2);
   }

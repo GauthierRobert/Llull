@@ -7,6 +7,7 @@ import type { MeshData, Vec2, Vec3 } from '@core/model/types';
 import { triangulatePolygon } from '@lib/triangulate';
 import { toCounterClockwise } from '@lib/polygon';
 import { add3, cross3, dot3, normalize3OrZero, scale3, sub3 } from '@lib/vec3';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * Builds the prism of `outer` minus `holes`. `place(point, side)` maps a local outline point to world space at the start (side 0) or end
@@ -23,7 +24,7 @@ export function prismMesh(
   const count = vertices.length;
   const positions: number[] = [];
   for (const side of [1, 0] as const) {
-    for (const point of vertices) positions.push(...place(point, side));
+    for (const point of vertices) appendAll(positions, place(point, side));
   }
   const indices: number[] = [];
   for (const [a, b, c] of triangles) indices.push(a, b, c, c + count, b + count, a + count);
@@ -56,7 +57,7 @@ export interface SweepFrame {
  */
 export function sweepFrame(start: Vec3, end: Vec3, roll = 0): SweepFrame | null {
   const delta = sub3(end, start);
-  const length = Math.hypot(...delta);
+  const length = Math.hypot(delta[0], delta[1], delta[2]);
   if (length === 0) return null;
   const d = scale3(delta, 1 / length);
   const reference: Vec3 = Math.abs(d[2]) > 0.999 ? [1, 0, 0] : [0, 0, 1];

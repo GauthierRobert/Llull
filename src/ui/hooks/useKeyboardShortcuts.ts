@@ -7,7 +7,15 @@
 import { useEffect } from 'react';
 import type { Vec3 } from '@core/model/types';
 import { useLayoutStore, usePaletteStore, useStore, useToolStore, useViewportStore } from '@ui/store';
-import { deleteSelection, duplicateSelection, hideSelection, isolateSelection, moveSelection } from '@ui/actions/selectionActions';
+import {
+  deleteSelection,
+  duplicateSelection,
+  hideSelection,
+  isolateSelection,
+  moveSelection,
+  selectAllVisible,
+} from '@ui/actions/selectionActions';
+import { zoomToFit } from '@ui/actions/viewActions';
 import { resolveShortcut } from './shortcuts';
 
 /** Document units (× NUDGE_LARGE_FACTOR with Shift). */
@@ -49,6 +57,10 @@ function handleChord(e: KeyboardEvent, state: AppState, modifier: boolean, key: 
   } else if (modifier && key === 'd') {
     e.preventDefault();
     duplicateSelection();
+  } else if (modifier && key === 'a') {
+    // Before the browser's own "select all", which would highlight the interface text.
+    e.preventDefault();
+    selectAllVisible();
   } else if (modifier && key === 'b') {
     e.preventDefault();
     useLayoutStore.getState().toggleSidebar();
@@ -92,6 +104,8 @@ function handlePlainKey(e: KeyboardEvent, state: AppState, tools: ToolState, key
     else hideSelection();
   } else if (key === 'n') {
     useLayoutStore.getState().toggleInspector();
+  } else if (key === 'f' && tools.viewMode === '3d') {
+    zoomToFit();
   } else if (e.key === '?') {
     tools.setShortcutsOpen(true);
   } else if (e.key in ARROW_DIRECTIONS) {

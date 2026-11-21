@@ -16,6 +16,7 @@ import { commentText, idLines, row } from '../decks/format';
 import { indexMesh } from '../thermal/meshGeometry';
 import { pretensionProblem } from './pretensionRules';
 import { isCutRefusal, numberDuplicates, pretensionCut, type PretensionCut } from './pretensionSection';
+import { appendAll } from '@lib/appendAll';
 
 /** One bolt of the plan: its cut, the duplicate node of every cut node and the reference node. */
 interface PlannedBolt {
@@ -153,14 +154,14 @@ export function pretensionModelLines(ctx: DeckContext): string[] | DeckRefusal {
   if ('code' in plan) return plan;
   const lines: string[] = [];
   for (const planned of plan.bolts)
-    lines.push(
+    appendAll(lines, [
       `** bolt pretension ${commentText(planned.bolt.id)} ${commentText(planned.bolt.name)}: ${planned.cut.nodes.length} cut nodes, section area ${row(planned.cut.area)}`,
       `*NSET, NSET=${planned.names.duplicates}`,
       ...idLines([...planned.duplicates.values()]),
       `*NODE, NSET=${planned.names.nset}`,
       row(planned.referenceNode, ...planned.cut.centroid),
       ...equations(planned),
-    );
+    ]);
   return lines;
 }
 

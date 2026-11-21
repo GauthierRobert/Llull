@@ -13,6 +13,7 @@ export { buildExchangeToolDefinitions, applyExchangeToolCall, exportStepFile } f
 
 export type {
   ConvergenceStudyOptions,
+  FeaSolveOptions,
   FeaToolsPort,
   FeaHost,
   FeaToolResult,
@@ -20,7 +21,7 @@ export type {
   FeaExportFormat,
   ResultsFileInput,
 } from './feaTools';
-export { buildFeaToolDefinitions, FEA_SOLVE_TIMEOUT_S } from './feaTools';
+export { buildFeaToolDefinitions, FEA_SOLVE_THREADS, FEA_SOLVE_TIMEOUT_S } from './feaTools';
 export { buildLibraryToolDefinitions, type MaterialLibraryStorePort, type LibraryRegistration } from './libraryTools';
 export { buildNativeToolDefinitions } from './nativeTools';
 

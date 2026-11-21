@@ -14,6 +14,7 @@ import { bodyParams, outputParam, targetIds } from './schema';
 import type { DeformPlan } from './request';
 import { runDeform } from './run';
 import { type Refusal, defaultTolerance, resolveTargetFrame } from './target';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /**
  * @affects replaces the entity by a mesh entity whose brep recipe is a deform node with a flow law (a table of frames along the target curve)
@@ -114,7 +115,7 @@ export const flowAlongCurve = defineCommand({
         if (local === null) return { code: 'DEF_FRAME_DEGENERATE', message: 'the frame is degenerate', paths: ['params.frame'] };
         const { extent } = resolved;
         const tolerance = output?.tolerance ?? defaultTolerance(target.diagonal);
-        const lateral = Math.max(...[extent.min[0], extent.max[0], extent.min[1], extent.max[1]].map(Math.abs));
+        const lateral = maxOf([extent.min[0], extent.max[0], extent.min[1], extent.max[1]].map(Math.abs));
         // the law maps local frame coordinates: the curves are expressed in them (with another frame than the world one the result was moved by the frame origin)
         const curve = curveToLocal(worldCurveOf(entity), local);
         // the up vector is a world direction (default +z): its components in the frame, whatever the frame

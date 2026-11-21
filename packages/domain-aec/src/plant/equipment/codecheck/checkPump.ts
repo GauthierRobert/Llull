@@ -6,6 +6,7 @@
 import type { EquipmentElement } from '@aec/building/types';
 import { issuesOf, warning, type ElementCheck, type Found } from './findings';
 import { nozzleFindings } from './nozzleFindings';
+import { appendAll } from '@lib/appendAll';
 
 export const PUMP_REVIEW_REASON =
   'pump hydraulics, casing pressure rating and nozzle loads are not judged by llull; the envelope must be confirmed against the vendor drawing';
@@ -48,6 +49,6 @@ export function checkPump(element: EquipmentElement): ElementCheck {
     found.push(warning('EQP_DESIGN_DATA_MISSING', 'baseplate sized by default (machine span + margins), not from a drawing', 'baseplate'));
   if (template.weightKg === undefined)
     found.push(warning('EQP_DESIGN_DATA_MISSING', 'no weightKg: the standards give no pump weight, floor loads see 0 kg', 'weightKg'));
-  found.push(...nozzleFindings(template, plant.nozzles));
+  appendAll(found, nozzleFindings(template, plant.nozzles));
   return { issues: issuesOf(element, found), reviewRequired: true, reviewReason: PUMP_REVIEW_REASON, notChecked: NOT_CHECKED };
 }

@@ -13,6 +13,7 @@ import { entityOfKind } from '../entity/entityOfKind';
 import { dirRejection } from './codes';
 import { edgeRefField, faceRefField, isEntity, subdivisionOf } from './shared';
 import { finishedCage, isCommandResult, topologyResult } from './topologyResult';
+import { appendAll } from '../../lib/appendAll';
 
 const COMMAND = 'bridge_cage_faces';
 const MAX_SEGMENTS = 16;
@@ -74,11 +75,26 @@ function appendCage(state: CageState, entity: SubdivisionEntity, other: Subdivis
     }
     return mintElementId(prefix, taken);
   };
-  state.vertexIds.push(...donor.vertexIds.map((id) => unique(id, 'v')));
-  state.faceIds.push(...donor.faceIds.map((id) => unique(id, 'f')));
-  state.faces.push(...donor.faces.map((face) => face.map((v) => v + offsets.vertex)));
-  state.sharp.push(...donor.sharp.map(([a, b, s]): [number, number, number] => [a + offsets.vertex, b + offsets.vertex, s]));
-  state.corners.push(...donor.corners.map(({ v, s }) => ({ v: v + offsets.vertex, s })));
+  appendAll(
+    state.vertexIds,
+    donor.vertexIds.map((id) => unique(id, 'v')),
+  );
+  appendAll(
+    state.faceIds,
+    donor.faceIds.map((id) => unique(id, 'f')),
+  );
+  appendAll(
+    state.faces,
+    donor.faces.map((face) => face.map((v) => v + offsets.vertex)),
+  );
+  appendAll(
+    state.sharp,
+    donor.sharp.map(([a, b, s]): [number, number, number] => [a + offsets.vertex, b + offsets.vertex, s]),
+  );
+  appendAll(
+    state.corners,
+    donor.corners.map(({ v, s }) => ({ v: v + offsets.vertex, s })),
+  );
   return offsets;
 }
 

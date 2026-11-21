@@ -19,6 +19,7 @@ import { renderDocument } from './scene';
 import { resolveRenderOptions } from './options';
 import { surfaceShadingOf } from './surfaceShading';
 import { extractSvgInner, r2, svgDocument } from './svg';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** The part of simulate_motion's `data` (detail 'poses') this command reads. */
 interface MotionSimulation {
@@ -123,7 +124,7 @@ export const renderMotion = defineCommand({
     if (traced.length > TRACE_COLORS.length) return fail(`trace names ${traced.length} bodies; at most ${TRACE_COLORS.length}`);
     const resolved = resolveRenderOptions(doc, { direction: params.direction });
     if ('error' in resolved) return fail(resolved.error);
-    const duration = params.duration ?? (params.times !== undefined ? Math.max(1e-3, ...params.times) : 5);
+    const duration = params.duration ?? (params.times !== undefined ? Math.max(1e-3, maxOf(params.times)) : 5);
     const late = (params.times ?? []).filter((time) => time > duration + 1e-9);
     if (late.length > 0) return fail(`times ${late.join(', ')} exceed the duration ${duration} s`);
     const simulate = ctx?.registry('simulate_motion');

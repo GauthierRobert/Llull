@@ -26,6 +26,7 @@ import { beamVerdicts, freeFlangeReduction, governing } from './purlinSection';
 import { round, weightKnPerMetre } from '../../shared/numeric';
 import { distance3 } from '@lib/vec3';
 import { boundsOfPoints } from '@core/geometry/bounds';
+import { minOf } from '@lib/arrayExtrema';
 
 type PurlinLoads = { readonly windPressure: number; readonly snowLoad: number; readonly roofDeadLoad: number };
 
@@ -69,7 +70,7 @@ export function analysePurlins(
   const [y0, yEnd] = [envelopeMin[1], envelopeMax[1]];
   const height = envelopeMax[2];
   const rafterZs = members.filter(({ member }) => member.role === 'rafter').flatMap(({ start, end }) => [start[2], end[2]]);
-  const eaves = rafterZs.length > 0 ? Math.min(...rafterZs) : null;
+  const eaves = rafterZs.length > 0 ? minOf(rafterZs) : null;
   const valleys = valleyLines(members.filter(({ member }) => member.role === 'rafter').map(({ start, end }) => ({ start, end })));
   // Monopitch hall: no two rafters meet at their high ends (no ridge).
   const rafterHighEnds = members

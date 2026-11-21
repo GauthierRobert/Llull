@@ -2,11 +2,18 @@
 // the view-space normals and the linear depth marks creases, silhouettes and contact lines, drawn dark over the beauty image. Cost is one extra
 // scene render plus one full-screen quad whatever the instance count (plant batches stay instanced; no per-prototype edge geometry), and the
 // renderer's global clipping planes cut the normal render too, so a section clips the edges with the surface.
+// Selection outline: while something is selected, the selection layer alone is drawn flat into a mask; the mask's outer rim is drawn in the
+// selection colour over everything (no depth test: the outline of a part hidden behind another still shows where it is).
 
 import * as THREE from 'three';
 import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import type { DepthRangeCamera } from './depthRangeCamera';
 import { hideEdgeExcluded } from './edgeExclusion';
+import { SELECTION_LAYER } from './selectionLayer';
+import { SELECTION_COLOR } from '../../viewportPalette';
+
+/** Near-black: on a shaded solid an edge reads as a darker crease in either theme. */
+const DEFAULT_LINE_COLOR = '#10131a';
 
 const EDGE_SHADER = {
   uniforms: {
@@ -16,8 +23,12 @@ const EDGE_SHADER = {
     texel: { value: new THREE.Vector2(1, 1) },
     cameraNear: { value: 0.1 },
     cameraFar: { value: 1000 },
-    lineColor: { value: new THREE.Color('#10131a') },
-    strength: { value: 0.85 },
+    lineColor: { value: new THREE.Color(DEFAULT_LINE_COLOR) },
+    strength: { value: 0.9 },
+    tMask: { value: null as THREE.Texture | null },
+    selectionColor: { value: new THREE.Color(SELECTION_COLOR) },
+    /** 0 = nothing selected (the mask is not sampled), 1 = draw the outline. */
+    selection: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -32,7 +43,22 @@ const EDGE_SHADER = {
     uniform float cameraFar;
     uniform vec3 lineColor;
     uniform float strength;
+    uniform sampler2D tMask;
+    uniform vec3 selectionColor;
+    uniform float selection;
     varying vec2 vUv;
+
+    // Coverage of the selection within ~2.5 texels: the mask dilated, so (dilated - mask) is a rim just outside the silhouette.
+    float dilatedMask(vec2 uv) {
+      float m = 0.0;
+      for (int i = 0; i < 8; i++) {
+        float angle = 0.7853981634 * float(i);
+        vec2 dir = vec2(cos(angle), sin(angle)) * texel;
+        m = max(m, texture2D(tMask, uv + dir * 2.5).r);
+        m = max(m, texture2D(tMask, uv + dir * 1.25).r);
+      }
+      return m;
+    }
 
     float viewDepth(vec2 uv) {
       float d = texture2D(tDepth, uv).x;
@@ -41,20 +67,23 @@ const EDGE_SHADER = {
     }
     vec3 viewNormal(vec2 uv) { return texture2D(tNormal, uv).xyz * 2.0 - 1.0; }
 
-    void main() {
-      vec4 base = texture2D(tDiffuse, vUv);
-      vec2 a = vUv + vec2(-texel.x, -texel.y);
-      vec2 b = vUv + vec2(texel.x, texel.y);
-      vec2 c = vUv + vec2(-texel.x, texel.y);
-      vec2 d = vUv + vec2(texel.x, -texel.y);
-      float z0 = viewDepth(a);
-      float z1 = viewDepth(b);
-      float z2 = viewDepth(c);
-      float z3 = viewDepth(d);
-      float zc = viewDepth(vUv);
+    // Edge strength (0..1) of the Roberts cross centred on uv.
+    float edgeAt(vec2 uv) {
+      // Normals (linear-filtered, multisampled) on half-texel arms: a crease is a one-pixel line (full-texel arms drew it three wide).
+      // Depth is a point-sampled texture: half-texel arms would often read the same texel twice and break up the silhouettes.
+      vec2 arm = texel * 0.5;
+      vec2 a = uv + vec2(-arm.x, -arm.y);
+      vec2 b = uv + vec2(arm.x, arm.y);
+      vec2 c = uv + vec2(-arm.x, arm.y);
+      vec2 d = uv + vec2(arm.x, -arm.y);
+      float z0 = viewDepth(uv + vec2(-texel.x, -texel.y));
+      float z1 = viewDepth(uv + vec2(texel.x, texel.y));
+      float z2 = viewDepth(uv + vec2(-texel.x, texel.y));
+      float z3 = viewDepth(uv + vec2(texel.x, -texel.y));
+      float zc = viewDepth(uv);
       // Depth jump relative to the depth itself, forgiven on surfaces seen at a grazing angle (their depth slopes steeply).
       float depthEdge = max(abs(z0 - z1), abs(z2 - z3)) / max(min(min(z0, z1), min(z2, z3)), 1e-4);
-      float grazing = 1.0 - abs(viewNormal(vUv).z);
+      float grazing = 1.0 - abs(viewNormal(uv).z);
       float tolerance = 1.0 + 8.0 * grazing * grazing;
       depthEdge = smoothstep(0.015 * tolerance, 0.045 * tolerance, depthEdge);
       vec3 n0 = viewNormal(a);
@@ -65,8 +94,27 @@ const EDGE_SHADER = {
       normalEdge = smoothstep(0.12, 0.35, normalEdge);
       // The normal target is cleared to zero: no surface there, the depth edge already draws the silhouette.
       if (zc >= cameraFar && z0 >= cameraFar && z1 >= cameraFar && z2 >= cameraFar && z3 >= cameraFar) normalEdge = 0.0;
-      float edge = max(depthEdge, normalEdge) * strength;
-      gl_FragColor = vec4(mix(base.rgb, lineColor, edge), max(base.a, edge));
+      return max(depthEdge, normalEdge);
+    }
+
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      // Four evaluations on a rotated sub-pixel grid: a line crossing a pixel covers it partially instead of all-or-nothing,
+      // which is what made the edges stair-stepped and of uneven weight.
+      float edge = 0.25 * (
+        edgeAt(vUv + texel * vec2(0.125, 0.375)) +
+        edgeAt(vUv + texel * vec2(-0.375, 0.125)) +
+        edgeAt(vUv + texel * vec2(-0.125, -0.375)) +
+        edgeAt(vUv + texel * vec2(0.375, -0.125))
+      ) * strength;
+      vec4 color = vec4(mix(base.rgb, lineColor, edge), max(base.a, edge));
+      if (selection > 0.5) {
+        float inside = texture2D(tMask, vUv).r;
+        float rim = clamp(dilatedMask(vUv) - inside, 0.0, 1.0);
+        color.rgb = mix(color.rgb, selectionColor, max(rim, inside * 0.07));
+        color.a = max(color.a, rim);
+      }
+      gl_FragColor = color;
     }
   `,
 };
@@ -75,7 +123,9 @@ export class EdgeOverlayPass extends Pass {
   private readonly material: THREE.ShaderMaterial;
   private readonly quad: FullScreenQuad;
   private readonly normalMaterial = new THREE.MeshNormalMaterial();
+  private readonly maskMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
   private readonly target: THREE.WebGLRenderTarget;
+  private readonly mask: THREE.WebGLRenderTarget;
   private readonly clearColor = new THREE.Color();
 
   constructor(
@@ -83,9 +133,15 @@ export class EdgeOverlayPass extends Pass {
     private readonly depthCamera: DepthRangeCamera,
     width: number,
     height: number,
+    /** True while something is selected: the mask render is skipped otherwise. */
+    private readonly hasSelection: () => boolean = () => false,
+    /** Line colour for this frame (the hidden-line view draws in the theme's line colour); the shader default otherwise. */
+    private readonly lineColor: () => string | null = () => null,
   ) {
     super();
-    this.target = new THREE.WebGLRenderTarget(width, height, { depthTexture: new THREE.DepthTexture(width, height) });
+    this.mask = new THREE.WebGLRenderTarget(width, height, { samples: 4, depthBuffer: false });
+    // Multisampled: the resolved normals blend across a silhouette, so the sub-pixel evaluations above see a gradient, not a step.
+    this.target = new THREE.WebGLRenderTarget(width, height, { samples: 4, depthTexture: new THREE.DepthTexture(width, height) });
     this.material = new THREE.ShaderMaterial({
       uniforms: THREE.UniformsUtils.clone(EDGE_SHADER.uniforms),
       vertexShader: EDGE_SHADER.vertexShader,
@@ -99,6 +155,7 @@ export class EdgeOverlayPass extends Pass {
 
   override setSize(width: number, height: number): void {
     this.target.setSize(width, height);
+    this.mask.setSize(width, height);
     this.material.uniforms['texel']?.value.set(1 / width, 1 / height);
   }
 
@@ -117,6 +174,8 @@ export class EdgeOverlayPass extends Pass {
     renderer.setClearColor(0x808080, 0);
     renderer.autoClear = true;
     renderer.render(this.scene, camera);
+    const selection = this.hasSelection();
+    if (selection) this.renderSelectionMask(renderer, camera);
     this.scene.overrideMaterial = null;
     this.scene.background = previousBackground;
     restoreVisibility();
@@ -127,6 +186,9 @@ export class EdgeOverlayPass extends Pass {
     uniforms['tDiffuse']!.value = readBuffer.texture;
     uniforms['tNormal']!.value = this.target.texture;
     uniforms['tDepth']!.value = this.target.depthTexture;
+    uniforms['tMask']!.value = this.mask.texture;
+    (uniforms['lineColor']!.value as THREE.Color).set(this.lineColor() ?? DEFAULT_LINE_COLOR);
+    uniforms['selection']!.value = selection ? 1 : 0;
     uniforms['cameraNear']!.value = camera.near;
     uniforms['cameraFar']!.value = camera.far;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
@@ -134,7 +196,20 @@ export class EdgeOverlayPass extends Pass {
     renderer.setRenderTarget(previousTarget);
   }
 
+  /** The selection layer alone, flat white on black. The camera's own layers are put back (it may be the view camera). */
+  private renderSelectionMask(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera): void {
+    const layers = camera.layers.mask;
+    camera.layers.set(SELECTION_LAYER);
+    this.scene.overrideMaterial = this.maskMaterial;
+    renderer.setRenderTarget(this.mask);
+    renderer.setClearColor(0x000000, 0);
+    renderer.render(this.scene, camera);
+    camera.layers.mask = layers;
+  }
+
   override dispose(): void {
+    this.mask.dispose();
+    this.maskMaterial.dispose();
     this.target.dispose();
     this.target.depthTexture?.dispose();
     this.material.dispose();

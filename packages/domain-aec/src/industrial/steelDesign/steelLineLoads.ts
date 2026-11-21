@@ -15,6 +15,7 @@ import { pipeWallMm, pipeWeightPerMetre } from '../piping/pipeWeight';
 import { carriedByEnds, pipeRunOf, weightSupportsOf } from '../piping/pipeSupportLayout';
 import { runPipes } from '../piping/pipeCarrier';
 import { applySupportedPipe, tributaryLengths } from './steelSupportLoads';
+import { appendAll } from '@lib/appendAll';
 
 interface LineLoadParams {
   /** kg/m³ of the pipe contents (1000 = water, 0 = empty). */
@@ -177,8 +178,8 @@ export function applyLineLoads(
     const pipeRun = run.pipe ? pipeRunOf(units, run.pipe) : null;
     if (pipeRun && weightSupportsOf(units, pipeRun).length > 0) {
       const supported = applySupportedPipe(units, pipeRun, run.weightPerMetre, beams, bars);
-      warnings.push(...supported.warnings);
-      columnNodes.push(...supported.columnNodes);
+      appendAll(warnings, supported.warnings);
+      appendAll(columnNodes, supported.columnNodes);
       runs.push({
         ...header,
         lengthM: pipeRun.lengthMm / 1000,

@@ -9,6 +9,7 @@ import type { DecalSurface } from '../model/decal';
 import { add3, scale3 } from '../lib/vec3';
 import { buildFaceChart } from './wrapChart';
 import type { SurfaceParams } from './kernelPorts';
+import { appendAll } from '../lib/appendAll';
 
 /** Largest angular step of a wrap patch strip, radians (a 0.05 rad chord sags a thousandth of the radius). */
 const MAX_STEP = 0.05;
@@ -59,8 +60,8 @@ export function wrapPatch(decal: Decal, wrap: DecalSurface): { positions: number
       [a, c, d],
     ] as const)
       for (const vertex of triangle as ReadonlyArray<NonNullable<(typeof quad)[number]>>) {
-        positions.push(...vertex.point);
-        uvs.push(...vertex.uv);
+        appendAll(positions, vertex.point);
+        appendAll(uvs, vertex.uv);
       }
   }
   return { positions, uvs };

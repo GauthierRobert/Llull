@@ -10,6 +10,7 @@ import { tableRejection } from '../noop';
 import { axisCrossing, helixOverlap, parseOrientation, type OrientationContext, type OrientationInput } from './sweepOrientation';
 import { z } from '../schema';
 import type { CommandResult } from '../types';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   SWG_PATH_INVALID: 'give exactly one of path (>= 2 points) or pathId (a curve entity)',
@@ -250,7 +251,7 @@ export function sweepDesign(doc: CadDocument, entity: SweepEntity, closed: boole
         );
     }
   }
-  const maxScale = evaluation.transforms === null ? 1 : Math.max(...evaluation.transforms.map((t) => Math.max(t.sx, t.sy)));
+  const maxScale = evaluation.transforms === null ? 1 : maxOf(evaluation.transforms.map((t) => Math.max(t.sx, t.sy)));
   const crossing = axisCrossing(entity, evaluation.frames, evaluation.transforms);
   if (crossing !== null) return refuseSweep(doc, 'sweep_profile', 'SWG_SELF_INTERSECTION_LOCAL', crossing, [], ['section']);
   const overlap = helixOverlap(entity, evaluation.transforms);

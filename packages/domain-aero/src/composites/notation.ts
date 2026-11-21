@@ -1,5 +1,6 @@
 /** Stacking notation (06 CMP §5.1, after NASA RP-1351): `[0/+-45/90]s`, `[0_5/45]_2s`, `[(0/90)_2/45]s`, `[45/-45/0_2/90~]s`, `[0/90]T`. Bottom to top. */
 
+import { appendAll } from '@lib/appendAll';
 export type NotationResult =
   | { readonly ok: true; readonly angles: readonly number[] }
   | { readonly ok: false; readonly message: string; readonly token: string; readonly index: number };
@@ -62,7 +63,7 @@ function parseItems(text: string, depth: number): number[] | null {
   for (const item of items) {
     const expanded = expandItem(item.trim(), depth);
     if (expanded === null) return null;
-    angles.push(...expanded);
+    appendAll(angles, expanded);
     if (angles.length > MAX_PLIES) return null;
   }
   return angles;
@@ -89,7 +90,7 @@ export function parseNotation(notation: string): NotationResult {
   for (const [index, item] of items.entries()) {
     const expanded = expandItem(item.trim(), 0);
     if (expanded === null) return fail(`"${item}" is not an angle, +-angle or (group)_n`, item, index);
-    angles.push(...expanded);
+    appendAll(angles, expanded);
     if (angles.length > MAX_PLIES) return fail(`more than ${MAX_PLIES} plies`, text, 0);
   }
   if (angles.length === 0 || repeat === 0) return fail('the stack is empty', text, 0);

@@ -32,9 +32,10 @@ export function scaleAndWeld(
   unitScale: number,
   weldTolerance?: number,
 ): WeldedBody {
-  const scaled = positions.map((value) => value * unitScale);
+  // A scale of exactly 1 changes no bit (x * 1 === x, -0 and NaN included): the million-value copy is skipped. The weld reads its input only.
+  const scaled = unitScale === 1 ? positions : positions.map((value) => value * unitScale);
   const tolerance = weldTolerance ?? WELD_TOLERANCE_FRACTION * meshDiagonal(scaled);
-  const welded = weldMesh({ positions: scaled, indices: [...triangles] }, tolerance);
+  const welded = weldMesh({ positions: scaled, indices: triangles }, tolerance);
   return {
     mesh: { positions: welded.positions, indices: welded.triangles },
     mergedVertices: welded.mergedVertices,

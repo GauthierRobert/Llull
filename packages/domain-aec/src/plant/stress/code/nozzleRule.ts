@@ -1,6 +1,7 @@
 /** One nozzle rule and its evaluation on a load in the nozzle frame, shared by `nozzle_load_check` (given loads) and `check_nozzle_loads` (stored results). */
 
 import { z } from '@core/commands/schema';
+import { maxOf } from '@lib/arrayExtrema';
 import {
   API610_FACTOR,
   API617_NEMA_FACTOR,
@@ -170,7 +171,7 @@ export function evaluateNozzleRule(rule: NozzleRule, given: Vec3, givenMoment: V
       unverified = [`user limits are caller-supplied (${user.source})`];
       numbers = { source: user.source, unit: si ? 'N, N.m' : 'lbf, ft.lbf' };
     }
-    ratio = Math.max(...components.map((entry) => entry.ratio));
+    ratio = maxOf(components.map((entry) => entry.ratio));
     numbers = { ...numbers, components };
   }
   return { ok: ratio <= 1, ratio, grade, ruleId, unverified, warnings, numbers, forceLbf, momentFtLbf };

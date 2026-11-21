@@ -17,6 +17,7 @@ import { bendEnd } from '../reliefGeometry';
 import { applyRelief, isReliefFailure, reliefData } from '../reliefOps';
 import { fixed, refuser, type Fail } from '../result';
 import { insideRadiusOf, isRefusal, partContext } from '../partLookup';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /** Overlap length of intervals [a0,a1] and [b0,b1]. */
 const overlap = (a0: number, a1: number, b0: number, b1: number): number =>
@@ -138,7 +139,7 @@ function trimmedOutline(
     fail(
       'FTR_PARAM_INVALID',
       parallel
-        ? `the picked edge of ${flat.id} cannot be moved inward by ${fixed(trim)}: a neighbouring outline edge is only ${fixed(Math.min(...neighbours))} long (a corner-relief notch or step at its end, not longer than the trim), so moving the edge would collapse it`
+        ? `the picked edge of ${flat.id} cannot be moved inward by ${fixed(trim)}: a neighbouring outline edge is only ${fixed(minOf(neighbours))} long (a corner-relief notch or step at its end, not longer than the trim), so moving the edge would collapse it`
         : `the flat ${flat.id} is too small to trim by ${fixed(trim)}`,
       parallel
         ? 'Reduce the corner-relief size, or use position material_outside.'
@@ -198,7 +199,7 @@ function bendLineOf(
       ? [
           [
             [0, 0],
-            [Math.max(...flat.outline.map((point) => point[0])), 0],
+            [maxOf(flat.outline.map((point) => point[0])), 0],
           ] as const,
         ]
       : []),

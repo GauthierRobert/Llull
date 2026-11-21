@@ -12,6 +12,7 @@ import { reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './found
 import { combine, findFooting, findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
 import { footingSettlementParts } from './foundationSettlement';
 import { round } from '../../shared/numeric';
+import { appendAll } from '@lib/appendAll';
 
 /** Checks footings and base plates of the columns of a level. */
 export function checkFoundations(
@@ -66,8 +67,9 @@ export function checkFoundations(
     if (footing) {
       footings += 1;
       checkedFootings.add(footing.id);
-      rows.push(
-        ...footingRows({ doc, reaction, wind, soilBearing, soilModulus, clayLayer, slidingHorizontal, slabShare }, footing, column.mark),
+      appendAll(
+        rows,
+        footingRows({ doc, reaction, wind, soilBearing, soilModulus, clayLayer, slidingHorizontal, slabShare }, footing, column.mark),
       );
       settlements.push({
         frame: reaction.frame,
@@ -79,12 +81,13 @@ export function checkFoundations(
     }
     if (plate) {
       plates += 1;
-      rows.push(
-        ...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind, loads.boltClass ?? DEFAULT_BOLT_CLASS),
+      appendAll(
+        rows,
+        plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind, loads.boltClass ?? DEFAULT_BOLT_CLASS),
       );
     }
   }
-  rows.push(...differentialRows(doc, settlements));
+  appendAll(rows, differentialRows(doc, settlements));
   const unchecked = levelElementsOf(building, 'footing', levelId).filter((element) => !checkedFootings.has(element.id)).length;
   return { rows, footings, plates, unchecked };
 }

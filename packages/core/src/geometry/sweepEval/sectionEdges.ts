@@ -4,6 +4,7 @@ import type { CurveSegment } from '../../model/curve';
 import type { SweepEntity, Vec2 } from '../../model/types';
 import { arcGeometry } from '../curveSegments';
 import { ringCurves } from '../sectionRing';
+import { appendAll } from '../../lib/appendAll';
 
 /** One boundary edge: a Bézier span of `degree` with `degree + 1` poles (and weights when rational, e.g. an arc piece of at most a quarter turn). */
 export interface SectionEdge {
@@ -61,7 +62,7 @@ export function constantEdges(section: SweepEntity['section']): SectionEdge[] | 
   for (const segment of segments) {
     const made = segmentEdges(segment);
     if (made === null) return null;
-    edges.push(...made);
+    appendAll(edges, made);
   }
   return edges;
 }

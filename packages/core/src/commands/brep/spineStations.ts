@@ -10,6 +10,8 @@ import type { GeometryKernel, ShapeEdge } from '../../geometry/kernel';
 import type { Vec3 } from '../../model/types';
 import type { BlendSection } from '../../geometry/kernelPorts';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
+import { hypotOf } from '../../lib/hypotOf';
+import { minOf } from '../../lib/arrayExtrema';
 
 /** Samples of the source edge the sections are placed on (the arc fraction of a section is read between two of them). */
 const SPINE_SAMPLES = 1001;
@@ -77,7 +79,7 @@ function stationsOnSamples(
       const length2 = along.reduce((sum, value) => sum + value * value, 0);
       const dot = along.reduce((sum, value, axis) => sum + value * (toward[axis] ?? 0), 0);
       const share = length2 > 0 ? Math.min(1, Math.max(0, dot / length2)) : 0;
-      const gap = Math.hypot(...along.map((value, axis) => share * value - (toward[axis] ?? 0)));
+      const gap = hypotOf(along.map((value, axis) => share * value - (toward[axis] ?? 0)));
       if (gap < best.gap) best = { gap, s: (samples[k]?.s ?? 0) + share * ((samples[k + 1]?.s ?? 0) - (samples[k]?.s ?? 0)) };
     }
     return best.s / total;
@@ -100,6 +102,6 @@ function stationsOnSamples(
           ? `${label}: the sections of the blend all project to one point of the edge, so the law cannot be read along it`
           : `${label}: the nearest edge point jumps backwards between sections ${jump - 1} and ${jump} (the radius approaches the local radius of curvature of the edge), so the law is not read at the spine`,
     };
-  const shift = closed ? -Math.floor(Math.min(...unwrapped) + SEAM_SLACK) : 0;
+  const shift = closed ? -Math.floor(minOf(unwrapped) + SEAM_SLACK) : 0;
   return { stations: unwrapped.map((station) => station + shift), closed };
 }

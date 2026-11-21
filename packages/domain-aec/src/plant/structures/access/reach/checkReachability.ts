@@ -51,7 +51,7 @@ export const checkReachability = defineCommand({
       .array(z.enum(['valves', 'nozzles', 'manways']))
       .optional()
       .describe(
-        'Targets read from the model: "valves" = the handwheel centre (valve centre + stem direction x catalogue stem height) of every valve of the routed piping, tagged by its tag (else its inline id). "nozzles" = the flange face centre of every equipment nozzle that is not a manway, tagged "<equipment mark>:<nozzle mark>" (kind equipment_nozzle). "manways" = the nozzles whose service contains the word "manway" or "manways" (case-insensitive; not inside a longer word such as "manwayish", not after "non-"; kind manway), same tag form; every other nozzle is "nozzles". Equipment without nozzles gives no target; a nozzle that does not suit its template is skipped, as in equipment_ports.',
+        'Targets read from the model: "valves" = the handwheel centre (valve centre + stem direction x catalogue stem height) of every valve of the routed piping, tagged by its tag (else its inline id). "nozzles" = the flange face centre of every equipment nozzle that is not a manway, tagged "<equipment mark>:<nozzle mark>" (kind equipment_nozzle). "manways" = the nozzles with kind "manway" (add_nozzle / update_nozzle { kind }); a nozzle record without a kind falls back to its service text containing the word "manway" or "manways" (case-insensitive; not inside a longer word, not after "non-"); kind manway, same tag form; every other nozzle is "nozzles". Equipment without nozzles gives no target; a nozzle that does not suit its template is skipped, as in equipment_ports.',
       ),
     operatingHeightMm: z
       .object({

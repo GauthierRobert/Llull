@@ -20,6 +20,7 @@ import type { LedgerData } from './ledger';
 import { speedTrend, trendWarning } from './speedTrend';
 import { map3 } from '@lib/vec3';
 import { pow } from '@lib/pow';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
 
@@ -178,8 +179,8 @@ function springResults(dynamics: DynamicsModel, trace: SimulationTrace): NonNull
         {
           freeLengthM: spring.freeLengthM,
           finalLengthM: last(recorded.length),
-          minLengthM: Math.min(...recorded.length),
-          maxLengthM: Math.max(...recorded.length),
+          minLengthM: minOf(recorded.length),
+          maxLengthM: maxOf(recorded.length),
           finalForceN: last(recorded.force),
           peakForceN: recorded.force.reduce((peak, force) => Math.max(peak, Math.abs(force)), 0),
         },
@@ -281,7 +282,7 @@ export function simulationData(
       const tipMach = (Math.abs(omega) * p.diameter) / 2 / SPEED_OF_SOUND;
       if (end.outsideTable === true)
         warnings.push(
-          `FPR_OUTSIDE_VALIDATED_RANGE: propeller '${p.id}' runs at J = ${(end.advanceRatio ?? 0).toFixed(3)}, beyond its table (last J ${Math.max(...(p.table?.points.map((point) => point[0]) ?? [0]))}): the coefficients are held at the last point`,
+          `FPR_OUTSIDE_VALIDATED_RANGE: propeller '${p.id}' runs at J = ${(end.advanceRatio ?? 0).toFixed(3)}, beyond its table (last J ${maxOf(p.table?.points.map((point) => point[0]) ?? [0])}): the coefficients are held at the last point`,
         );
       const figureOfMerit = p.powerCoefficient > 0 ? pow(p.thrustCoefficient, 1.5) / (p.powerCoefficient * Math.sqrt(Math.PI / 2)) : null;
       if (tipMach > MAX_TIP_MACH)

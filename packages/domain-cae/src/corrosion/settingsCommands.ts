@@ -95,3 +95,32 @@ export const setGalvanicGroup = defineCommand({
     );
   },
 });
+
+/**
+ * @affects doc.corrosion.materials[material] (removes it; affected: [material])
+ * @invariant the material itself is untouched; its parts become COR_GROUP_MISSING (unknown) in the next check
+ * @failure no galvanic group entry for the material -> COR_GROUP_NOT_SET (document unchanged)
+ */
+export const removeGalvanicGroup = defineCommand({
+  name: 'remove_galvanic_group',
+  description:
+    'Remove the galvanic group entry of a material (set with set_galvanic_group), also when the material no longer exists. ' +
+    'The material is kept; its parts are reported unknown (COR_GROUP_MISSING) by the next check_material_compatibility. Needed before the material can be deleted.',
+  params: z.object({ material: z.string().describe('Material id whose galvanic group entry is removed.') }),
+  run: (doc, { material }): CommandResult => {
+    const materials = corrosionOf(doc).materials;
+    if (!Object.hasOwn(materials, material))
+      return refuseCor(
+        doc,
+        'remove_galvanic_group',
+        'COR_GROUP_NOT_SET',
+        `material '${material}' has no galvanic group entry`,
+        [material],
+        ['material'],
+      );
+    const kept = Object.fromEntries(Object.entries(materials).filter(([key]) => key !== material));
+    return changed(withCorrosion(doc, { materials: kept }), `remove_galvanic_group: removed the galvanic group of '${material}'.`, [
+      material,
+    ]);
+  },
+});

@@ -13,6 +13,7 @@ import { superelevationStations } from '../alignment/superelevation';
 import { surfaceTinById } from '../surface/surfaceTin';
 import type { CivilContext } from '../context';
 import { toMetres } from '@core/model/units';
+import { appendAll } from '@lib/appendAll';
 
 type MeshBuffers = { readonly positions: number[]; readonly indices: number[] };
 
@@ -25,7 +26,7 @@ function addStrip(buffers: MeshBuffers, rows: ReadonlyArray<{ cross: RoadCrossSe
   const base = buffers.positions.length / 3;
   const width = rows[0]?.nodes.length ?? 0;
   for (const row of rows) {
-    for (const node of row.nodes) buffers.positions.push(...vertex(row.cross, node));
+    for (const node of row.nodes) appendAll(buffers.positions, vertex(row.cross, node));
   }
   for (let r = 0; r + 1 < rows.length; r++) {
     for (let j = 0; j + 1 < width; j++) {

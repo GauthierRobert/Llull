@@ -1,6 +1,7 @@
 /** Hot Young's modulus E(T) of the operating cases (07 PST §5.2, named setting `hotModulus` of the model): read from the `E` property model of a document material. */
 
 import { evaluatePropertyModel, isRefused, resolvePropertyModel, type PropertyRecord } from '@core/model/propertyModelEval';
+import { maxOf } from '@lib/arrayExtrema';
 import type { CadDocument } from '@core/model/types';
 import type { LoadCaseDef, OperatingConditions, StressModel } from '../model/schema';
 import type { PrimitiveFailure } from './primitives';
@@ -17,7 +18,7 @@ export interface HotModulus {
 /** The metal temperature a case runs at: the largest T primitive of its `basic` list (null when it has none). */
 export function caseTemperatureC(loadCase: LoadCaseDef, conditions: OperatingConditions): number | null {
   const temps = conditions.temperatures.filter((entry) => (loadCase.basic ?? []).includes(entry.name)).map((entry) => entry.tempC);
-  return temps.length === 0 ? null : Math.max(...temps);
+  return temps.length === 0 ? null : maxOf(temps);
 }
 
 /**

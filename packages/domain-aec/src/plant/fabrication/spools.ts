@@ -10,6 +10,7 @@ import { distance3, lerp3 } from '@lib/vec3';
 import { outsideDiameterMm } from '../../industrial/piping/pipeSizes';
 import { nodeKey, type JointClass, type LineGraph } from './joints';
 import type { NetworkComponent, PipingNetwork, SpoolBreak, SpoolLimits } from './model';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface SpoolInfo {
   readonly name: string;
@@ -141,11 +142,13 @@ function metrics(network: PipingNetwork, members: readonly number[]): Omit<Spool
   });
   const maxOd = Math.max(
     0,
-    ...members.flatMap((index) => (components[index] as NetworkComponent).ends.map((end) => outsideDiameterMm(end.boreMm) ?? end.boreMm)),
+    maxOf(
+      members.flatMap((index) => (components[index] as NetworkComponent).ends.map((end) => outsideDiameterMm(end.boreMm) ?? end.boreMm)),
+    ),
   );
   const extent = [0, 1, 2].map((axis) => {
     const values = points.map((point) => point[axis] as number);
-    return values.length === 0 ? 0 : Math.max(...values) - Math.min(...values) + maxOd;
+    return values.length === 0 ? 0 : maxOf(values) - minOf(values) + maxOd;
   });
   const [x = 0, y = 0, z = 0] = extent.sort((a, b) => b - a);
   const weighted = members.filter((index) => (components[index] as NetworkComponent).weight !== undefined);

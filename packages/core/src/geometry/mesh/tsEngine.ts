@@ -97,14 +97,15 @@ function vertexNormals(positions: ReadonlyArray<number>, triangles: ReadonlyArra
       (pts[1][2] - pts[0][2]) * (pts[2][0] - pts[0][0]) - (pts[1][0] - pts[0][0]) * (pts[2][2] - pts[0][2]),
       (pts[1][0] - pts[0][0]) * (pts[2][1] - pts[0][1]) - (pts[1][1] - pts[0][1]) * (pts[2][0] - pts[0][0]),
     ];
-    const length = Math.hypot(...n);
+    const length = Math.hypot(n[0], n[1], n[2]);
     if (length === 0) continue;
     for (let k = 0; k < 3; k++) {
       const [u, v]: [Vec3, Vec3] = [pts[(k + 1) % 3] as Vec3, pts[(k + 2) % 3] as Vec3];
       const o = pts[k] as Vec3;
       const e1: Vec3 = [u[0] - o[0], u[1] - o[1], u[2] - o[2]];
       const e2: Vec3 = [v[0] - o[0], v[1] - o[1], v[2] - o[2]];
-      const cosine = (e1[0] * e2[0] + e1[1] * e2[1] + e1[2] * e2[2]) / (Math.hypot(...e1) * Math.hypot(...e2) || 1);
+      const cosine =
+        (e1[0] * e2[0] + e1[1] * e2[1] + e1[2] * e2[2]) / (Math.hypot(e1[0], e1[1], e1[2]) * Math.hypot(e2[0], e2[1], e2[2]) || 1);
       const angle = Math.acos(Math.max(-1, Math.min(1, cosine)));
       for (let axis = 0; axis < 3; axis++)
         normals[(ids[k] as number) * 3 + axis] =

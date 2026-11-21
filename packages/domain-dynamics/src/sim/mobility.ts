@@ -11,6 +11,7 @@ import type { Topology } from './topology';
 import { applyMat3, mulMat3 } from '@lib/axisRotation';
 import { elementAt } from '@lib/elementAt';
 import { cross3, dot3, scale3 } from '@lib/vec3';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
@@ -241,7 +242,7 @@ export function consistentSpeeds(
   const driven = topology.tree.map((entry, i) => (free.includes(i) ? 0 : prescribedSpeed(entry.joint.id)));
   const rhs = jacobian.map((row) => -row.reduce((sum, value, i) => sum + value * elementAt(driven, i), 0));
   const a = free.map((i) => free.map((j) => jacobian.reduce((sum, row) => sum + elementAt(row, i) * elementAt(row, j), 0)));
-  const scale = Math.max(1e-300, ...a.map((row, i) => elementAt(row, i)));
+  const scale = Math.max(1e-300, maxOf(a.map((row, i) => elementAt(row, i))));
   const regular = a.map((row, i) => row.map((value, j) => value + (i === j ? 1e-12 * scale : 0)));
   const b = free.map((i) => jacobian.reduce((sum, row, r) => sum + elementAt(row, i) * elementAt(rhs, r), 0));
   const solution = solveSystem(regular, b);

@@ -9,7 +9,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMm } from '@core/model/units';
 import { getBuilding } from '../../building/model';
 import { noop, report } from '@core/commands/noop';
-import { dot3, scale3, sub3 } from '@lib/vec3';
+import { dot3, hypot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
 import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
@@ -74,7 +74,7 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
     const ab = sub3(b, a);
     const ap = sub3(point, a);
     const t = clamp01(dot3(ap, ab) / (dot3(ab, ab) || 1));
-    best = Math.min(best, Math.hypot(...sub3(ap, scale3(ab, t))));
+    best = Math.min(best, hypot3(sub3(ap, scale3(ab, t))));
   }
   return best;
 }

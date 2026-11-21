@@ -25,6 +25,7 @@ import { DEFAULT_MAX_LENGTH_STRAIN } from './conventions';
 import type { FaceRefInput, FaceSession, PlacementInput, ResolvedChart } from './faceSession';
 import type { ChartRegion } from './sketchProfiles';
 import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineRegions, probePoints } from './wrapMapping';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const MAX_PROBES = 48;
 
@@ -95,7 +96,7 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
   if ('summary' in planned) return planned;
   const { steps, clippedArea, strain } = planned;
   if (steps.length === 0) return fail('WRP_OUTSIDE_FACE', 'the sketch lies on none of the chain faces', ['profileIds'], params.profileIds);
-  const joinStrain = Math.max(0, ...chain.edges.map((edge) => edge.mismatch));
+  const joinStrain = Math.max(0, maxOf(chain.edges.map((edge) => edge.mismatch)));
   if (!chain.developable && strain > limit) {
     const refused = fail(
       'WRP_DISTORTION_EXCEEDED',

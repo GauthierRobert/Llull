@@ -10,6 +10,7 @@ import type { ImportedExchange, ImportedOccurrence } from '../../geometry/kernel
 import { eulerFromMat } from '../../lib/axisRotation';
 import { nextId } from '../../lib/id';
 import { instanceEntity } from '../assembly/assemblies';
+import { appendAll } from '../../lib/appendAll';
 
 /** Where one product of the file ended up. */
 export interface ProductPlacement {
@@ -124,7 +125,7 @@ export function buildTreeStructure(imported: ImportedExchange, entities: readonl
     const component = componentOf.get(root);
     if (component === undefined) {
       const flat = solidEntities(root);
-      topLevel.push(...flat);
+      appendAll(topLevel, flat);
       placements.set(root, { topLevel: flat.map((entity) => entity.id) });
     } else {
       const instance = instanceEntity(nextId('instance'), component, [0, 0, 0], [0, 0, 0]);

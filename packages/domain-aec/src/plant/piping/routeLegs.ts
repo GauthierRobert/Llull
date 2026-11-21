@@ -14,6 +14,7 @@ import { at, partOf, type Slot } from './routeEnv';
 import { turnPartFields } from './routeTurns';
 import type { RunCtx } from './routeRunCtx';
 import { dnAfter } from './runSizes';
+import { appendAll } from '@lib/appendAll';
 
 const BRANCH_KINDS: ReadonlySet<string> = new Set(['olet', 'stubIn']);
 
@@ -160,7 +161,7 @@ function addPiece(
 
 function addSlotParts(c: RunCtx, w: LegWalk, slot: Slot): void {
   const built = slot.build(axisOf(w), w.u);
-  c.parts.push(...built.parts);
+  appendAll(c.parts, built.parts);
   built.joints.forEach(c.addJoint);
   if (built.inline !== undefined) c.inline.push(built.inline);
   if (slot.offset !== undefined) w.sideways = add3(w.sideways, slot.offset);

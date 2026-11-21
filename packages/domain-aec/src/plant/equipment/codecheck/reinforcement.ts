@@ -51,11 +51,15 @@ export interface ReinforcementOptions {
   readonly nozzleStressMPa?: number | undefined;
 }
 
+/** Named refusal of the pad credit: the pad is stored and drawn, its area is not counted (no cited source for A5 in validation/sources.md). */
+const PAD_NOT_CREDITED =
+  'reinforcing pad (A5) stored on the nozzle but NOT credited: the A5 formula has no cited source in validation/sources.md (refused by name); the available area is conservative';
+
 export const NOT_CHECKED = [
-  'weld sizes and weld-path strength (UG-41)',
+  'weld sizes and weld-path strength (UG-41): no cited source in validation/sources.md, refused by name',
   'reinforcing pad (A5) and fillet weld metal (A41): not modelled, so the available area is conservative',
   'inward projection (A3) and nozzle loads',
-  'openings close to each other or to a seam (UG-36(c)(2), UG-37(e))',
+  'openings close to each other or to a seam (UG-36(c)(2), UG-37(e)): no cited source for the spacing rule in validation/sources.md, refused by name',
 ];
 
 const refusal = (mark: string, code: string, message: string, path: string): NozzleReinforcement => ({
@@ -200,8 +204,11 @@ function nozzleReinforcement(
         fr: f,
         corrosionAllowanceMm: allowance,
         material: plant.design?.material ?? 'unspecified',
+        ...(nozzle.pad === undefined
+          ? {}
+          : { padOutsideDiameterMm: nozzle.pad.outsideDiameter * mm, padThicknessMm: nozzle.pad.thickness * mm }),
       },
-      notChecked: NOT_CHECKED,
+      notChecked: nozzle.pad === undefined ? NOT_CHECKED : [PAD_NOT_CREDITED, ...NOT_CHECKED],
     },
   };
 }

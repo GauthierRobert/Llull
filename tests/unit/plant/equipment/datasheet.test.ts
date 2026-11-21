@@ -288,7 +288,7 @@ describe('equipment_datasheet CSV', () => {
     const result = sheet(doc, 'V-101', { format: 'csv', table: 'nozzles' });
     const rows = csvRows(textAt(result, 'text'));
     expect(rows).toHaveLength(5);
-    expect(rows[0]).toHaveLength(21);
+    expect(rows[0]).toHaveLength(23);
     expect(rows[1]?.slice(0, 15)).toEqual([
       'N1',
       'V-101:N1',

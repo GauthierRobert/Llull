@@ -187,4 +187,26 @@ describe('useKeyboardShortcuts', () => {
       expect(useLayoutStore.getState().sidebarOpen).toBe(!sidebar);
     });
   });
+  it('Ctrl+A selects every entity that is not hidden, instead of the page text', () => {
+    const select = vi.fn();
+    const doc = execute(execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document, 'add_sphere', { radius: 1 }).document;
+    const [boxId, sphereId] = doc.order as [string, string];
+    useStore.setState({ document: doc, select });
+    useViewportStore.getState().hideEntities([sphereId]);
+    render(<Harness />);
+    const event = new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, cancelable: true, bubbles: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(select).toHaveBeenCalledWith([boxId]);
+    useViewportStore.getState().showAllEntities();
+  });
+  it('F frames the model in the 3D view only (in 2D the key belongs to the fillet tool)', () => {
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'f' });
+    expect(dispatch).toHaveBeenCalledWith('fit_view', { direction: 'current', padding: 1.4 }, { quiet: true, coalesce: true });
+    dispatch.mockClear();
+    useToolStore.setState({ viewMode: '2d' });
+    fireEvent.keyDown(window, { key: 'f' });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
 });

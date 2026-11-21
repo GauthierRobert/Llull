@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { dimensionDrawing, dimensionText, formatDimensionValue } from '@core/geometry/dimensionAnnotation';
+import { type DimensionDrawing, dimensionDrawing, dimensionText, formatDimensionValue } from '@core/geometry/dimensionAnnotation';
 import { xy } from '../helpers/xy';
 
 function draw(doc: CadDocument, command: string, params: object): { doc: CadDocument; entity: Entity } {
@@ -82,5 +82,42 @@ describe('dimension text', () => {
     expect(dimensionText({ ...base, tolerance: '±0.1' }, 10, 1)).toBe('10.0 ±0.1');
     expect(dimensionText({ ...base, precision: 0 }, 10.4, 3)).toBe('10');
     expect(dimensionText({ ...base, tolerance: '±0.1', label: 'REF' }, 10, 1)).toBe('REF');
+  });
+});
+
+describe('dimension style look (arrowheads, extension lines, number format)', () => {
+  const { ids } = sketch();
+  const linear = (look: Parameters<typeof dimensionDrawing>[4]): DimensionDrawing =>
+    dimensionDrawing('linear', [ids['left'], ids['right']], 5, 0.3, look)!;
+
+  it('draws open (default), closed, tick, dot and no arrowheads', () => {
+    expect(linear({}).segments).toHaveLength(3 + 4);
+    expect(linear({ arrowStyle: 'closed' }).segments).toHaveLength(3 + 6);
+    expect(linear({ arrowStyle: 'tick' }).segments).toHaveLength(3 + 2);
+    expect(linear({ arrowStyle: 'dot' }).segments).toHaveLength(3 + 16);
+    expect(linear({ arrowStyle: 'none' }).segments).toHaveLength(3);
+    const radial = dimensionDrawing('diameter', [ids['circle']], 5, 0.3, { arrowStyle: 'none' })!;
+    expect(radial.segments).toHaveLength(1);
+  });
+  it('tick is a 45° slash of arrow length through the dimension-line end', () => {
+    const [, , , slash] = linear({ arrowStyle: 'tick' }).segments;
+    const [[ax, ay], [bx, by]] = slash!;
+    expect(Math.hypot(bx - ax, by - ay)).toBeCloseTo(0.3, 9);
+    expect(Math.abs(bx - ax)).toBeCloseTo(Math.abs(by - ay), 9);
+  });
+  it('extension lines start after the gap and run past the dimension line', () => {
+    const [plain] = linear({}).segments;
+    const [styled] = linear({ extensionGap: 1, extensionBeyond: 2 }).segments;
+    const length = (segment: typeof plain): number => Math.hypot(segment![1][0] - segment![0][0], segment![1][1] - segment![0][1]);
+    expect(length(styled)).toBeCloseTo(length(plain) - 1 + 2, 9);
+    expect(linear({ extensionGap: 999 }).segments[0]![0]).toEqual(plain![1]);
+  });
+  it('formats separators, affixes and angular precision', () => {
+    expect(formatDimensionValue('linear', 12.345, 2, { decimalSeparator: ',', prefix: '~', suffix: ' mm' })).toBe('~12,35 mm');
+    expect(formatDimensionValue('diameter', 20, 0, { prefix: 'x' })).toBe('Øx20');
+    expect(formatDimensionValue('angular', 45.123, 3, { angularPrecision: 2 })).toBe('45.12°');
+    expect(formatDimensionValue('angular', 45.123, 3)).toBe('45.1°');
+    const text = dimensionText({ dimensionKind: 'linear', tolerance: '±0.1' }, 3, 3, { precision: 1 });
+    expect(text).toBe('3.0 ±0.1');
   });
 });

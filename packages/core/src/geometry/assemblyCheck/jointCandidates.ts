@@ -8,6 +8,7 @@
 
 import type { MeshData, Vec3 } from '../../model/types';
 import { cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** A cylindrical surface coaxial with the joint axis. */
 export interface Candidate {
@@ -58,7 +59,7 @@ function facetsOf(mesh: MeshData, anchor: Vec3, axis: Vec3, toleranceOf: (radius
     const radial = corners.map((p, k) => sub3(p, scale3(axis, along[k] ?? 0)));
     const radii = radial.map(len3);
     const mean = radii.reduce((sum, radius) => sum + radius, 0) / 3;
-    if (mean <= 1e-300 || Math.max(...radii) - Math.min(...radii) > toleranceOf(mean)) continue;
+    if (mean <= 1e-300 || maxOf(radii) - minOf(radii) > toleranceOf(mean)) continue;
     const middle = scale3(
       radial.reduce<Vec3>((sum, r) => [sum[0] + r[0], sum[1] + r[1], sum[2] + r[2]], [0, 0, 0]),
       1 / 3,
@@ -66,14 +67,7 @@ function facetsOf(mesh: MeshData, anchor: Vec3, axis: Vec3, toleranceOf: (radius
     const angles = radial.map((r) => Math.atan2(dot3(r, e2), dot3(r, e1)));
     // a facet of a round surface spans a small angle about the axis; a box or prism face (corners at the circumradius) spans much more
     if (angularSpan(angles) > MAX_FACET_SPAN) continue;
-    facets.push({
-      convex: dot3(normal, middle) > 0,
-      radius: mean,
-      area: doubleArea / 2,
-      low: Math.min(...along),
-      high: Math.max(...along),
-      angles,
-    });
+    facets.push({ convex: dot3(normal, middle) > 0, radius: mean, area: doubleArea / 2, low: minOf(along), high: maxOf(along), angles });
   }
   return facets;
 }
@@ -107,7 +101,7 @@ export function meshCandidates(meshes: readonly MeshData[], anchor: Vec3, axisDi
         found.push({
           convex,
           radius: part.reduce((sum, facet) => sum + facet.radius * facet.area, 0) / area,
-          range: [Math.min(...part.map((facet) => facet.low)), Math.max(...part.map((facet) => facet.high))],
+          range: [minOf(part.map((facet) => facet.low)), maxOf(part.map((facet) => facet.high))],
         });
       };
       const flush = (): void => {

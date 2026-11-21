@@ -8,6 +8,7 @@ import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { ringNormal } from '../../geometry/skin';
 import { closureJump } from '../../geometry/loftSkin/closure';
 import { REMEDIATION, sig, type Finding } from './checkFindings';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Largest angle (radians) between the seam directions of neighbouring section rings (ring point 0 seen from the ring centroid, carried by the minimal rotation between the planes), and where it is. */
 export function seamTwist(rings: ReadonlyArray<ReadonlyArray<Vec3>>, closed = false): { value: number; at: number } {
@@ -55,7 +56,7 @@ export function checkLoft(entity: LoftEntity, endAngle: number, unit: string): F
       remediation: REMEDIATION.SWG_CHECK_LOFT_TWIST as string,
       message: `neighbouring sections start ${sig(twist.value)} rad apart (limit ${endAngle}): the rulings twist`,
     });
-  const jump = entity.closed === true ? Math.max(0, ...(entity.faces ?? []).map(closureJump)) : 0;
+  const jump = entity.closed === true ? Math.max(0, maxOf((entity.faces ?? []).map(closureJump))) : 0;
   if (jump > endAngle)
     findings.push({
       code: 'SWG_CHECK_LOFT_CLOSURE_G1',

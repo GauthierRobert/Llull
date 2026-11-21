@@ -10,6 +10,8 @@ import { entityLocalToWorld } from './entityFrame';
 import { vec3At } from '../lib/vec3';
 import { triangulatePolygon } from '../lib/triangulate';
 import type { Vec3 } from '../model/vectors';
+import { minOf } from '../lib/arrayExtrema';
+import { appendAll } from '../lib/appendAll';
 
 export interface MeshBuilder {
   /** Index of the vertex at (x, y, z); identical coordinates share one vertex. */
@@ -72,7 +74,7 @@ export function addStarAnnulusCap(
   const turn = 2 * Math.PI;
   const prepare = (loop: ReadonlyArray<Point2>): { points: Point2[]; angles: number[] } => {
     const raw = loop.map(([x, y]) => (Math.atan2(y, x) + turn) % turn);
-    const start = raw.indexOf(Math.min(...raw));
+    const start = raw.indexOf(minOf(raw));
     const points = [...loop.slice(start), ...loop.slice(0, start)];
     const angles = [...raw.slice(start), ...raw.slice(0, start)].map((a, i, all) => (i > 0 && a < all[i - 1]! ? a + turn : a));
     return { points, angles };
@@ -177,6 +179,6 @@ export function prismMesh(outer: ReadonlyArray<Point2>, holes: ReadonlyArray<Rea
 export function placeMesh(mesh: MeshData, position: Vec3, rotation: Vec3): MeshData {
   const positions: number[] = [];
   for (let i = 0; i + 2 < mesh.positions.length; i += 3)
-    positions.push(...entityLocalToWorld({ position, rotation }, vec3At(mesh.positions, i)));
+    appendAll(positions, entityLocalToWorld({ position, rotation }, vec3At(mesh.positions, i)));
   return { positions, indices: [...mesh.indices] };
 }

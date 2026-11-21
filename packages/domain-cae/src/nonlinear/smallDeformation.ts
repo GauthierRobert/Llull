@@ -2,6 +2,7 @@
 
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { magnitude, maxOverNodes } from '../results/fields';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 /**
  * Estimated largest rotation in radians: atan(largest displacement magnitude over every stored increment / largest extent of the mesh bounding box). The
@@ -16,7 +17,7 @@ export function estimatedRotation(mesh: FeMeshArtifact, results: FeResultsArtifa
   if (mesh.nodes.length === 0 || peak === 0) return null;
   const extent = [1, 2, 3].reduce((best, axis) => {
     const values = mesh.nodes.map((node) => node[axis] ?? 0);
-    return Math.max(best, Math.max(...values) - Math.min(...values));
+    return Math.max(best, maxOf(values) - minOf(values));
   }, 0);
   return extent > 0 ? Math.atan(peak / extent) : null;
 }

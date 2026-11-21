@@ -1,6 +1,8 @@
 /** Value validation of the raw `analysis.fitDispositions` / `analysis.fitLedger` (load path): the human fit dispositions and the ledger replays re-apply them from. */
 
 import { isRecord } from '@lib/isRecord';
+import { appendAll } from '@lib/appendAll';
+import { stepKeyProblems } from '../shared/schemas';
 
 const DECISIONS = ['accepted', 'rejected', 'redesign'];
 const text = (value: unknown): value is string => typeof value === 'string' && value !== '';
@@ -14,6 +16,7 @@ function dispositionProblems(entry: unknown, at: string, withRowKey: boolean): s
   for (const key of ['justification', 'inputsHash', 'signer', 'signatureId'])
     if (!text(entry[key])) problems.push(`${at}.${key} must be text`);
   if (typeof entry['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
+  if (withRowKey) appendAll(problems, stepKeyProblems(entry['stepKey'], at));
   // no nonce check: a margin / thermal / fit signature is made over a payload the client computed (signing kind `payload`), which carries no nonce
   const signature = entry['signature'];
   if (!isRecord(signature) || Object.keys(signature).length === 0) problems.push(`${at}.signature must be a signature object`);
@@ -28,12 +31,12 @@ export function fitDispositionErrors(analysis: Record<string, unknown>): string[
     if (!isRecord(dispositions)) problems.push('analysis.fitDispositions must be a record');
     else
       for (const [rowKey, entry] of Object.entries(dispositions))
-        problems.push(...dispositionProblems(entry, `analysis.fitDispositions['${rowKey}']`, false));
+        appendAll(problems, dispositionProblems(entry, `analysis.fitDispositions['${rowKey}']`, false));
   }
   const ledger = analysis['fitLedger'];
   if (ledger !== undefined) {
     if (!Array.isArray(ledger)) problems.push('analysis.fitLedger must be a list');
-    else ledger.forEach((entry, index) => problems.push(...dispositionProblems(entry, `analysis.fitLedger[${index}]`, true)));
+    else ledger.forEach((entry, index) => appendAll(problems, dispositionProblems(entry, `analysis.fitLedger[${index}]`, true)));
   }
   return problems;
 }

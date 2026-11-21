@@ -2,6 +2,7 @@ import type { Vec2 } from '@core/model/types';
 import { type Viewport } from '../../shared/sheetFrame';
 import { n, svgPoints, svgText, paperDimension, svgLine } from '@core/geometry/drawingSvg';
 import { ROW_HEIGHT } from './anchorPlanLayout';
+import { appendAll } from '@lib/appendAll';
 
 export class PlanCanvas {
   readonly parts: string[] = [];
@@ -33,7 +34,7 @@ export class PlanCanvas {
 
   /** Aligned dimension between two model points, drawn `side` paper-mm off the measured line. */
   dimension(a: Vec2, b: Vec2, side: number, label: string): void {
-    this.parts.push(...paperDimension(this.map(a), this.map(b), side, label, 2.2));
+    appendAll(this.parts, paperDimension(this.map(a), this.map(b), side, label, 2.2));
   }
 
   polygon(points: ReadonlyArray<Vec2>, cssClass: string): void {

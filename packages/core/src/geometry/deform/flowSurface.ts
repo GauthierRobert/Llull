@@ -14,6 +14,7 @@ import { cross3, dot3, len3, normalize3, scale3 } from '../../lib/vec3';
 import { closestOnSurface, surfaceProbe } from '../../lib/nurbs/closest';
 import { surfaceDerivatives, surfaceDomain } from '../../lib/nurbs/surface';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
+import { appendAll } from '../../lib/appendAll';
 
 export type FlowSurfaceLaw = Extract<DeformLaw, { kind: 'flowSurface' }>;
 
@@ -489,11 +490,11 @@ export function buildFlowSurface(options: FlowSurfaceOptions): FlowSurfaceLaw | 
       for (let j = 0; j < ny; j++) {
         const sample = targetSheet.node(x0 + i * hx, y0 + j * hy, hx, hy);
         if (typeof sample === 'string') return sample;
-        nodes.push(...sample.point, ...sample.normal);
+        appendAll(nodes, [...sample.point, ...sample.normal]);
         if (baseSheet === null) continue;
         const own = baseSheet.node(x0 + i * hx, y0 + j * hy, hx, hy);
         if (typeof own === 'string') return asBase(own);
-        baseNodes.push(...own.point, ...own.normal);
+        appendAll(baseNodes, [...own.point, ...own.normal]);
       }
     const law: FlowSurfaceLaw = { kind: 'flowSurface', x0, y0, hx, hy, nx, ny, nodes, ...(baseSheet === null ? {} : { baseNodes }) };
     let worst = 0;

@@ -5,6 +5,7 @@ import type { FeaTarget } from '@core/model/feaTarget';
 import { entityBoundsInDoc, boundsExtent } from '@core/geometry/bounds';
 import { is3D, type CadDocument } from '@core/model/types';
 import { vec3, z } from '@core/commands/schema';
+import { hypotOf } from '@lib/hypotOf';
 
 export const feaTargetSchema = z.object({
   entityId: z.string().describe('Id of the analysed 3D entity (it must be a part of the analysis: set_part_idealization).'),
@@ -80,7 +81,7 @@ export function targetProblem(doc: CadDocument, analysisCase: AnalysisCase, targ
 const FAR_FRACTION = 0.05;
 
 const gapToBounds = (point: readonly number[], min: readonly number[], max: readonly number[]): number =>
-  Math.hypot(...[0, 1, 2].map((i) => Math.max((min[i] ?? 0) - (point[i] ?? 0), 0, (point[i] ?? 0) - (max[i] ?? 0))));
+  hypotOf([0, 1, 2].map((i) => Math.max((min[i] ?? 0) - (point[i] ?? 0), 0, (point[i] ?? 0) - (max[i] ?? 0))));
 
 /**
  * Warning text (leading space, '' when fine) for selector points lying farther than 5 % of the part size outside its bounds (document units).

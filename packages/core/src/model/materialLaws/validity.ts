@@ -34,3 +34,14 @@ export function validityIssue(validity: readonly MaterialValidRange[]): MatlIssu
   }
   return null;
 }
+
+/** Upper equivalent-plastic-strain bound of a model in strain units ('1'): the equation range ahead of the data range (`bound` says which); null when not stated or its unit does not convert. */
+export function plasticStrainBound(
+  validity: readonly MaterialValidRange[] | undefined,
+): { readonly value: number; readonly bound: 'equation' | 'data' } | null {
+  const range = validity?.find((candidate) => candidate.variable === 'equivalentPlasticStrain');
+  if (range === undefined) return null;
+  const bound = range.equation === undefined ? 'data' : 'equation';
+  const converted = convertValue((range.equation ?? range.data)[1], range.unit, VALIDITY_BASE_UNIT.equivalentPlasticStrain);
+  return isUnitFailure(converted) ? null : { value: converted.value, bound };
+}

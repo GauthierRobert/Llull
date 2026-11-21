@@ -3,6 +3,7 @@
  * largest magnitude) before the factorisation; the condition estimate is max|R_ii| / min|R_ii| of the equilibrated system.
  */
 
+import { maxOf, minOf } from './arrayExtrema';
 export interface LeastSquaresSolution {
   readonly coefficients: readonly number[];
   readonly conditionEstimate: number;
@@ -19,7 +20,7 @@ export function solveLeastSquares(
   const sqrtW = rows.map((_, i) => Math.sqrt(weights?.[i] ?? 1));
   const a = rows.map((row, i) => row.map((value) => value * (sqrtW[i] ?? 1)));
   const b = rhs.map((value, i) => value * (sqrtW[i] ?? 1));
-  const scale = Array.from({ length: n }, (_, j) => Math.max(...a.map((row) => Math.abs(row[j] ?? 0))) || 1);
+  const scale = Array.from({ length: n }, (_, j) => maxOf(a.map((row) => Math.abs(row[j] ?? 0))) || 1);
   for (const row of a) for (let j = 0; j < n; j += 1) row[j] = (row[j] ?? 0) / (scale[j] ?? 1);
   const at = (i: number, j: number): number => a[i]?.[j] ?? 0;
   const set = (i: number, j: number, value: number): void => {
@@ -48,8 +49,8 @@ export function solveLeastSquares(
     for (let i = 0; i < v.length; i += 1) b[k + i] = (b[k + i] ?? 0) - factorB * (v[i] ?? 0);
   }
   const diagonal = Array.from({ length: n }, (_, k) => Math.abs(at(k, k)));
-  const minDiagonal = Math.min(...diagonal);
-  const conditionEstimate = minDiagonal === 0 ? Number.POSITIVE_INFINITY : Math.max(...diagonal) / minDiagonal;
+  const minDiagonal = minOf(diagonal);
+  const conditionEstimate = minDiagonal === 0 ? Number.POSITIVE_INFINITY : maxOf(diagonal) / minDiagonal;
   const solution = new Array<number>(n).fill(0);
   if (Number.isFinite(conditionEstimate)) {
     for (let k = n - 1; k >= 0; k -= 1) {

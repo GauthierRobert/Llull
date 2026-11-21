@@ -3,6 +3,7 @@
 import { DEFAULT_LAYER_ID, type Entity, type ShapeRecipe, type Vec3 } from '@core/model/types';
 import { orientOutward } from '@core/geometry/meshVolume';
 import { solidTriangles } from '@core/geometry/solidTriangles';
+import { appendAll } from '@lib/appendAll';
 
 export const SHEET_COLOR = '#9fb3c4';
 
@@ -21,7 +22,7 @@ export function solidPiece(entity: Entity): Piece {
   const indices: number[] = [];
   for (const triangle of solidTriangles(entity)) {
     const base = positions.length / 3;
-    for (const corner of triangle) positions.push(...corner);
+    for (const corner of triangle) appendAll(positions, corner);
     indices.push(base, base + 1, base + 2);
   }
   return { recipe: { op: 'solid', entity }, positions, indices: orientOutward(positions, indices) };

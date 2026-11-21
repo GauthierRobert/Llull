@@ -9,6 +9,7 @@ export interface ComplexValue {
 }
 
 const RADIX = 2;
+/** QR sweeps allowed per eigenvalue (since its last deflation) before the iteration is declared non-convergent. */
 const MAX_ITERATIONS = 60;
 
 /** Scale rows and columns by powers of two so their norms are comparable (eigenvalues unchanged). */
@@ -80,9 +81,10 @@ const sign = (magnitude: number, of: number): number => (of >= 0 ? Math.abs(magn
 
 /**
  * All eigenvalues of the square matrix `matrix` (rows), ordered by real part then imaginary part, both descending; null when the QR iteration
- * does not converge (not seen on a finite matrix of a few tens of states) or the matrix has a non-finite entry.
+ * does not converge within `maxIterations` sweeps per root (not seen on a finite matrix of a few tens of states at the default) or the matrix
+ * has a non-finite entry.
  */
-export function eigenvalues(matrix: readonly (readonly number[])[]): ComplexValue[] | null {
+export function eigenvalues(matrix: readonly (readonly number[])[], maxIterations: number = MAX_ITERATIONS): ComplexValue[] | null {
   const n = matrix.length;
   if (n === 0) return [];
   if (matrix.some((row) => row.length !== n || row.some((value) => !Number.isFinite(value)))) return null;
@@ -133,7 +135,7 @@ export function eigenvalues(matrix: readonly (readonly number[])[]): ComplexValu
         deflated = true;
         continue;
       }
-      if (iterations >= MAX_ITERATIONS) return null;
+      if (iterations >= maxIterations) return null;
       if (iterations === 10 || iterations === 20) {
         shift += x;
         for (let i = 0; i <= nn; i += 1) set(i, i, at(i, i) - x);

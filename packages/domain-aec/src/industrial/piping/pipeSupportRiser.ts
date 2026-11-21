@@ -12,6 +12,7 @@ import { metres as shown } from '../steelDesign/steelMemberRows';
 import { pipeWallMm, pipeWeightPerMetre } from './pipeWeight';
 import { riserRuns } from './routeSupport';
 import type { EndCarrier, PipeRun, SupportStation } from './pipeSupportLayout';
+import { maxOf } from '@lib/arrayExtrema';
 
 export interface RiserRow {
   /** Elevations of the riser start / end (absolute), m. */
@@ -103,7 +104,7 @@ export function riserRows(
       toZM: roundedMetres(riser.to[2]),
       lengthM: roundedMetres(length),
       guides: lateral.length,
-      maxGuideSpacingM: roundedMetres(Math.max(largest, ...free.map((value) => (value === null ? 0 : value)))),
+      maxGuideSpacingM: roundedMetres(Math.max(largest, maxOf(free.map((value) => (value === null ? 0 : value))))),
       allowedSpacingM: roundedMetres(allowedMm),
       weightKn: round(weightKn, 2),
       weightBy,

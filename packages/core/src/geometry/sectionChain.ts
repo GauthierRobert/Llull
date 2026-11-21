@@ -10,6 +10,7 @@ import { distance3 } from '../lib/vec3';
 import { elevateDegree, insertKnot } from '../lib/nurbs/edit';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import { evaluateCurve } from '../lib/nurbs/evaluate';
+import { maxOf } from '../lib/arrayExtrema';
 
 /** Cubic Bézier spans of `curve`: degree 1..3 non-rational, else null (degree above 3 or rational). */
 function bezierPoles(curve: NurbsCurveData): ReadonlyArray<Vec3> | null {
@@ -26,7 +27,7 @@ function bezierPoles(curve: NurbsCurveData): ReadonlyArray<Vec3> | null {
 export function hasClosingEdge(curve: NurbsCurveData): boolean {
   const start = curve.poles[0] as Vec3;
   const end = curve.poles[curve.poles.length - 1] as Vec3;
-  return distance3(start, end) > 1e-9 * Math.max(1, ...curve.poles.map((pole) => distance3(pole, start)));
+  return distance3(start, end) > 1e-9 * Math.max(1, maxOf(curve.poles.map((pole) => distance3(pole, start))));
 }
 
 /**

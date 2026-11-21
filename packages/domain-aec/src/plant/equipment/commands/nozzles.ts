@@ -103,7 +103,16 @@ export const addNozzle = defineCommand({
     const record = nozzleRecord(
       doc,
       mark,
-      { dn, rating: params.rating, facing: params.facing ?? 'RF', projection: params.projection, location, service: params.service },
+      {
+        dn,
+        rating: params.rating,
+        facing: params.facing ?? 'RF',
+        projection: params.projection,
+        location,
+        service: params.service,
+        kind: params.kind,
+        pad: params.pad,
+      },
       defaulted,
     );
     if (isNozzleIssue(record)) return refuseIssue(doc, 'add_nozzle', record, [element.id]);
@@ -138,8 +147,11 @@ export const updateNozzle = defineCommand({
     mark: z.string().min(1).describe('Mark of the nozzle to change.'),
     angleConvention: angleConventionParam,
     ...nozzleFields,
+    removePad: z.boolean().optional().describe('true removes the reinforcing pad (cannot be combined with pad).'),
   }),
   run: (doc, params): CommandResult => {
+    if (params.removePad === true && params.pad !== undefined)
+      return refuse(doc, 'update_nozzle', 'EQP_PARAM_INVALID', 'give pad OR removePad, not both', [], ['removePad']);
     const target = targetOf(doc, 'update_nozzle', params.equipment);
     if (!isTarget(target)) return target;
     const { element, building } = target;
@@ -148,7 +160,7 @@ export const updateNozzle = defineCommand({
     if (current === undefined)
       return refuse(doc, 'update_nozzle', 'EQP_NOZZLE_NOT_FOUND', `${element.mark} has no nozzle ${params.mark}`, [element.id], ['mark']);
     const convention: AngleConvention = params.angleConvention ?? 'north_cw';
-    const changes = ['service', 'dn', 'nps', 'rating', 'facing', 'location', 'projection'].filter(
+    const changes = ['service', 'kind', 'pad', 'removePad', 'dn', 'nps', 'rating', 'facing', 'location', 'projection'].filter(
       (name) => params[name as keyof typeof params] !== undefined,
     );
     if (changes.length === 0)
@@ -168,6 +180,8 @@ export const updateNozzle = defineCommand({
         projection: params.projection ?? current.projection,
         location,
         service: params.service ?? current.service,
+        kind: params.kind ?? current.kind,
+        pad: params.removePad === true ? undefined : (params.pad ?? current.pad),
       },
       defaulted,
     );

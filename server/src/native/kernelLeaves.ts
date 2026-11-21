@@ -27,6 +27,7 @@ import { encodeLoops, encodeSurface } from '@core/geometry/surfaceWire';
 import { clamp } from '@lib/clamp';
 import { signedArea } from '@lib/polygon';
 import { add3, scale3 } from '@lib/vec3';
+import { maxOf } from '@lib/arrayExtrema';
 
 const SEGMENT_CODES = { line: 0, arc: 1, bezier: 2, ellipse: 3 } as const;
 
@@ -145,7 +146,7 @@ function subdivisionPayload(entity: Extract<Entity, { kind: 'subdivision' }>): R
   const positions = entityTrianglePositions(entity, NO_COMPONENTS);
   const triangles = { positions, indices: orientOutward(positions, []) };
   if (!(entity.levels > 0)) return { triangles };
-  const span = Math.max(...entity.vertices.flatMap((p) => p.map(Math.abs)), 1);
+  const span = Math.max(maxOf(entity.vertices.flatMap((p) => p.map(Math.abs))), 1);
   const patches = subdivisionPatches(entity).flatMap((patch) => patch.flat());
   return { patches, tolerance: span * 1e-7, triangles };
 }

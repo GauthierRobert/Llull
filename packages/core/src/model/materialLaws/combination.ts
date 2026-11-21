@@ -2,6 +2,7 @@
 
 import { behaviourOf } from '../materialLawCatalog';
 import { SET_SLOTS, type ConstitutiveSet, type MaterialModel, type SetSlot } from '../materialModel';
+import { appendAll } from '../../lib/appendAll';
 
 export interface CombinationIssue {
   readonly code: 'MATL_COMBINATION_INVALID' | 'MATL_MODEL_NOT_FOUND';
@@ -33,7 +34,7 @@ export function combinationIssues(set: ConstitutiveSet, models: readonly Materia
   const members = setMembers(set, models);
   const elastic = members.elastic?.model;
   const plastic = members.plastic?.model;
-  issues.push(...elasticPresenceIssues(members, elastic, plastic));
+  appendAll(issues, elasticPresenceIssues(members, elastic, plastic));
   if (plastic?.kind === 'j2_plasticity') plasticJ2Issues(members, elastic, plastic, issues);
   if (plastic?.kind === 'hill48_plasticity') {
     if (members.hyperelastic !== undefined)
@@ -45,7 +46,7 @@ export function combinationIssues(set: ConstitutiveSet, models: readonly Materia
     issues.push(combination('set.creep', 'creep needs an elastic_isotropic or elastic_orthotropic model in the set'));
   if (members.viscoelastic !== undefined && elastic === undefined && members.hyperelastic === undefined)
     issues.push(combination('set.viscoelastic', 'viscoelastic needs an elastic or a hyperelastic model in the set'));
-  issues.push(...rateIssues(members, elastic, plastic));
+  appendAll(issues, rateIssues(members, elastic, plastic));
   return issues;
 }
 

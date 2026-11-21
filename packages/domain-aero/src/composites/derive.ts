@@ -87,14 +87,23 @@ export function syncOutlines(doc: CadDocument): CadDocument {
 const sameEntity = (a: Entity | undefined, b: Entity | undefined): boolean =>
   a === b || (a !== undefined && b !== undefined && JSON.stringify(a) === JSON.stringify(b));
 
+/**
+ * Ids of the outline entities the composites model of `doc` derived (`<ply>.o<k>`, k counting from 0), read from the plies:
+ * the guard runs on every command, so it must not walk every entity of a document that has no ply.
+ */
+function derivedOutlineIds(doc: CadDocument): string[] {
+  const ids: string[] = [];
+  for (const plyId of doc.composites?.plyOrder ?? [])
+    for (let piece = 0; Object.hasOwn(doc.entities, `${plyId}.o${piece}`); piece += 1) ids.push(`${plyId}.o${piece}`);
+  return ids;
+}
+
 /** Outlines change only through composites commands (those replace `composites`). */
 export const compositesDerivationGuard: DerivationGuard = {
   domain: 'composites',
   check(previous: CadDocument, next: CadDocument) {
     if (next.composites !== previous.composites || next.entities === previous.entities) return null;
-    const edited = Object.keys(previous.entities).filter(
-      (id) => OUTLINE_ID.test(id) && !sameEntity(previous.entities[id], next.entities[id]),
-    );
+    const edited = derivedOutlineIds(previous).filter((id) => !sameEntity(previous.entities[id], next.entities[id]));
     if (edited.length === 0) return null;
     return `it would edit the derived outline(s) ${edited.join(', ')} of composite plies. Edit the ply instead (edit_ply, delete_ply, define_zone + generate_plies_from_zones) — derived geometry is read-only.`;
   },

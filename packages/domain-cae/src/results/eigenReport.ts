@@ -2,6 +2,8 @@
 
 import type { AnalysisCase, FeResultsArtifact, UnitSystem } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 interface ModalMode {
   readonly mode: number;
@@ -92,7 +94,7 @@ export function eigenReport(analysis: AnalysisCase, results: FeResultsArtifact):
   const participation = new Map(tableOf(results, 'participation factors').map((row) => [row[0] ?? 0, vector(row, 1)]));
   const effective = new Map(tableOf(results, 'effective modal mass').map((row) => [row[0] ?? 0, vector(row, 1)]));
   const total = vector(tableOf(results, 'total effective mass')[0], 0) ?? null;
-  const highest = Math.max(...eigenvalues.map((row) => row[3] ?? 0));
+  const highest = maxOf(eigenvalues.map((row) => row[3] ?? 0));
   const threshold = Math.max(RIGID_BODY_ABSOLUTE_HZ, RIGID_BODY_RELATIVE * highest);
   const fraction = (mass: Vec3 | undefined): Vec3 | undefined =>
     mass === undefined || total === null
@@ -136,6 +138,6 @@ export function eigenNote(report: ModalReport | BucklingReport): string {
       `extracted modes carry x/y/z ${shares.map((share) => `${Math.round(share * 1000) / 10}%`).join(' / ')} of the model mass (ccx TOTAL EFFECTIVE MASS)`,
     );
   }
-  parts.push(...report.warnings);
+  appendAll(parts, report.warnings);
   return parts.join('; ');
 }

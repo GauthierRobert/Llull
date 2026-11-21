@@ -1,7 +1,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { BuildingElement } from '@aec/building/types';
 import { distance, polygonArea } from '@lib/polygon';
-import { distance3 } from '@lib/vec3';
+import { distance3, hypot3 } from '@lib/vec3';
 import { toMetres } from '@core/model/units';
 import { elementsOf, getBuilding } from '../model';
 import { findProfile } from '../../steel/profiles';
@@ -181,5 +181,5 @@ export function memberMass(doc: CadDocument, member: Extract<BuildingElement, { 
 
 /** True area of a planar 3D panel (half the Newell normal length). */
 export function panelArea(panel: Extract<BuildingElement, { category: 'panel' }>): number {
-  return Math.hypot(...polygonNormal(panel.corners)) / 2;
+  return hypot3(polygonNormal(panel.corners)) / 2;
 }

@@ -50,7 +50,7 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
       fieldMesh: (request, fieldHost) => runFieldMesh(request, fieldHost, { runner, store, hooks: caeHooks, env }),
     });
   const solve: FeaToolsPort['solve'] = (analysisId, options, host) =>
-    runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck, randomPost });
+    runFeaSolve(analysisId, options, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck, randomPost });
   return {
     mesh,
     solve,

@@ -8,6 +8,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { Slope } from '@aec/plant/types';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '@lib/vec3';
 import { slopedLeg, validSlope } from './slope';
+import { maxOf } from '@lib/arrayExtrema';
 
 export const COMPASS_NAMES = ['+X', '-X', '+Y', '-Y', '+Z', '-Z'] as const;
 export type Compass = (typeof COMPASS_NAMES)[number];
@@ -77,7 +78,7 @@ const fail = (
 ): PathFailure => ({ ok: false, code, message, paths, detail });
 
 /** Geometric tolerance for coordinates of the given magnitude (02 RTE §5: 1e-6 x max(1, |coordinates|)). */
-export const epsilonFor = (...points: readonly Vec3[]): number => 1e-6 * Math.max(1, ...points.flatMap((p) => p.map(Math.abs)));
+export const epsilonFor = (...points: readonly Vec3[]): number => 1e-6 * Math.max(1, maxOf(points.flatMap((p) => p.map(Math.abs))));
 
 export const unitVector = (v: Vec3): Vec3 => {
   const length = len3(v);

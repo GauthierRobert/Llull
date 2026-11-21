@@ -5,7 +5,13 @@
 
 import { type CadDocument, type Entity, type Vec2, is2D } from '../../model/types';
 import type { RegionHatch } from '../../model/regionHatch';
-import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing, dimensionText } from '../../geometry/dimensionAnnotation';
+import {
+  DEFAULT_ARROW_SIZE,
+  DEFAULT_DIMENSION_OFFSET,
+  dimensionDrawing,
+  dimensionStyleOf,
+  dimensionText,
+} from '../../geometry/dimensionAnnotation';
 import { catmullRomBeziers } from '../../geometry/curveSegments';
 import { entityPlanPoint } from '../../geometry/entityFrame';
 import type { CommandResult } from '../types';
@@ -191,16 +197,23 @@ function shapesOf(
     }
     case 'dimension': {
       const refs = entity.entityIds.map((refId) => doc.entities[refId]);
-      const drawing = dimensionDrawing(entity.dimensionKind, refs, entity.offset ?? DEFAULT_DIMENSION_OFFSET);
+      const style = dimensionStyleOf(doc, entity);
+      const drawing = dimensionDrawing(
+        entity.dimensionKind,
+        refs,
+        entity.offset ?? DEFAULT_DIMENSION_OFFSET,
+        style.arrowSize ?? DEFAULT_ARROW_SIZE,
+        style,
+      );
       if (!drawing) return 'DIMENSION_DANGLING';
       return [
         ...drawing.segments.map((segment): DraftShape => ({ kind: 'line', a: segment[0], b: segment[1] })),
         {
           kind: 'text',
           at: drawing.textAt,
-          height: DIMENSION_TEXT_HEIGHT,
+          height: style.textHeight ?? DIMENSION_TEXT_HEIGHT,
           rotation: 0,
-          content: dimensionText(entity, drawing.value, doc.displayPrecision),
+          content: dimensionText(entity, drawing.value, doc.displayPrecision, style),
           anchor: 'center',
         },
       ];

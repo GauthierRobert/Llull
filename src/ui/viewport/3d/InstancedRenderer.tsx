@@ -14,7 +14,7 @@ import { useDisposable } from '../useDisposable';
 import { isAdditiveSelect } from '../selectClick';
 import { isClippedAway } from './review/activeClipPlanes';
 import { useStableByKey } from '../useStableByKey';
-import { XRAY_OPACITY } from '../viewportPalette';
+import { XRAY_OPACITY, currentViewportPalette, hiddenLineSurface } from '../viewportPalette';
 import { pow } from '@lib/pow';
 
 /** Geometry of a batch from its first entity (the grouping key guarantees shared params). */
@@ -48,7 +48,7 @@ export function makeMaterialArgs(
   displayMode: DisplayMode,
   batchMaterial?: { roughness: number; metalness: number } | undefined,
 ): THREE.MeshStandardMaterialParameters {
-  if (displayMode === 'wireframe') return { ...SHADED_MATERIAL_ARGS, wireframe: true };
+  if (displayMode === 'wireframe') return { ...SHADED_MATERIAL_ARGS, ...hiddenLineSurface(currentViewportPalette().background) };
   if (displayMode === 'xray') {
     return {
       ...SHADED_MATERIAL_ARGS,

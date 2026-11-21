@@ -2,7 +2,8 @@
 
 import type { ContactBehaviour, ContactPair, ContactSettings } from '@core/model/contact';
 import type { DeckContext, DeckRefusal } from '../decks/context';
-import { appendAll, commentText, row } from '../decks/format';
+import { appendAll } from '@lib/appendAll';
+import { commentText, row } from '../decks/format';
 import { pairValueProblem } from './pairRules';
 import { pairTargetKey } from '../hash/targets';
 
@@ -93,7 +94,10 @@ export function contactModelLines(ctx: DeckContext): string[] | DeckRefusal {
         faces.map(([element, face]) => row(element, `S${face}`)),
       );
     }
-    lines.push(`*SURFACE INTERACTION, NAME=${names.interaction}`, ...behaviourLines(pair.behaviour, settings.formulation === 'mortar'));
+    appendAll(lines, [
+      `*SURFACE INTERACTION, NAME=${names.interaction}`,
+      ...behaviourLines(pair.behaviour, settings.formulation === 'mortar'),
+    ]);
     if (pair.friction !== undefined)
       lines.push(
         '*FRICTION',

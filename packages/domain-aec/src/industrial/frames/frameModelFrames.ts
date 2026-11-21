@@ -22,6 +22,8 @@ import {
   craneCapacityOf,
   valleyLines,
 } from './frameModelTypes';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /**
  * Frames of a level. Planes are grouped per hall (overlapping rafter x-ranges) for tributary widths; a hall with a single frame plane has
@@ -88,7 +90,7 @@ export function framesOf(
       // Roof loads per horizontal length, spread along the rafter.
       const perLength = (kN: number): number => (area(kN) * tributary * Math.abs(x1 - x0)) / length;
       const stations = [x0, x1, ...purlins.filter((x) => x > x0 && x < x1)].sort((a, b) => a - b);
-      const purlinGap = Math.max(...stations.slice(1).map((x, index) => x - (stations[index] as number)));
+      const purlinGap = maxOf(stations.slice(1).map((x, index) => x - (stations[index] as number)));
       const unbraced = (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1);
       const loadsOf = (haunchWeight: number): CaseLoads => ({
         G: { qx: 0, qy: -(perLength(loads.deadLoad) + selfWeight(rafter.profile) * (1 + haunchWeight)) },
@@ -155,7 +157,7 @@ export function framesOf(
           .map((member) => mm(member.start[2]))
           .filter((z) => z > zBottom && z < zTop),
       ].sort((a, b) => a - b);
-      const railGap = Math.max(...railLevels.slice(1).map((z, index) => z - (railLevels[index] as number)));
+      const railGap = maxOf(railLevels.slice(1).map((z, index) => z - (railLevels[index] as number)));
       const splits: number[] = [];
       for (const bracket of brackets) {
         const z = mm(bracket.start[2]);
@@ -164,7 +166,7 @@ export function framesOf(
         const runway = craneBeams.filter((beam) =>
           [beam.start, beam.end].some((point) => near(mm(point[0]), endX) && near(mm(point[1]), endY)),
         );
-        const capacity = loads.craneCapacity ?? Math.max(0, ...runway.map((beam) => craneCapacityOf(beam) ?? 0));
+        const capacity = loads.craneCapacity ?? Math.max(0, maxOf(runway.map((beam) => craneCapacityOf(beam) ?? 0)));
         if (!(capacity > 0)) continue;
         splits.push(z);
         const runwayWeight = runway.reduce(
@@ -208,7 +210,7 @@ export function framesOf(
       });
       columnTops.push({ node: topNode, height, elementId: column.id });
     }
-    nodeLoads.push(...craneRailLoads(rails, loads.craneModel, high - low));
+    appendAll(nodeLoads, craneRailLoads(rails, loads.craneModel, high - low));
     if (analysis.length === 0) return [];
     const topXs = [...new Set(columnTops.map((top) => Math.round(nodes[top.node]?.x ?? 0)))].sort((a, b) => a - b);
     return [

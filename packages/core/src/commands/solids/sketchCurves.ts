@@ -11,6 +11,7 @@ import { JOINT_TOLERANCE, chainIssue, mapSegment, reverseChain, sampleProfile } 
 import { MAX_PROFILE_POINTS } from '../limits';
 import { entityCurves } from '../../geometry/entityCurves';
 import { planeToWorld } from '../../geometry/workPlane';
+import { appendAll } from '../../lib/appendAll';
 
 /** Closed exact boundary in sketch coordinates and its polygon tessellation. */
 export interface SketchLoop {
@@ -55,7 +56,7 @@ function joinPieces(pieces: CurveSegment<Vec2>[][]): CurveSegment<Vec2>[] | null
     if (index < 0) return null;
     const [piece] = remaining.splice(index, 1) as [CurveSegment<Vec2>[]];
     const oriented = near(firstPoint(piece), tail) ? piece : reverseChain(piece);
-    chain.push(...snapStart(oriented, tail as Vec2));
+    appendAll(chain, snapStart(oriented, tail as Vec2));
   }
   const head = firstPoint(chain);
   const last = chain[chain.length - 1];

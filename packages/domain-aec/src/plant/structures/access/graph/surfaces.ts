@@ -8,6 +8,7 @@ import type { AssemblyElement, BuildingModel, GratingElement, SlabElement } from
 import { findGratingType } from '../../grating/gratingTypes';
 import { boxOf, makeRegion, unionBox, type Region, type Ring } from './regions';
 import { GRADE_ID, type SurfaceNode } from './types';
+import { maxOf } from '@lib/arrayExtrema';
 
 const scaled = (ring: ReadonlyArray<Vec2>, factor: number): Ring => ring.map(([x, y]): Vec2 => [x * factor, y * factor]);
 
@@ -110,8 +111,8 @@ function platformNode(
     members: panels.map((panel) => panel.id),
     levelId: assembly.levelId,
     mark: assembly.mark,
-    topMm: Math.max(...tops),
-    thicknessMm: Math.max(...panels.map((panel) => findGratingType(panel.gratingType)?.barDepthMm ?? 0)),
+    topMm: maxOf(tops),
+    thicknessMm: maxOf(panels.map((panel) => findGratingType(panel.gratingType)?.barDepthMm ?? 0)),
     regions,
     box: unionBox(regions.map((region) => boxOf(region.outer))),
     areaM2: areaM2(regions),

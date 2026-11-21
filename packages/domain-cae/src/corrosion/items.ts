@@ -1,6 +1,5 @@
 /** Galvanic compatibility items (PHY-13 FR-COR-04..09, FR-COR-12, FR-COR-17; TR-COR-05..10, TR-COR-13): one item per contacting pair. */
 
-import type { ContactPair } from '@core/geometry/contacts';
 import type { CadDocument } from '@core/model/types';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
@@ -8,6 +7,7 @@ import { REVIEW_REASON, UNVERIFIED_REASON } from './codes';
 import { type PartFacts, isolationsOf, materialOfPart, partFacts } from './resolve';
 import { ALUMINIUM_GROUPS, CFRP_GROUP, GALVANIC_889D_MATRIX, REMEDIES, type Remedy, limitOf } from './tables';
 import type { AcceptanceState } from './gate';
+import type { ItemContact } from './exactContacts';
 import type { Acceptance, CorrosionEnvironment, CorrosionScheme } from './types';
 
 export type ItemStatus = 'pass' | 'pass_isolated' | 'warn' | 'fail' | 'unknown';
@@ -158,7 +158,7 @@ function verdictOf(a: PartFacts, b: PartFacts, scheme: CorrosionScheme, environm
  */
 export function galvanicItem(
   doc: CadDocument,
-  pair: Pick<ContactPair, 'a' | 'b' | 'kind' | 'source' | 'approximate' | 'materials'> & { readonly stack?: boolean },
+  pair: ItemContact,
   scheme: CorrosionScheme,
   environment: CorrosionEnvironment,
   acceptances: Readonly<Record<string, Acceptance>>,

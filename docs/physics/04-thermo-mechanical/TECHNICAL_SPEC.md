@@ -541,3 +541,7 @@ mechanical loads; the `llull guide` section; a signing implementation (09 PLM).
 3. **Transient bar (VC-TMC-01.a in time)**: 12 output increments to 600 s, von Mises rising 160 -> 251.8 MPa (-E alpha dT = 252 MPa), peak at the end; the probe passes
    the PHY-00 judge (probe -251.785 MPa). **Bimetal VC-TMC-04** (native kernel, conformal STEP mesh): tip 1.27933 mm against 1.27273 (+0.52 %, 3 %
    allowed), kappa 1.023464e-3 against 1.018182e-3 1/mm (+0.52 %, 2 % allowed): pass. NAFEMS T1 (VC-TMC-03) passes too. Toolchain: `docs/decisions/SV1-solver-toolchain-windows.md`.
+
+### As built (SIG-REPLAY, 2026-11-20)
+
+`dispose_fit_result` stamps its signed record with the step that wrote it, and a regeneration keeps a record only while that step is live (suppressed or deleted: pending again). See [SIG-REPLAY](../../decisions/SIG-REPLAY.md).

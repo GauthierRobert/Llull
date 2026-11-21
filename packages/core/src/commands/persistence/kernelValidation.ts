@@ -9,6 +9,7 @@ import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isRecord } from '../../lib/isRecord';
 import { blobProblem } from '../../model/blobs';
 import { MAX_RECIPE_DEPTH } from '../../geometry/shapeRecipe';
+import { appendAll } from '../../lib/appendAll';
 
 const TOLERANCE_KEYS = ['linear', 'angular', 'maxImportTolerance'] as const;
 
@@ -19,6 +20,9 @@ function kernelSettingsProblems(settings: unknown): string[] {
   if (settings['kernel'] !== 'occt' && settings['kernel'] !== 'manifold') errors.push("kernelSettings.kernel must be 'occt' or 'manifold'");
   for (const key of ['occtVersion', 'build'])
     if (settings[key] !== undefined && typeof settings[key] !== 'string') errors.push(`kernelSettings.${key} must be a string`);
+  const storage = settings['meshStorage'];
+  if (storage !== undefined && storage !== 'full' && storage !== 'recipe')
+    errors.push("kernelSettings.meshStorage must be 'full' or 'recipe'");
   const tolerance = settings['modelingTolerance'];
   if (!isRecord(tolerance)) return [...errors, 'kernelSettings.modelingTolerance must be an object'];
   for (const key of TOLERANCE_KEYS) {
@@ -83,7 +87,7 @@ function fontProblems(fonts: unknown, blobs: unknown): string[] {
       errors.push(
         `WRP_FONT_UNAVAILABLE: font '${id}' needs a font blob (font/ttf, font/otf or font/x-llull-stroke) in the document blobs — re-run import_font`,
       );
-    else errors.push(...variationProblems(id, record['variation']));
+    else appendAll(errors, variationProblems(id, record['variation']));
   }
   return errors;
 }
@@ -101,7 +105,7 @@ export function kernelSliceProblems(doc: Record<string, unknown>): string[] {
       );
     else if (problem !== null) errors.push(`${problem}: blob '${key}' bytes do not match its sha256, mediaType or size`);
   }
-  errors.push(...fontProblems(doc['fonts'], blobs));
+  appendAll(errors, fontProblems(doc['fonts'], blobs));
   const leaves: Array<readonly [string, string]> = [];
   const tooDeep = new Set<string>();
   for (const section of ['entities', 'components'] as const) {

@@ -14,6 +14,7 @@ import { faceRefField, placementField } from './schemas';
 import { runWrapChain } from './wrapChain';
 import { isSketchFailure, sketchOutline, type SketchOutline } from './sketchProfiles';
 import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineCurves, probePoints, type MappedCurve } from './wrapMapping';
+import { appendAll } from '../../lib/appendAll';
 
 /** Most sketch entities one call wraps (each loop becomes a curve entity). */
 const MAX_ENTITIES = 500;
@@ -88,7 +89,7 @@ export const wrapToFace = defineCommand({
     for (const outline of outlines) {
       const curves = mapOutlineCurves(session, resolved.chart, outline, tolerance);
       if (isMappingFailure(curves)) return wrapRejection(doc, 'wrap_to_face', curves.code, curves.message, [...curves.ids], ['entityIds']);
-      mapped.push(...curves);
+      appendAll(mapped, curves);
     }
     const pieces = mapped.map((curve) => curve.pieces);
     const overlap = checkWrapAround(resolved.chart, pieces, params.entityIds);

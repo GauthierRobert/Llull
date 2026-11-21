@@ -5,6 +5,7 @@ import { cross3, len3 } from '../vec3';
 import { pointInPolygon, segmentsIntersect } from '../polygon';
 import { surfaceDerivatives, surfaceDomain } from './surface';
 import type { NurbsSurfaceData, UvTrimLoop } from './surfaceTypes';
+import { maxOf, minOf } from '../arrayExtrema';
 
 type Uv = readonly [number, number];
 
@@ -16,10 +17,10 @@ export function regionTester(loops: ReadonlyArray<UvTrimLoop>): (point: Uv) => b
     const polygon = loop.polygon.map(asPoint);
     return {
       polygon,
-      uMin: Math.min(...polygon.map((p) => p[0])),
-      uMax: Math.max(...polygon.map((p) => p[0])),
-      vMin: Math.min(...polygon.map((p) => p[1])),
-      vMax: Math.max(...polygon.map((p) => p[1])),
+      uMin: minOf(polygon.map((p) => p[0])),
+      uMax: maxOf(polygon.map((p) => p[0])),
+      vMin: minOf(polygon.map((p) => p[1])),
+      vMax: maxOf(polygon.map((p) => p[1])),
     };
   });
   return (point) => {

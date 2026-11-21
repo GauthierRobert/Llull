@@ -14,6 +14,7 @@ import { pointsExtent } from '../../lib/extent';
 import { noop } from '../noop';
 import { elementAt } from '../../lib/elementAt';
 import type { Vec2 as Point } from '../../model/vectors';
+import { appendAll } from '../../lib/appendAll';
 
 /** Pulley/sprocket: center in the local 2D frame + radius. */
 type PulleySpec = { center: [number, number]; radius: number };
@@ -124,7 +125,7 @@ export const drawBeltAround = defineCommand({
       const outTPni = elementAt(tangentPairs, ni)[0];
       const inAngle = Math.atan2(inTP[1] - pni.center[1], inTP[0] - pni.center[0]);
       const sweep = ccwSweep(inAngle, Math.atan2(outTPni[1] - pni.center[1], outTPni[0] - pni.center[0]));
-      points.push(...sampleArc(pni.center, pni.radius, inAngle, sweep, samplesInt));
+      appendAll(points, sampleArc(pni.center, pni.radius, inAngle, sweep, samplesInt));
       totalLength += pni.radius * sweep;
     }
     const { minX, minY, maxX, maxY } = pointsExtent(points);

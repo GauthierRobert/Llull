@@ -6,6 +6,7 @@ import { encodePng } from '../../../lib/png';
 import { rasterScenePixels } from '../raster';
 import { appendOverlay, emptyScene, OVERLAY_Z, type OverlayFill, type OverlayStroke } from './rasterOverlay';
 import { placeText } from './overlayText';
+import { appendAll } from '../../../lib/appendAll';
 
 const MAX_CELL_WIDTH = 320;
 const MAX_COLUMNS = 6;
@@ -98,8 +99,8 @@ export function buildSheet(cells: readonly SheetCell[], cell: { width: number; h
       INK,
       OVERLAY_Z.text,
     );
-    fills.push(...text.fills);
-    strokes.push(...text.strokes);
+    appendAll(fills, text.fills);
+    appendAll(strokes, text.strokes);
   });
   if (fills.length + strokes.length > 0) {
     const ink = rasterScenePixels(appendOverlay(emptyScene(width, height), { fills, strokes }));

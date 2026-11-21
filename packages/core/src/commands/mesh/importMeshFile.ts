@@ -95,7 +95,7 @@ export const importMeshFile = defineCommand({
         );
     } else bytes = params.base64 !== undefined ? base64ToUint8Array(params.base64) : new TextEncoder().encode(params.text);
     if (bytes === null) return reject('MESH_PARAM_INVALID', 'base64 is not valid base64', ['base64']);
-    const sha256 = sha256Hex(bytes);
+    const sha256 = assets?.sha256?.(bytes) ?? sha256Hex(bytes);
     if (params.sourceSha256 !== undefined && params.sourceSha256.toLowerCase() !== sha256) {
       return reject('MESH_IMPORT_SHA_MISMATCH', `the file sha256 is ${sha256}, not the pinned ${params.sourceSha256}`, ['sourceSha256']);
     }

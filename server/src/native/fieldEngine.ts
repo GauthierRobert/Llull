@@ -13,6 +13,7 @@ import { setFieldEngine } from '@core/geometry/field/engine';
 import {
   type FieldEngine,
   type FieldGrid,
+  type FieldMeshResult,
   type FieldProvenance,
   type FieldRefusal,
   type FieldSamples,
@@ -133,6 +134,15 @@ function refusalOf(report: Record<string, unknown>): FieldRefusal | null {
 
 const num = (value: unknown): number => (typeof value === 'number' ? value : NaN);
 
+/**
+ * The `measures` of a mesh job report: both `volume` and `area` numbers, else nothing (absent from an older binary, null when not finite), and
+ * the caller then measures the mesh itself.
+ */
+export function measuresOfReport(report: Record<string, unknown>): Pick<FieldMeshResult, 'measures'> {
+  const [volume, area] = [report['volume'], report['area']];
+  return typeof volume === 'number' && typeof area === 'number' ? { measures: { volume, area } } : {};
+}
+
 /** The native engine, or null when `llull-compute` is not installed. */
 export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}): FieldEngine | null {
   const env = options.env ?? process.env;
@@ -250,6 +260,7 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
               ok: true as const,
               mesh,
               closedManifold: report['closedManifold'] === true,
+              ...measuresOfReport(report),
               samples: num(report['samples']),
               evaluatedSamples: num(report['evaluatedSamples']),
               prunedFraction: num(report['prunedFraction']),

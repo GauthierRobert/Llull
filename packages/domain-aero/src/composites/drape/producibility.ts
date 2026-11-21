@@ -6,6 +6,7 @@ import { sig } from '../../shared/results';
 import { isDoublyCurved } from '../surface';
 import { type PlyDrapeResult, drapePly } from './plyDrape';
 import type { OverLockRegion } from './shear';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export interface ProducibilityFinding {
   readonly code: 'CMP_DRAPE_LIMIT_MISSING' | 'CMP_PRODUCIBILITY_OVER_LOCK' | 'CMP_PRODUCIBILITY_NEAR_LOCK' | 'CMP_DRAPE_INCOMPLETE';
@@ -84,13 +85,13 @@ export function assessPly(
   const result = drape(part, ply, limits);
   if (!result.ok) return { error: result.message };
   const pieces = result.pieces.map((piece) => piece.summary);
-  const maxShearDeg = Math.max(0, ...pieces.map((summary) => summary.maxShearDeg));
+  const maxShearDeg = Math.max(0, maxOf(pieces.map((summary) => summary.maxShearDeg)));
   const sum = (pick: (s: (typeof pieces)[number]) => number | null): number => pieces.reduce((total, s) => total + (pick(s) ?? 0), 0);
   const nodesOverLock = limits.lock === undefined ? null : sum((s) => s.nodesOverLock);
   const nodesOverWarning = limits.warning === undefined ? null : sum((s) => s.nodesOverWarning);
   const areaOverLock = limits.lock === undefined ? null : sum((s) => s.areaOverLock);
   const findings: ProducibilityFinding[] = [];
-  const coverage = Math.min(...result.pieces.map((piece) => piece.coverage));
+  const coverage = minOf(result.pieces.map((piece) => piece.coverage));
   const truncated = result.pieces.some((piece) => piece.net.stats.truncated);
   if (truncated || coverage < MIN_COVERAGE)
     findings.push({

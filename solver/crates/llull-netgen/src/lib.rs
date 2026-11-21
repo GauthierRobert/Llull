@@ -83,6 +83,7 @@ mod ffi {
         fn face_centroid(self: &Shape, face: i32) -> Result<Vec<f64>>;
         fn face_distance(self: &Shape, face: i32, x: f64, y: f64, z: f64) -> Result<Vec<f64>>;
         fn edge_distance(self: &Shape, edge: i32, x: f64, y: f64, z: f64) -> Result<f64>;
+        fn edge_bounds(self: &Shape, edge: i32) -> Result<Vec<f64>>;
         fn face_radius(self: &Shape, face: i32) -> Result<f64>;
         fn sample_face(self: &Shape, face: i32, spacing: f64) -> Result<Vec<f64>>;
         fn sample_edge(self: &Shape, edge: i32, spacing: f64) -> Result<Vec<f64>>;
@@ -226,6 +227,16 @@ impl Shape {
     /// Distance from `point` to the trimmed edge.
     pub fn edge_distance(&self, edge: i32, point: &Point) -> Result<f64> {
         Ok(self.0.edge_distance(edge, point[0], point[1], point[2])?)
+    }
+
+    /// `[min xyz, max xyz]` of a box holding everything [`Shape::edge_distance`] measures to: the curve grown by the edge tolerance and
+    /// each vertex point grown by its own tolerance (never smaller than the edge); `None` for a degenerated edge.
+    pub fn edge_bounds(&self, edge: i32) -> Result<Option<[f64; 6]>> {
+        let b = self.0.edge_bounds(edge)?;
+        if b.is_empty() {
+            return Ok(None);
+        }
+        <[f64; 6]>::try_from(b.as_slice()).map(Some).map_err(|_| Error(format!("edge bounds: 6 numbers expected, got {}", b.len())))
     }
 
     /// Radius of a cylinder face, minor radius of a torus face, 0 otherwise.

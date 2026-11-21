@@ -1,6 +1,6 @@
 // Shared shell of every 3D solid branch: selection click, display-mode material, BVH raycasting, disposal (R9).
 
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { BaseEntity } from '@core/model/types';
 import { selectOnClick } from '@ui/viewport/selectClick';
@@ -10,6 +10,7 @@ import { applyBoxUvs, useFinishTextures } from '../useFinishTextures';
 import { useViewportStore } from '@ui/store';
 import { useGhostStore } from '@ui/store/ghostStore';
 import { useTintStore } from '@ui/store/tintStore';
+import { setOnSelectionLayer } from '../effects/selectionLayer';
 
 export interface SolidSurface {
   roughness: number;
@@ -65,6 +66,13 @@ export function SolidMeshShell({
     };
   }, [geometry, boundsTree]);
 
+  // The edge pass outlines whatever is on the selection layer.
+  const meshRef = useRef<THREE.Mesh>(null);
+  useLayoutEffect(() => {
+    // Outside a Canvas (a DOM render in tests) the ref is not a three object.
+    if (meshRef.current instanceof THREE.Object3D) setOnSelectionLayer(meshRef.current, selected);
+  }, [selected]);
+
   const ghosted = useGhostStore((s) => s.ghostedIds.has(entity.id));
   const tint = useTintStore((s) => s.tints.get(entity.id));
   const matProps = useMaterialProps({
@@ -86,6 +94,7 @@ export function SolidMeshShell({
 
   return (
     <mesh
+      ref={meshRef}
       name={entity.id}
       geometry={geometry}
       position={position}

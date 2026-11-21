@@ -26,6 +26,7 @@ import { indexedMesh, placementMatrix, positionKey, sharedGeometryGroups } from 
 import { exactShapeKeyOf } from './gltfPrototypes';
 import { instanceIdExtras } from './gltfIds';
 import { pow } from '../../lib/pow';
+import { appendAll } from '../../lib/appendAll';
 
 /** Metalness / roughness of a solid without an assigned material (matches the viewport). */
 export const DEFAULT_METALNESS = 0.08;
@@ -148,7 +149,7 @@ function addToBuckets(
         transforms: new InstanceTransforms(),
       }));
       prototypes.set(key, buckets);
-      sink.buckets.push(...buckets);
+      appendAll(sink.buckets, buckets);
     }
     for (const bucket of buckets) {
       bucket.entityIds.push(instance.id);
@@ -189,10 +190,9 @@ export function collectSceneParts(doc: CadDocument, ids: readonly string[], sink
     if (entity === undefined) continue;
     const label = entity.name ?? entity.id;
     if (entity.kind !== 'instance') {
-      parts.push(
-        ...(sink === undefined
-          ? partsOfSolid(label, id, entity, appearanceOf(doc, entity))
-          : placedParts(label, entity, doc, solidPrototypes)),
+      appendAll(
+        parts,
+        sink === undefined ? partsOfSolid(label, id, entity, appearanceOf(doc, entity)) : placedParts(label, entity, doc, solidPrototypes),
       );
       continue;
     }
@@ -202,7 +202,7 @@ export function collectSceneParts(doc: CadDocument, ids: readonly string[], sink
       continue;
     }
     for (const child of component === undefined ? [] : expandInstance(entity, component))
-      parts.push(...partsOfSolid(`${label}/${child.name ?? child.id}`, entity.id, child, appearanceOf(doc, child, entity.materialId)));
+      appendAll(parts, partsOfSolid(`${label}/${child.name ?? child.id}`, entity.id, child, appearanceOf(doc, child, entity.materialId)));
   }
   return parts;
 }
@@ -227,7 +227,7 @@ export function collectDecalParts(doc: CadDocument, ids: readonly string[]): Dec
       const patch = decalPatch(decal, local);
       if (patch.positions.length === 0) continue;
       const positions: number[] = [];
-      for (let i = 0; i < patch.positions.length; i += 3) positions.push(...entityLocalToWorld(entity, vec3At(patch.positions, i)));
+      for (let i = 0; i < patch.positions.length; i += 3) appendAll(positions, entityLocalToWorld(entity, vec3At(patch.positions, i)));
       parts.push({
         name: `${entity.name ?? entity.id}/decal "${decal.text}"`,
         entityId: entity.id,

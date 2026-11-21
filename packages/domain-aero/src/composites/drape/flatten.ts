@@ -2,6 +2,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import { type DrapeNet, type DrapeNode } from './net';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 export type FlatLookup = { readonly kind: 'ok'; readonly flat: Vec2 } | { readonly kind: 'locked' } | { readonly kind: 'miss' };
 
@@ -62,8 +63,8 @@ export function netFlattener(net: DrapeNet): (uv: Vec2) => FlatLookup {
   for (const cell of cells) {
     const xs = cell.corners.map((corner) => corner.hit.uv[0]);
     const ys = cell.corners.map((corner) => corner.hit.uv[1]);
-    for (let bx = Math.floor(Math.min(...xs) / size); bx <= Math.floor(Math.max(...xs) / size); bx++)
-      for (let by = Math.floor(Math.min(...ys) / size); by <= Math.floor(Math.max(...ys) / size); by++) {
+    for (let bx = Math.floor(minOf(xs) / size); bx <= Math.floor(maxOf(xs) / size); bx++)
+      for (let by = Math.floor(minOf(ys) / size); by <= Math.floor(maxOf(ys) / size); by++) {
         const list = buckets.get(`${bx},${by}`);
         if (list === undefined) buckets.set(`${bx},${by}`, [cell]);
         else list.push(cell);

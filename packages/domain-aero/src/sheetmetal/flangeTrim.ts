@@ -6,6 +6,7 @@ import { add3, normalize3, scale3 } from '@lib/vec3';
 import { cornerNotch } from './cornerGeometry';
 import { clipHalfPlane, EPS, moveEdgeInward } from './geometry2d';
 import { childBends, flatOf, type BendNode, type FlatNode } from './graph';
+import { appendAll } from '@lib/appendAll';
 
 const distanceToLine = (point: Vec2, a: Vec2, b: Vec2): number => {
   const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
@@ -37,7 +38,7 @@ export function refitBends(
     if (was.every((point, i) => Math.hypot(point[0] - (now[i] as Vec2)[0], point[1] - (now[i] as Vec2)[1]) < 1e-9)) continue;
     const refit = refitBend(part, bend, after[edge] as Vec2, after[(edge + 1) % count] as Vec2);
     if (typeof refit === 'string') return { reason: refit, occupied: false };
-    nodes.push(...refit);
+    appendAll(nodes, refit);
   }
   return { nodes };
 }

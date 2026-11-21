@@ -3,6 +3,7 @@
 import type { PrintIdealization } from '@core/model/printIdealization';
 import type { Vec3 } from '@core/model/vectors';
 import { pow } from '@lib/pow';
+import { maxOf } from '@lib/arrayExtrema';
 
 type Triangle = readonly [Vec3, Vec3, Vec3];
 
@@ -28,7 +29,7 @@ export function skinEstimate(triangles: readonly Triangle[], axis: Vec3, wall: n
   let skin = 0;
   for (const [a, b, c] of triangles) {
     const normal = cross(sub(b, a), sub(c, a));
-    const twiceArea = Math.hypot(...normal);
+    const twiceArea = Math.hypot(normal[0], normal[1], normal[2]);
     signed += dot(a, cross(b, c)) / 6;
     if (twiceArea === 0) continue;
     const along = Math.min(1, Math.abs(dot(normal, axis)) / twiceArea);
@@ -136,7 +137,7 @@ export function fitPowerLaw(points: readonly { readonly density: number; readonl
     C: Math.exp(a),
     points: n,
     rmsLogResidual: Math.sqrt(sse / n),
-    maxRelativeResidual: Math.max(...residuals.map((r) => Math.abs(Math.exp(-r) - 1))),
+    maxRelativeResidual: maxOf(residuals.map((r) => Math.abs(Math.exp(-r) - 1))),
     rSquared: sst > 0 ? 1 - sse / sst : 1,
   };
 }

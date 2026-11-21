@@ -10,6 +10,7 @@ import type {
   ThermoMechSetup,
 } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
+import { artifactHash } from '../shared/artifactHash';
 import { canonicalJson } from '@lib/canonicalJson';
 import { evaluateExpression, expressionSyntaxError, extractReferences, isBuiltinConstant } from '@lib/expression';
 import { sha256Hex } from '@lib/sha256';
@@ -20,6 +21,7 @@ import { temperatureProblem } from '../shared/quantity';
 import { mapNodalField, type MappingReport } from './mapping';
 import { mappingRequest, readMappedField, type MappingRequest } from './mappedField';
 import { affineBetween, metresPer, temperatureIn, type Affine } from './units';
+import { hypotOf } from '@lib/hypotOf';
 
 /** Nodal temperatures aligned with `mesh.nodes` (same order), in the case temperature scale. */
 export interface ResolvedField {
@@ -117,7 +119,7 @@ function modelSize(mesh: FeMeshArtifact): number {
       low[k] = Math.min(low[k] ?? c, c);
       high[k] = Math.max(high[k] ?? c, c);
     });
-  return Math.hypot(...low.map((l, k) => (high[k] ?? l) - l));
+  return hypotOf(low.map((l, k) => (high[k] ?? l) - l));
 }
 
 function tableField(
@@ -269,7 +271,7 @@ function thermalSource(
     );
   const artifact = results as FeResultsArtifact;
   if (field.mapping !== 'interpolate') {
-    const meshHash = sha256Hex(canonicalJson(mesh));
+    const meshHash = artifactHash(mesh, artifacts);
     if (meshesDiffer(artifacts, artifact.meshHash, meshHash, mesh))
       return refusal(
         'TMC_MESH_MISMATCH',

@@ -1,5 +1,5 @@
-// HTML chrome of B-rep face handle editing: the "Edit faces" chip for a selected exact solid, and while editing a bar with the operation,
-// the live value and the backend preview status. Gathers input only; the drag commits one command (faceEditActions).
+// HTML chrome of B-rep face handle editing: the "Edit faces" chip (selection bar) for a selected exact solid, and while editing a bar
+// with the operation, the live value and the backend preview status. Gathers input only; the drag commits one command (faceEditActions).
 
 import { faceHint } from './faceEditHints';
 import { Icon } from '@ui/components/Icon';
@@ -7,6 +7,26 @@ import { useFaceEditStore } from '@ui/store/faceEditStore';
 import { useRemotePreviewStore } from '@ui/store/remotePreviewStore';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { FACE_OPS, canEditFaces, formatFaceValue } from './faceEditModel';
+
+/** The "Edit faces" chip: shown for a sole selected exact solid until face editing starts. */
+export function FaceEditStart(): React.ReactElement | null {
+  const sole = useSoleSelectedEntity();
+  const active = useFaceEditStore((s) => s.active);
+  if (active || !canEditFaces(sole)) return null;
+  return (
+    <div className="feature-start feature-start--faces" role="toolbar" aria-label="Face editing">
+      <button
+        type="button"
+        className="feature-start__chip"
+        title="Push, pull or tilt a face: drag the handles on the faces of this solid"
+        onClick={useFaceEditStore.getState().start}
+      >
+        <Icon name="cube" size={15} />
+        Edit faces
+      </button>
+    </div>
+  );
+}
 
 export function FaceEditBar(): React.ReactElement | null {
   const sole = useSoleSelectedEntity();
@@ -19,17 +39,8 @@ export function FaceEditBar(): React.ReactElement | null {
   const also = useFaceEditStore((s) => s.also.length);
   const hint = faceHint(op, pick !== null, value !== null);
   const editable = canEditFaces(sole);
-  if (!editable) return null;
+  if (!editable || !active) return null;
   const edit = useFaceEditStore.getState();
-  if (!active) {
-    return (
-      <div className="feature-start feature-start--faces" role="toolbar" aria-label="Face editing">
-        <button type="button" className="feature-start__chip" title="Drag handles on the faces of this solid" onClick={edit.start}>
-          Edit faces
-        </button>
-      </div>
-    );
-  }
   const refused = status === 'refused' || status === 'unavailable';
   const readout =
     value === null

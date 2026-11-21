@@ -5,6 +5,7 @@ import { linesText, num, row } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
 import { partIssues } from './readiness';
 import { outputTimesS } from './times';
+import { appendAll } from '@lib/appendAll';
 
 const refuse = (code: string, message: string, ids: readonly string[] = []): DeckRefusal => ({ code, message, ids });
 
@@ -58,7 +59,7 @@ export function creepSteps(ctx: DeckContext): DeckSections {
     ),
   ];
   if (creep.preloadStep)
-    lines.push(
+    appendAll(lines, [
       '** step 1: elastic preload (creep is off in *STATIC)',
       `*STEP${nlgeom}`,
       '*STATIC',
@@ -67,7 +68,7 @@ export function creepSteps(ctx: DeckContext): DeckSections {
       '*TEMPERATURE',
       temperature,
       '*END STEP',
-    );
+    ]);
   const control = [
     creep.initialIncrementS,
     creep.durationS,
@@ -78,7 +79,7 @@ export function creepSteps(ctx: DeckContext): DeckSections {
         ]
       : []),
   ];
-  lines.push(
+  appendAll(lines, [
     `** ${creep.preloadStep ? 'step 2: ' : ''}creep hold of ${num(creep.durationS)} s`,
     `*STEP${nlgeom}, INC=${creep.maxIncrements}`,
     `*VISCO, CETOL=${num(creep.cetol)}`,
@@ -91,6 +92,6 @@ export function creepSteps(ctx: DeckContext): DeckSections {
     `*EL FILE, TIME POINTS=${TIME_POINTS}`,
     'S, CEEQ',
     '*END STEP',
-  );
+  ]);
   return { text: linesText(lines) };
 }

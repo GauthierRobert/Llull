@@ -1,0 +1,28 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "create_material", "params": {"name": "syn_adhesive", "density": 0.0012, "color": "#d9a441", "metalness": 0, "roughness": 0.6}},
+ {"command": "set_material_property", "params": {"material": "syn_adhesive", "property": "TML", "value": 0.95, "unit": "%", "basis": "company", "testMethod": "ASTM_E595", "source": {"citation": "synthetic test value (PHY-14 VC-ENV-06.1)"}}},
+ {"command": "set_material_property", "params": {"material": "syn_adhesive", "property": "CVCM", "value": 0.05, "unit": "%", "basis": "company", "testMethod": "ASTM_E595", "source": {"citation": "synthetic test value"}}},
+ {"command": "set_material_property", "params": {"material": "syn_adhesive", "property": "WVR", "value": 0.30, "unit": "%", "basis": "company", "testMethod": "ASTM_E595", "source": {"citation": "synthetic test value"}}},
+ {"command": "set_material_property", "params": {"material": "syn_adhesive", "property": "moistureDiffusivity", "value": 1e-6, "unit": "mm^2/s", "basis": "company", "source": {"citation": "synthetic test value (VC-ENV-04)"}}},
+ {"command": "set_material_property", "params": {"material": "syn_adhesive", "property": "moistureSaturation", "value": 1.5, "unit": "%", "basis": "company", "source": {"citation": "synthetic test value (VC-ENV-04)"}}},
+ {"command": "set_material_property", "params": {"material": "syn_adhesive", "property": "cme", "value": 0.001, "unit": "1/%", "basis": "company", "source": {"citation": "synthetic test value (VC-ENV-05)"}}},
+ {"command": "set_material_property", "params": {"material": "syn_adhesive", "property": "aoErosionYield", "value": 3e-24, "unit": "cm^3", "basis": "company", "source": {"citation": "Kapton H reference value (S9, S10)"}}},
+ {"command": "create_material", "params": {"name": "syn_metal", "density": 0.0027, "color": "#b0b4b8", "metalness": 1, "roughness": 0.3}},
+ {"command": "set_material_property", "params": {"material": "syn_metal", "property": "TML", "value": 0.01, "unit": "%", "basis": "company", "source": {"citation": "synthetic test value"}}},
+ {"command": "set_material_property", "params": {"material": "syn_metal", "property": "CVCM", "value": 0.0, "unit": "%", "basis": "company", "source": {"citation": "synthetic test value"}}},
+ {"command": "add_box", "params": {"size": [100, 100, 16.6666666667], "anchor": "min"}, "as": "panel"},
+ {"command": "assign_material", "params": {"materialName": "syn_adhesive", "entityIds": ["$panel"]}},
+ {"command": "add_box", "params": {"size": [20, 20, 2], "position": [200, 0, 0], "anchor": "min"}, "as": "bracket"},
+ {"command": "assign_material", "params": {"materialName": "syn_metal", "entityIds": ["$bracket"]}},
+ {"command": "set_mission_environment", "params": {
+   "outgassingProfile": "nasa_gsfc_screening",
+   "humidityExposure": {"relativeHumidity": 50, "temperature": {"value": 20, "unit": "degC"}, "duration": {"value": 7, "unit": "d"}, "faces": "both", "source": "synthetic storage specification"},
+   "aoFluence": {"value": 1e21, "unit": "atoms/cm^2", "source": "synthetic mission analysis"}
+ }},
+ {"command": "moisture_uptake", "params": {"thickness": {"value": 2, "unit": "mm"}, "material": "syn_adhesive", "useMissionExposure": true, "targets": [0.5, 0.9, 0.99]}},
+ {"command": "hygro_strain", "params": {"beta": {"value": 0.001, "unit": "1/%"}, "deltaMoisture": {"value": 1.22660470969, "unit": "%"}, "alpha": {"value": 30e-6, "unit": "1/K"}}},
+ {"command": "ao_erosion", "params": {"material": "syn_adhesive", "area": {"value": 10, "unit": "cm^2"}, "density": {"value": 1.0, "unit": "g/cm^3", "source": "synthetic"}}},
+ {"command": "check_space_environment", "params": {"moistureThickness": [{"entityId": "$panel", "thickness": {"value": 2, "unit": "mm"}}]}},
+ {"command": "check_space_environment", "params": {"profile": "ecss_q_st_70_02"}}
+]

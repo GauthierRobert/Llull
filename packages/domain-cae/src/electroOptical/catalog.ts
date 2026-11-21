@@ -9,6 +9,7 @@ import { electricalResistance, shieldAbsorption } from './conductorQueries';
 import { disposeBondCheck } from './disposeCommand';
 import { normalReflectance } from './normalReflectance';
 import { opticalBalance } from './opticalBalance';
+import { removeLightningZone, setLightningZone } from './zoneCommands';
 
 export const electroOpticalCommands = commandCatalog(
   assignSurfaceCoating,
@@ -22,4 +23,6 @@ export const electroOpticalCommands = commandCatalog(
   electricalResistance,
   shieldAbsorption,
   normalReflectance,
+  setLightningZone,
+  removeLightningZone,
 );

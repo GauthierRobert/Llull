@@ -2,6 +2,11 @@
   "note": "Hits of the INT-14 source scan (tests/unit/contract/fallbackInventory.test.ts) that are not engineering inputs, or are tracked in fallback_inventory.json. Each entry: file (under packages/), match (substring of the trimmed source line, unique per file), reason.",
   "entries": [
     {
+      "file": "domain-cae/src/reliability/acceptance.ts",
+      "match": "const seed = params.seed ?? 0;",
+      "reason": "accept_reliability_result: seed of a study without mc / is, which no method reads (it is out of the result hash); a sampled study without a seed is refused PRB_PARAMS_INVALID"
+    },
+    {
       "file": "domain-cae/src/explicit/historyQuery.ts",
       "match": "offset = 0, limit = MAX_PAGE",
       "reason": "explicit_time_history paging: first sample and page size of a read-out (the total is returned), not an engineering input"
@@ -243,7 +248,7 @@
     },
     {
       "file": "domain-aec/src/plant/structures/access/edgeChecks.ts",
-      "match": "Math.max(0, ...rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0));",
+      "match": "Math.max(0, maxOf(rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0)));",
       "reason": "rule entry without a minimum contributes 0 to a max over rulesets"
     },
     {

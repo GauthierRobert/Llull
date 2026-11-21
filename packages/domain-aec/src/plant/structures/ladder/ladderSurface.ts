@@ -4,6 +4,7 @@ import type { Vec2 } from '@core/model/types';
 import { pointInPolygon, projectOntoSegment } from '@lib/polygon';
 import type { BuildingModel } from '@aec/building/types';
 import { elementsOf } from '@aec/building/model';
+import { minOf } from '@lib/arrayExtrema';
 
 export interface WalkingSurface {
   readonly id: string;
@@ -48,7 +49,7 @@ export function nearestSurface(candidates: ReadonlyArray<WalkingSurface>, point:
 /** Plan distance from `point` to the polygon: 0 inside, else to the nearest edge. */
 export function distanceToRing(point: Vec2, ring: ReadonlyArray<Vec2>): number {
   if (pointInPolygon(point, ring)) return 0;
-  return Math.min(...ring.map((start, index) => projectOntoSegment(point, start, ring[(index + 1) % ring.length] as Vec2).distance));
+  return minOf(ring.map((start, index) => projectOntoSegment(point, start, ring[(index + 1) % ring.length] as Vec2).distance));
 }
 
 /** The surface whose top is within `tolerance` of `top` and whose plan lies within `reach` of `point`; the nearest, then the lowest id. */

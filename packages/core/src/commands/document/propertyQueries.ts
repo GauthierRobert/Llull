@@ -120,7 +120,7 @@ const atText = (at: VariableValues): string =>
 
 /**
  * @affects nothing — read-only; data = PropertyEvaluation { available, value, unit, rangeStatus, derivative?, band?, basis, provenance,
- *   method, unverified, unverifiedReasons, reviewRequired, warnings, defaults }
+ *   method, testMethod?, unverified, unverifiedReasons, reviewRequired, warnings, defaults }
  * @invariant never extrapolates; never substitutes a basis; the room-temperature density is used for a variable query only with
  *   allowConstant (then a named default)
  * @failure PROP_OUT_OF_RANGE, PROP_VARIABLE_MISSING, PROP_NO_MODEL_FOR_PROPERTY (candidates), PROP_CONSTANT_ONLY,

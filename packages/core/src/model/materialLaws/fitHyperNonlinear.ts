@@ -10,6 +10,7 @@ import { fitFailureOr, type NonlinearBase } from './fitCommon';
 import { searchFit, type ConvergenceReport, type FitControl, type ParamSpec } from './fitSearch';
 import { arrudaBoyceDerivatives, nominalStress, type HyperMode, type ResolvedHyper } from './hyperelastic';
 import { failure, type LawFailure } from './resolve';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export interface NonlinearHyperFit extends NonlinearBase {
   readonly resolved: ResolvedHyper;
@@ -70,12 +71,12 @@ function summarising(
       return {
         mode: test.mode,
         rms: Math.sqrt(sumSquares(r) / Math.max(r.length, 1)),
-        maxAbs: Math.max(0, ...r.map(Math.abs)),
+        maxAbs: Math.max(0, maxOf(r.map(Math.abs))),
         count: r.length,
       };
     }),
     summary: summarise(residuals, observed, conditionNumber) satisfies FitSummary,
-    range: { variable: 'stretch', unit: '1', data: [Math.min(...stretches), Math.max(...stretches)] },
+    range: { variable: 'stretch', unit: '1', data: [minOf(stretches), maxOf(stretches)] },
   };
 }
 
@@ -112,7 +113,7 @@ export function fitOgden(
   if (rowCount <= 2 * terms)
     return failure('MATL_FIT_INSUFFICIENT_DATA', 'tests', `${rowCount} rows for ${2 * terms} parameters`, 'add data or use fewer terms');
   const rows: Rows = { tests, objective };
-  const peak = Math.max(...tests.flatMap((test) => test.rows.map(([, stress]) => Math.abs(stress))), 1e-12);
+  const peak = Math.max(maxOf(tests.flatMap((test) => test.rows.map(([, stress]) => Math.abs(stress)))), 1e-12);
   const specs: ParamSpec[] = [
     ...Array.from({ length: terms }, (_, k) => ({
       name: `mu${k + 1}`,

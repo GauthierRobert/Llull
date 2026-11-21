@@ -51,7 +51,7 @@ export function weightField(built: BuiltModel, conditions: OperatingConditions, 
 type Vec = readonly [number, number, number];
 
 const unit = (vector: Vec): Vec => {
-  const size = Math.hypot(...vector);
+  const size = Math.hypot(vector[0], vector[1], vector[2]);
   return [vector[0] / size, vector[1] / size, vector[2] / size];
 };
 
@@ -69,7 +69,7 @@ export function windLoads(built: BuiltModel, conditions: OperatingConditions, wi
     const axis = unit([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
     const along = direction[0] * axis[0] + direction[1] * axis[1] + direction[2] * axis[2];
     const normal: Vec = [direction[0] - along * axis[0], direction[1] - along * axis[1], direction[2] - along * axis[2]];
-    const size = Math.hypot(...normal);
+    const size = Math.hypot(normal[0], normal[1], normal[2]);
     const effective = element.odMm + 2 * insulationThickness(conditions);
     const scale = wind.pressureKPa * KPA_TO_N_PER_MM2 * wind.dragCoefficient * effective * size;
     for (let i = 0; i < 3; i++) out[index * 3 + i] = scale * (normal[i] as number);

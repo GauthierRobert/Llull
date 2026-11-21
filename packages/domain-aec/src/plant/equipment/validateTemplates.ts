@@ -2,6 +2,7 @@
 
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
+import { appendAll } from '@lib/appendAll';
 
 const SUPPORT_NUMBERS: ReadonlyMap<string, readonly string[]> = new Map([
   ['skirt', ['height', 'thickness', 'baseRingWidth']],
@@ -72,7 +73,7 @@ function exchangerDesignErrors(design: unknown, at: string): string[] {
 export function exchangerErrors(template: Record<string, unknown>, at: string): string[] {
   const errors = positive(template, ['shellInsideDiameter', 'shellThickness', 'tubesheetThickness'], at);
   if (typeof template['temaType'] !== 'string') errors.push(`${at}.temaType must be a string`);
-  errors.push(...defaultedErrors(template, at), ...exchangerDesignErrors(template['design'], at));
+  appendAll(errors, [...defaultedErrors(template, at), ...exchangerDesignErrors(template['design'], at)]);
   const tema = template['tema'];
   const fixed = isRecord(tema) && tema['fixedTubesheet'] === true;
   if (
@@ -87,7 +88,7 @@ export function exchangerErrors(template: Record<string, unknown>, at: string): 
   const tubes = template['tubes'];
   if (!isRecord(tubes)) errors.push(`${at}.tubes must be an object`);
   else {
-    errors.push(...positive(tubes, ['outsideDiameter', 'wallThickness', 'count', 'length', 'pitch', 'passes'], `${at}.tubes`));
+    appendAll(errors, positive(tubes, ['outsideDiameter', 'wallThickness', 'count', 'length', 'pitch', 'passes'], `${at}.tubes`));
     if (!oneOf(tubes['layoutAngleDeg'], [30, 45, 60, 90])) errors.push(`${at}.tubes.layoutAngleDeg must be 30, 45, 60 or 90`);
     if (!isString(tubes['wallSource']) || typeof tubes['wallUnverified'] !== 'boolean')
       errors.push(`${at}.tubes needs wallSource (string) and wallUnverified (boolean)`);
@@ -111,7 +112,7 @@ export function exchangerErrors(template: Record<string, unknown>, at: string): 
     const channel = template[name];
     if (channel === undefined && !required) continue;
     if (!isRecord(channel)) errors.push(`${at}.${name} must be an object${required ? '' : ' or absent'}`);
-    else errors.push(...positive(channel, ['length', 'thickness'], `${at}.${name}`));
+    else appendAll(errors, positive(channel, ['length', 'thickness'], `${at}.${name}`));
   }
   const support = template['support'];
   if (isRecord(support) && support['type'] !== 'saddles' && support['type'] !== 'none')
@@ -171,7 +172,7 @@ export function pumpErrors(template: Record<string, unknown>, at: string): strin
   const errors = isRecord(envelope)
     ? positive(envelope, ['a', 'f', 'h1', 'h2', 'suctionDn', 'dischargeDn'], `${at}.envelope`)
     : [`${at}.envelope must be an object`];
-  errors.push(...defaultedErrors(template, at));
+  appendAll(errors, defaultedErrors(template, at));
   if (isRecord(envelope)) {
     if (!isString(envelope['rating'])) errors.push(`${at}.envelope.rating must be a string`);
     if (!oneOf(envelope['grade'], ['A', 'B', 'C'])) errors.push(`${at}.envelope.grade must be A, B or C`);
@@ -179,17 +180,17 @@ export function pumpErrors(template: Record<string, unknown>, at: string): strin
   }
   if (template['weightKg'] !== undefined && !isPositiveNumber(template['weightKg'])) errors.push(`${at}.weightKg must be a number > 0`);
   const baseplate = template['baseplate'];
-  errors.push(
-    ...(isRecord(baseplate)
-      ? positive(baseplate, ['length', 'width', 'height'], `${at}.baseplate`)
-      : [`${at}.baseplate must be an object`]),
+  appendAll(
+    errors,
+    isRecord(baseplate) ? positive(baseplate, ['length', 'width', 'height'], `${at}.baseplate`) : [`${at}.baseplate must be an object`],
   );
   const driver = template['driver'];
   if (driver !== undefined && isRecord(driver) && !(isFiniteNumber(driver['gap']) && (driver['gap'] as number) >= 0))
     errors.push(`${at}.driver.gap must be a number >= 0`);
   if (driver !== undefined)
-    errors.push(
-      ...(isRecord(driver) ? positive(driver, ['length', 'width', 'height'], `${at}.driver`) : [`${at}.driver must be an object`]),
+    appendAll(
+      errors,
+      isRecord(driver) ? positive(driver, ['length', 'width', 'height'], `${at}.driver`) : [`${at}.driver must be an object`],
     );
   return errors;
 }

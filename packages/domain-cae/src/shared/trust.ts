@@ -8,7 +8,7 @@ import type { FeExplicitArtifact } from '@core/model/explicit';
 import type { FeTopologyArtifact } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
+import { artifactHash } from './artifactHash';
 import { meshSummary, resultsSummary } from '../results/summary';
 import { stateOf, type AnalysisState } from './state';
 
@@ -52,18 +52,6 @@ function withoutHeatBalance(summary: ResultsSummary): object {
 
 type StoredArtifact = FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact | FeExplicitArtifact;
 
-const artifactHashes = new WeakMap<object, string>();
-
-/** sha256 of the canonical JSON of an artifact, computed once per artifact object. */
-function hashOfArtifact(artifact: StoredArtifact): string {
-  let hash = artifactHashes.get(artifact);
-  if (hash === undefined) {
-    hash = sha256Hex(canonicalJson(artifact));
-    artifactHashes.set(artifact, hash);
-  }
-  return hash;
-}
-
 export type Fetched<T> = { readonly artifact: T } | { readonly code: string; readonly message: string };
 
 /**
@@ -82,7 +70,7 @@ export function fetchArtifact<K extends StoredArtifact['kind']>(
       code: `${codePrefix}_ARTIFACT_NOT_FOUND`,
       message: port ? `no ${kind} artifact for hash ${hash}` : `no artifact store available for ${kind} ${hash}`,
     };
-  if (hashOfArtifact(found) !== hash)
+  if (artifactHash(found, port) !== hash)
     return { code: `${codePrefix}_SUMMARY_MISMATCH`, message: `the sha256 of the ${kind} artifact is not ${hash}` };
   return { artifact: found as Extract<StoredArtifact, { kind: K }> };
 }

@@ -37,10 +37,11 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 
 ## v0.5 — Parametric & constraints (the leap to "real CAD")
 
-- [ ] Named parameters / variables (`set_parameter`) — change a value, model regenerates
-- [ ] Geometric + dimensional constraints + a pure constraint solver
-- [ ] Feature history / timeline: insert, reorder, edit-params, suppress → re-evaluate
-- [ ] Constructive vs evaluated geometry split (`entities` becomes a derived cache)
+- [x] Named parameters / variables (`set_parameter`, `delete_parameter`, `=expr` step params) — change a value, model regenerates
+- [x] Geometric + dimensional constraints + a pure constraint solver (`add_constraint`, `update_constraint`, `solve_constraints`)
+- [x] Feature history / timeline: insert, reorder, edit-params, suppress → re-evaluate (`insert_step`, `reorder_step`, `edit_step_params`,
+      `set_step_suppressed`, `delete_step`, `replay_history`)
+- [x] Constructive vs evaluated geometry split (`entities` becomes a derived cache) — plugin-derived entities and, opt-in, kernel results (`set_mesh_storage`)
 - See the `parametric` skill, architecture L8.
 
 ## v0.6 — Measurement & inspection (read-only query tools)
@@ -74,8 +75,12 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 
 ## v1.0 — Drawings & documentation
 
-- [ ] 2D drawings generated from 3D: orthographic / section / detail views
-- [ ] GD&T, dimension styles, title blocks, sheets (paper space)
+- [x] 2D drawings generated from 3D: orthographic / section / detail views (`create_sheet`, `create_drawing_view`, `add_section_view`,
+      `add_detail_view`, `export_sheet_svg`)
+- [x] GD&T (`add_geometric_tolerance`, datum features / targets, PMI), title blocks + sheets (paper space: `create_sheet`, `update_sheet`)
+- [x] Dimension styles (`create_dimension_style` / `update_` / `delete_` / `apply_` / `set_active_dimension_style`, `list_dimension_styles`):
+      text height, arrowheads (open / closed / tick / dot / none), extension gap + overshoot, decimals, separator, prefix / suffix, colour;
+      read by the 2D viewport, `render_view`, `describe_scene` and the DXF / SVG exports
 
 ## Civil / site engineering — see docs/CIVIL.md, docs/MARKET_READINESS.md
 
@@ -119,7 +124,7 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 - [x] Step-scoped deterministic ids; replay re-mints identical ids
 - [x] Replay prefix cache; parameter edits regenerate only dependent steps; kernel memoization
 - [x] Derivation guards; saved files omit plugin-derived geometry (llull-document v2)
-- [ ] Kernel (boolean / fillet) mesh results as a derived cache, not stored in files
+- [x] Kernel (boolean / fillet) mesh results as a derived cache, not stored in files — `set_mesh_storage recipe`, file v4 `derivedMeshes`, rebuilt on load
 - [x] Command-log live sync (`/live`); UI bridge retired (the offline outbox was removed in LC1 step 6)
 - [x] Plugins (building, industrial); npm workspaces; tool discovery (then MCP `search_tools` / `enable_toolset`; now `llull search` / `llull list <toolset>`)
 - [x] Every source file under 500 code lines

@@ -21,6 +21,8 @@ import { readChamferLegs } from './checkChamferLegs';
 import { chamferNodes, legFilletNodes } from '../../geometry/blend/blendInfo';
 import { checkBlendFace, type BlendFaceWorld } from './checkBlendFace';
 import type { BlendRow, EntityCheck } from './checkBlendRows';
+import { appendAll } from '../../lib/appendAll';
+import { maxOf } from '../../lib/arrayExtrema';
 
 const refuse = tableRejection({
   SRF_ENTITY_NOT_FOUND:
@@ -136,10 +138,10 @@ function checkEntity(
     blends,
     findings,
   );
-  findings.push(
+  appendAll(findings, [
     ...overshootFindings(kernel, recipe as ShapeRecipe, entityId, unit, diagonal),
     ...shapeFindings(kernel, recipe as ShapeRecipe, entityId, unit),
-  );
+  ]);
   return { blends, findings, unverified, unverifiedJunctions, g0: tolerances.g0 };
 }
 
@@ -285,7 +287,7 @@ export const checkBlends = defineCommand({
     const base = { g1AngleRad: params.g1AngleRad ?? DEFAULT_G1_ANGLE_RAD, g2Rel: params.g2Rel ?? DEFAULT_G2_REL };
     const checks =
       kernel === null ? [] : targets.map((entity) => checkEntity(kernel, entity, samples, base, params.g0, require === 'G2', unit));
-    const g0Used = params.g0 ?? Math.max(1e-12, ...checks.map((check) => check.g0));
+    const g0Used = params.g0 ?? Math.max(1e-12, maxOf(checks.map((check) => check.g0)));
     const named = namedTolerances({
       g0Used,
       unit,
@@ -310,7 +312,7 @@ export const checkBlends = defineCommand({
     const defaulted = Object.entries(named)
       .filter(([, tolerance]) => tolerance.defaulted)
       .map(([name]) => name);
-    if (purpose === 'release') findings.push(...releaseFindings(targets, defaulted, unit));
+    if (purpose === 'release') appendAll(findings, releaseFindings(targets, defaulted, unit));
     const notRun =
       kernel === null
         ? 'no geometry kernel is installed'

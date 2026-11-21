@@ -21,6 +21,7 @@ import type { SolidSession } from './faceSession';
 import { freeformContours } from './freeformSilhouette';
 import type { SilhouetteCurve } from './silhouetteCurve';
 import { continuousUv } from './splitChains';
+import { appendAll } from '../../lib/appendAll';
 
 export interface SilhouetteReport {
   readonly curves: SilhouetteCurve[];
@@ -291,14 +292,14 @@ export function silhouettes(session: SolidSession, direction: Vec3, tolerance = 
       const found = torusContours(session, face, surface, uvBounds, d, tolerance);
       if (typeof found === 'string') report.unsupported.push({ face, surface: 'torus', reason: found });
       else {
-        report.curves.push(...found.curves);
+        appendAll(report.curves, found.curves);
         if (found.onEdge && !report.onEdge.includes(face)) report.onEdge.push(face);
       }
     } else if (surface.type === 'other' && surface.kind === 'bspline') {
       const found = freeformContours(session, face, uvBounds, d, tolerance);
       if (typeof found === 'string') report.unsupported.push({ face, surface: 'bspline', reason: found });
       else {
-        report.curves.push(...found.curves);
+        appendAll(report.curves, found.curves);
         if (found.edgeOn) report.edgeOn.push(face);
         if (found.onEdge && !report.onEdge.includes(face)) report.onEdge.push(face);
       }

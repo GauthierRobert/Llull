@@ -119,7 +119,7 @@ The dependency laws are executable. `npm run arch` (part of `npm run check`) run
 A contract test (`tests/unit/contract/catalogs.test.ts`) checks that every exported command
 definition is registered, so a command missing from its catalog fails the build. CI
 (`.github/workflows/check.yml`) runs the full gate, coverage and the server suite on every push
-and pull request; a Claude Code hook additionally gives agents immediate feedback while they edit.
+to `main` (and on manual dispatch); a Claude Code hook additionally gives agents immediate feedback while they edit.
 See `docs/decisions/AR1-modular-command-layer.md` for the reasoning.
 
 ## Plugins
@@ -152,7 +152,15 @@ between steps never need rewriting. On top of that:
 - **Constructive vs evaluated.** The definition (history, parameters, constraints,
   domain models) is the source of truth; `entities` and `order` are the evaluated cache.
   Saved files (llull-document version 3) omit plugin-derived geometry and re-derive it on
-  load. Versions 1 and 2 are still read.
+  load. Versions 1 and 2 are still read. Kernel results (`mesh` entities with a `brep` recipe) are
+  derived too, opt-in: `set_mesh_storage recipe` makes a save omit their triangles (envelope version 4,
+  `derivedMeshes`) and the loader rebuilds them from the recipe with the kernel it is given
+  (`KRN_DERIVED_MESH_NO_KERNEL` / `KRN_DERIVED_MESH_UNBUILT` when it cannot). Listed entities are validated before any
+  kernel sees them (`KRN_DERIVED_MESH_INVALID`); rebuilt triangles must hash to the saved ones, so content hashes and
+  released revisions stay stable (`KRN_DERIVED_MESH_DRIFT`, `load_document acceptMeshDrift` to take them anyway). Recipes
+  with an imported exact leaf (`{ op: 'brep' }`) keep their triangles, and recovery slots, autosave, crash reports and
+  vault objects always store full meshes (`keepKernelMeshes`). Default `full` keeps the stored triangles, which also
+  serve as the fallback when a kernel cannot rebuild a tree.
 
 ## Geometry kernel
 

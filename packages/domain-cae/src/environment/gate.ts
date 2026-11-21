@@ -1,17 +1,11 @@
-/** Re-verification of a stored environment deviation (a record in the slice proves nothing by itself); local copy of the corrosion gate pattern. */
+/** The signed act of approve_environment_deviation and the re-verification of a stored deviation (a record in the slice proves nothing by itself). */
 
 import type { HumanSignaturePort } from '@core/model/analysis';
-import { documentIdentity, boundVerdict } from '@core/model/documentUid';
-import { humanGatePayload } from '@core/model/humanGate';
 import type { CadDocument } from '@core/model/types';
+import { type SignedState, signedState } from '../shared/signedGate';
 import type { Deviation } from './types';
 
 export const DEVIATION_ACT = 'approve or reject a space-environment deviation';
-
-export const nonceOf = (signature: unknown): string =>
-  typeof signature === 'object' && signature !== null && typeof (signature as { nonce?: unknown }).nonce === 'string'
-    ? (signature as { nonce: string }).nonce
-    : '';
 
 export const acceptanceDetails = (
   decision: string,
@@ -21,33 +15,17 @@ export const acceptanceDetails = (
 ): Record<string, unknown> => ({ decision, justification, fingerprint, documentUid });
 
 /** 'ok' = genuine for this document and signer; 'noport' = no signing port, so nothing can be confirmed. */
-export type DeviationState = 'ok' | 'invalid' | 'foreign' | 'unbound' | 'noport';
+export type DeviationState = SignedState;
 
-function verdictOf(doc: CadDocument, port: HumanSignaturePort, key: string, deviation: Deviation): DeviationState {
-  const { verdict, signed } = boundVerdict(
+/** The state of the stored `deviation` of `key` (re-verified through the port over the payload it was signed for); never throws. */
+export const deviationState = (doc: CadDocument, port: HumanSignaturePort | null, key: string, deviation: Deviation): DeviationState =>
+  signedState(
+    doc,
     port,
-    deviation.signature,
-    deviation.documentUid === '' ? undefined : deviation.documentUid,
-    documentIdentity(doc),
-    (uid) =>
-      humanGatePayload(
-        DEVIATION_ACT,
-        [key],
-        acceptanceDetails(deviation.decision, deviation.justification, deviation.fingerprint, uid),
-        nonceOf(deviation.signature),
-      ),
+    {
+      act: DEVIATION_ACT,
+      ids: [key],
+      details: (uid) => acceptanceDetails(deviation.decision, deviation.justification, deviation.fingerprint, uid),
+    },
+    deviation,
   );
-  return verdict === 'ok' && (signed === null || signed.signer !== deviation.signer || signed.signatureId !== deviation.signatureId)
-    ? 'invalid'
-    : verdict;
-}
-
-/** The deviation state; never throws: a port that fails on a hostile signature has not confirmed it. */
-export function deviationState(doc: CadDocument, port: HumanSignaturePort | null, key: string, deviation: Deviation): DeviationState {
-  if (port === null) return 'noport';
-  try {
-    return verdictOf(doc, port, key, deviation);
-  } catch {
-    return 'invalid';
-  }
-}

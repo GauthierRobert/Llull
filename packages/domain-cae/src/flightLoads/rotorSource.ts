@@ -9,6 +9,8 @@ export interface RotorRecord {
   readonly rpm: number;
   /** minRpm..maxRpm of the controller that commands this rotor, when there is one. */
   readonly controllerBand: { readonly controllerId: string; readonly lowRpm: number; readonly highRpm: number } | null;
+  /** Blades stored on the rotor record (add_rotor bladeCount), null when the record states none. */
+  readonly bladeCount: number | null;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -47,6 +49,7 @@ export function rotorsOfFlightModel(
       );
       const low = controller?.['minRpm'];
       const high = controller?.['maxRpm'];
+      const blades = rotor['bladeCount'];
       return {
         id,
         rpm: finite(rotor['rpm']) ? Math.abs(rotor['rpm']) : 0,
@@ -54,6 +57,7 @@ export function rotorsOfFlightModel(
           controller !== undefined && finite(low) && finite(high) && high > 0 && low <= high
             ? { controllerId: String(controller['id']), lowRpm: low, highRpm: high }
             : null,
+        bladeCount: finite(blades) && Number.isInteger(blades) && blades >= 1 ? blades : null,
       };
     });
 }

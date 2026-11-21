@@ -9,6 +9,7 @@ import type { HumanSignaturePort } from '@core/model/analysis';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { thermoFixture } from './fixtures';
+import { expectSignedReplayFollowsHistory } from '../../../helpers/signedReplay';
 
 const ROW = 'hole 20 degC | shaft 20 degC';
 const params = { rowKey: ROW, decision: 'accepted', justification: 'checked by hand', inputsHash: 'h1' };
@@ -46,6 +47,13 @@ describe('dispose_fit_result: the signature stays out of the record', () => {
     expect(step?.params).toMatchObject({ rowKey: ROW, confirmation: { verified: true } });
     expect(JSON.stringify(signed.featureHistory)).not.toContain(SECRET);
     expect(JSON.stringify(deserializeDocument(serializeDocument(signed)).featureHistory)).not.toContain(SECRET);
+  });
+
+  it('SIG-REPLAY: suppressing or deleting the dispose step drops the disposition and its ledger entry; unsuppressing does not restore them', () => {
+    const entryOf = (document: CadDocument): { stepKey?: string } | undefined =>
+      (document.analysis?.fitLedger ?? []).find((entry) => entry.rowKey === ROW);
+    const outcome = expectSignedReplayFollowsHistory(signed, 'dispose_fit_result', entryOf, withPort(port()));
+    for (const next of [outcome.suppressed, outcome.deleted, outcome.restored]) expect(disposed(next)).toBeUndefined();
   });
 
   it('replay_history keeps the disposition without spending the signature again', () => {

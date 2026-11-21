@@ -5,6 +5,7 @@
  */
 
 /** Element i of a numeric array; 0 for an index past the end (noUncheckedIndexedAccess identity, never an engineering default). */
+import { maxOf, minOf } from '@lib/arrayExtrema';
 const at = (values: ArrayLike<number>, index: number): number => values[index] ?? 0;
 
 export interface FrameElement {
@@ -206,7 +207,7 @@ export function frameModel(
       const p = position[dof];
       return p === undefined || p < 0 ? [] : [p];
     });
-    if (used.length > 0) bandwidth = Math.max(bandwidth, Math.max(...used) - Math.min(...used));
+    if (used.length > 0) bandwidth = Math.max(bandwidth, maxOf(used) - minOf(used));
   }
   return { coords, elements, dofs, free, position, bandwidth };
 }

@@ -19,7 +19,7 @@ export interface OverhangResult {
 
 /** Overhang of `mesh` (outward oriented) for the build direction `up` (any non-zero vector pointing away from the plate) and `criticalAngleDeg` in (0, 90]. */
 export function overhang(mesh: MeshData, up: Vec3, criticalAngleDeg: number): OverhangResult {
-  const length = Math.hypot(...up);
+  const length = Math.hypot(up[0], up[1], up[2]);
   const u: Vec3 = [up[0] / length, up[1] / length, up[2] / length];
   const cosCritical = Math.cos((criticalAngleDeg * Math.PI) / 180);
   let area = 0;

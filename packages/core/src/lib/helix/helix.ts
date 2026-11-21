@@ -7,6 +7,7 @@ import { add3, cross3, distance3, dot3, len3, normalize3, scale3, sub3 } from '.
 import type { ScalarLaw } from '../law/types';
 import type { HelixDefinition } from './types';
 import { powInt } from '../powInt';
+import { appendAll } from '../appendAll';
 
 const NODES: ReadonlyArray<readonly [number, number]> = [
   [0, 0.5688888888888889],
@@ -250,7 +251,7 @@ function bezierChain(def: HelixDefinition, spans: number): { poles: Vec3[]; devi
       sub3(end.point, scale3(end.derivative, alpha)),
       end.point,
     ];
-    poles.push(...(k === 0 ? piece : piece.slice(1)));
+    appendAll(poles, k === 0 ? piece : piece.slice(1));
     for (const t of [0.25, 0.5, 0.75])
       deviation = Math.max(deviation, distanceToCurve(def, bezierPoint(piece, t), k * step, (k + 1) * step));
   }

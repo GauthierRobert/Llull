@@ -8,6 +8,7 @@ import { solveLeastSquares } from '../../lib/leastSquares';
 import { nominalStress, polynomialDerivatives, type HyperMode, type ResolvedHyper } from './hyperelastic';
 import { failure, type LawFailure } from './resolve';
 import { pow } from '../../lib/pow';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 export type FitObjective = 'absolute' | 'relative';
 export type HyperFitKind = 'hyper_neo_hooke' | 'hyper_mooney_rivlin' | 'hyper_yeoh' | 'hyper_polynomial' | 'hyper_reduced_polynomial';
@@ -78,8 +79,8 @@ export const summarise = (residuals: readonly number[], observed: readonly numbe
   const relative = residuals.flatMap((r, i) => ((observed[i] ?? 0) !== 0 ? [Math.abs(r / (observed[i] ?? 1))] : []));
   return {
     rms: Math.sqrt(sumSquares(residuals) / Math.max(residuals.length, 1)),
-    maxAbs: Math.max(0, ...residuals.map(Math.abs)),
-    maxRel: Math.max(0, ...relative),
+    maxAbs: Math.max(0, maxOf(residuals.map(Math.abs))),
+    maxRel: Math.max(0, maxOf(relative)),
     rSquared: total > 0 ? 1 - sumSquares(residuals) / total : 1,
     points: residuals.length,
     conditionNumber,
@@ -138,7 +139,7 @@ export function fitHyperelastic(
     return {
       mode: test.mode,
       rms: Math.sqrt(sumSquares(residuals) / Math.max(residuals.length, 1)),
-      maxAbs: Math.max(0, ...residuals.map(Math.abs)),
+      maxAbs: Math.max(0, maxOf(residuals.map(Math.abs))),
       count: residuals.length,
     };
   });
@@ -177,7 +178,7 @@ export function fitHyperelastic(
     resolved,
     perTest,
     summary: summarise(residuals, observed, solution.conditionEstimate),
-    stretchRange: [Math.min(...stretches), Math.max(...stretches)],
+    stretchRange: [minOf(stretches), maxOf(stretches)],
   };
 }
 
@@ -246,11 +247,11 @@ export function fitRambergOsgood(
       {
         mode: 'uniaxial_plastic',
         rms: Math.sqrt(sumSquares(residuals) / residuals.length),
-        maxAbs: Math.max(...residuals.map(Math.abs)),
+        maxAbs: maxOf(residuals.map(Math.abs)),
         count: residuals.length,
       },
     ],
-    plasticStrainMax: Math.max(...usable.map(([strain, stress]) => strain - stress / youngModulus)),
+    plasticStrainMax: maxOf(usable.map(([strain, stress]) => strain - stress / youngModulus)),
   };
 }
 
@@ -315,10 +316,10 @@ export function fitProny(
       {
         mode: 'relaxation',
         rms: Math.sqrt(sumSquares(residuals) / residuals.length),
-        maxAbs: Math.max(...residuals.map(Math.abs)),
+        maxAbs: maxOf(residuals.map(Math.abs)),
         count: residuals.length,
       },
     ],
-    timeRange: [Math.min(...times), Math.max(...times)],
+    timeRange: [minOf(times), maxOf(times)],
   };
 }

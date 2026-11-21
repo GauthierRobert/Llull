@@ -23,6 +23,7 @@ import { absoluteZeroOf } from '../thermal/quantities';
 import { expansionCards, refused } from './deck';
 import { PREHEAT_PERIOD_S, startOf } from './preheat';
 import { temperatureIn } from './units';
+import { appendAll } from '@lib/appendAll';
 
 /** The thermo-mechanical set-up (with its thermal set-up) of a coupled case, else undefined. */
 export const coupledOf = (
@@ -121,7 +122,7 @@ export function coupledSections(ctx: DeckContext): DeckSections {
     ...ctx.mesh.nodes.map(([id]) => row(id, reference)),
   ];
   if (start.preheat)
-    lines.push(
+    appendAll(lines, [
       `** pre-heating: every node from T_ref ${num(reference)} to the start temperature ${num(start.value)} ${scale} (stress-free at T_ref)`,
       '*STEP',
       '*STATIC',
@@ -135,7 +136,7 @@ export function coupledSections(ctx: DeckContext): DeckSections {
       '*EL FILE',
       'ENER',
       '*END STEP',
-    );
+    ]);
   const output = plan.output === '' ? '' : `, ${plan.output}`;
   const stepLines = [...plan.notes, ...plan.stepLines];
   const outputs = [`*NODE FILE${output}`, 'U, NT', `*EL FILE${output}`, 'S, HFL', '*END STEP'];

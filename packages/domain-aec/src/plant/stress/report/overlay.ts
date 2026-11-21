@@ -9,6 +9,7 @@ import { escapeXml } from '@lib/escapeXml';
 import { analyzeStressModel } from '../analysis';
 import { modelGeometry } from '../model/geometry';
 import { getStress } from '../model/store';
+import { appendAll } from '@lib/appendAll';
 
 export const RATIO_COLORS = { ok: '#35c759', warn: '#ffb020', over: '#ff3b30', none: '#8a8a99' } as const;
 export type RatioBand = keyof typeof RATIO_COLORS;
@@ -56,11 +57,11 @@ export const pipeStressOverlay: RenderOverlay = {
       if (body.length === 0) continue;
       lines += body.length;
       models.push({ modelId, elements: body.length, ...counts, maxRatio: Number(maxRatio.toFixed(3)), status: analysis.status });
-      svg.push(
+      appendAll(svg, [
         `  <g class="pipe-stress-overlay" data-model="${escapeXml(modelId)}" stroke-width="5" stroke-linecap="round" opacity="0.9">`,
         ...body,
         '  </g>',
-      );
+      ]);
     }
     return { svg, stats: { entities, lines, points: 0, detail: { models, skipped } } };
   },

@@ -11,6 +11,7 @@ import { evaluateSurface, surfaceDomain } from '../../lib/nurbs/surface';
 import { surfaceSample } from '../../lib/nurbs/surfaceCurvature';
 import { closestPointOnTriangle, type Triangle } from '../triangleQueries';
 import type { DeviationReport, DeviationRequest, DeviationShape } from './types';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Source samples beyond this count are thinned evenly (keeps the cost of a mesh-to-mesh comparison bounded). */
 const MAX_SAMPLES = 20_000;
@@ -137,11 +138,7 @@ export function measureDeviation(request: DeviationRequest): DeviationReport {
     worst: { point: points[worstIndex] as Vec3, foot: worstFoot.foot, distance: worstFoot.distance },
     signed:
       request.to.type === 'surface' && signedValues.length === distances.length
-        ? {
-            mean: signedValues.reduce((sum, d) => sum + d, 0) / signedValues.length,
-            min: Math.min(...signedValues),
-            max: Math.max(...signedValues),
-          }
+        ? { mean: signedValues.reduce((sum, d) => sum + d, 0) / signedValues.length, min: minOf(signedValues), max: maxOf(signedValues) }
         : null,
     histogram,
   };

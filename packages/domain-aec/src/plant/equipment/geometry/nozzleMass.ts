@@ -40,11 +40,13 @@ export function neckMassParts(
     const bore = Math.max(0, outer - nozzle.neckWall);
     const neck = annulus(outer, bore) * Math.max(0, nozzle.projection - wallOf(nozzle) - nozzle.flange.thickness);
     const flange = annulus(nozzle.flange.outsideDiameter / 2, bore) * nozzle.flange.thickness;
+    const pad = nozzle.pad === undefined ? 0 : annulus(nozzle.pad.outsideDiameter / 2, outer) * nozzle.pad.thickness;
     return {
       part: `nozzle ${nozzle.mark}`,
-      kg: (neck + flange) * powInt(scale, 3) * density,
+      kg: (neck + flange + pad) * powInt(scale, 3) * density,
       method:
-        'neck annulus beyond the outside wall + flange as a bored disc (OD x thickness from the catalogue; hub and bolt holes ignored)',
+        'neck annulus beyond the outside wall + flange as a bored disc (OD x thickness from the catalogue; hub and bolt holes ignored)' +
+        (nozzle.pad === undefined ? '' : ' + reinforcing pad as a flat annulus (OD x thickness, curvature ignored)'),
     };
   });
 }

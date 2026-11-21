@@ -18,6 +18,8 @@ import { preloadSchema } from './pretensionCommands';
 import { stackOf, type StackView } from './stackRead';
 import { stackGeometry, type StackGeometry } from './stackGeometry';
 import { boltStiffness, membersStiffness, stiffnessFactor } from './stackStiffness';
+import { minOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Offset of the face-selection points from the axis, in hole diameters (between the hole edge at 0.5 and a washer face at 0.75). */
 const FACE_POINT_DIAMETERS = 0.65;
@@ -59,7 +61,7 @@ function stiffnessOf(
   const kMembers = membersStiffness(layers, shank);
   const unitsToMm = unit;
   const coneAtMidGrip = (1.5 * shank + grip * Math.tan(Math.PI / 6)) / unitsToMm;
-  const narrowest = Math.min(...geometry.plates.map((plate) => plate.width));
+  const narrowest = minOf(geometry.plates.map((plate) => plate.width));
   const warnings = [
     ...(coneAtMidGrip > narrowest
       ? [
@@ -241,7 +243,7 @@ export const jointFromFastenerStack = defineCommand({
           [],
         );
       current = result.document;
-      affected.push(...result.affected.slice(1));
+      appendAll(affected, result.affected.slice(1));
     }
     const pairIds = affected.slice(2);
     const stiffness = stiffnessOf(doc, analysis, stack, geometry, params.boltEntityId, diameter);

@@ -17,6 +17,8 @@ import { gridParameters, placedSurface, surfacePoleExtent } from '../../geometry
 import { refuseSrf } from './shared';
 import { sewIntoSolid } from './sewShell';
 import { isRefusal, sig, surfaceEntityOf } from './surfaceShared';
+import { maxOf } from '../../lib/arrayExtrema';
+import { appendAll } from '../../lib/appendAll';
 
 type Side = 'u0' | 'u1' | 'v0' | 'v1';
 
@@ -38,7 +40,7 @@ function mergeAlong(a: NurbsSurfaceData, b: NurbsSurfaceData, tolerance: number)
     const lastRow = left.poles[left.poles.length - 1] as ReadonlyArray<Vec3>;
     const firstRow = right.poles[0] as ReadonlyArray<Vec3>;
     if (lastRow.length !== firstRow.length || left.degreeU !== right.degreeU) continue;
-    const gap = Math.max(...lastRow.map((pole, j) => distance3(pole, firstRow[j] as Vec3)));
+    const gap = maxOf(lastRow.map((pole, j) => distance3(pole, firstRow[j] as Vec3)));
     if (gap > tolerance) continue;
     const p = left.degreeU;
     const fullA = expandKnots(left.knotsU, left.multiplicitiesU);
@@ -113,7 +115,7 @@ export const sewSurfaces = defineCommand({
       return refuseSrf(doc, 'sew_surfaces', 'SRF_TRIM_UNSUPPORTED', 'sheets trimmed by curves cannot be sewn', ids, ['params.ids']);
     const [a, b] = [placedSurface(first), placedSurface(second)];
     const size = Math.max(
-      ...[surfacePoleExtent(a), surfacePoleExtent(b)].flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]]),
+      maxOf([surfacePoleExtent(a), surfacePoleExtent(b)].flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]])),
       1e-9,
     );
     const tol = tolerance ?? 1e-6 * size;
@@ -230,7 +232,7 @@ export const thickenSurface = defineCommand({
     const indices: number[] = [];
     const at = (i: number, j: number): number => i * countV + j;
     // Seams (a sheet closed in u or v) and collapsed edges (poles) share their vertices and get no wall: otherwise the mesh has coincident fins.
-    const eps = 1e-9 * Math.max(1, ...samples.map((s) => distance3(s.point, (samples[0] as { point: Vec3 }).point)));
+    const eps = 1e-9 * Math.max(1, maxOf(samples.map((s) => distance3(s.point, (samples[0] as { point: Vec3 }).point))));
     const coincide = (a: number, b: number): boolean =>
       distance3((samples[a] as { point: Vec3 }).point, (samples[b] as { point: Vec3 }).point) <= eps;
     const rowsU = Array.from({ length: countU }, (_, i) => i);
@@ -255,7 +257,7 @@ export const thickenSurface = defineCommand({
     };
     const push = (...triangle: number[]): void => {
       const corners = triangle.map((k) => (k >= bottom ? bottom + canon(k - bottom) : canon(k)));
-      if (new Set(corners).size === 3) indices.push(...corners);
+      if (new Set(corners).size === 3) appendAll(indices, corners);
     };
     for (let i = 0; i + 1 < countU; i++)
       for (let j = 0; j + 1 < countV; j++) {

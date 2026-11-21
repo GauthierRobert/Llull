@@ -2,6 +2,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import { isRecord } from '@lib/isRecord';
+import { convexEnvelopeIndices } from './convexEnvelope';
 
 const RAD = Math.PI / 180;
 
@@ -16,12 +17,25 @@ export interface FlightInstant {
   readonly angularVelocity: Vec3;
   readonly angularAccel: Vec3;
   readonly thrustN: Readonly<Record<string, number>>;
+  /** Rotor speed (rpm) and shaft power (W) per rotor id: the reaction torque Q = P / (2 pi n) of a mount (rotorMountMoment). */
+  readonly rotorRpm: Readonly<Record<string, number>>;
+  readonly shaftPowerW: Readonly<Record<string, number>>;
 }
 
 const isVec3 = (value: unknown): value is Vec3 => Array.isArray(value) && value.length === 3 && value.every((c) => Number.isFinite(c));
 const valueAt = (values: readonly number[], index: number): number => values[index] ?? 0;
 const isVecList = (value: unknown, length: number): value is Vec3[] =>
   Array.isArray(value) && value.length === length && value.every(isVec3);
+
+/** Sample `index` of series `key` of every rotor that records it. */
+function rotorSample(rotors: Readonly<Record<string, unknown>>, key: string, index: number): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(rotors).flatMap(([id, rotor]) => {
+      const value = isRecord(rotor) && Array.isArray(rotor[key]) ? rotor[key][index] : undefined;
+      return typeof value === 'number' ? [[id, value]] : [];
+    }),
+  );
+}
 
 /** Body-axes components of a world vector for the attitude (roll, pitch, yaw in degrees, Z-Y-X): R^T v with R = Rz(yaw) Ry(pitch) Rx(roll). */
 function toBodyAxes(v: Vec3, rollDeg: number, pitchDeg: number, yawDeg: number): Vec3 {
@@ -53,7 +67,7 @@ function derivative(times: readonly number[], values: readonly Vec3[]): Vec3[] {
 
 /**
  * The instants of a run_flight `detail: "series"` payload: a_world = d(velocity)/dt, alpha = d(body rate)/dt (central differences on the
- * recorded samples), everything rotated into the body axes of each sample; thrust per rotor id.
+ * recorded samples), everything rotated into the body axes of each sample; thrust, speed and shaft power per rotor id.
  * @failure a malformed or too short series (< 3 samples, non-increasing time, wrong lengths) -> a message string
  */
 export function flightInstants(series: unknown, gravityWorld: Vec3): FlightInstant[] | string {
@@ -77,17 +91,20 @@ export function flightInstants(series: unknown, gravityWorld: Vec3): FlightInsta
       gravityMps2: toBodyAxes(gravityWorld, roll, pitch, yaw),
       angularVelocity: rate[index] ?? [0, 0, 0],
       angularAccel: alpha[index] ?? [0, 0, 0],
-      thrustN: Object.fromEntries(
-        Object.entries(thrust).flatMap(([id, rotor]) => {
-          const value = isRecord(rotor) && Array.isArray(rotor['thrustN']) ? rotor['thrustN'][index] : undefined;
-          return typeof value === 'number' ? [[id, value]] : [];
-        }),
-      ),
+      thrustN: rotorSample(thrust, 'thrustN', index),
+      rotorRpm: rotorSample(thrust, 'rpm', index),
+      shaftPowerW: rotorSample(thrust, 'shaftPowerW', index),
     };
   });
 }
 
 const norm = (v: Vec3): number => Math.hypot(v[0], v[1], v[2]);
+/** Specific force a - g of an instant (body axes, m/s^2): what the mounts carry per unit mass. */
+const specificForce = (i: FlightInstant): Vec3 => [
+  i.accelMps2[0] - i.gravityMps2[0],
+  i.accelMps2[1] - i.gravityMps2[1],
+  i.accelMps2[2] - i.gravityMps2[2],
+];
 
 /** An instant of the run chosen for export, with what made it the choice. */
 export interface ChosenInstant {
@@ -95,17 +112,29 @@ export interface ChosenInstant {
   readonly label: string;
 }
 
+/** Default relative tolerance of the convex envelope (of the bounding-box diagonal of the specific forces). */
+export const DEFAULT_ENVELOPE_TOLERANCE = 0.02;
+
 /**
- * Instants of `at`: a time (the nearest sample), `peak_load` (the largest specific force |a - g|, the load factor the structure carries), or
- * `envelope` (the peaks of specific force, angular velocity and angular acceleration, one case each, equal samples merged).
+ * Instants of `at`: a time (the nearest sample), `peak_load` (the largest specific force |a - g|, the load factor the structure carries),
+ * `envelope` (the peaks of specific force, angular velocity and angular acceleration, one case each, equal samples merged) or
+ * `convex_envelope` (the vertices of the convex hull of the specific forces of all samples within `tolerance`, labels hull_1.. in time order).
  */
-export function chooseInstants(instants: readonly FlightInstant[], at: number | 'peak_load' | 'envelope'): ChosenInstant[] {
+export function chooseInstants(
+  instants: readonly FlightInstant[],
+  at: number | 'peak_load' | 'envelope' | 'convex_envelope',
+  tolerance: number = DEFAULT_ENVELOPE_TOLERANCE,
+): ChosenInstant[] {
   const argmax = (score: (instant: FlightInstant) => number): FlightInstant =>
     instants.reduce((best, instant) => (score(instant) > score(best) ? instant : best), instants[0] as FlightInstant);
-  const specific = (i: FlightInstant): number =>
-    norm([i.accelMps2[0] - i.gravityMps2[0], i.accelMps2[1] - i.gravityMps2[1], i.accelMps2[2] - i.gravityMps2[2]]);
+  const specific = (i: FlightInstant): number => norm(specificForce(i));
   if (typeof at === 'number') return [{ instant: argmax((i) => -Math.abs(i.timeS - at)), label: 't' }];
   if (at === 'peak_load') return [{ instant: argmax(specific), label: 'peak' }];
+  if (at === 'convex_envelope')
+    return convexEnvelopeIndices(instants.map(specificForce), tolerance).flatMap((index, k) => {
+      const instant = instants[index];
+      return instant === undefined ? [] : [{ instant, label: `hull_${k + 1}` }];
+    });
   const picks: ChosenInstant[] = [
     { instant: argmax(specific), label: 'peak_f' },
     { instant: argmax((i) => norm(i.angularVelocity)), label: 'peak_w' },

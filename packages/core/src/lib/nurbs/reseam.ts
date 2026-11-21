@@ -10,12 +10,13 @@ import { insertKnot } from './edit';
 import { curveDomain } from './evaluate';
 import { expandKnots, compressKnots } from './knotVector';
 import type { NurbsCurveData } from './types';
+import { maxOf } from '../arrayExtrema';
 
 /** True when the curve's last pole is its first (a closed curve in the clamped, non-periodic representation). */
 export function isClosedCurve(curve: NurbsCurveData): boolean {
   const first = curve.poles[0] as Vec3;
   const last = curve.poles[curve.poles.length - 1] as Vec3;
-  const size = Math.max(...curve.poles.map((pole) => distance3(pole, first)), 1e-12);
+  const size = Math.max(maxOf(curve.poles.map((pole) => distance3(pole, first))), 1e-12);
   const sameWeight =
     curve.weights === undefined || Math.abs((curve.weights[0] as number) - (curve.weights[curve.weights.length - 1] as number)) < 1e-12;
   return distance3(first, last) <= 1e-9 * size && sameWeight;

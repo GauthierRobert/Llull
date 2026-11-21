@@ -9,6 +9,7 @@
 import { findTankMaterial, minimumThicknessRow, TANK_TABLE_EDITION } from '../data/api650Tables';
 import { oneFootCourses, ONE_FOOT_LIMIT_M, type CourseThickness } from './api650';
 import type { CodeFinding } from './asme';
+import { maxOf } from '@lib/arrayExtrema';
 
 export const API650_REVIEW_REASON = 'API 650 one-foot thickness computed by llull from the cited formulas; not a certified tank design';
 
@@ -104,7 +105,7 @@ export function tankShellResult(input: TankShellInput, mmPerUnit: number): TankS
     diameterM,
     courses,
     allowableStress: stresses,
-    maximumGoverningThicknessMm: Math.max(...courses.map((course) => course.governingThicknessMm)),
+    maximumGoverningThicknessMm: maxOf(courses.map((course) => course.governingThicknessMm)),
     warnings,
     unverified: warnings.length > 0,
   };

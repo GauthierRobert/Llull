@@ -9,6 +9,7 @@
 import type { CadDocument, Entity, MeshSolidEntity } from '../model/types';
 import type { MeshAssetRef } from '../model/meshProvenance';
 import { assetLeaves } from '../geometry/recipeLeaves';
+import { appendAll } from '../lib/appendAll';
 
 /**
  * A mesh entity that depends on stored assets: its own (`entity.asset`), or those of the mesh leaves of its construction tree (`brep`; a
@@ -127,7 +128,7 @@ function recordsNamed(doc: CadDocument, token: string): readonly object[] {
   for (const [field, slice] of Object.entries(doc)) {
     if (NOT_RECORDS.has(field) || !isRecord(slice)) continue;
     const records = recordIndex(slice).get(token);
-    if (records !== undefined) found.push(...records);
+    if (records !== undefined) appendAll(found, records);
   }
   return found;
 }

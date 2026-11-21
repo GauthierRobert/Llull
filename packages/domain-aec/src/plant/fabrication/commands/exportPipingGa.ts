@@ -11,6 +11,7 @@ import { buildIsoGraph } from '../iso/isoGraph';
 import { dxfOf, svgOf } from '../iso/isoRender';
 import { allLineIds, isLineRead, loadLine } from '../lineNetwork';
 import { getBuilding } from '../../../building/model';
+import { minOf } from '@lib/arrayExtrema';
 
 const fileStem = (key: string): string => key.replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -115,7 +116,7 @@ export const exportPipingGa = defineCommand({
       if (!isLineRead(read)) return read;
       const graph = buildIsoGraph(read.network);
       if (graph.steps.length === 0) continue;
-      const lowest = Math.min(...graph.steps.flatMap((step) => [step.start[2], step.end[2]]));
+      const lowest = minOf(graph.steps.flatMap((step) => [step.start[2], step.end[2]]));
       if (params.levelId !== undefined && levelOf(doc, lowest) !== params.levelId) continue;
       lines.push({ id, network: read.network, graph });
     }

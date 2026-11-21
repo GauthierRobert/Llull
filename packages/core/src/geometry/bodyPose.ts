@@ -4,6 +4,7 @@ import type { CadDocument, Entity } from '../model/types';
 import type { Quaternion, Vec3 } from '../model/vectors';
 import { applyMat3, eulerFromMat, matFromAxisAngle, matFromEulerXYZ, mulMat3, type Mat3 } from '../lib/axisRotation';
 import { add3, cross3, dot3, lerp3, scale3, sub3 } from '../lib/vec3';
+import { hypotOf } from '../lib/hypotOf';
 
 /** Rotation matrix of the unit quaternion [w, x, y, z] (normalized here). */
 export function matFromQuaternion(q: Quaternion): Mat3 {
@@ -103,7 +104,7 @@ function slerp(a: Quaternion, b: Quaternion, fraction: number): Quaternion {
   const [wa, wb] =
     sin < 1e-9 ? [1 - fraction, fraction * sign] : [Math.sin((1 - fraction) * angle) / sin, (Math.sin(fraction * angle) / sin) * sign];
   const q = [0, 1, 2, 3].map((k) => wa * (a[k] ?? 0) + wb * (b[k] ?? 0));
-  const norm = Math.hypot(...q) || 1;
+  const norm = hypotOf(q) || 1;
   return [(q[0] ?? 0) / norm, (q[1] ?? 0) / norm, (q[2] ?? 0) / norm, (q[3] ?? 0) / norm];
 }
 
@@ -115,7 +116,7 @@ function relativeRotation(a: Quaternion, b: Quaternion): { axis: Vec3; angle: nu
   const w = bw * aw - bx * ax - by * ay - bz * az;
   const v: Vec3 = [bw * ax + bx * aw + by * az - bz * ay, bw * ay - bx * az + by * aw + bz * ax, bw * az + bx * ay - by * ax + bz * aw];
   const sign = w < 0 ? -1 : 1;
-  const sine = Math.hypot(...v);
+  const sine = Math.hypot(v[0], v[1], v[2]);
   if (sine < 1e-12) return null;
   return { axis: [(v[0] * sign) / sine, (v[1] * sign) / sine, (v[2] * sign) / sine], angle: 2 * Math.atan2(sine, w * sign) };
 }

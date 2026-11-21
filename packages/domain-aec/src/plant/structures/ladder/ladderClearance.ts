@@ -15,6 +15,7 @@ import { elementBoxes } from '../../../industrial/clash/clashBoxes';
 import { pipingClashBodies } from '../../piping/clashBodies';
 import { boxFootprint } from './boxFootprint';
 import { walkingSurfaces } from './ladderSurface';
+import { minOf } from '@lib/arrayExtrema';
 
 /** How far behind the rungs the search looks, mm: a ladder with nothing nearer reports this value. */
 export const BACK_SEARCH_MM = 2000;
@@ -108,10 +109,12 @@ function rayDistance(origin: Vec2, direction: Vec2, ring: ReadonlyArray<Vec2>, r
   const end: Vec2 = [origin[0] + direction[0] * reach, origin[1] + direction[1] * reach];
   return Math.min(
     Infinity,
-    ...ring.map((start, index) => {
-      const hit = segmentIntersection(origin, end, start, ring[(index + 1) % ring.length] as Vec2);
-      return hit === null ? Infinity : Math.hypot(hit[0] - origin[0], hit[1] - origin[1]);
-    }),
+    minOf(
+      ring.map((start, index) => {
+        const hit = segmentIntersection(origin, end, start, ring[(index + 1) % ring.length] as Vec2);
+        return hit === null ? Infinity : Math.hypot(hit[0] - origin[0], hit[1] - origin[1]);
+      }),
+    ),
   );
 }
 

@@ -1,8 +1,9 @@
 /** 3D quickhull in double precision: closed outward-wound triangle mesh of a point set, coplanar points merged away. */
 
 import type { Vec3 } from '../../model/vectors';
-import { cross3, dot3, normalize3, sub3 } from '../../lib/vec3';
+import { cross3, dot3, hypot3, normalize3, sub3 } from '../../lib/vec3';
 import { meshDiagonal } from './weld';
+import { appendAll } from '../../lib/appendAll';
 
 export interface HullMesh {
   /** Hull vertices (flat xyz), the subset of the input points that are corners of the hull, in first-use order. */
@@ -133,7 +134,7 @@ export function convexHull(points: ReadonlyArray<number>): HullMesh | null {
       const owner = created.find((f) => distanceTo(f, point) > epsilon);
       if (owner !== undefined) owner.outside.push(p);
     }
-    pending.push(...created);
+    appendAll(pending, created);
   }
   const remap = new Map<number, number>();
   const positions: number[] = [];
@@ -145,7 +146,7 @@ export function convexHull(points: ReadonlyArray<number>): HullMesh | null {
       if (mapped === undefined) {
         mapped = positions.length / 3;
         remap.set(v, mapped);
-        positions.push(...at(v));
+        appendAll(positions, at(v));
       }
       triangles.push(mapped);
     }
@@ -161,11 +162,11 @@ function initialSimplex(count: number, at: (i: number) => Vec3, epsilon: number)
       if ((at(i)[axis] as number) < (at(min)[axis] as number)) min = i;
       if ((at(i)[axis] as number) > (at(max)[axis] as number)) max = i;
     }
-    if (Math.hypot(...sub3(at(max), at(min))) > Math.hypot(...sub3(at(hi), at(lo)))) [lo, hi] = [min, max];
+    if (hypot3(sub3(at(max), at(min))) > hypot3(sub3(at(hi), at(lo)))) [lo, hi] = [min, max];
   }
   const axis = sub3(at(hi), at(lo));
-  if (Math.hypot(...axis) <= epsilon) return null;
-  const lineDistance = (i: number): number => Math.hypot(...cross3(axis, sub3(at(i), at(lo)))) / Math.hypot(...axis);
+  if (Math.hypot(axis[0], axis[1], axis[2]) <= epsilon) return null;
+  const lineDistance = (i: number): number => hypot3(cross3(axis, sub3(at(i), at(lo)))) / Math.hypot(axis[0], axis[1], axis[2]);
   let third = -1;
   let thirdDistance = epsilon;
   for (let i = 0; i < count; i++) {

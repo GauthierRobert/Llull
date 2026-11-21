@@ -204,4 +204,14 @@ describe('CommandPalette', () => {
     act(() => usePaletteStore.getState().setOpen(false));
     expect(usePaletteStore.getState().pendingCommand).toBeNull();
   });
+
+  it('openCommand with preset values fills them over the selection pre-fill, for that command only', () => {
+    render(<Harness />);
+    act(() => usePaletteStore.getState().openCommand('boolean', { op: 'subtract', a: 'box-1.1' }));
+    expect((screen.getByLabelText(/^Op\b/) as HTMLSelectElement).value).toBe('subtract');
+    expect((screen.getByLabelText(/^A\b/) as HTMLInputElement).value).toBe('box-1.1');
+    expect(usePaletteStore.getState().pendingParams).toEqual({ op: 'subtract', a: 'box-1.1' });
+    act(() => usePaletteStore.getState().setOpen(false));
+    expect(usePaletteStore.getState().pendingParams).toBeNull();
+  });
 });

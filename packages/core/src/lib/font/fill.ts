@@ -10,6 +10,7 @@ import type { Vec2 } from '../../model/vectors';
 import { pointInPolygon, segmentsIntersect } from '../polygon';
 import { unionPolygons } from '../polygonBoolean';
 import { flattenLoop, loopArea, loopBox, type OutlineBox, type OutlineLoop } from './outline';
+import { appendAll } from '../appendAll';
 
 export interface FillRegion {
   readonly outer: OutlineLoop;
@@ -95,7 +96,7 @@ export function fillRegions(loops: readonly OutlineLoop[]): FillResult {
     for (const cluster of clusters) {
       const result = uniteOverlaps(cluster.map((index) => items[index] as Item));
       if ('error' in result) return result;
-      replaced.push(...result.loops.map(itemOf));
+      appendAll(replaced, result.loops.map(itemOf));
     }
     items = replaced;
   }

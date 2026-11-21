@@ -107,8 +107,9 @@ command   = COMMAND [ ALIAS | "_" ] { key "=" value } ;    (* any mutating regis
 for       = "for" NAME "in" expr ".." expr "{" ;           (* inclusive; closed by a "}" line *)
 check     = "check" (METRIC | READ_ONLY_COMMAND) { key "=" value } "expect" OP value [ "±" NUMBER [ "%" | UNIT ] ] ;
 key       = NAME { "." NAME } ;                            (* dotted keys fill object params *)
-value     = NUMBER-or-EXPR | NAME | ALIAS "." SIDE | ALIAS "[" INT "]" | "[" value { "," value } "]" | STRING | JSON-object | true | false ;
+value     = NUMBER-or-EXPR | NAME | ALIAS "." SIDE | ALIAS "[" SELECTOR "]" | ALIAS "." ("entity" | "entities") [ "[" SELECTOR "]" ] | "[" value { "," value } "]" | STRING | JSON-object | true | false ;
 ALIAS     = NAME with optional {expr} placeholders: post{i}
+SELECTOR  = EXPR | EXPR ".." EXPR | EXPR "..<" EXPR ;   (* index (negative counts from the end) | inclusive range | end-exclusive range *)
 OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
 ```
 
@@ -122,10 +123,11 @@ OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
 | Target param | Bare word | Number / expression | Other |
 | --- | --- | --- | --- |
 | enum | the member (else `DESIGN_BAD_ENUM` listing the members) | — | — |
-| string | the alias's first live id when the word is an alias, else the text | — | `"quoted text"` |
+| string | the alias's id when the word is a one-id alias; a group alias is `DESIGN_ALIAS_ARITY` (pick `ribs[0]`); else the text | — | `"quoted text"` |
+| string \| string[] | a one-id alias: that id; a group alias: all its ids | — | — |
 | number | a parameter / loop variable | constants fold; otherwise evaluated per run | units: `6mm` `3.2m` `2in` → document unit |
 | array of numbers | — | per item | `alias.side` → the anchor point `[x, y, z]` |
-| array | an alias expands to all its live ids | per item | — |
+| array | an alias (or `alias[a..<b]`) expands to all its live ids, a single id stays a one-item list; a word that is no alias is a literal id, `[word]` (the command then refuses an unknown id) | per item | — |
 | object with `near` | — | — | `alias.side` → `{ near: point }` |
 | object | — | — | dotted keys (`hole.kind=simple`); free-form records accept any key; unions: JSON `{…}` |
 | union | branch chosen by the value's shape | | |
@@ -143,7 +145,14 @@ OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
   what the line changed.
 - Its **geometry** is its created entities: those derived from its records (`wall-1:body-0`) when it has both. Anchors and the
   bbox / volume metrics measure the geometry.
-- `alias[i]` picks one id. A line whose command reports no id cannot take an alias (`create_material _ name="steel"` is then referred to
+- Arity is fixed at definition: an alias with one id is `single`, with several `group`. A bare group alias on a list /
+  `string | string[]` param binds every id; on a one-id param it is `DESIGN_ALIAS_ARITY` (no compatibility mode: the former
+  first-id binding is gone; the error names `ribs[0]`). Untyped params take all ids of a group.
+- `alias[expr]` picks one id (expression over parameters and loop variables; negative counts from the end: `ribs[-1]`),
+  `alias[a..<b]` / `alias[a..b]` a group; outside the ids is `DESIGN_INDEX_RANGE`.
+- `alias.entity` = the first entity the alias's line created, `alias.entities` = all (indexable: `af.entities[1]`): for lines whose alias
+  names records (`airfoil_from_naca af …` then `loft_sections sectionIds=[af.entity, …]`). On an entity alias they are its entities.
+  A line that created none is `DESIGN_NO_ENTITY`. A line whose command reports no id cannot take an alias (`create_material _ name="steel"` is then referred to
   by name).
 - Consumption: an entity a later line deletes (boolean operands, drilled targets) is consumed. Using its alias as an entity is
   `DESIGN_ALIAS_CONSUMED`, and the hint names the live alias that finally holds it. As an anchor it still works, from the box it had when
@@ -199,7 +208,7 @@ CLI: the only addition is the generic `@text:PATH` (`server/src/cli/fileParams.t
 
 Every error names its line (`error.paths = ["line N"]`), the offending text and one fix: `DESIGN_SYNTAX`, `DESIGN_UNKNOWN_COMMAND`
 (+ close names), `DESIGN_UNKNOWN_PARAM` (+ the params), `DESIGN_BAD_VALUE`, `DESIGN_BAD_ENUM` (+ members), `DESIGN_UNKNOWN_ALIAS` /
-`DESIGN_UNKNOWN_ANCHOR` / `DESIGN_UNKNOWN_PARAMETER` (+ close names), `DESIGN_ALIAS_CONSUMED` (+ live heir), `DESIGN_UNIT_NOT_SUPPORTED`,
+`DESIGN_UNKNOWN_ANCHOR` / `DESIGN_UNKNOWN_PARAMETER` (+ close names), `DESIGN_ALIAS_CONSUMED` (+ live heir), `DESIGN_ALIAS_ARITY` / `DESIGN_INDEX_RANGE` / `DESIGN_NO_ENTITY`, `DESIGN_UNIT_NOT_SUPPORTED`,
 `DESIGN_LOOP_LIMIT` (1000 iterations per loop, 5000 commands, 1000 checks), `DESIGN_STEP_FAILED` (the command's own refusal and remediation),
 `DESIGN_CHECK_FAILED`, `DESIGN_NO_DESIGN`. A design that runs no command is refused (`DESIGN_SYNTAX`). Any failure leaves the document unchanged. A failure during a regeneration surfaces as
 core's `HIST_STEP_FAILED`, naming the design line.

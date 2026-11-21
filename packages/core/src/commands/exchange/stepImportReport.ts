@@ -4,6 +4,7 @@ import type { CadDocument } from '../../model/types';
 import type { ImportedShapes, ImportedSolid, ImportShapesOptions } from '../../geometry/kernelPorts';
 import type { ModelingTolerance } from '../../model/kernelSettings';
 import { MM_PER_UNIT } from '../../model/units';
+import { maxOf } from '../../lib/arrayExtrema';
 
 interface ImportWarning {
   readonly code: 'KRN_IMPORT_TOLERANCE_HIGH' | 'XCH_GVP_YELLOW' | 'XCH_GVP_RED' | 'XCH_GVP_NOT_CHECKABLE' | 'XCH_PMI_UNMAPPED';
@@ -70,7 +71,7 @@ export function stepImportReport(input: ReportInput): StepImportReport {
           {
             code: 'KRN_IMPORT_TOLERANCE_HIGH',
             severity: 'warn',
-            message: `sub-shape tolerance up to ${Math.max(...high.map((body) => body.maxToleranceMm))} mm exceeds maxImportTolerance ${tolerance.maxImportTolerance} mm`,
+            message: `sub-shape tolerance up to ${maxOf(high.map((body) => body.maxToleranceMm))} mm exceeds maxImportTolerance ${tolerance.maxImportTolerance} mm`,
             entityIds: high.map((body) => body.id),
             remediation: 'check the result with a measurement against the source; a reviewer decides if the tolerance is acceptable',
           },
@@ -88,7 +89,7 @@ export function stepImportReport(input: ReportInput): StepImportReport {
     unit: { document: input.doc.units, scaleFromMm: 1 / MM_PER_UNIT[input.doc.units] },
     census: imported.census,
     solids: bodies,
-    maxToleranceMm: Math.max(0, ...bodies.map((body) => body.maxToleranceMm)),
+    maxToleranceMm: Math.max(0, maxOf(bodies.map((body) => body.maxToleranceMm))),
     skipped: imported.skipped,
     warnings,
     reviewRequired: { value: reasons.length > 0, reasons },

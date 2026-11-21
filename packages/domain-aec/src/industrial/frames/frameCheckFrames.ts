@@ -9,6 +9,8 @@ import { isSteelRefusal, memberStrength, strengthNote } from '../steelDesign/ste
 import { refusedFields } from '../common/utilisation';
 import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
 import { type CheckRow, SLS_CRANE, SLS_SWAY, SLS_VERTICAL, connectionCheck, solveUltimate, ultimateCombinations } from './frameCheckSolve';
+import { maxOf } from '@lib/arrayExtrema';
+import { appendAll } from '@lib/appendAll';
 
 /** Forces of a row that reports a stability or deflection limit rather than member forces. */
 const NO_FORCES = { axial: 0, moment: 0, shear: 0 } as const;
@@ -73,8 +75,8 @@ export function checkFrames(
         const fy = strength.fy;
         const resistance = sectionResistance(profile, fy);
         const moment = forces.maxMoment * amplification;
-        const shear = Math.max(...forces.shear.map(Math.abs));
-        const compression = Math.max(0, ...forces.axial.map((value) => -value));
+        const shear = maxOf(forces.shear.map(Math.abs));
+        const compression = Math.max(0, maxOf(forces.axial.map((value) => -value)));
         const section = forces.maxAxial / resistance.axial + moment / resistance.moment;
         const buckling = memberBuckling(profile, fy, compression, moment, analysis.lengths);
         const shearRatio = shear / resistance.shear;
@@ -173,8 +175,9 @@ export function checkFrames(
     });
     const swayCases: { name: string; factors: Partial<Record<LoadCase, number>>; crane: boolean }[] = [];
     if (wind) {
-      swayCases.push(
-        ...windCasesOf([frame]).map((windCase) => ({ name: `SLS ${windCase.label}`, factors: { [windCase.loadCase]: 1 }, crane: false })),
+      appendAll(
+        swayCases,
+        windCasesOf([frame]).map((windCase) => ({ name: `SLS ${windCase.label}`, factors: { [windCase.loadCase]: 1 }, crane: false })),
       );
     }
     if (frame.craneNodes.length > 0) {

@@ -11,6 +11,7 @@ import { solveFrameSystem } from './steelFrameSolve';
 import type { BeamResult, ColumnNode } from './steelFraming';
 import type { SteelBar } from './steelMemberBars';
 import { skippedRow, type MemberRow } from './steelMemberRows';
+import { appendAll } from '@lib/appendAll';
 
 interface FrameParams {
   readonly notionalFactor: number;
@@ -134,7 +135,7 @@ export function analyseFrames(
     const outcome = analyseFrame(frame, columnNodes, params);
     for (const [id, row] of outcome.rows) rows.set(id, row);
     reports.push(outcome.report);
-    warnings.push(...outcome.warnings);
+    appendAll(warnings, outcome.warnings);
     if (outcome.report.status === 'solved') {
       coverage.push({ direction: frame.direction, beamTops: frame.beams.map((beam) => beam.loads.top) });
     }

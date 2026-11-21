@@ -13,6 +13,7 @@ import { duplicateSummary, findTwin, samePoint, sameRing, sameSegment } from '..
 import { commitBuilding } from '../evaluate/evaluateElements';
 import { beamReferenceParam } from './beamReference';
 import { levelIdParam } from '../levelParams';
+import { maxOf } from '@lib/arrayExtrema';
 
 const concreteMaterialParam = z.string().optional().describe('Material. Default concrete.');
 
@@ -79,7 +80,7 @@ function resolveOutline(
   if (source.wallIds === undefined || !walls.every((wall): wall is WallElement => wall?.category === 'wall')) return { outline: null };
   if (new Set(walls.map((wall) => wall.levelId)).size > 1) return { outline: null, failure: 'wallIds belong to different levels' };
   const loop = wallLoop(walls);
-  const shift = wallShift(Math.max(...walls.map((wall) => wall.thickness)) / 2);
+  const shift = wallShift(maxOf(walls.map((wall) => wall.thickness)) / 2);
   const outline = loop ? (shift === 0 ? loop : offsetPolygon(loop, shift)) : null;
   return { outline, wallLevelId: walls[0]?.levelId };
 }

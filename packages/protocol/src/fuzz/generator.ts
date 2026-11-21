@@ -9,6 +9,7 @@
 
 import { createPrng, floorToGrid, FUZZ_GRID_MM, type Prng } from './prng';
 import { FUZZ_FEATURE_KINDS, type FuzzAction, type FuzzCase, type FuzzFeatureKind, type FuzzStep } from './types';
+import { appendAll } from '@lib/appendAll';
 
 export const MAX_FUZZ_FEATURES = 8;
 const BLEND_SIZES = [0.5, 1] as const;
@@ -253,7 +254,7 @@ function holeStep(prng: Prng, layout: Layout): FuzzStep | null {
   }
   const first = placed[0];
   if (first === undefined) return null;
-  layout.holes.push(...placed);
+  appendAll(layout.holes, placed);
   // A blind hole (118° drill point, tip ~0.6 d) must stop inside the stock: below every pocket floor, and never into a shell cavity.
   const deepest = floorToGrid(layout.floor - FUZZ_GRID_MM - 0.6 * diameter) / FUZZ_GRID_MM;
   const blind = prng.next() < 0.5 && !layout.shelled && deepest >= 1;

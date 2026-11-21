@@ -7,6 +7,7 @@
 import type { Vec3 } from '../../model/types';
 import type { CageSymmetry } from '../../model/subdivisionCage';
 import { distance3 } from '../../lib/vec3';
+import { minOf } from '../../lib/arrayExtrema';
 
 export type SymmetryAxis = 'x' | 'y' | 'z';
 const AXIS: Record<SymmetryAxis, 0 | 1 | 2> = { x: 0, y: 1, z: 2 };
@@ -61,7 +62,7 @@ export function pairVertices(vertices: ReadonlyArray<Vec3>, planes: readonly Sym
             }
       if (bestDistance <= tolerance) row[v] = best;
       else {
-        const exact = unpaired.length < REPORTED_DISTANCES ? Math.min(...vertices.map((q) => distance3(q, target))) : Infinity;
+        const exact = unpaired.length < REPORTED_DISTANCES ? minOf(vertices.map((q) => distance3(q, target))) : Infinity;
         unpaired.push({ plane, vertex: v, distance: exact });
       }
     });

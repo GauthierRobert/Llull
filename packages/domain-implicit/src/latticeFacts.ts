@@ -12,6 +12,8 @@ import { type FieldNode, type StrutsNode, type TpmsNode, withField } from './mod
 import { KNOWN_CLASS, strutBookkeeping, strutGeometry } from './struts';
 import { TPMS_FACTS, rectangularCoordinates, tpmsRegisters } from './tpms';
 import { compileField } from './compile';
+import { RESERVED_ID_MARK } from './nodeValidation';
+import { maxOf, minOf } from '@lib/arrayExtrema';
 
 const TOLERANCE = 1e-6;
 const MAX_BLOCK = 40;
@@ -68,7 +70,7 @@ export function strutFacts(node: StrutsNode, box: Box | null, radius: LawRange):
   const cells = box === null ? null : ((box.max[0] - box.min[0]) * (box.max[1] - box.min[1]) * (box.max[2] - box.min[2])) / cellVolume;
   const counted = block === null ? null : blockCounts(node, block);
   const rho1 = (r: number): number => (Math.PI * r ** 2 * lengthPerCell) / cellVolume;
-  const longest = Math.max(...lengths);
+  const longest = maxOf(lengths);
   const maxwell = book.beams - 3 * book.nodes + 6;
   return {
     cell: node.cell,
@@ -102,21 +104,24 @@ export function strutFacts(node: StrutsNode, box: Box | null, radius: LawRange):
   };
 }
 
-/** The lattice node without region, map and rotation, as a stand-alone node `__cell` (one unrotated rectangular cell at its origin). */
+/** Id of the transient bare-cell node: carries the reserved mark, so no stored node can share it (nodeValidation). */
+const BARE_CELL_ID = `${RESERVED_ID_MARK}cell`;
+
+/** The lattice node without region, map and rotation, as a stand-alone node `#cell` (one unrotated rectangular cell at its origin). */
 export function bareCell(doc: CadDocument, node: FieldNode & { op: 'tpms' | 'struts' }): ReturnType<typeof compileField> {
   const bare: FieldNode =
     node.op === 'tpms'
       ? (({ region: clipped, map: wrapped, ...rest }) => (
           void clipped,
           void wrapped,
-          { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }
+          { ...rest, rotation: [0, 0, 0] as Vec3, id: BARE_CELL_ID }
         ))(node)
       : (({ region: clipped, map: wrapped, ...rest }) => (
           void clipped,
           void wrapped,
-          { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }
+          { ...rest, rotation: [0, 0, 0] as Vec3, id: BARE_CELL_ID }
         ))(node);
-  return compileField(withField(doc, bare), '__cell');
+  return compileField(withField(doc, bare), BARE_CELL_ID);
 }
 
 /** Nodes per cell edge of the thickness analysis for a 2 x 2 x 2 block under the engine's budget (never above `wanted`). */
@@ -138,7 +143,7 @@ export interface PhaseMeasures {
  */
 export function cellPhaseMeasures(engine: FieldEngine, program: FieldProgram, node: TpmsNode, resolution: number): PhaseMeasures {
   const cell = node.cellSize;
-  const voxel = Math.min(...cell) / cellNodes(engine, resolution);
+  const voxel = minOf(cell) / cellNodes(engine, resolution);
   const box = { min: node.origin, max: [node.origin[0] + 2 * cell[0], node.origin[1] + 2 * cell[1], node.origin[2] + 2 * cell[2]] as Vec3 };
   const answer = engine.measure(program, { ...box, voxel }, null, { kind: 'nodes' });
   if (!answer.ok || answer.kind !== 'nodes')
@@ -170,7 +175,7 @@ export function tpmsFacts(
   phases: PhaseMeasures | null,
 ): Record<string, unknown> {
   const facts = TPMS_FACTS[node.kind];
-  const smallest = Math.min(...node.cellSize);
+  const smallest = minOf(node.cellSize);
   const thickness =
     node.form === 'network'
       ? null
@@ -209,10 +214,10 @@ export function measuredSpecificSurface(
   cell: Vec3,
   cells: number,
 ): number | null {
-  const voxel = Math.min(...cell) / cells;
+  const voxel = minOf(cell) / cells;
   const result = engine.mesh(nodalProgram, { min: [0, 0, 0], max: cell, voxel }, { mesher: 'tetra', maxTriangles: 2_000_000 });
   if (!result.ok) return null;
-  return meshMeasures(result.mesh).area / (cell[0] * cell[1] * cell[2]);
+  return (result.measures?.area ?? meshMeasures(result.mesh).area) / (cell[0] * cell[1] * cell[2]);
 }
 
 /** Program whose negative side is {F < 0} of the TPMS family of `node` on its rectangular cells (the nodal surface F = 0). */

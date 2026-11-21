@@ -9,6 +9,7 @@ import { effectiveFriction } from './jointPhysics';
 import { heatSeries } from './transmissionReport';
 import { propellerOutput } from './forceLaws';
 import type { SimulationTrace } from '@core/dynamics/physicsEngine';
+import { maxOf } from '@lib/arrayExtrema';
 
 /** Final values of the energy balance, J. */
 export interface EnergyData {
@@ -99,7 +100,7 @@ function thrustSeries(dynamics: DynamicsModel, trace: SimulationTrace): number[]
   for (const propeller of Object.values(dynamics.propellers)) {
     const positions = trace.bodyPosition[dynamics.joints[propeller.joint]?.child ?? ''];
     if (positions === undefined) continue;
-    const length = Math.hypot(...propeller.thrustDirection);
+    const length = Math.hypot(propeller.thrustDirection[0], propeller.thrustDirection[1], propeller.thrustDirection[2]);
     if (!(length > 0)) continue;
     const force = trace.times.map((_, i) => {
       const thrust = propellerOutput(propeller, trace.jointVelocity[propeller.joint]?.[i] ?? 0).thrust / length;
@@ -127,7 +128,7 @@ export function energyOf(dynamics: DynamicsModel, trace: SimulationTrace): { dat
   const input = appliedWork === undefined ? [] : appliedWork.map((w, i) => w + (propeller[i] ?? 0) + (thrust[i] ?? 0));
   const initial = total[0] ?? 0;
   const deviation = total.reduce((worst, e) => Math.max(worst, Math.abs(e - initial)), 0);
-  const scale = Math.max(0, ...kinetic, ...potential.map(Math.abs));
+  const scale = Math.max(0, maxOf(kinetic), maxOf(potential.map(Math.abs)));
   const balance =
     appliedWork === undefined
       ? {}

@@ -26,6 +26,8 @@ import { hasMeshLeaf } from '../../geometry/operandRecipe';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { MESH_TS_TRIANGLE_CAP } from '../../geometry/mesh/engineTypes';
 import { hasUnverifiedLeaf, sourceMeshOf } from './sourceMesh';
+import { appendAll } from '../../lib/appendAll';
+import { maxOf, minOf } from '../../lib/arrayExtrema';
 
 /** Vertices sampled for the Jacobian and displacement at most (a stride over larger meshes). */
 const MAX_SAMPLES = 200_000;
@@ -80,7 +82,7 @@ function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp, positions
           const c: Vec3 = [i, j, k].map(
             (at, a) => (law.box.min[a] as number) + (((law.box.max[a] as number) - (law.box.min[a] as number)) * at) / (GRID - 1),
           ) as unknown as Vec3;
-          oriented.push(...toWorld(warp.frame, fromBoxCoordinates(law, c)));
+          appendAll(oriented, toWorld(warp.frame, fromBoxCoordinates(law, c)));
         }
     return oriented;
   }
@@ -91,23 +93,23 @@ function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp, positions
         solveBase(law, toLocal(warp.frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number])),
       );
     const range = (a: number): [number, number] => [
-      Math.min(...coordinates.map((c) => c[a] as number)),
-      Math.max(...coordinates.map((c) => c[a] as number)),
+      minOf(coordinates.map((c) => c[a] as number)),
+      maxOf(coordinates.map((c) => c[a] as number)),
     ];
     const grid = baseSurfaceGrid(law, range(0), range(1), range(2));
     const world: number[] = [];
     for (let i = 0; i + 2 < grid.length; i += 3)
-      world.push(...toWorld(warp.frame, [grid[i] as number, grid[i + 1] as number, grid[i + 2] as number]));
+      appendAll(world, toWorld(warp.frame, [grid[i] as number, grid[i + 1] as number, grid[i + 2] as number]));
     return world;
   }
   if (law.kind === 'flowCurve' && law.base !== undefined) {
     const local: number[] = [];
     for (let i = 0; i + 2 < positions.length; i += 3)
-      local.push(...toLocal(warp.frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]));
+      appendAll(local, toLocal(warp.frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]));
     const grid = baseFlowGrid(law, local);
     const world: number[] = [];
     for (let i = 0; i + 2 < grid.length; i += 3)
-      world.push(...toWorld(warp.frame, [grid[i] as number, grid[i + 1] as number, grid[i + 2] as number]));
+      appendAll(world, toWorld(warp.frame, [grid[i] as number, grid[i + 1] as number, grid[i + 2] as number]));
     return world;
   }
   if (law.kind !== 'point' && law.kind !== 'lattice' && law.kind !== 'flowCurve' && law.kind !== 'flowSurface' && law.kind !== 'rbf')
@@ -134,7 +136,7 @@ function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp, positions
           low[1] + ((high[1] - low[1]) * j) / (GRID - 1),
           low[2] + ((high[2] - low[2]) * k) / (GRID - 1),
         ];
-        out.push(...toWorld(warp.frame, q));
+        appendAll(out, toWorld(warp.frame, q));
       }
   return out;
 }

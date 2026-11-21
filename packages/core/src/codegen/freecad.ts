@@ -10,6 +10,7 @@ import { FREECAD_SWEPT_PY } from './pythonSwept';
 import { sweptComment } from './sweptCalls';
 import { FREECAD_SUBDIVISION_PY, SUBDIVISION_PY } from './pythonSubdivision';
 import { FREECAD_CHAMFER_PY } from './pythonChamfer';
+import { appendAll } from '../lib/appendAll';
 
 const HELPERS = String.raw`
 import math
@@ -192,12 +193,9 @@ export function emitFreeCad(program: FeatureProgram): string {
     `doc = App.newDocument("llull")`,
     '',
   ];
-  lines.push(
-    ...parametersAndModel(
-      program,
-      (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${commentText(p.name)}`,
-      featureLine,
-    ),
+  appendAll(
+    lines,
+    parametersAndModel(program, (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${commentText(p.name)}`, featureLine),
   );
   lines.push('', sectionBanner('RESULT'));
   program.outputs.forEach((output, i) => {

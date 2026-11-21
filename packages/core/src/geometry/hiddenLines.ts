@@ -11,6 +11,7 @@ import { lerp3 } from '../lib/vec3';
 import { pointsExtent } from '../lib/extent';
 import { clipSegmentToSide } from './planeEdges';
 import { type Face, type FeatureEdge, type Segment2, type ViewFrame, depthOf, sectionPlane } from './viewProjection';
+import { maxOf, minOf } from '../lib/arrayExtrema';
 
 export interface EdgeRuns {
   readonly visible: Segment2[];
@@ -59,8 +60,8 @@ class Occluders {
     for (const triangle of triangles) {
       const xs = [triangle.a[0], triangle.b[0], triangle.c[0]];
       const ys = [triangle.a[1], triangle.b[1], triangle.c[1]];
-      const [i0, j0] = this.index([Math.min(...xs), Math.min(...ys)]);
-      const [i1, j1] = this.index([Math.max(...xs), Math.max(...ys)]);
+      const [i0, j0] = this.index([minOf(xs), minOf(ys)]);
+      const [i1, j1] = this.index([maxOf(xs), maxOf(ys)]);
       for (let i = i0; i <= i1; i++) {
         for (let j = j0; j <= j1; j++) {
           const key = i * this.size + j;

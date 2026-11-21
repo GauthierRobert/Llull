@@ -2,10 +2,9 @@
 
 import type { FeMeshArtifact, FeResultsArtifact, ThermalResultsSummary, ThermalSetup } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
+import { artifactHash } from '../shared/artifactHash';
 import { toMetres } from '@core/model/units';
 import type { Vec3 } from '@core/model/vectors';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
 import { systemToSi } from './thermalUnits';
 import { evaluateProbes } from '../results/probes';
 import { analysisLengthMetres } from '../shared/defaults';
@@ -14,6 +13,7 @@ import { flowsAndBalance, nodal } from './heatBalance';
 import { physicalConstantsOf, hasRadiation } from './constants';
 import { caseTables } from './material';
 import { indexMesh } from './meshGeometry';
+import { hypotOf } from '@lib/hypotOf';
 
 type Step = FeResultsArtifact['steps'][number];
 const ORIGIN: Vec3 = [0, 0, 0];
@@ -83,7 +83,7 @@ export function thermalResultsSummary(
       if (t > maxT.value) maxT = { value: t, node, timeS: timeOf(step) };
       if (t < minT.value) minT = { value: t, node, timeS: timeOf(step) };
       const components = flux !== undefined && Object.hasOwn(flux.values, String(node)) ? (flux.values[String(node)] ?? []) : [];
-      const magnitude = Math.hypot(...components.slice(0, 3));
+      const magnitude = hypotOf(components.slice(0, 3));
       if (magnitude > maxFlux.value) maxFlux = { value: magnitude, node, timeS: timeOf(step) };
     }
   }
@@ -108,7 +108,7 @@ export function thermalResultsSummary(
       series: reading.values.filter((v) => v.value !== null).map((v) => [steady ? 0 : v.time, v.value ?? 0] as const),
     });
   }
-  const resultsHash = sha256Hex(canonicalJson(results));
+  const resultsHash = artifactHash(results);
   return {
     temperatureScale: scale,
     times: steps.map(timeOf),

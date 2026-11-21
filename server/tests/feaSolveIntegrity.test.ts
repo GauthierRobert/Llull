@@ -79,7 +79,7 @@ function solve(extra: Partial<FeaSolveDeps> = {}): Promise<FeaToolResult> {
       return { summary: 'recorded', affected: [], isError: false };
     },
   };
-  return runFeaSolve('an', undefined, host, { store, hooks, ccx, ...extra });
+  return runFeaSolve('an', {}, host, { store, hooks, ccx, ...extra });
 }
 
 describe('fea_solve records and reports the mesh adequacy (FR-INT-06)', () => {

@@ -7,6 +7,7 @@
  */
 
 import type { Vec3 } from '../../model/types';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** A condition: coefficient x unknown pairs over the local unknowns of a group. */
 export type SparseRow = ReadonlyArray<readonly [number, number]>;
@@ -121,7 +122,7 @@ export function solveDense(
     for (const [k, c] of row) line[k] = (line[k] as number) + c;
     return line;
   });
-  const largest = Math.max(...dense.map((row) => Math.sqrt(dot(row, row))), 1e-300);
+  const largest = Math.max(maxOf(dense.map((row) => Math.sqrt(dot(row, row)))), 1e-300);
   const basis: Float64Array[] = [];
   const factor: Float64Array[] = [];
   const kept: number[] = [];

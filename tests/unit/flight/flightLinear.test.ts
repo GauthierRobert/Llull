@@ -1,10 +1,9 @@
 /**
- * Numerics of the linearisation (13 FLT M5): the eigenvalue solver against matrices with known spectra, the central-difference Jacobian against a
- * linear system with a known A and B, and the mode labels against hand-built state matrices.
+ * Numerics of the linearisation (13 FLT M5): the eigenvalue solver against matrices with known spectra and its iteration limit, and the
+ * central-difference Jacobian against a linear system with a known A and B (mode labels: flightModeLabels.test.ts).
  */
 import { describe, expect, it } from 'vitest';
 import { eigenvalues } from '@dynamics/flight/eigenvalues';
-import { analyseModes } from '@dynamics/flight/flightModes';
 import { centralJacobian } from '@dynamics/flight/linearModel';
 
 const sorted = (values: readonly { re: number; im: number }[]): number[][] => values.map((value) => [value.re, value.im]);
@@ -73,6 +72,33 @@ describe('eigenvalues (nonsymmetric, real)', () => {
     ]);
     expect(jordan?.map((value) => value.re)).toEqual([2, 2]);
   });
+
+  it('the cyclic permutation (on which the Francis shift stalls) converges through the exceptional shifts to the cube roots of unity', () => {
+    const values = eigenvalues([
+      [0, 0, 1],
+      [1, 0, 0],
+      [0, 1, 0],
+    ]);
+    const [one, upper, lower] = values ?? [];
+    expect(one?.re).toBeCloseTo(1, 9);
+    expect(one?.im).toBeCloseTo(0, 9);
+    expect(upper?.re).toBeCloseTo(-0.5, 9);
+    expect(upper?.im).toBeCloseTo(Math.sqrt(3) / 2, 9);
+    expect(lower?.im).toBeCloseTo(-Math.sqrt(3) / 2, 9);
+  });
+
+  it('an iteration that exhausts its sweep limit is non-convergence: null, never a partial spectrum', () => {
+    const companion = [
+      [0, 1, 0],
+      [0, 0, 1],
+      [-5, -7, -3],
+    ];
+    expect(eigenvalues(companion, 0)).toBeNull();
+    expect(eigenvalues(companion, 1)).toBeNull();
+    // 1 x 1 and 2 x 2 blocks deflate without a sweep, so they need none
+    expect(eigenvalues([[4]], 0)).toEqual([{ re: 4, im: 0 }]);
+    expect(eigenvalues(companion)).toHaveLength(3);
+  });
 });
 
 describe('centralJacobian', () => {
@@ -89,135 +115,23 @@ describe('centralJacobian', () => {
     a.forEach((row, i) => row.forEach((value, j) => expect(jacobian[i]?.[j]).toBeCloseTo(value, 9)));
     b.forEach((row, i) => expect(jacobian[i]?.[3]).toBeCloseTo(row[0] ?? 0, 9));
   });
-});
 
-/** An 8 x 8 state matrix (u, v, w, p, q, r, roll, pitch) from a longitudinal and a lateral 4 x 4 block. */
-function stateMatrix(longitudinal: number[][], lateral: number[][]): number[][] {
-  const lon = [0, 2, 4, 7];
-  const lat = [1, 3, 5, 6];
-  const a = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0));
-  lon.forEach((i, r) => lon.forEach((j, c) => ((a[i] as number[])[j] = longitudinal[r]?.[c] ?? 0)));
-  lat.forEach((i, r) => lat.forEach((j, c) => ((a[i] as number[])[j] = lateral[r]?.[c] ?? 0)));
-  return a;
-}
-
-describe('mode labels', () => {
-  it('fixed wing: phugoid < short period, Dutch roll pair, roll subsidence = fastest real, spiral = slowest real', () => {
-    const slow = [
-      [-0.02, 0.7, 0, 0],
-      [-0.7, -0.02, 0, 0],
-      [0, 0, -3, 5],
-      [0, 0, -5, -3],
-    ];
-    const lateral = [
-      [-1, 0, 0, 0],
-      [0, -8, 0, 0],
-      [0, 0, -0.5, 4],
-      [0, 0, -4, -0.5],
-    ];
-    const modes = analyseModes(stateMatrix(slow, lateral), 'fixed_wing')?.modes ?? [];
-    const byLabel = Object.fromEntries(modes.map((mode) => [mode.label, mode]));
-    expect(byLabel['phugoid']?.im).toBeCloseTo(0.7, 9);
-    expect(byLabel['phugoid']?.dampingRatio).toBeCloseTo(0.02 / Math.hypot(0.02, 0.7), 9);
-    expect(byLabel['short_period']?.im).toBeCloseTo(5, 9);
-    expect(byLabel['dutch_roll']?.periodS).toBeCloseTo((2 * Math.PI) / 4, 9);
-    expect(byLabel['roll_subsidence']?.re).toBeCloseTo(-8, 9);
-    expect(byLabel['roll_subsidence']?.timeConstantS).toBeCloseTo(0.125, 9);
-    expect(byLabel['spiral']?.re).toBeCloseTo(-1, 9);
-    expect(modes.every((mode) => mode.stability === 'stable')).toBe(true);
+  it('a step missing for a variable is an invariant breach (RangeError), never a silent zero column', () => {
+    expect(() => centralJacobian((z) => z, [1, 2], [1e-3])).toThrow(RangeError);
   });
 
-  it('an unstable spiral is flagged with its time to double; a lone longitudinal pair slower than the real roots is the phugoid', () => {
-    const longitudinal = [
-      [-0.02, 0.7, 0, 0],
-      [-0.7, -0.02, 0, 0],
-      [0, 0, -9, 0],
-      [0, 0, 0, -12],
-    ];
-    const lateral = [
-      [0.04, 0, 0, 0],
-      [0, -6, 0, 0],
-      [0, 0, -2, 0],
-      [0, 0, 0, -3],
-    ];
-    const analysed = analyseModes(stateMatrix(longitudinal, lateral), 'fixed_wing');
-    const spiral = analysed?.modes.find((mode) => mode.label === 'spiral');
-    expect(spiral?.stability).toBe('unstable');
-    expect(spiral?.timeToDoubleS).toBeCloseTo(Math.LN2 / 0.04, 9);
-    expect(analysed?.modes.find((mode) => mode.label === 'phugoid')).toBeDefined();
-    expect(analysed?.modes.filter((mode) => mode.label === 'longitudinal_real')).toHaveLength(2);
-    expect(analysed?.modes.filter((mode) => mode.label === 'lateral_real')).toHaveLength(2);
-    expect(analysed?.couplingRatio).toBe(0);
-  });
-
-  it('a lone fast pair beside slower real roots is the short period; two lateral pairs both read as Dutch roll', () => {
-    const longitudinal = [
-      [-0.05, 0, 0, 0],
-      [0, -0.2, 0, 0],
-      [0, 0, -3, 5],
-      [0, 0, -5, -3],
-    ];
-    const analysed = analyseModes(
-      stateMatrix(longitudinal, [
-        [-1, 3, 0, 0],
-        [-3, -1, 0, 0],
-        [0, 0, -2, 6],
-        [0, 0, -6, -2],
-      ]),
-      'fixed_wing',
-    );
-    expect(analysed?.modes.filter((mode) => mode.label === 'short_period')).toHaveLength(1);
-    expect(analysed?.modes.filter((mode) => mode.label === 'dutch_roll')).toHaveLength(2);
-  });
-
-  it('hover: heave is the real longitudinal root nearest A[w][w], yaw the real lateral root nearest A[r][r], the chains are translations', () => {
-    const a = stateMatrix(
-      [
-        [0, 0, 0, -9.8],
-        [0, -0.4, 0, 0],
-        [0, 0, 0, -1],
-        [0, 0, 0, 0],
-      ],
-      [
-        [0, 0, 0, -9.8],
-        [0, 0, 0, 1],
-        [0, 0, -0.3, 0],
-        [0, 1, 0, 0],
-      ],
-    );
-    const modes = analyseModes(a, 'hover')?.modes ?? [];
-    expect(modes.filter((mode) => mode.label === 'heave')).toHaveLength(1);
-    expect(modes.find((mode) => mode.label === 'heave')?.re).toBeCloseTo(-0.4, 6);
-    expect(modes.find((mode) => mode.label === 'yaw')?.re).toBeCloseTo(-0.3, 6);
-    expect(modes.filter((mode) => mode.label === 'pitch_translation').length).toBeGreaterThan(0);
-    expect(modes.filter((mode) => mode.label === 'roll_translation').length).toBeGreaterThan(0);
-  });
-
-  it('strong longitudinal-lateral coupling leaves a full-matrix root with no block root within 10 %: labelled coupled, couplingRatio > 0', () => {
-    const a = stateMatrix(
-      [
-        [-1, 0, 0, 0],
-        [0, -2, 0, 0],
-        [0, 0, -3, 0],
-        [0, 0, 0, -4],
-      ],
-      [
-        [-5, 0, 0, 0],
-        [0, -6, 0, 0],
-        [0, 0, -7, 0],
-        [0, 0, 0, -8],
-      ],
-    );
-    (a[0] as number[])[5] = 30;
-    (a[5] as number[])[0] = -30;
-    const coupled = analyseModes(a, 'fixed_wing');
-    expect(coupled?.couplingRatio).toBeGreaterThan(0.1);
-    expect(coupled?.modes.some((mode) => mode.label === 'coupled')).toBe(true);
-  });
-
-  it('a non-finite state matrix has no analysis', () => {
-    const a = stateMatrix([], []);
-    (a[0] as number[])[0] = Number.NaN;
-    expect(analyseModes(a, 'hover')).toBeNull();
+  it('outputs of unequal length fill the missing derivatives with zero: one row per output of the longest evaluation', () => {
+    // two outputs above x0 = 0, one below: d f_1 / dx reads the missing lower value as 0
+    const f = (z: readonly number[]): number[] => ((z[0] ?? 0) > 0 ? [3 * (z[0] ?? 0), 5] : [3 * (z[0] ?? 0)]);
+    const jacobian = centralJacobian(f, [0], [0.5]);
+    expect(jacobian).toHaveLength(2);
+    expect(jacobian[0]?.[0]).toBeCloseTo(3, 12);
+    expect(jacobian[1]?.[0]).toBeCloseTo(5, 12);
+    // a variable whose evaluations have fewer outputs than another's leaves 0 in its shorter column
+    const ragged = centralJacobian((z) => ((z[1] ?? 0) === 0 ? [z[0] ?? 0, 1] : [z[1] ?? 0]), [0, 0], [0.25, 0.25]);
+    expect(ragged).toEqual([
+      [1, 1],
+      [0, 0],
+    ]);
   });
 });

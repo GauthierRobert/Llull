@@ -14,6 +14,7 @@ import { entityToTriangles } from '../../geometry/entityTriangles';
 import { recognizePrism, type PrismSection } from '../../geometry/prismRecognition';
 import { solidTriangles } from '../../geometry/solidTriangles';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
+import { maxOf } from '../../lib/arrayExtrema';
 
 /** Hole tools stick out of the solid by this fraction of its depth on both ends, so the subtraction is never coplanar. */
 const TOOL_OVERSHOOT = 0.25;
@@ -25,7 +26,7 @@ const fmt = (v: Vec3): string => `[${v.map((c) => Number(c.toPrecision(6))).join
 function sameBox(built: Entity, source: readonly (readonly [Vec3, Vec3, Vec3])[]): boolean {
   const mine = boundsOfPoints(solidTriangles(built).flat());
   const theirs = boundsOfPoints(source.flat());
-  const size = Math.max(...theirs.max.map((hi, i) => hi - (theirs.min[i] as number)));
+  const size = maxOf(theirs.max.map((hi, i) => hi - (theirs.min[i] as number)));
   return [0, 1, 2].every(
     (i) =>
       Math.abs((mine.min[i] as number) - (theirs.min[i] as number)) <= BOUNDS_TOLERANCE * size &&

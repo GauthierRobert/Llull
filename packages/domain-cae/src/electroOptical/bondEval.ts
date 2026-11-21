@@ -14,6 +14,7 @@ import { electroOpticalOf } from './model';
 import { bulkResistance } from './physics';
 import { resistivityOf } from './resistivity';
 import type { BondElement, BondPath } from './types';
+import { appendAll } from '@lib/appendAll';
 
 export type BondStatus = 'pass' | 'fail' | 'unknown';
 
@@ -65,6 +66,11 @@ const FAIL_ORDER = ['EOP_COATING_INSULATES', 'EOP_BOND_RESISTANCE_EXCEEDED'];
 
 /** A composite material cannot replace a metallic bond path: its record names a composite product form or designation (a heuristic on the record text, stated in the warning). */
 const COMPOSITE_TEXT = /cfrp|carbon|composite|laminate|prepreg|fabric|gfrp|kevlar/i;
+/** Metals whose names hold a composite word ("carbon steel", "AISI 1020 carbon steel"). */
+const METAL_TEXT = /carbon[\s-]+steel/gi;
+
+/** True when a material record's text names a composite (carbon steel excluded). */
+export const isCompositeText = (text: string): boolean => COMPOSITE_TEXT.test(text.replace(METAL_TEXT, ' '));
 
 interface Evaluated {
   readonly row: BondElementRow;
@@ -107,9 +113,9 @@ function evaluateElement(
   if ('code' in rho)
     return { row: strap(null, element.material), finding: { code: rho.code, message: `strap ${rho.message}` }, unverified: [] };
   const record = Object.hasOwn(doc.materials, element.material) ? doc.materials[element.material]?.record : undefined;
-  const composite = COMPOSITE_TEXT.test(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
+  const composite = isCompositeText(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
   return {
-    row: strap(bulkResistance(rho.rho, length.value, area.value), `${rho.provenance}; R = rho L / A`),
+    row: strap(bulkResistance(rho.rho, length.value, area.value), `${rho.provenance}; ${rho.temperatureModel}; R = rho L / A`),
     ...(composite
       ? {
           warning: {
@@ -179,7 +185,7 @@ const severity = (finding: Finding): number => {
 export function bondRow(doc: CadDocument, path: BondPath, context: BondContext, ctx: ExecutionContext | undefined): BondRow {
   const evaluated = path.elements.map((element, index) => evaluateElement(doc, element, index, path, ctx));
   const findings: Finding[] = evaluated.flatMap((item) => (item.finding === undefined ? [] : [item.finding]));
-  for (const element of path.elements) if (element.kind === 'joint') findings.push(...interfaceFindings(doc, element, context));
+  for (const element of path.elements) if (element.kind === 'joint') appendAll(findings, interfaceFindings(doc, element, context));
   const resolved = evaluated.every((item) => item.row.ohm !== null);
   const totalOhm = resolved ? evaluated.reduce((sum, item) => sum + (item.row.ohm === null ? 0 : item.row.ohm), 0) : null;
   const elements = evaluated.map(

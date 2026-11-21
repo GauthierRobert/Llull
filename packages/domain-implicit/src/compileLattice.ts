@@ -21,6 +21,7 @@ import {
   sphericalCoordinates,
   tpmsRegisters,
 } from './tpms';
+import { minOf } from '@lib/arrayExtrema';
 
 /** `part` kept where the region field is negative (max of the two), or `part` itself without a region. */
 function clipToRegion(host: CompileHost, part: Part, region: string | undefined, frame: Frame): Part {
@@ -111,7 +112,7 @@ export function tpmsPart(host: CompileHost, node: TpmsNode, frame: Frame): Part 
   const { field, gradient } = tpmsRegisters(b, node.kind, cellCoordinates(host, node, frame));
   const value = host.law(node.control.value, frame);
   const graded = typeof node.control.value === 'string';
-  const smallest = Math.min(...node.cellSize);
+  const smallest = minOf(node.cellSize);
   let reg: number;
   if (node.form === 'network') {
     const level = graded ? b.sub(field, value.reg) : b.shift(field, -value.lo);
@@ -131,7 +132,7 @@ export function tpmsPart(host: CompileHost, node: TpmsNode, frame: Frame): Part 
 
 /** Largest radius the periodic set may carry: the law's upper bound, else just under half the shortest strut. */
 function radiusReach(node: StrutsNode, value: ScalarPart): number {
-  const shortest = Math.min(...strutGeometry(node.cell, node.cellSize, 1e-6, undefined).lengths);
+  const shortest = minOf(strutGeometry(node.cell, node.cellSize, 1e-6, undefined).lengths);
   return Number.isFinite(value.hi) ? Math.min(value.hi, shortest / 2) : shortest / 2;
 }
 

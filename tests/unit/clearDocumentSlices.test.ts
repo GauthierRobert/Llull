@@ -43,6 +43,8 @@ const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {
   activeExplodedView: {},
   sketchPlanes: { a: {} },
   sketchLinks: { a: {} },
+  dimensionStyles: { a: {} },
+  activeDimensionStyleId: 'a',
 };
 
 const withProbe = (key: string): CadDocument => ({ ...createEmptyDocument(), [key]: SLICE_PROBES[key as keyof typeof SLICE_PROBES] });

@@ -24,6 +24,8 @@ import { validateCamera, validateLayer, validateEntityValue, validateMaterialVal
 import { materialLibraryProblems } from './materialRecordValidation';
 import { mechanismProblems } from './mechanismValidation';
 import { sketchPlaneProblems } from './sketchPlaneValidation';
+import { dimensionStyleProblems } from './dimensionStyleValidation';
+import { appendAll } from '../../lib/appendAll';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
 
@@ -135,6 +137,7 @@ const PROTOTYPE_KEYED_RECORDS = [
   'explodedViews',
   'sketchPlanes',
   'sketchLinks',
+  'dimensionStyles',
 ] as const;
 
 /** Commands that rewrite or replay `featureHistory`; recorded as a step they would re-enter replay. Other legacy meta/read-only steps replay inertly. */
@@ -169,6 +172,8 @@ function historyProblems(history: ReadonlyArray<unknown>): string[] {
     if (!isRecord(step['params'])) errors.push(`${where}: params must be an object`);
     if (step['affected'] !== undefined && !isStringArray(step['affected'])) errors.push(`${where}: affected must be an array of strings`);
     if (step['suppressed'] !== undefined && typeof step['suppressed'] !== 'boolean') errors.push(`${where}: suppressed must be a boolean`);
+    if (step['mergedStepKeys'] !== undefined && !isStringArray(step['mergedStepKeys']))
+      errors.push(`${where}: mergedStepKeys must be an array of strings`);
   });
   return errors;
 }
@@ -268,28 +273,29 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
     }
   }
   const history = v['featureHistory'];
-  if (Array.isArray(history)) errors.push(...historyProblems(history));
+  if (Array.isArray(history)) appendAll(errors, historyProblems(history));
   for (const layer of Object.values(layers)) {
     if (!validateLayer(layer)) errors.push(`layer entry is malformed: ${JSON.stringify(layer)}`);
   }
   validateSection(v['materials'], validateMaterialValue);
-  errors.push(...materialLibraryProblems(v['materialLibraries'], v['materials']));
+  appendAll(errors, materialLibraryProblems(v['materialLibraries'], v['materials']));
   validateSection(v['parameters'], validateParameterValue);
   validateSection(v['recipes'], validateRecipeValue);
   validateSection(v['constraints'], validateConstraintValue);
   validateSection(v['joints'], validateJointValue);
-  errors.push(...drawingsProblems(v['drawings']));
-  errors.push(...pmiProblems(v['pmi']));
-  errors.push(...exchangeProblems(v['exchange']));
-  errors.push(...dynamicsProblems(v['dynamics']));
-  errors.push(...prototypeProblems(v['prototype']));
-  errors.push(...reviewProblems(v['review'], v['display']));
-  errors.push(...displayProblems(v['display']));
-  errors.push(...instanceArrayProblems(v['instanceArrays'], v));
-  errors.push(...kernelSliceProblems(v));
-  for (const extension of documentExtensions()) errors.push(...extension.validate(v));
+  appendAll(errors, drawingsProblems(v['drawings']));
+  appendAll(errors, pmiProblems(v['pmi']));
+  appendAll(errors, exchangeProblems(v['exchange']));
+  appendAll(errors, dynamicsProblems(v['dynamics']));
+  appendAll(errors, prototypeProblems(v['prototype']));
+  appendAll(errors, reviewProblems(v['review'], v['display']));
+  appendAll(errors, displayProblems(v['display']));
+  appendAll(errors, instanceArrayProblems(v['instanceArrays'], v));
+  appendAll(errors, kernelSliceProblems(v));
+  for (const extension of documentExtensions()) appendAll(errors, extension.validate(v));
   validateSection(v['driveRelations'], validateDriveRelationValue);
-  errors.push(...mechanismProblems(v));
-  errors.push(...sketchPlaneProblems(v));
+  appendAll(errors, mechanismProblems(v));
+  appendAll(errors, sketchPlaneProblems(v));
+  appendAll(errors, dimensionStyleProblems(v));
   return errors;
 }

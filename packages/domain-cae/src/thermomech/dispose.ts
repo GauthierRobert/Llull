@@ -10,13 +10,15 @@ import { sha256Hex } from '@lib/sha256';
 import { execute } from '@core/commands/registry';
 import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity, withDocumentUid } from '@core/model/documentUid';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
+import { stepStamp } from '@lib/replaySurvivors';
+import { notReapplied } from '../shared/signedGate';
 import { analysisOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { refuseTmc } from './refusal';
 
 /**
  * @affects doc.analysis.fitDispositions[rowKey] (affected: [rowKey]) and doc.analysis.fitLedger; stores the verified signature and the document uid next to the decision so a reader can re-verify it
- * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); a replay honours a recorded step only from `analysis.fitLedger` (kept by replaySeed; same row, decision,
+ * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); a replay honours a recorded step only from `analysis.fitLedger` (kept by replaySeed while its stamped step is live, none kept for the row: a no-op, pending; same row, decision,
  *   justification, inputsHash and this document's uid, its signature re-verified when a port is installed), so a replay never invents a disposition and a document with another uid loses it (a byte copy keeps its uid by design); recorded only with a signature verified, then spent last (a refusal never burns it), over sha256 of canonical JSON
  *   { act, documentUid, rowKey, decision, justification, inputsHash }; with `fitParams` the command re-runs fit_at_temperature itself (also on replay) and the row must hash to `inputsHash`
  *   (a client-given `currentInputsHash` is only a hint)
@@ -68,6 +70,12 @@ export const disposeFitResult = defineCommand({
               entry.documentUid === documentIdentity(doc),
           )
         : undefined;
+    if (
+      ctx?.replaying === true &&
+      isRecordedConfirmation(confirmation) &&
+      !(model.fitLedger ?? []).some((entry) => entry.rowKey === rowKey)
+    )
+      return notReapplied(doc, 'dispose_fit_result', rowKey);
     const port = ctx?.humanSignature ?? null;
     const payloadFor = (documentUid: string): string =>
       sha256Hex(canonicalJson(withDocumentUid({ act: 'dispose_fit_result', rowKey, decision, justification, inputsHash }, documentUid)));
@@ -115,7 +123,7 @@ export const disposeFitResult = defineCommand({
       documentUid: documentIdentity(doc),
     };
     const fitDispositions: FitDispositions = { ...model.fitDispositions, [rowKey]: record };
-    const fitLedger = kept === undefined ? [...(model.fitLedger ?? []), { ...record, rowKey }] : model.fitLedger;
+    const fitLedger = kept === undefined ? [...(model.fitLedger ?? []), { ...record, rowKey, ...stepStamp(ctx) }] : model.fitLedger;
     return changed(
       { ...doc, analysis: { ...model, fitDispositions, ...(fitLedger !== undefined ? { fitLedger } : {}) } },
       `dispose_fit_result: row '${rowKey}' ${decision} by ${signer.signer} (signature ${signer.signatureId}).`,

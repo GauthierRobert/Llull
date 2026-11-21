@@ -2,7 +2,7 @@
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FeMeshArtifact, FeResultsArtifact, ResultsSummary } from '@core/model/analysis';
@@ -62,6 +62,7 @@ const STEP = { step: 1, time: 1, fields: { DISP: { components: ['D1'], values: {
 
 interface Harness {
   readonly timeouts: number[];
+  readonly threads: (number | undefined)[];
   readonly commands: { name: string; params: unknown }[];
   readonly ccx: CcxRunner;
   readonly host: { getDoc: () => CadDocument; applyCommand: (name: string, params: unknown) => FeaToolResult };
@@ -70,10 +71,12 @@ interface Harness {
 
 function harness(frdText: string, hooks: Partial<CaeHooks> = {}): Harness {
   const timeouts: number[] = [];
+  const threads: (number | undefined)[] = [];
   const commands: { name: string; params: unknown }[] = [];
   const ccx: CcxRunner = {
-    run: async (jobDirectory, job, timeoutMs) => {
+    run: async (jobDirectory, job, timeoutMs, solverThreads) => {
       timeouts.push(timeoutMs);
+      threads.push(solverThreads);
       await writeFile(path.join(jobDirectory, `${job}.frd`), frdText);
       return { exitCode: 0, log: '', timedOut: false };
     },
@@ -94,8 +97,112 @@ function harness(frdText: string, hooks: Partial<CaeHooks> = {}): Harness {
     resultsSummary: (_doc, _id, _mesh, _results, hash) => summaryOf(hash),
     ...hooks,
   };
-  return { timeouts, commands, ccx, host, hooks: merged };
+  return { timeouts, threads, commands, ccx, host, hooks: merged };
 }
+
+describe('solver threads (PERF1)', () => {
+  it('runs on one thread unless asked, and a threaded run says so in the summary, the data and the artifact', async () => {
+    const single = harness('x');
+    const one = await runFeaSolve('an', {}, single.host, { store, hooks: single.hooks, ccx: single.ccx });
+    expect(single.threads).toEqual([1]);
+    expect(one.summary).not.toContain('solver threads');
+    expect(one.data).toMatchObject({ threads: 1 });
+
+    const many = harness('x');
+    const four = await runFeaSolve('an', { threads: 4 }, many.host, { store, hooks: many.hooks, ccx: many.ccx });
+    expect(many.threads).toEqual([4]);
+    expect(four.summary).toContain('4 solver threads: the last digits vary between runs');
+    expect(four.data).toMatchObject({ threads: 4 });
+    const stored = store.get(String((four.data as { resultsHash: string }).resultsHash));
+    expect(stored).toMatchObject({ kind: 'fe_results', solverThreads: 4 });
+    const plain = store.get(String((one.data as { resultsHash: string }).resultsHash));
+    expect(plain === null ? null : 'solverThreads' in plain).toBe(false);
+  });
+
+  it('takes the host default of the runner and clamps the request to [1, 256]', async () => {
+    const hosted = harness('x');
+    await runFeaSolve('an', {}, hosted.host, { store, hooks: hosted.hooks, ccx: { ...hosted.ccx, defaultThreads: 6 } });
+    await runFeaSolve('an', { threads: 9999 }, hosted.host, { store, hooks: hosted.hooks, ccx: hosted.ccx });
+    await runFeaSolve('an', { threads: 0 }, hosted.host, { store, hooks: hosted.hooks, ccx: hosted.ccx });
+    expect(hosted.threads).toEqual([6, 256, 1]);
+  });
+
+  it('the tool schema states the bounds and the dispatch forwards a whole number of threads', async () => {
+    const tool = buildFeaToolDefinitions().find((entry) => entry.name === 'fea_solve');
+    expect(tool?.inputSchema.properties['threads']).toMatchObject({ type: 'integer', minimum: 1, maximum: 256 });
+    const seen: (number | undefined)[] = [];
+    const port: FeaToolsPort = {
+      mesh: () => Promise.resolve(ok('')),
+      solve: (_id, options) => {
+        seen.push(options.threads);
+        return Promise.resolve(ok(''));
+      },
+      exportDeck: () => Promise.resolve(ok('')),
+      importField: () => Promise.resolve(ok('')),
+      convergenceStudy: () => Promise.resolve(ok('')),
+      importResults: () => Promise.resolve(ok('')),
+    };
+    const deps = { port: null, allowCodeExecution: false, getDoc: createEmptyDocument, applyCommand: () => ok(''), fea: port };
+    for (const threads of [4.7, 100000, 0, 'many']) await applyExchangeToolCall('fea_solve', { analysisId: 'an', threads }, deps);
+    await applyExchangeToolCall('fea_solve', { analysisId: 'an' }, deps);
+    expect(seen).toEqual([4, 256, undefined, undefined, undefined]);
+  });
+});
+
+describe('solver method (PERF1)', () => {
+  it('solves on the direct solver unless asked; the iterative deck, summary, data and artifact say so', async () => {
+    const decks: string[] = [];
+    const reading = (run: Harness): CcxRunner => ({
+      ...run.ccx,
+      run: async (jobDirectory, job, timeoutMs, threads) => {
+        decks.push(await readFile(path.join(jobDirectory, `${job}.inp`), 'utf8'));
+        return run.ccx.run(jobDirectory, job, timeoutMs, threads);
+      },
+    });
+    const hooks = { iterativeSolverDeck: (_doc: CadDocument, _id: string, text: string) => ({ text: `${text}** iterative\n` }) };
+    const direct = harness('x', hooks);
+    const plain = await runFeaSolve('an', {}, direct.host, { store, hooks: direct.hooks, ccx: reading(direct) });
+    expect(plain.data).toMatchObject({ solver: 'direct' });
+    expect(plain.summary).not.toContain('Iterative solver');
+    const asked = harness('x', hooks);
+    const iterative = await runFeaSolve('an', { solver: 'iterative' }, asked.host, { store, hooks: asked.hooks, ccx: reading(asked) });
+    expect(decks).toEqual(['*DECK\n', '*DECK\n** iterative\n']);
+    expect(iterative.summary).toContain('Iterative solver: results agree with a direct solve to about three digits (a few 1e-4 relative)');
+    expect(iterative.data).toMatchObject({ solver: 'iterative' });
+    expect(store.get(String((iterative.data as { resultsHash: string }).resultsHash))).toMatchObject({ solverMethod: 'iterative' });
+    const stored = store.get(String((plain.data as { resultsHash: string }).resultsHash));
+    expect(stored === null ? null : 'solverMethod' in stored).toBe(false);
+  });
+
+  it('refuses a case the iterative solver does not suit before starting the solver', async () => {
+    const run = harness('x');
+    const result = await runFeaSolve('an', { solver: 'iterative' }, run.host, { store, hooks: run.hooks, ccx: run.ccx });
+    expect(result.isError).toBe(true);
+    expect(result.summary).toContain('fea_solve FEA_SOLVER_OPTION_UNSUPPORTED');
+    expect(run.timeouts).toEqual([]);
+  });
+
+  it('the tool schema lists the methods and the dispatch forwards a known one only', async () => {
+    const tool = buildFeaToolDefinitions().find((entry) => entry.name === 'fea_solve');
+    expect(tool?.inputSchema.properties['solver']).toMatchObject({ type: 'string', enum: ['direct', 'iterative'] });
+    const seen: (string | undefined)[] = [];
+    const port: FeaToolsPort = {
+      mesh: () => Promise.resolve(ok('')),
+      solve: (_id, options) => {
+        seen.push(options.solver);
+        return Promise.resolve(ok(''));
+      },
+      exportDeck: () => Promise.resolve(ok('')),
+      importField: () => Promise.resolve(ok('')),
+      convergenceStudy: () => Promise.resolve(ok('')),
+      importResults: () => Promise.resolve(ok('')),
+    };
+    const deps = { port: null, allowCodeExecution: false, getDoc: createEmptyDocument, applyCommand: () => ok(''), fea: port };
+    for (const solver of ['iterative', 'direct', 'pardiso', 3])
+      await applyExchangeToolCall('fea_solve', { analysisId: 'an', solver }, deps);
+    expect(seen).toEqual(['iterative', 'direct', undefined, undefined]);
+  });
+});
 
 describe('timeoutS bounds (review finding 9)', () => {
   it('the tool schema states minimum and maximum', () => {
@@ -122,9 +229,9 @@ describe('timeoutS bounds (review finding 9)', () => {
     expect(seen).toEqual([86400, 1, 30]);
 
     const high = harness('x');
-    await runFeaSolve('an', 1e12, high.host, { store, hooks: high.hooks, ccx: high.ccx });
+    await runFeaSolve('an', { timeoutS: 1e12 }, high.host, { store, hooks: high.hooks, ccx: high.ccx });
     const low = harness('x');
-    await runFeaSolve('an', 0, low.host, { store, hooks: low.hooks, ccx: low.ccx });
+    await runFeaSolve('an', { timeoutS: 0 }, low.host, { store, hooks: low.hooks, ccx: low.ccx });
     expect(high.timeouts).toEqual([86_400_000]);
     expect(low.timeouts).toEqual([1000]);
   });
@@ -134,7 +241,7 @@ describe('result handling (review findings 8-9)', () => {
   it('refuses a result file above the cap without parsing it', async () => {
     const parseFrd = vi.fn(() => [STEP]);
     const run = harness('x'.repeat(50), { parseFrd });
-    const result = await runFeaSolve('an', undefined, run.host, { store, hooks: run.hooks, ccx: run.ccx, maxResultsBytes: 10 });
+    const result = await runFeaSolve('an', {}, run.host, { store, hooks: run.hooks, ccx: run.ccx, maxResultsBytes: 10 });
     expect(result.isError).toBe(true);
     expect(result.summary).toContain('FEA_RESULTS_TOO_LARGE');
     expect(parseFrd).not.toHaveBeenCalled();
@@ -144,7 +251,7 @@ describe('result handling (review findings 8-9)', () => {
   it('refuses non-finite results as FEA_SOLVER_FAILED and records nothing', async () => {
     const nan = { ...STEP, fields: { DISP: { components: ['D1'], values: { '1': [Number.NaN] } } } };
     const run = harness('x', { parseFrd: () => [nan] });
-    const result = await runFeaSolve('an', undefined, run.host, { store, hooks: run.hooks, ccx: run.ccx });
+    const result = await runFeaSolve('an', {}, run.host, { store, hooks: run.hooks, ccx: run.ccx });
     expect(result.isError).toBe(true);
     expect(result.summary).toContain('FEA_SOLVER_FAILED');
     expect(result.summary).toContain('non-finite');
@@ -166,7 +273,7 @@ describe('result handling (review findings 8-9)', () => {
       get: (hash) => (reads.push(hash), store.get(hash)),
     };
     const run = harness('x', { resultsSummary });
-    const result = await runFeaSolve('an', undefined, run.host, { store: spying, hooks: run.hooks, ccx: run.ccx });
+    const result = await runFeaSolve('an', {}, run.host, { store: spying, hooks: run.hooks, ccx: run.ccx });
     expect(result.isError).toBe(false);
     const hash = received[0]?.hash ?? '';
     expect(hash).toMatch(/^[0-9a-f]{64}$/);

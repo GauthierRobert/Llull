@@ -89,7 +89,7 @@ llull check_creep analysisId=$an $D > check.json            # must not contain s
 llull fea_mesh analysisId=$an $D --timeout 300 > mesh.json
 llull fea_solve analysisId=$an $D --timeout 900 --progress > solve.json
 llull creep_report analysisId=$an $D > report.json         # probes[centre].history[-1].ceeq vs VC-CRP-10
-python3 -I compare.py report.json expected_results.json VC-CRP-10    # PHY-00 harness: value, tolerance, unit
+llull compare_expected report.json expected_results.json VC-CRP-10 pointer=/data/maxCeeq/value   # PHY-00 judge: value, tolerance, unit
 llull creep_closed_form check=norton_relaxation 'inputs={"E_MPa":200000,"A":1e-18,"n":5,"sigma0_MPa":100,"t_s":3600}' --json
 ```
 

@@ -46,6 +46,8 @@ export interface Rotor {
   readonly airDensity: number;
   /** kg·m² of the parts spinning with the rotor (blades, hub, motor bell) about its axis; 0 = no gyroscopic torque. */
   readonly spinInertiaKgM2: number;
+  /** Blades of the rotor (a whole number >= 1), when known: the blade-passing order of check_rotor_resonance (14 FLL-M4b). Absent = not stated. */
+  readonly bladeCount?: number;
 }
 
 /**
