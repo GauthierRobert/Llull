@@ -1022,7 +1022,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     }
     // the steady-speed map of the pieces of a chain of several edges
     for (Piece &piece : chain.pieces) {
-      constexpr int kNodes = 128;
+      constexpr int kNodes = 1024;
       std::vector<double> speed(kNodes + 1), cumulative(kNodes + 1, 0.0);
       for (int i = 0; i <= kNodes; ++i) {
         speed[i] = star.raw[piece.edge].tangent(piece.a + (piece.b - piece.a) * i / kNodes).Magnitude();
