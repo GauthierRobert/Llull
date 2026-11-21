@@ -162,6 +162,15 @@ describe('saveFiles', () => {
     expect(intoDir[0]?.path).toBe(path.join(root, 'm.scad'));
   });
 
+  it('writes data.image (capture_viewport) as the .png and strips it from the printed data', () => {
+    const root = dir();
+    const bytes = Buffer.from([137, 80, 78, 71, 1, 2, 3]);
+    const data = { image: bytes.toString('base64'), width: 1, height: 1, view: 'iso' };
+    const [saved] = saveDataFiles(data, path.join(root, 'cap', 'engine.png'));
+    expect(readFileSync(saved?.path ?? '')).toEqual(bytes);
+    expect(withoutPayloads(data)).toMatchObject({ image: expect.stringContaining('saved'), width: 1 });
+  });
+
   it('rasterizes svg for a .png target and fails clearly without a payload', () => {
     const root = dir();
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';

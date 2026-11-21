@@ -132,7 +132,7 @@ export function guardRead(): RequestHandler {
   const inner = buildGuard(true);
   return (req, res, next) => {
     const presented = req.query['ticket'];
-    const isLiveStream = req.method === 'GET' && req.baseUrl + req.path === '/live';
+    const isLiveStream = req.method === 'GET' && ['/live', '/viewport/stream'].includes(req.baseUrl + req.path);
     if (typeof presented !== 'string' || presented === '' || !isLiveStream || req.headers.authorization !== undefined)
       return inner(req, res, next);
     if (!consumeTicket(presented)) return void res.status(401).json(UNAUTHORIZED_BODY);

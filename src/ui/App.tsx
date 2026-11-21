@@ -21,6 +21,7 @@ import { ExportAnimationDialog } from '@ui/components/ExportAnimationDialog';
 import { CommandPalette } from '@ui/components/commandPalette/CommandPalette';
 import { PaletteResultToast } from '@ui/components/commandPalette/PaletteResultToast';
 import { useLiveDocument } from '@ui/hooks/useLiveDocument';
+import { useViewportCapture } from '@ui/hooks/useViewportCapture';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { useAutoFrame } from '@ui/hooks/useAutoFrame';
 import { useAutosave } from '@ui/hooks/useAutosave';
@@ -45,6 +46,7 @@ export function App(): React.ReactElement {
   const showInspector = inspectorOpen && hasSelection;
 
   useLiveDocument();
+  useViewportCapture();
   useKeyboardShortcuts();
   useAutoFrame();
   useAutosave();

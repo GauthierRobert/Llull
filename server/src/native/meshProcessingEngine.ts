@@ -506,7 +506,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
       const key = keyOf(files);
       // a finished result answers without a scope: a hit needs no job
       const held = scope?.lookup(key) ?? keptResult(key);
-      if (held !== undefined) return held;
+      if (held !== undefined && !('frame' in held)) return held;
       if (scope === null)
         return failure(
           MESH_ENGINE_NEEDS_HOST,

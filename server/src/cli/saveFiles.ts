@@ -17,7 +17,7 @@ export interface OutputFile {
   readonly bytes: Buffer;
 }
 
-const BASE64_KEYS = ['stlBase64', 'stepBase64', 'base64'] as const;
+const BASE64_KEYS = ['stlBase64', 'stepBase64', 'base64', 'image'] as const;
 const TEXT_KEYS = ['text', 'step', 'iges', 'stl', 'ifc', 'dxf', 'svg', 'content'] as const;
 
 /** The single file a data record carries (base64 or text payload), or null. */
@@ -125,7 +125,9 @@ export function saveDataFiles(data: unknown, target: string, exportDir?: string)
       },
     ];
   }
-  const files = wantsPng ? (png !== null ? [png] : []) : filesOfData(data); // never svg text into a .png
+  // never text into a .png: its picture is the rasterized svg, or a PNG the command returned itself (data.image, capture_viewport)
+  const picture = isRecord(data) && nonEmptyString(data['image']) !== undefined ? filesOfData({ image: data['image'] }) : [];
+  const files = wantsPng ? (svg !== undefined ? (png !== null ? [png] : []) : picture) : filesOfData(data);
   if (files.length === 0) {
     throw new Error(
       wantsPng
