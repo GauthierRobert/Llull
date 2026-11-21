@@ -23,7 +23,12 @@ export class RefValue {
   ) {}
 }
 
-export type Value = number | boolean | string | null | readonly Value[] | { readonly [key: string]: Value } | RefValue;
+/** A module instance namespace (`fan` of `use "fan.lld" as fan`): `fan.blades` reads its exported alias. */
+export class NamespaceValue {
+  constructor(readonly path: string) {}
+}
+
+export type Value = number | boolean | string | null | readonly Value[] | { readonly [key: string]: Value } | RefValue | NamespaceValue;
 
 export interface FnDef {
   readonly name: string;
@@ -40,6 +45,8 @@ export interface EvalHost {
   readonly functions: ReadonlyMap<string, FnDef>;
   /** The alias `name`, or `.entity` / `.entities` of it; undefined when unbound. */
   alias(name: string, member: 'entity' | 'entities' | null): RefValue | undefined;
+  /** True when `name` is a module instance namespace (some exported alias lives under it). */
+  namespace?(name: string): boolean;
 }
 
 /** A list (range, comprehension, linspace, concat) longer than this is refused. */
@@ -161,6 +168,7 @@ class Evaluator {
     if (Object.hasOwn(BUILTIN_CONSTANTS, name)) return BUILTIN_CONSTANTS[name] ?? 0;
     const ref = fnDepth === 0 ? this.host.alias(name, null) : undefined;
     if (ref !== undefined) return ref;
+    if (fnDepth === 0 && this.host.namespace?.(name) === true) return new NamespaceValue(name);
     const known = [...Object.keys(this.host.parameters), ...(fnDepth === 0 ? Object.keys(this.host.vars) : [])];
     for (let s = scope; s !== null; s = s.parent) known.push(s.name);
     const near = similarNames(name, known);
@@ -276,6 +284,13 @@ class Evaluator {
 
   private member(baseExpr: Expr, name: string, scope: Scope | null, fnDepth: number): Value {
     const base = this.eval(baseExpr, scope, fnDepth);
+    if (base instanceof NamespaceValue) {
+      const path = `${base.path}.${name}`;
+      const ref = this.host.alias(path, null);
+      if (ref !== undefined) return ref;
+      if (this.host.namespace?.(path) === true) return new NamespaceValue(path);
+      throw this.type(`module ${base.path} exports no "${name}"`, 'Only names in the module `export` line are visible outside it.');
+    }
     if (base instanceof RefValue) {
       if ((name === 'entity' || name === 'entities') && base.name !== null) {
         const ref = this.host.alias(base.name, name);

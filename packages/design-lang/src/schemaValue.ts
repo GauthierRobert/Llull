@@ -42,6 +42,8 @@ export class NameRef {
     readonly param = '',
     /** The param is a list: the reference resolves to a list even for one id. */
     readonly list = false,
+    /** Slot without a schema (nested list item): a name that is a parameter or loop variable reads as its number. */
+    readonly untyped = false,
   ) {}
 }
 
@@ -78,7 +80,7 @@ export interface BoundCommand {
 }
 
 export const SIDES: readonly string[] = ['top', 'bottom', 'front', 'back', 'left', 'right', 'center'];
-const ANCHOR = /^([A-Za-z_][\w{}+\-*/]*)\.(top|bottom|front|back|left|right|center)$/;
+const ANCHOR = /^([A-Za-z_][\w{}+\-*/]*(?:\.[A-Za-z_][\w{}+\-*/]*)*)\.(top|bottom|front|back|left|right|center)$/;
 const PLAIN_NAME = /^[A-Za-z_][\w{}+\-*/]*$/;
 const ALIGNS = ['front', 'back', 'left', 'right', 'top', 'bottom'];
 
@@ -306,6 +308,6 @@ function untypedValue(node: ValueNode, key: string, ctx: BindContext): Template 
   if (node.kind === 'list') return node.items.map((item) => untypedValue(item, key, ctx));
   if (node.kind !== 'word') return null;
   if (node.text === 'true' || node.text === 'false') return node.text === 'true';
-  if (isPlainRef(node.text)) return new NameRef(node.text, true, key);
+  if (isPlainRef(node.text)) return new NameRef(node.text, true, key, false, true);
   return numberValue(node, key, ctx);
 }

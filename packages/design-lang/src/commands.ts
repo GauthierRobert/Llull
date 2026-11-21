@@ -10,7 +10,9 @@ import type { CommandResult } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument, type FeatureStep } from '@core/model/types';
 import { MM_PER_UNIT } from '@core/model/units';
 import { attempt, DesignError, toCommandError } from './errors';
-import { addedRecordKeys, withoutOwnRecords } from './regenerate';
+import { addedRecordKeys, withoutOwnLayers, withoutOwnRecords } from './regenerate';
+import { changedModules, embedModules, filesOfEmbedded, loadModules, type EmbeddedModule } from './modules';
+import { normalizeModulePath } from './modulePath';
 import { parseDesign, type Statement } from './parse';
 import { evaluateChecks, runDesign, type TraceLine } from './run';
 import { convertUnits } from './units';
@@ -22,6 +24,11 @@ const DESIGN_STEP = 'design_source';
 function designStep(doc: CadDocument): FeatureStep | undefined {
   return doc.featureHistory.find((step) => step.name === DESIGN_STEP && !step.suppressed);
 }
+
+const embeddedOf = (step: FeatureStep): EmbeddedModule[] => {
+  const modules = (step.params as { modules?: unknown }).modules;
+  return Array.isArray(modules) ? (modules as EmbeddedModule[]) : [];
+};
 
 const sourceOf = (step: FeatureStep): string => String((step.params as { source?: unknown }).source ?? '');
 
@@ -65,15 +72,27 @@ export const designSource = defineCommand({
     reads: z
       .record(z.string(), z.union([z.number(), z.string()]))
       .describe('Parameter markers { name: "=name" } that make set_parameter regenerate this step (written by apply_design).'),
+    modules: z
+      .array(
+        z.object({
+          path: z.string().describe('Module path relative to the design folder.'),
+          sha256: z.string().describe('SHA-256 (hex) of the text.'),
+          text: z.string().describe('The module source.'),
+        }),
+      )
+      .optional()
+      .describe('Embedded module files { path, sha256, text } the design `use`s (written by apply_design; replay needs no files).'),
   }),
   annotations: { requiresKernel: true },
-  run: (doc, { source }, ctx): CommandResult => {
+  run: (doc, { source, modules }, ctx): CommandResult => {
     const run = attempt(() => {
       const statements = parseDesign(source);
+      const table = loadModules(statements, filesOfEmbedded(modules ?? []));
       const stepKey = ctx?.stepKey;
       const regenerating = stepKey !== undefined && doc.featureHistory.some((step) => step.id === `step-${stepKey}`);
-      const input = regenerating && ctx !== undefined ? withoutOwnRecords(doc, statements, ctx, stepKey) : doc;
-      return { input, result: runDesign(input, statements, ctx) };
+      const base = regenerating ? withoutOwnLayers(doc, stepKey) : doc;
+      const input = regenerating && ctx !== undefined ? withoutOwnRecords(base, statements, ctx, stepKey, table) : base;
+      return { input, result: runDesign(input, statements, ctx, undefined, table) };
     });
     if (run instanceof DesignError) return designRejection(doc, DESIGN_STEP, run);
     const { input, result } = run;
@@ -85,9 +104,15 @@ export const designSource = defineCommand({
       );
     return {
       document: result.document,
-      summary: `design: ${result.commands} command(s), ${result.affected.length} entit${result.affected.length === 1 ? 'y' : 'ies'}; ${checksSummary(result.checks)}.`,
+      summary: `design: ${result.commands} command(s), ${result.affected.length} entit${result.affected.length === 1 ? 'y' : 'ies'}${result.modules.length > 0 ? `, ${result.modules.length} module instance(s)` : ''}; ${checksSummary(result.checks)}.`,
       affected: [...result.affected, ...addedRecordKeys(input, result.document)],
-      data: { aliases: result.aliases, aliasGeometry: result.geometry, checks: result.checks, commands: result.commands },
+      data: {
+        aliases: result.aliases,
+        aliasGeometry: result.geometry,
+        checks: result.checks,
+        commands: result.commands,
+        modules: result.modules,
+      },
     };
   },
 });
@@ -169,12 +194,31 @@ export const applyDesign = defineCommand({
       .record(z.string(), z.number())
       .optional()
       .describe('Overrides for declared params, e.g. { "w": 100 } (otherwise an existing parameter value wins, then the param default).'),
+    modules: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe(
+        'Module files the design `use`s, { "fan.lld": "<text>" } (paths relative to the design folder). The CLI fills it from the files next to ' +
+          'a source=@text: file. Omitted paths fall back to the copy embedded by the last apply; a changed text is reported (DESIGN_MODULE_HASH_CHANGED warning).',
+      ),
   }),
   annotations: { metaHistory: true },
-  run: (doc, { source, set }): CommandResult => {
-    const prepared = attempt(() => prepareInputs(doc, parseDesign(source), set ?? {}));
-    if (prepared instanceof DesignError) return designRejection(doc, 'apply_design', prepared);
-    const params = { source, reads: readsOf(prepared, source) };
+  run: (doc, { source, set, modules }): CommandResult => {
+    const loaded = attempt(() => {
+      const statements = parseDesign(source);
+      const previous = designStep(doc) === undefined ? [] : embeddedOf(designStep(doc) as FeatureStep);
+      const files: Record<string, string> = Object.fromEntries(previous.map((m) => [m.path, m.text]));
+      for (const [path, text] of Object.entries(modules ?? {})) files[normalizeModulePath(path, 0)] = text;
+      const embedded = embedModules(loadModules(statements, files), files);
+      return { prepared: prepareInputs(doc, statements, set ?? {}), embedded, changes: changedModules(previous, embedded) };
+    });
+    if (loaded instanceof DesignError) return designRejection(doc, 'apply_design', loaded);
+    const { prepared, embedded, changes } = loaded;
+    const params = {
+      source,
+      reads: readsOf(prepared, [source, ...embedded.map((m) => m.text)].join('\n')),
+      ...(embedded.length > 0 ? { modules: embedded } : {}),
+    };
     const suppressed = prepared.featureHistory.find((step) => step.name === DESIGN_STEP && step.suppressed);
     if (suppressed !== undefined)
       return designRejection(
@@ -201,12 +245,22 @@ export const applyDesign = defineCommand({
         : replaced instanceof DesignError
           ? []
           : replaced;
-    const aliases = (r.data as { aliases?: Record<string, string[]> } | undefined)?.aliases;
+    const data = r.data as { aliases?: Record<string, string[]>; modules?: unknown } | undefined;
+    const warning =
+      changes.length > 0
+        ? `; WARNING DESIGN_MODULE_HASH_CHANGED: ${changes.map((c) => c.path).join(', ')} changed since the last apply (new text embedded)`
+        : '';
     return {
       document: r.document,
-      summary: `apply_design: ${existing === undefined ? 'recorded' : 'replaced'} the design (${r.affected.length} entities); ${checksSummary(checks)}.`,
+      summary: `apply_design: ${existing === undefined ? 'recorded' : 'replaced'} the design (${r.affected.length} entities); ${checksSummary(checks)}${warning}.`,
       affected: r.affected,
-      data: { checks, ...(aliases !== undefined ? { aliases } : {}) },
+      data: {
+        checks,
+        ...(data?.aliases !== undefined ? { aliases: data.aliases } : {}),
+        ...(data?.modules !== undefined ? { moduleInstances: data.modules } : {}),
+        ...(embedded.length > 0 ? { modules: embedded.map((m) => ({ path: m.path, sha256: m.sha256 })) } : {}),
+        ...(changes.length > 0 ? { warnings: changes.map((c) => ({ code: 'DESIGN_MODULE_HASH_CHANGED', ...c })) } : {}),
+      },
     };
   },
 });
@@ -330,10 +384,16 @@ export const expandDesign = defineCommand({
   description:
     'Show what a .lld design will run: every command in order (loops, comprehensions, functions and aliases expanded) with its resolved ' +
     "params. Runs it on an empty scratch document (the open document is not touched). Without `source` it expands the document's design. " +
-    'data: { lines: [{ line, command, alias, params }], commands }.',
-  params: z.object({ source: z.string().optional().describe(".lld design source to expand (default: the document's design).") }),
+    'data: { lines: [{ line, command, alias, params, file }], commands } (file = the module file the line is in, null for the design itself).',
+  params: z.object({
+    source: z.string().optional().describe(".lld design source to expand (default: the document's design)."),
+    modules: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe('Module files { "fan.lld": "<text>" } the source `use`s; paths the document design already embeds need not be passed.'),
+  }),
   annotations: { readOnly: true, requiresKernel: true },
-  run: (doc, { source }, ctx): CommandResult => {
+  run: (doc, { source, modules }, ctx): CommandResult => {
     const step = designStep(doc);
     const text = source ?? (step === undefined ? undefined : sourceOf(step));
     if (text === undefined)
@@ -350,8 +410,11 @@ export const expandDesign = defineCommand({
     const trace: TraceLine[] = [];
     const run = attempt(() => {
       const statements = parseDesign(text);
+      const files: Record<string, string> = Object.fromEntries((step === undefined ? [] : embeddedOf(step)).map((m) => [m.path, m.text]));
+      for (const [path, body] of Object.entries(modules ?? {})) files[normalizeModulePath(path, 0)] = body;
+      const table = loadModules(statements, files);
       const sandbox = { ...createEmptyDocument(), units: doc.units, parameters: doc.parameters };
-      runDesign(prepareInputs(sandbox, statements, {}), statements, ctx, trace);
+      runDesign(prepareInputs(sandbox, statements, {}), statements, ctx, trace, table);
     });
     if (run instanceof DesignError) return designRejection(doc, 'expand_design', run);
     return report(doc, `expand_design: ${trace.length} command(s).`, { lines: trace, commands: trace.length });

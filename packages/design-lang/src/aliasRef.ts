@@ -14,7 +14,7 @@ export interface AliasRefParts {
   readonly selector: string | null;
 }
 
-const REF = /^([A-Za-z_][\w{}+\-*/]*?)(?:\.(entity|entities))?(?:\[([^[\]]*)\])?$/;
+const REF = /^([A-Za-z_][\w{}+\-*/]*(?:\.[A-Za-z_][\w{}+\-*/]*)*?)(?:\.(entity|entities))?(?:\[([^[\]]*)\])?$/;
 
 /** The parts of a reference word, or null when the word is not shaped like one (an expression, a number, a dotted id…). */
 export function splitAliasRef(text: string): AliasRefParts | null {

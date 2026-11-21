@@ -7,6 +7,6 @@ module stage(x0: length, hubR: length, tipR: length, rotors: int, stators: int, 
   loft_sections blade sectionIds=[sec.entity, tip.entity]
   array_polar blades id=blade count=rotors center=[0,0,0] axis=[1,0,0] as="instances"
   add_connection_group bladed kind="bolted" members={patternOf: blade} detect={toleranceMm: 0.01} reason="platform on disk rim"
-  revolve_profile casing profile=[for i in 0..<8: [r(1) + (if i mod 2 == 0 then 0 else 1.5), x0 - pitch/2 + i*pitch/4]] axis="x"
+  revolve_profile casing profile=[for i in 0..<8: [r(1) + (if mod(i, 2) == 0 then 0 else 1.5), x0 - pitch/2 + i*pitch/4]] axis="x"
   export disk, blades, casing
 }
