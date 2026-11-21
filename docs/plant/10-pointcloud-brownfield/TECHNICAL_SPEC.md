@@ -923,13 +923,50 @@ over a roll search (coarse 5° on 300 points, golden section ±5° on all) for B
 the axis, so every candidate carries `axisDirection`, `depthDirection`, `widthDirection` with width x depth = axis). A roll is tried only when the rotated extents are
 within 30 % of the outline's. h and b are the rotated extents of the best orientation. The command derives the `add_steel_member` roll from the depth direction with
 the sweep-frame convention (`shared/mesh.ts`) and returns `addSteelMember = { profile, start, end, roll, levelId? }`: `add_steel_member` reads z relative to its level, so the command takes `levelId` (default the active level,
-else the first; unknown: `SCN_PARAM_INVALID`) and subtracts that level's elevation (`axis` / `member` stay absolute; the test creates the member on a level at 3.6 m and compares position and frame). `tw` / `tf` are `null` with a reason (not resolvable
-from a scan below 10 sigma; STL-A does not gate them). Refusals: < 30 points `SCN_FIT_TOO_FEW_POINTS`, section under 1 cm `SCN_FIT_NO_MODEL`, no outline within the
+else the first; unknown: `SCN_PARAM_INVALID`) and subtracts that level's elevation (`axis` / `member` stay absolute; the test creates the member on a level at 3.6 m and compares position and frame). `tw` / `tf` are measured for I sections and `null` with a reason otherwise (§13.12). Refusals: < 30 points `SCN_FIT_TOO_FEW_POINTS`, section under 1 cm `SCN_FIT_NO_MODEL`, no outline within the
 extent gate `SCN_STEEL_NO_CANDIDATE`; warnings: `SCN_STEEL_NO_MATCH` (best score above the inlier band: built-up section) and `SCN_STEEL_LOW_COVERAGE` (under 80 % of the best
 outline's perimeter has scan points within the band: occluded / one-sided, h, b and centre are of the visible part, the fit is unverified; no translation refinement per roll is
-built). Job caps (`NATIVE_JOB_INPUT` naming the field): 512 outlines, 3 to 256 finite vertices per loop with a non-zero box, names of 64 characters, `maxCandidates` 1 to 100. Not built: the commit of a steel extraction
-(`commit_asbuilt_extraction` takes pipes only; FR-SCN-15 "optionally create `add_steel_member`" is one `add_steel_member` call on the returned proposal), the
-`$fromStep` binding of plan SC-SCN-05. VC-SCN-23 on the pack file STL-A: IPE 300 first, h / b within 3 mm, axis within 0.26° (asserted), centre within 3 mm.
+built). Job caps (`NATIVE_JOB_INPUT` naming the field): 512 outlines, 3 to 256 finite vertices per loop with a non-zero box, names of 64 characters, `maxCandidates` 1 to 100. The commit of a steel extraction and the `$fromStep` path of SC-SCN-05 are §13.12. VC-SCN-23 on the pack file STL-A: IPE 300 first, h / b within 3 mm, axis within 0.26° (asserted), centre within 3 mm.
+
+### 13.12 Steel as-built commit, face-plane axis, tw / tf (SCN-V2, 2026-11-21)
+
+**1. `commit_asbuilt_extraction` for steel members** (`scan/steelCommit.ts`, called from `extractionCommands.ts` after the common hash / cloud / stale / duplicate checks, so
+the pipe semantics and the human gate are unchanged). `fit_steel_member` now returns `data.extractions[0] = { profile, unverified, extraction }`; `extraction` is a hashed
+record of kind `steel_member` (`ExtractionRecord.kind: 'pipe' | 'steel_member'`) whose `fit` holds `profile, start, end, direction, length` (metres, document frame), `roll`
+(the `add_steel_member` roll), `depthDirection, widthDirection, hMm, bMm, twMm, tfMm, scoreMm`. The commit runs `add_steel_member` through `execute` with `asBuilt: { extractionId,
+unverified }` (new optional field on `add_steel_member` and `SteelMemberElement`, validated like the pipe's), z relative to `levelId` (default active level). New param `role`
+(default `column` when the axis is within 15 degrees of vertical, else `beam`). The record keeps `createdElementIds`; `accept_asbuilt_extraction` is unchanged (same ledger, same
+`SCN_HUMAN_GATE` for agents), and replay re-creates the member from the stored numbers without the cloud (TR-SCN-04).
+Designation rule (`normaliseDesignation`, also used by `findProfile`): upper-case, whitespace, hyphens and underscores removed, so "IPE 300", "ipe-300", "IPE_300" all map to
+`IPE300`. A designation that is still not in the catalogue is refused `SCN_STEEL_PROFILE_UNKNOWN` naming it, document unchanged. `$fromStep` of SC-SCN-05 resolves
+as `extractions.0.extraction` (the plan JSON is corrected from `extractions.0`; `tests/unit/scan/steelCommit.test.ts` walks that exact path). The `$fromStep` binding itself
+(TR-SCN-03, `build_project`) is still not in core: the plan stays DRAFT and an agent chains the two calls with `--json`.
+
+**2. Face-plane axis refinement and tw / tf** (native, `llull-cloud/src/fit/steel_faces.rs`; release build only, like the rest of `steel`). After the best placement the points are
+assigned to the faces (edges of the best outline longer than 20 mm) by nearest edge within a band of 5 % of the smaller section dimension (a band at the noise level truncates the points
+on the response of the plane being fitted: the axis then freezes short of the truth; the wide band keeps the passes contracting, asserted: 0.6 degree hint error -> within 0.2 degree). A plane is fitted
+per face (smallest eigenvector of its scatter, at least 30 points) and the axis is the direction least aligned with the plane normals (smallest eigenvector of the point-weighted sum of n nᵀ);
+at least two non-parallel faces are required. The section is re-projected on the refined axis and re-ranked, up to 8 passes, until the move is under 0.005 degree; a pass whose best
+profile changes or whose score worsens by more than 2 % stops the loop, and a total move over 5 degrees is refused (kept PCA, reason given). Result `axisRefinement { applied, deltaDeg, faces,
+facePoints, residual, reason }` (residual = RMS point-to-own-plane distance, metres). It also repairs a tilted `axisHint` (hint 0.6 degree off -> axis within 0.2 degree of the truth, `tests/steel.rs`); a hint
+so far off (12 degrees) that the section is not found is refused / not refined, never silently bent.
+tw / tf (I sections only: IPE, HEA, HEB outlines carry catalogue `tw`, `tf` into the job, which only place the sampling windows): the web faces are the medians of the points near x = +/- tw/2 over the
+central 70 % of the clear height, the flange faces the medians of the points near the outer and inner y of each flange over the middle 70 % of the outstand (fillets excluded). `measured` carries
+`twMm, tfMm, twResidualMm, tfResidualMm` (RMS scatter of the plate's points about its two face positions), `twCatalogueMm, tfCatalogueMm`. A plate is reported only when its two faces are at least 5 residuals apart and
+each has 20 points: otherwise `null` with `twTfReason` ("one-sided", "not separately resolved"). This matters: on the pack's STL-A (faces seen from +x / +z) the web is a single face, the naive gap of its two noise halves
+is 1.9 mm, and the guard refuses it; the flange (both faces seen) is measured 10.66 mm against 10.7 mm. Comparison with the catalogue: `SCN_STEEL_THICKNESS_MISMATCH` warns by profile and plate when
+|measured - catalogue| exceeds the fit's own inlier band (3 x noiseSigma, else 2.5 x median spacing; `threshold.value`). Justification: below that band the difference cannot be told from the face-position noise and the window
+truncation of the estimate, and it is the same band that already decides inliers and `SCN_STEEL_NO_MATCH`; no mill-tolerance table (EN 10034) is used, because the offline source set holds none (sources.md S16 lists only the nominal dimensions).
+The warning makes the extraction unverified (`fit quality: SCN_STEEL_THICKNESS_MISMATCH`), like `SCN_STEEL_LOW_COVERAGE`. Algorithm version string `<binary>/steel-2`.
+
+**3. End to end through the real binary** (`server/tests/scanNative.test.ts`, describe "scan steel member on llull-compute"; skipped by tool without `llull-compute`, found at `solver/target/{compute,release}`
+or `LLULL_COMPUTE`; build `cargo build --release -p llull-compute` in `solver/`; the `llull-cloud` crate is its library): (a) STL-A with the SC-SCN-05 region: IPE300 first, h / b within 3 mm, axis within 0.2 degree,
+refinement applied on >= 4 faces, web unresolved with its reason, flange 10.7 +/- 1.5 mm, no mismatch warning, then `commit_asbuilt_extraction` -> beam IPE300 with the section centre within 3 mm, replay-equal; (b) a generated two-sided IPE300
+with an 11 mm web (12 000 points, sigma 0.4 mm): tw 11 +/- 0.5 mm, tf 10.7 +/- 0.5 mm, exactly one `SCN_STEEL_THICKNESS_MISMATCH` naming "IPE300 web thickness tw".
+
+Tests: `llull-cloud/tests/steel.rs` (17: thickness with residual, thicker web, no tw/tf outline and bad pair refused, sparse web, tilted hint pulled back, far hint not refined, PCA axis within 0.1 degree, STL-A one-sided),
+`tests/unit/scan/steelCommit.test.ts` (thickness / refinement data, mismatch warning, non-I null, `$fromStep` path, "IPE 300" -> IPE300, level elevation, column / role, unknown profile by name, tamper, unverified, human gate, replay, purity).
+Left: for UPN / C / hollow / angle sections tw / tf are `null` (the plate model is I only); `$fromStep` in `build_project`; batch extraction; COPC / E57 export (needs an independent reader, see §13.10); `llull pack --with-scans`; global registration.
 
 ### 13.10 Left (V1 remainder, 2026-11-04)
 

@@ -69,10 +69,17 @@ export const addSteelMember = defineCommand({
       .describe(
         'Columns only: "pinned" (default; or the fixity of its base plate) or "fixed" (the foot restrains rotation in check_steel_members).',
       ),
+    asBuilt: z
+      .object({
+        extractionId: z.string().describe('Extraction record id in doc.scan.extractions.'),
+        unverified: z.boolean().describe('Whether the scan-derived geometry is unverified.'),
+      })
+      .optional()
+      .describe('Set by commit_asbuilt_extraction: marks the member as scan-derived (as-built). Do not set it by hand.'),
   }),
   run: (
     doc,
-    { profile, start, end, role = 'beam', roll = 0, levelId, material, note, startJoint, endJoint, baseFixity },
+    { profile, start, end, role = 'beam', roll = 0, levelId, material, note, startJoint, endJoint, baseFixity, asBuilt },
   ): CommandResult => {
     const from = toVec3(start);
     const to = toVec3(end);
@@ -93,7 +100,7 @@ export const addSteelMember = defineCommand({
     );
     if (memberTwin) return noop(doc, duplicateSummary('add_steel_member', memberTwin, `a ${role} ${profile} between these points`));
     const added = appendMembers(resolution.building, resolution.level.id, [
-      { role, profile, start: from, end: to, roll, material, note, startJoint, endJoint, baseFixity },
+      { role, profile, start: from, end: to, roll, material, note, startJoint, endJoint, baseFixity, asBuilt },
     ]);
     if ('reason' in added) return noop(doc, `add_steel_member failed: ${added.reason}.`);
     const section = findProfile(profile) as SteelProfile;

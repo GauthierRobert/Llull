@@ -1,6 +1,6 @@
 {
   "id": "SC-SCN-05",
-  "status": "DRAFT \u2014 not runnable: scan commands and the $fromStep plan binding are unbuilt; add_level / add_steel_member exist",
+  "status": "DRAFT - the commands exist (fit_steel_member data.extractions[0].extraction -> commit_asbuilt_extraction, tests/unit/scan/steelCommit.test.ts resolves the binding); the $fromStep plan binding is not in build_project yet",
   "validates": [
     "VC-SCN-23"
   ],
@@ -60,7 +60,7 @@
       "params": {
         "extraction": {
           "$fromStep": "fit",
-          "path": "extractions.0"
+          "path": "extractions.0.extraction"
         }
       },
       "as": "member"

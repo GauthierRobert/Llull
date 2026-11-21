@@ -3,6 +3,7 @@
 //! chamfer distance RMS(min distance of a section point to the outline) over a roll search (coarse 5° steps, then golden section ±5°) with the
 //! section seen from either end. h and b are measured on the rotated extents (0.5 % / 99.5 % percentiles, robust to stray points).
 
+use super::steel_faces::{estimate_thickness, placed, refine_axis, AxisRefinement, Thickness, MAX_REFINE_DEG as MAX_TOTAL_REFINE_DEG};
 use super::{too_few, FitSettings, FitWarning, Threshold};
 use crate::cloud::Vec3;
 use crate::error::{CloudError, CloudResult};
@@ -28,6 +29,11 @@ pub struct Outline {
     pub name: String,
     /// Closed loop (x, y) in metres around the bounding-box centre; x = width b, y = depth h.
     pub loop_xy: Vec<[f64; 2]>,
+    /// Web / flange thickness (metres) of a doubly symmetric I outline (x = width, y = depth): when both are sent the fit also estimates tw / tf.
+    #[serde(default)]
+    pub tw: Option<f64>,
+    #[serde(default)]
+    pub tf: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,6 +69,10 @@ pub struct SteelFit {
     pub rms: f64,
     pub threshold: Threshold,
     pub warnings: Vec<FitWarning>,
+    /// Face-plane refinement of the axis (None: no candidate outline with enough planar faces).
+    pub axis_refinement: AxisRefinement,
+    /// Web / flange thickness of the best candidate (None when its outline carries no tw / tf).
+    pub thickness: Option<Thickness>,
 }
 
 fn percentile(sorted: &[f64], q: f64) -> f64 {
@@ -70,7 +80,7 @@ fn percentile(sorted: &[f64], q: f64) -> f64 {
     sorted[at.min(sorted.len() - 1)]
 }
 
-fn extents(points: &[[f64; 2]]) -> ([f64; 2], [f64; 2]) {
+pub(super) fn extents(points: &[[f64; 2]]) -> ([f64; 2], [f64; 2]) {
     let mut low = [0.0; 2];
     let mut high = [0.0; 2];
     for k in 0..2 {
@@ -82,12 +92,12 @@ fn extents(points: &[[f64; 2]]) -> ([f64; 2], [f64; 2]) {
     (low, high)
 }
 
-fn rotated(points: &[[f64; 2]], theta: f64) -> Vec<[f64; 2]> {
+pub(super) fn rotated(points: &[[f64; 2]], theta: f64) -> Vec<[f64; 2]> {
     let (s, c) = libm::sincos(theta);
     points.iter().map(|p| [c * p[0] - s * p[1], s * p[0] + c * p[1]]).collect()
 }
 
-fn segment_distance(p: &[f64; 2], a: &[f64; 2], b: &[f64; 2]) -> f64 {
+pub(super) fn segment_distance(p: &[f64; 2], a: &[f64; 2], b: &[f64; 2]) -> f64 {
     let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
     let length2 = dx * dx + dy * dy;
     let t = if length2 > 0.0 { (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length2).clamp(0.0, 1.0) } else { 0.0 };
@@ -222,6 +232,16 @@ fn validate(outlines: &[Outline], axis_hint: &Option<Vec3>, max_candidates: usiz
             return Err(CloudError::input(format!("params.outlines[].loopXy of '{}' holds a non-finite coordinate", outline.name)));
         }
         let size = size_of(outline);
+        match (outline.tw, outline.tf) {
+            (None, None) => {}
+            (Some(tw), Some(tf)) if tw > 0.0 && tf > 0.0 && tw < size[0] && 2.0 * tf < size[1] => {}
+            _ => {
+                return Err(CloudError::input(format!(
+                    "params.outlines[].tw / tf of '{}' must be both set, positive, tw < width and 2 tf < depth",
+                    outline.name
+                )))
+            }
+        }
         if size[0] <= 0.0 || size[1] <= 0.0 || size[0].is_nan() || size[1].is_nan() {
             return Err(CloudError::input(format!("params.outlines[].loopXy of '{}' has a zero bounding box", outline.name)));
         }
@@ -293,6 +313,101 @@ fn place(section: &[[f64; 2]], frame_uv: (&Vec3, &Vec3), axis: &Vec3, centroid: 
     })
 }
 
+/// The region projected on the plane normal to `axis`: section coordinates, axial extent (0.5 % / 99.5 %), in-plane extents.
+struct SectionView {
+    axis: Vec3,
+    u: Vec3,
+    v: Vec3,
+    section: Vec<[f64; 2]>,
+    t_low: f64,
+    t_high: f64,
+    low: [f64; 2],
+    high: [f64; 2],
+}
+
+impl SectionView {
+    fn new(points: &[Vec3], centroid: &Vec3, axis: Vec3) -> Self {
+        let (u, v) = frame(&axis);
+        let section: Vec<[f64; 2]> = points
+            .iter()
+            .map(|p| {
+                let r = sub(p, centroid);
+                [dot(&r, &u), dot(&r, &v)]
+            })
+            .collect();
+        let mut axial: Vec<f64> = points.iter().map(|p| dot(&sub(p, centroid), &axis)).collect();
+        axial.sort_by(f64::total_cmp);
+        let (low, high) = extents(&section);
+        SectionView { axis, u, v, section, t_low: percentile(&axial, 0.005), t_high: percentile(&axial, 0.995), low, high }
+    }
+
+    /// Every outline placed on the section, best score first.
+    fn rank(&self, centroid: &Vec3, outlines: &[Outline]) -> Vec<Candidate> {
+        let mut candidates: Vec<Candidate> =
+            outlines.iter().filter_map(|o| place(&self.section, (&self.u, &self.v), &self.axis, centroid, o)).collect();
+        candidates.sort_by(|a, b| a.score.total_cmp(&b.score).then_with(|| a.profile.cmp(&b.profile)));
+        candidates
+    }
+}
+
+/// Passes of the face-plane refinement: a tilted axis smears the section so the first pass sees few face points; each pass re-projects on the
+/// refined axis and re-ranks, and stops when the axis moves less than REFINE_CONVERGED_DEG or the best score stops improving.
+const REFINE_PASSES: usize = 8;
+/// Points are assigned to faces within this share of the smaller section dimension: a band at the noise level would truncate the points on the
+/// response of the plane being fitted and freeze the axis short of the truth; the wide band keeps the passes contracting.
+const REFINE_WIDE_BAND: f64 = 0.05;
+const REFINE_CONVERGED_DEG: f64 = 0.005;
+
+fn refine_loop(
+    points: &[Vec3],
+    centroid: &Vec3,
+    outlines: &[Outline],
+    max_candidates: usize,
+    band: f64,
+    mut view: SectionView,
+    mut candidates: Vec<Candidate>,
+) -> (SectionView, Vec<Candidate>, AxisRefinement) {
+    let first_axis = view.axis;
+    let mut result = AxisRefinement::not_applied("no face-plane evidence");
+    for pass in 0..REFINE_PASSES {
+        let Some(outline) = outlines.iter().find(|o| o.name == candidates[0].profile) else { break };
+        let wide = REFINE_WIDE_BAND * candidates[0].h.min(candidates[0].b);
+        let band_now = band.max(wide);
+        let probe = refine_axis(points, &placed(&view.section, &candidates[0]), outline, &view.axis, band_now);
+        match probe {
+            Ok((refined, info)) => {
+                let next = SectionView::new(points, centroid, refined);
+                let mut again = next.rank(centroid, outlines);
+                again.truncate(max_candidates.max(1));
+                if !again.first().is_some_and(|c| c.profile == candidates[0].profile && c.score <= candidates[0].score * 1.02 + 1e-9) {
+                    if pass == 0 {
+                        result =
+                            AxisRefinement::not_applied("the refined axis did not improve the best score; the principal axis was kept");
+                    }
+                    break;
+                }
+                view = next;
+                candidates = again;
+                let total = dot(&view.axis, &first_axis).clamp(-1.0, 1.0).acos().to_degrees();
+                result = AxisRefinement { delta_deg: total, ..info };
+                if total > MAX_TOTAL_REFINE_DEG {
+                    break;
+                }
+                if info.delta_deg < REFINE_CONVERGED_DEG {
+                    break;
+                }
+            }
+            Err(reason) => {
+                if pass == 0 {
+                    result = AxisRefinement::not_applied(&reason);
+                }
+                break;
+            }
+        }
+    }
+    (view, candidates, result)
+}
+
 /// @failure < 30 points -> SCN_FIT_TOO_FEW_POINTS; no / degenerate outlines or a zero axisHint -> NATIVE_JOB_INPUT; a section thinner than 1 cm
 ///   -> SCN_FIT_NO_MODEL; no hint and an ambiguous axis -> SCN_STEEL_AXIS_AMBIGUOUS;
 ///   no outline within the extent gate -> SCN_STEEL_NO_CANDIDATE
@@ -313,18 +428,9 @@ pub fn fit(
     };
     let threshold = settings.threshold(&KdTree::build(points));
     let centroid = mean(points);
-    let (u, v) = frame(&axis);
-    let section: Vec<[f64; 2]> = points
-        .iter()
-        .map(|p| {
-            let r = sub(p, &centroid);
-            [dot(&r, &u), dot(&r, &v)]
-        })
-        .collect();
-    let mut axial: Vec<f64> = points.iter().map(|p| dot(&sub(p, &centroid), &axis)).collect();
-    axial.sort_by(f64::total_cmp);
-    let (t_low, t_high) = (percentile(&axial, 0.005), percentile(&axial, 0.995));
-    let (low, high) = extents(&section);
+    let view = SectionView::new(points, &centroid, axis);
+    let (t_low, t_high) = (view.t_low, view.t_high);
+    let (low, high) = (view.low, view.high);
     let in_plane = (high[0] - low[0]).max(high[1] - low[1]);
     if axis_hint.is_none() && (eigen_ratio < AXIS_EIGEN_RATIO || t_high - t_low < AXIS_EXTENT_RATIO * in_plane) {
         return Err(CloudError::new(
@@ -339,7 +445,7 @@ pub fn fit(
     if (high[0] - low[0]) < MIN_EXTENT && (high[1] - low[1]) < MIN_EXTENT {
         return Err(CloudError::new("SCN_FIT_NO_MODEL", "the section of the region is thinner than 1 cm in both directions; not a member"));
     }
-    let mut candidates: Vec<Candidate> = outlines.iter().filter_map(|o| place(&section, (&u, &v), &axis, &centroid, o)).collect();
+    let mut candidates = view.rank(&centroid, outlines);
     if candidates.is_empty() {
         return Err(CloudError::new(
             "SCN_STEEL_NO_CANDIDATE",
@@ -351,8 +457,11 @@ pub fn fit(
             ),
         ));
     }
-    candidates.sort_by(|a, b| a.score.total_cmp(&b.score).then_with(|| a.profile.cmp(&b.profile)));
     candidates.truncate(max_candidates.max(1));
+    let (view, candidates, axis_refinement) = refine_loop(points, &centroid, outlines, max_candidates, threshold.value, view, candidates);
+    let (t_low, t_high) = (view.t_low, view.t_high);
+    let section = &view.section;
+    let axis = view.axis;
     let best = &candidates[0];
     let mut warnings = Vec::new();
     if best.score > threshold.value {
@@ -367,7 +476,7 @@ pub fn fit(
         });
     }
     if let Some(outline) = outlines.iter().find(|o| o.name == best.profile) {
-        let share = coverage(&section, best, outline, threshold.value);
+        let share = coverage(section, best, outline, threshold.value);
         if share < MIN_COVERAGE {
             warnings.push(FitWarning {
                 code: "SCN_STEEL_LOW_COVERAGE",
@@ -387,6 +496,11 @@ pub fn fit(
         length: t_high - t_low,
         points_in_region: points.len(),
         section_points: section.len().min(MAX_SECTION_POINTS),
+        thickness: outlines
+            .iter()
+            .find(|o| o.name == best.profile)
+            .and_then(|o| estimate_thickness(&placed(section, best), o, threshold.value)),
+        axis_refinement,
         rms: best.score,
         threshold,
         candidates,

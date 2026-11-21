@@ -5,7 +5,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
@@ -39,7 +39,7 @@ afterAll(() => rmSync(store, { recursive: true, force: true }));
 /** Imports a pack file and attaches it to `doc` (metres). */
 async function attach(doc: CadDocument, file: string): Promise<{ doc: CadDocument; cloudId: string }> {
   const imported = await runScanImport(
-    { path: path.join(DATA, file), options: DEFAULT_IMPORT_OPTIONS },
+    { path: path.resolve(DATA, file), options: DEFAULT_IMPORT_OPTIONS },
     { runner: createComputeRunner(process.env, BINARY), store, env: process.env },
   );
   if (!imported.ok) throw new Error(`${imported.code}: ${imported.message}`);
@@ -321,5 +321,137 @@ describe('scan registration on llull-compute', () => {
       ctx,
     );
     expect(two.error?.code).toBe('SCN_REG_TARGETS_INSUFFICIENT');
+  });
+});
+
+describe('scan steel member on llull-compute', () => {
+  native(
+    'fits STL-A (IPE 300), refines the axis, reports what a one-sided scan resolves and commits the as-built member (VC-SCN-23, SC-SCN-05)',
+    async () => {
+      const truth = TRUTH['STL-A'] as {
+        file: string;
+        h_mm: number;
+        b_mm: number;
+        tf_mm: number;
+        sectionCentre_m: [number, number, number];
+        noiseSigma_m: number;
+        tolerance: { h_mm: number; b_mm: number; axisAngle_deg: number; sectionCentre_m: number };
+      };
+      const attached = await attach(metres(), truth.file);
+      const doc = execute(attached.doc, 'add_level', { name: 'Ref', elevation: 0 }).document;
+      const region = { kind: 'box', min: [4.8, 0.9, 3.8], max: [5.2, 3.1, 4.2] };
+      const fitted = execute(
+        doc,
+        'fit_steel_member',
+        { cloudId: attached.cloudId, region, families: ['IPE', 'HEA', 'HEB'], noiseSigma: truth.noiseSigma_m },
+        ctx,
+      );
+      expect(fitted.rejected, fitted.summary).toBeUndefined();
+      const data = fitted.data as {
+        candidates: { profile: string }[];
+        measured: {
+          hMm: number;
+          bMm: number;
+          twMm: number | null;
+          tfMm: number | null;
+          tfResidualMm: number | null;
+          twTfReason: string | null;
+        };
+        axis: { direction: number[] };
+        axisRefinement: { applied: boolean; faces: number };
+        warnings: { code: string }[];
+        extractions: { extraction: unknown }[];
+      };
+      expect(data.candidates[0]?.profile).toBe('IPE300');
+      expect(Math.abs(data.measured.hMm - truth.h_mm)).toBeLessThanOrEqual(truth.tolerance.h_mm);
+      expect(Math.abs(data.measured.bMm - truth.b_mm)).toBeLessThanOrEqual(truth.tolerance.b_mm);
+      const angle = (Math.acos(Math.min(1, Math.abs(data.axis.direction[1] ?? 0))) * 180) / Math.PI;
+      expect(angle).toBeLessThanOrEqual(truth.tolerance.axisAngle_deg);
+      expect(data.axisRefinement.applied, JSON.stringify(data.axisRefinement)).toBe(true);
+      expect(data.axisRefinement.faces).toBeGreaterThanOrEqual(4);
+      // The pack scan is one-sided: the web (7 sigma, one face seen) is not resolved and says why; the flange is measured near its catalogue value.
+      expect(data.measured.twMm).toBeNull();
+      expect(data.measured.twTfReason).toContain('tw:');
+      expect(Math.abs((data.measured.tfMm ?? Number.NaN) - truth.tf_mm)).toBeLessThanOrEqual(1.5);
+      expect(data.measured.tfResidualMm).toBeGreaterThan(0);
+      expect(data.warnings.map((w) => w.code)).not.toContain('SCN_STEEL_THICKNESS_MISMATCH');
+      const committed = execute(doc, 'commit_asbuilt_extraction', { extraction: data.extractions[0]?.extraction }, ctx);
+      expect(committed.rejected, committed.summary).toBeUndefined();
+      const member = committed.document.building?.elements[committed.affected[1] ?? ''] as unknown as {
+        profile: string;
+        role: string;
+        start: number[];
+        asBuilt: { extractionId: string };
+      };
+      expect(member.profile).toBe('IPE300');
+      expect(member.role).toBe('beam');
+      expect(Math.abs((member.start[0] ?? 0) - truth.sectionCentre_m[0])).toBeLessThanOrEqual(truth.tolerance.sectionCentre_m);
+      expect(Math.abs((member.start[2] ?? 0) - truth.sectionCentre_m[2])).toBeLessThanOrEqual(truth.tolerance.sectionCentre_m);
+      expect(member.asBuilt.extractionId).toBe(committed.affected[0]);
+      const replayed = execute(committed.document, 'replay_history', {});
+      expect(JSON.stringify(replayed.document.building)).toBe(JSON.stringify(committed.document.building));
+    },
+  );
+
+  native('a two-sided IPE 300 with an 11 mm web: tw / tf measured through the binary, the thick web warns by name', async () => {
+    const outline: [number, number][] = [
+      [-0.075, -0.15],
+      [0.075, -0.15],
+      [0.075, -0.1393],
+      [0.0055, -0.1393],
+      [0.0055, 0.1393],
+      [0.075, 0.1393],
+      [0.075, 0.15],
+      [-0.075, 0.15],
+      [-0.075, 0.1393],
+      [-0.0055, 0.1393],
+      [-0.0055, -0.1393],
+      [-0.075, -0.1393],
+    ];
+    const edges = outline.map((a, i) => ({ a, b: outline[(i + 1) % outline.length] ?? a }));
+    const lengths = edges.map(({ a, b }) => Math.hypot(b[0] - a[0], b[1] - a[1]));
+    const total = lengths.reduce((sum, length) => sum + length, 0);
+    let state = 12345;
+    const uniform = (): number => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return (state + 0.5) / 4294967296;
+    };
+    const gauss = (): number => Math.sqrt(-2 * Math.log(uniform())) * Math.cos(2 * Math.PI * uniform());
+    const rows = ['x_m,y_m,z_m'];
+    for (let n = 0; n < 12000; n++) {
+      let s = uniform() * total;
+      let i = 0;
+      while (i < edges.length - 1 && s > (lengths[i] ?? 0)) s -= lengths[i++] ?? 0;
+      const edge = edges[i];
+      if (edge === undefined) continue;
+      const t = s / (lengths[i] || 1);
+      const x = 5 + edge.a[0] + t * (edge.b[0] - edge.a[0]) + 0.0004 * gauss();
+      const z = 4 + edge.a[1] + t * (edge.b[1] - edge.a[1]) + 0.0004 * gauss();
+      rows.push(`${x.toFixed(6)},${(1 + 2 * uniform()).toFixed(6)},${z.toFixed(6)}`);
+    }
+    const file = path.join(store, 'ipe300-thick-web.csv');
+    writeFileSync(file, rows.join('\n'));
+    const attached = await attach(metres(), file);
+    const result = execute(
+      attached.doc,
+      'fit_steel_member',
+      { cloudId: attached.cloudId, region: { kind: 'all' }, families: ['IPE'], noiseSigma: 0.0004 },
+      ctx,
+    );
+    expect(result.rejected, result.summary).toBeUndefined();
+    const data = result.data as {
+      candidates: { profile: string }[];
+      measured: { twMm: number | null; tfMm: number | null; twCatalogueMm: number | null };
+      axisRefinement: { applied: boolean };
+      warnings: { code: string; message: string }[];
+    };
+    expect(data.candidates[0]?.profile).toBe('IPE300');
+    expect(Math.abs((data.measured.twMm ?? Number.NaN) - 11)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs((data.measured.tfMm ?? Number.NaN) - 10.7)).toBeLessThanOrEqual(0.5);
+    expect(data.measured.twCatalogueMm).toBe(7.1);
+    expect(data.axisRefinement.applied).toBe(true);
+    const mismatch = data.warnings.filter((w) => w.code === 'SCN_STEEL_THICKNESS_MISMATCH');
+    expect(mismatch).toHaveLength(1);
+    expect(mismatch[0]?.message).toContain('IPE300 web thickness tw');
   });
 });

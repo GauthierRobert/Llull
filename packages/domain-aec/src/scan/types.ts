@@ -60,11 +60,11 @@ export type RegionSpec =
 
 export interface ExtractionRecord {
   readonly id: string;
-  readonly kind: 'pipe';
+  readonly kind: 'pipe' | 'steel_member';
   readonly cloudId: string;
   readonly assetKey: string;
   readonly region: RegionSpec;
-  /** Cylinder fit in metres, document frame (axis point / direction, radius, ends, quality). */
+  /** Pipe: cylinder fit in metres, document frame (axis point / direction, radius, ends, quality). Steel member: profile, axis ends, roll and measured section (metres). */
   readonly fit: Readonly<Record<string, unknown>>;
   readonly snapped?: {
     readonly table: 'en10220';

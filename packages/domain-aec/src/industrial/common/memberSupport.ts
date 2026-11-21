@@ -71,6 +71,7 @@ export interface MemberSpec {
   startJoint?: JointFixity | undefined;
   endJoint?: JointFixity | undefined;
   baseFixity?: BaseFixity | undefined;
+  asBuilt?: { readonly extractionId: string; readonly unverified: boolean } | undefined;
 }
 
 export const jointFixitySchema = z.enum(['pinned', 'rigid']);
@@ -119,6 +120,7 @@ export function appendMembers(
       ...(spec.startJoint !== undefined ? { startJoint: spec.startJoint } : {}),
       ...(spec.endJoint !== undefined ? { endJoint: spec.endJoint } : {}),
       ...(spec.baseFixity !== undefined ? { baseFixity: spec.baseFixity } : {}),
+      ...(spec.asBuilt !== undefined ? { asBuilt: spec.asBuilt } : {}),
     };
     next = withElement(next, member);
     ids.push(member.id);

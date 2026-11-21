@@ -166,12 +166,15 @@ export function lightestProfile(accept: (candidate: SteelProfile) => boolean): S
 
 const BY_NAME = new Map(STEEL_PROFILES.map((profile) => [profile.name.toUpperCase(), profile]));
 
+/** The catalogue key of a designation: whitespace, hyphens and underscores removed, upper case ("IPE 300", "ipe-300", "IPE_300" -> "IPE300"). */
+export const normaliseDesignation = (name: string): string => name.replace(/[\s_-]+/g, '').toUpperCase();
+
 /**
- * Case- and space-insensitive lookup ("ipe 300", "HEA200", "shs100x5").
+ * Case-, space-, hyphen- and underscore-insensitive lookup ("ipe 300", "IPE-300", "HEA200", "shs100x5").
  * @failure non-string / unknown name -> undefined
  */
 export function findProfile(name: unknown): SteelProfile | undefined {
-  return typeof name === 'string' ? BY_NAME.get(name.replace(/\s+/g, '').toUpperCase()) : undefined;
+  return typeof name === 'string' ? BY_NAME.get(normaliseDesignation(name)) : undefined;
 }
 
 interface ProfileOutline {

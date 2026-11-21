@@ -19,6 +19,8 @@ import { levelIdParam } from '../building/levelParams';
 import { gateAcceptance, refused } from './acceptanceGate';
 import { refuseScan } from './codes';
 import { extractionHash, unverifiedReasons, type PendingExtraction } from './extraction';
+import { MEMBER_ROLES } from '../industrial/common/memberSupport';
+import { commitSteelMember } from './steelCommit';
 import { sameTransform } from './mat4';
 import { findCloud, fromM, scanOf, withScan } from './model';
 import { regionSpec } from './region';
@@ -26,11 +28,15 @@ import { regionParam } from './schemas';
 
 const extractionParam = z
   .object({
-    kind: z.literal('pipe').describe('Extraction kind.'),
+    kind: z
+      .enum(['pipe', 'steel_member'])
+      .describe('Extraction kind: pipe (extract_pipes, trace_pipe_centreline) or steel_member (fit_steel_member).'),
     cloudId: z.string().describe('Cloud the fit was made on.'),
     assetKey: z.string().describe('Asset key of that cloud.'),
     region: regionParam,
-    fit: z.record(z.string(), z.unknown()).describe('Native cylinder fit, metres, document frame.'),
+    fit: z
+      .record(z.string(), z.unknown())
+      .describe('Native fit, metres, document frame: a cylinder (pipe) or { profile, start, end, roll, ... } (steel member).'),
     snapped: z
       .object({
         table: z.literal('en10220').describe('Size table.'),
@@ -55,31 +61,43 @@ const extractionParam = z
       .describe('Provenance.'),
     extractionHash: z.string().describe('sha256 of the canonical content.'),
   })
-  .describe('data.extractions[i].extraction of extract_pipes (or data.extraction of fit_primitive kind cylinder), unchanged.');
+  .describe(
+    'data.extractions[i].extraction of extract_pipes, trace_pipe_centreline or fit_steel_member (or data.extraction of fit_primitive kind cylinder), unchanged.',
+  );
 
 const vec = (value: unknown): number[] | null =>
   Array.isArray(value) && value.length === 3 && value.every((v) => typeof v === 'number') ? (value as number[]) : null;
 
 /**
- * @affects 1 extraction record + the pipe run add_pipe_run creates (affected: [extractionId, pipeId]), the run flagged asBuilt
+ * @affects 1 extraction record + the pipe run add_pipe_run (kind pipe) or the steel member add_steel_member (kind steel_member) creates (affected: [extractionId, elementId]), flagged asBuilt
  * @invariant a traced extraction (fit.centreline from trace_pipe_centreline) routes ONE run through every PI; else start -> end. The extraction hash matches its content, else refused; unverified = the record's reasons + the cloud's registration status now
  * @failure hash mismatch -> SCN_EXTRACTION_TAMPERED; unknown cloud -> SCN_CLOUD_NOT_FOUND; already committed -> SCN_EXTRACTION_DUPLICATE;
- *   a fit without start / end / radius -> SCN_PARAM_INVALID; add_pipe_run refusals are passed on
+ *   a fit without start / end / radius (pipe) or profile / start / end / roll (steel) -> SCN_PARAM_INVALID; a steel profile not in the catalogue -> SCN_STEEL_PROFILE_UNKNOWN;
+ *   add_pipe_run / add_steel_member refusals are passed on
  */
 export const commitAsbuiltExtraction = defineCommand({
   name: 'commit_asbuilt_extraction',
   description:
-    'Turn a pipe extraction (from extract_pipes, or fit_primitive kind cylinder) into an as-built pipe run: add_pipe_run from the fitted ends ' +
+    'Turn an extraction into an as-built element. A STEEL MEMBER extraction (fit_steel_member data.extractions[0].extraction) becomes an as-built ' +
+    'add_steel_member: its profile designation is matched to the catalogue ignoring case, spaces, hyphens and underscores ("IPE 300" = "IPE300"), an unknown ' +
+    'designation is refused by name (SCN_STEEL_PROFILE_UNKNOWN), role defaults to column (axis within 15 degrees of vertical) else beam. A PIPE extraction (from ' +
+    'extract_pipes, trace_pipe_centreline or fit_primitive kind cylinder) becomes an as-built pipe run: add_pipe_run from the fitted ends ' +
     '(z relative to the level), DN from the snap (else the measured OD), flagged asBuilt with the extraction id and unverified when the ' +
     'cloud registration is unverified or the fit quality is low. The extraction record is stored with its provenance. Pass the extraction ' +
     'unchanged: its hash is checked (SCN_EXTRACTION_TAMPERED). Fabrication use needs a reviewer: accept_asbuilt_extraction.',
   params: z.object({
     extraction: extractionParam,
-    line: z.string().optional().describe('Line number of the as-built run, e.g. "L-101".'),
-    service: z.string().optional().describe('Fluid / service. Default "process".'),
+    line: z.string().optional().describe('Pipe extractions: line number of the as-built run, e.g. "L-101". Ignored for a steel member.'),
+    service: z.string().optional().describe('Pipe extractions: fluid / service. Default "process". Ignored for a steel member.'),
+    role: z
+      .enum([...MEMBER_ROLES])
+      .optional()
+      .describe(
+        'Steel member extractions: structural role. Default column when the axis is within 15 degrees of vertical, else beam. Ignored for a pipe.',
+      ),
     levelId: levelIdParam,
   }),
-  run: (doc, { extraction, line, service, levelId }, ctx): CommandResult => {
+  run: (doc, { extraction, line, service, role, levelId }, ctx): CommandResult => {
     const command = 'commit_asbuilt_extraction';
     const pending: PendingExtraction = { ...extraction, region: regionSpec(extraction.region) } as PendingExtraction;
     if (extractionHash(pending) !== extraction.extractionHash)
@@ -114,6 +132,8 @@ export const commitAsbuiltExtraction = defineCommand({
     const twin = Object.values(scan.extractions).find((e) => e.extractionHash === extraction.extractionHash);
     if (twin !== undefined)
       return refuseScan(doc, command, 'SCN_EXTRACTION_DUPLICATE', `already committed as ${twin.id}`, [twin.id], ['extraction']);
+    const reasons = [...new Set([...extraction.unverifiedReasons, ...unverifiedReasons(scan, cloud, [])])];
+    if (extraction.kind === 'steel_member') return commitSteelMember(doc, ctx, { command, pending, reasons, role, levelId });
     const [start, end, radius] = [vec(extraction.fit['start']), vec(extraction.fit['end']), extraction.fit['radius']];
     const traced = Array.isArray(extraction.fit['centreline']) ? extraction.fit['centreline'].map(vec) : null;
     if (start === null || end === null || typeof radius !== 'number' || (traced !== null && (traced.length < 2 || traced.includes(null))))
@@ -125,7 +145,6 @@ export const commitAsbuiltExtraction = defineCommand({
         [cloud.id],
         ['extraction.fit'],
       );
-    const reasons = [...new Set([...extraction.unverifiedReasons, ...unverifiedReasons(scan, cloud, [])])];
     const level = resolveLevel(doc, getBuilding(doc), levelId);
     const elevation = level.ok ? level.level.elevation : 0;
     const insulation = typeof extraction.fit['insulationThicknessM'] === 'number' ? extraction.fit['insulationThicknessM'] : 0;

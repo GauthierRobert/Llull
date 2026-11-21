@@ -1216,7 +1216,7 @@
 | `check_point_clouds` | Read-only check of the scan workspace (end every scan job with it): missing assets (SCN_ASSET_MISSING), unregistered stations, unverified or unaccepted registr… | read-only |
 | `clear_scan_crop` | Remove a crop box created by set_scan_crop. |  |
 | `cloud_to_model_deviation` | Read-only: as-built vs design. | read-only |
-| `commit_asbuilt_extraction` | Turn a pipe extraction (from extract_pipes, or fit_primitive kind cylinder) into an as-built pipe run: add_pipe_run from the fitted ends (z relative to the lev… |  |
+| `commit_asbuilt_extraction` | Turn an extraction into an as-built element. |  |
 | `compute_registration` | Read-only: register the MOVING cloud onto the FIXED cloud and return a record for apply_registration. | read-only |
 | `describe_point_cloud` | Read-only summary of an attached cloud in document units and frame: point count, scans (pose, count, fields), bounds and centroid (placed by the cloud transfor… | read-only |
 | `detach_point_cloud` | Detach a cloud from the document. |  |

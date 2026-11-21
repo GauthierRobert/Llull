@@ -213,6 +213,8 @@ export interface SteelMemberElement extends LevelElementBase {
   baseFixity?: BaseFixity;
   /** The platform assembly that generated this member (06 STA M6): read-only, edited through the assembly. */
   assemblyId?: string;
+  /** Set when the member was committed from a point-cloud extraction (plant 10 `commit_asbuilt_extraction`): scan-derived geometry. */
+  asBuilt?: { readonly extractionId: string; readonly unverified: boolean };
 }
 
 /** A concrete pad footing; its TOP sits at level elevation + `topOffset` (usually negative). */
