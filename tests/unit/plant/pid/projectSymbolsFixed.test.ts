@@ -107,7 +107,7 @@ describe('define_pid_symbol: actuators', () => {
     const sheet = Object.values(valve.sheets)[0] as NonNullable<(typeof valve.sheets)[string]>;
     const glyph = buildPidDrawing(valve, sheet).glyphs.find((entry) => entry.id === actuating?.id) as PidGlyph;
     const ys = polygon(glyph).map((point) => point[1] as number);
-    const valveY = (Object.values(valve.items).find((item) => item.tag === 'FV-101') as { at: number[] }).at[1] as number;
+    const valveY = (Object.values(valve.items).find((item) => item.tag === 'FV-101') as unknown as { at: number[] }).at[1] as number;
     expect(Math.min(...ys)).toBeCloseTo(valveY + 3.2, 9);
     expect(Math.max(...ys)).toBeCloseTo(valveY + 3.2 + 30 * scale, 9);
   });
@@ -132,8 +132,14 @@ describe('define_pid_symbol: off-page connectors', () => {
     const glyph = buildPidDrawing(pid, sheet).glyphs.find((entry) => entry.id === opc?.id);
     const corners = polygon(glyph as PidGlyph);
     expect(corners).toHaveLength(4);
-    expect(Math.max(...corners.map((point) => Math.abs((point[0] as number) - (opc as { at: number[] }).at[0]!)))).toBeCloseTo(4, 9);
-    expect(Math.max(...corners.map((point) => Math.abs((point[1] as number) - (opc as { at: number[] }).at[1]!)))).toBeCloseTo(4, 9);
+    expect(Math.max(...corners.map((point) => Math.abs((point[0] as number) - (opc as unknown as { at: number[] }).at[0]!)))).toBeCloseTo(
+      4,
+      9,
+    );
+    expect(Math.max(...corners.map((point) => Math.abs((point[1] as number) - (opc as unknown as { at: number[] }).at[1]!)))).toBeCloseTo(
+      4,
+      9,
+    );
   });
 });
 
