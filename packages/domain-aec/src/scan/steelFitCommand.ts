@@ -13,7 +13,7 @@ import { refuseScan } from './codes';
 import { cloudAccess, isAccess } from './access';
 import { isSuccess, runOp } from './compute';
 import { pendingExtraction, unverifiedReasons } from './extraction';
-import { measuredSection, measuredThickness } from './steelSection';
+import { axisRefinementOf, measuredSection, measuredThickness } from './steelSection';
 import { fromM, scanOf, toM, vecFromM } from './model';
 import { regionSpec, resolveRegion } from './region';
 import { cloudIdParam, regionParam, seedParam } from './schemas';
@@ -205,7 +205,9 @@ export const fitSteelMember = defineCommand({
       .filter(isRecord)
       .flatMap((w) => (typeof w['code'] === 'string' ? [{ code: w['code'], message: String(w['message'] ?? '') }] : []));
     const nativeThreshold = result['threshold'];
-    const bandMm = isRecord(nativeThreshold) ? mm(nativeThreshold['value']) : Number.POSITIVE_INFINITY;
+    const bandMm = isRecord(nativeThreshold) ? mm(nativeThreshold['value']) : Number.NaN;
+    if (!(Number.isFinite(bandMm) && bandMm > 0))
+      return refuseScan(doc, command, 'NATIVE_PROTOCOL', 'the steel fit answered without a positive finite threshold.value', [cloudId]);
     const thickness = measuredThickness(result['thickness'], findProfile(best.profile), bandMm);
     const warnings = [...nativeWarnings, ...thickness.warnings];
     const reasons = unverifiedReasons(
@@ -268,7 +270,7 @@ export const fitSteelMember = defineCommand({
         axis: { direction: axis, start: startDoc, end: endDoc },
         member: { start: startDoc, end: endDoc, direction: axis, length },
         measured: measuredSection({ hMm: best.hMm, bMm: best.bMm, rollDeg: best.rollDeg }, thickness),
-        axisRefinement: result['axisRefinement'] ?? null,
+        axisRefinement: axisRefinementOf(result['axisRefinement']),
         addSteelMember: {
           profile: best.profile,
           start: relative(startDoc),

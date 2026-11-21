@@ -66,8 +66,18 @@ export function commitSteelMember(doc: CadDocument, ctx: ExecutionContext | unde
   const vertical = length > 0 && Math.abs(end[2] - start[2]) / length >= VERTICAL_COS;
   const id = nextId('ext');
   const at = (p: readonly [number, number, number]): number[] => [fromM(doc, p[0]), fromM(doc, p[1]), fromM(doc, p[2]) - elevation];
+  const scan = scanOf(doc);
+  const record: ExtractionRecord = {
+    ...pending,
+    unverified: reasons.length > 0,
+    unverifiedReasons: [...reasons],
+    id,
+    createdElementIds: [],
+    status: 'computed',
+  };
+  const withRecord = withScan(doc, { ...scan, extractions: { ...scan.extractions, [id]: record } });
   const added = execute(
-    doc,
+    withRecord,
     'add_steel_member',
     {
       profile: profile.name,
@@ -82,17 +92,11 @@ export function commitSteelMember(doc: CadDocument, ctx: ExecutionContext | unde
   );
   if (added.affected.length === 0) return { ...added, document: doc, summary: `${command}: ${added.summary}` };
   const elements = added.document.building?.elements ?? {};
-  const record: ExtractionRecord = {
-    ...pending,
-    unverified: reasons.length > 0,
-    unverifiedReasons: [...reasons],
-    id,
-    createdElementIds: added.affected.filter((created) => Object.hasOwn(elements, created)),
-    status: 'computed',
-  };
   const after = scanOf(added.document);
+  const created = added.affected.filter((element) => Object.hasOwn(elements, element));
+  const stored = { ...record, createdElementIds: created };
   return changed(
-    withScan(added.document, { ...after, extractions: { ...after.extractions, [id]: record } }),
+    withScan(added.document, { ...after, extractions: { ...after.extractions, [id]: stored } }),
     `Committed extraction ${id}: as-built steel member ${added.affected.join(', ')} (${profile.name}, from '${designation}')${reasons.length > 0 ? ` (unverified: ${reasons.join('; ')})` : ''}. Review before fabrication (accept_asbuilt_extraction).`,
     [id, ...added.affected],
   );

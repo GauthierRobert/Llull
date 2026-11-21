@@ -22,12 +22,16 @@ export interface MeasuredThickness {
   readonly warnings: ReadonlyArray<{ readonly code: string; readonly message: string }>;
 }
 
+const INVALID_PLATE =
+  'the native thickness estimate was malformed (tw / tf must be finite and > 0, residual >= 0, samples a non-negative integer) and was dropped';
 const NOT_I = 'tw / tf are estimated for the I sections IPE, HEA and HEB; other families are read from the catalogue';
 
 function plate(raw: unknown, catalogueMm: number | null): PlateMeasure | null {
   if (!isRecord(raw)) return null;
   const [value, residual, samples] = [raw['value'], raw['residual'], raw['samples']];
-  if (typeof value !== 'number' || typeof residual !== 'number' || typeof samples !== 'number') return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || !(value > 0)) return null;
+  if (typeof residual !== 'number' || !Number.isFinite(residual) || residual < 0) return null;
+  if (typeof samples !== 'number' || !Number.isInteger(samples) || samples < 0) return null;
   return {
     mm: value * 1000,
     residualMm: residual * 1000,
@@ -47,6 +51,7 @@ export function measuredThickness(raw: unknown, profile: SteelProfile | undefine
     return { tw: null, tf: null, reason: profile === undefined ? 'the best candidate is not a catalogue profile' : NOT_I, warnings: [] };
   const tw = plate(raw['tw'], profile?.tw ?? null);
   const tf = plate(raw['tf'], profile?.tf ?? null);
+  const malformed = (raw['tw'] != null && tw === null) || (raw['tf'] != null && tf === null);
   const plates: ReadonlyArray<readonly [string, string, PlateMeasure | null]> = [
     ['tw', 'web', tw],
     ['tf', 'flange', tf],
@@ -63,7 +68,9 @@ export function measuredThickness(raw: unknown, profile: SteelProfile | undefine
           },
         ],
   );
-  return { tw, tf, reason: typeof raw['reason'] === 'string' ? raw['reason'] : null, warnings };
+  const nativeReason = typeof raw['reason'] === 'string' ? raw['reason'] : null;
+  const reason = nativeReason ?? (malformed ? INVALID_PLATE : null);
+  return { tw, tf, reason, warnings };
 }
 
 /** The `measured` block of fit_steel_member data: rotated extents, tw / tf with their residual and the catalogue values, or null with the reason. */
@@ -81,4 +88,30 @@ export function measuredSection(
     tfCatalogueMm: thickness.tf?.catalogueMm ?? null,
     twTfReason: thickness.reason,
   };
+}
+
+export interface AxisRefinementData {
+  readonly applied: boolean;
+  readonly deltaDeg: number;
+  readonly faces: number;
+  readonly facePoints: number;
+  /** Metres: RMS distance of the face points to their fitted planes. */
+  readonly residual: number;
+  readonly reason: string | null;
+}
+
+/** The native `axisRefinement` picked field by field; null when any field has the wrong type. */
+export function axisRefinementOf(raw: unknown): AxisRefinementData | null {
+  if (!isRecord(raw) || typeof raw['applied'] !== 'boolean') return null;
+  const [deltaDeg, faces, facePoints, residual, reason] = [
+    raw['deltaDeg'],
+    raw['faces'],
+    raw['facePoints'],
+    raw['residual'],
+    raw['reason'],
+  ];
+  const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+  if (!finite(deltaDeg) || !finite(faces) || !finite(facePoints) || !finite(residual)) return null;
+  if (reason !== null && reason !== undefined && typeof reason !== 'string') return null;
+  return { applied: raw['applied'], deltaDeg, faces, facePoints, residual, reason: reason ?? null };
 }
