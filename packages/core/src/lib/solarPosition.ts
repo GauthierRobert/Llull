@@ -70,7 +70,7 @@ function refractionDeg(e: number): number {
   const tan = Math.tan(e * RAD);
   if (e > 5) return (58.1 / tan - 0.07 / (tan * tan * tan) + 0.000086 / (tan * tan * tan * tan * tan)) / 3600;
   if (e > -0.575) return (1735 + e * (-518.2 + e * (103.4 + e * (-12.79 + e * 0.711)))) / 3600;
-  return -20.774 / tan / 3600;
+  return -20.772 / tan / 3600;
 }
 
 /** Solar position at `latitudeDeg` (north +) / `longitudeDeg` (east +) for a civil date-time. */

@@ -1068,3 +1068,21 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
   query: { name: 'check_motor_data', params: constant({ motor: 'm' }) },
   mutate: { name: 'set_motor_drive', params: constant({ motor: 'm', mode: 'voltage', volts: 5 }) },
 };
+
+/** The site context (`doc.siteContext`, plant 09 VIS FR-VIS-18): a core slice with no plugin row; pluginSliceFuzz.test.ts runs it like DYNAMICS_SEED. */
+export const SITE_CONTEXT_SEED: PluginSliceSeed = {
+  roots: ['siteContext'],
+  build: () => {
+    const result = execute(createEmptyDocument(), 'set_site_context', {
+      latitudeDeg: 48.2,
+      longitudeDeg: 16.37,
+      dateTime: '2026-06-21T14:30:00+02:00',
+      northAngleDeg: 30,
+      groundElevation: 170,
+    });
+    if (result.document.siteContext === undefined) throw new Error(`SITE_CONTEXT_SEED: ${result.summary}`);
+    return result.document;
+  },
+  query: { name: 'sun_position', params: constant({}) },
+  mutate: { name: 'set_site_context', params: constant({ latitudeDeg: 10, longitudeDeg: 20, dateTime: '2026-01-01T12:00:00Z' }) },
+};

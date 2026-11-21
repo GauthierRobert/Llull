@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { siteLightOf } from '@core/commands/render/siteLight';
+import { renderCameraRgba } from '@core/commands/render/frames';
 import { shade } from '@core/commands/render/camera';
 
 const box = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] }).document;
@@ -47,6 +48,13 @@ describe('render lighting from the site context', () => {
     const rasterNoon = render(at(NOON), { view: 'top' });
     expect(raster.summary).toContain('sky light only');
     expect(raster.svg).not.toBe(rasterNoon.svg);
+  });
+  it('lights walkthrough / BCF frames (renderCameraRgba) with the site sun too', () => {
+    const camera = { projection: 'perspective', eye: [6, -6, 5], direction: [-0.6, 0.6, -0.5], up: [0, 0, 1], fovDeg: 50 } as const;
+    const frame = (doc: typeof box): Uint8Array =>
+      renderCameraRgba(doc, { ...camera, direction: [-0.6, 0.6, -0.5254] }, 64, 64, [0, 0, 0], [0, 0, 0]);
+    expect(frame(at(MIDNIGHT))).not.toEqual(frame(at(NOON)));
+    expect(frame(at(NOON))).not.toEqual(frame(box));
   });
   it('ignores a stored site whose date-time no longer parses', () => {
     const corrupt = { ...box, siteContext: { latitudeDeg: 0, longitudeDeg: 0, dateTime: 'x', northAngleDeg: 0 } };

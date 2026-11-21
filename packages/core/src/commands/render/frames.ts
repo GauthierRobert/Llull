@@ -5,6 +5,7 @@
  * @pure (with the reference stage)
  */
 
+import { siteLightOf } from './siteLight';
 import type { CadDocument, Vec3 } from '../../model/types';
 import { encodePng } from '../../lib/png';
 import { boundsCenter } from '../../geometry/bounds';
@@ -57,11 +58,13 @@ export function renderCameraRgba(
     drawn = pixels(extras.augment === undefined ? scene : extras.augment(scene));
     return new Uint8Array(drawn.length);
   };
+  const site = siteLightOf(doc);
   renderDocument(doc, 'custom', width, height, {
     view: viewpointView(camera, width, height, center),
     caption: false,
     background: null,
     pixels: capture,
+    ...(site === null ? {} : { light: site.light }),
     ...(extras.shading === undefined ? {} : { shading: extras.shading }),
     ...(extras.colorOverrides === undefined ? {} : { colorOverrides: extras.colorOverrides }),
   });

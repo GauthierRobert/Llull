@@ -14,9 +14,11 @@ describe('solar position (NOAA equations)', () => {
     const when = parseIsoWithOffset('2003-10-17T12:30:30-07:00');
     expect(when).not.toBeNull();
     const p = solarPosition(39.742476, -105.1786, when!);
+    // Measured: delta azimuth 0.0023 deg, delta elevation 0.0030 deg. Deliberately not modelled: the SPA observer elevation 1830.14 m (parallax),
+    // pressure 820 mbar and temperature 11 C (this code uses the standard-atmosphere NOAA refraction).
     // SPA topocentric: zenith 50.11162 deg (elevation 39.88838), azimuth 194.34024 deg east of north.
-    expect(Math.abs(p.azimuthDeg - 194.34024)).toBeLessThan(0.02);
-    expect(Math.abs(p.elevationDeg - 39.88838)).toBeLessThan(0.02);
+    expect(Math.abs(p.azimuthDeg - 194.34024)).toBeLessThan(0.005);
+    expect(Math.abs(p.elevationDeg - 39.88838)).toBeLessThan(0.005);
   });
   it('gives the solstice declination, polar day and polar night', () => {
     const noon = solarPosition(0, 0, parseIsoWithOffset('2026-06-21T12:00:00Z')!);
@@ -98,6 +100,8 @@ describe('set_site_context / clear_site_context / sun_position', () => {
       { ...SITE, dateTime: '2026-06-21T14:30:00' },
       { ...SITE, dateTime: '2026-13-01T00:00:00Z' },
       { ...SITE, dateTime: 'now' },
+      { ...SITE, northAngleDeg: 1e308 },
+      { ...SITE, northAngleDeg: -361 },
     ]) {
       expectNoOp(execute(doc, 'set_site_context', bad), doc);
     }
@@ -143,6 +147,7 @@ describe('set_site_context / clear_site_context / sun_position', () => {
       { ...good, dateTime: '2026-06-21T14:30' },
       { ...good, northAngleDeg: 'x' },
       { ...good, longitudeDeg: 400 },
+      { ...good, northAngleDeg: 1e308 },
     ])
       expect(() => deserializeDocument(envelope(bad))).toThrow(/siteContext/);
     expect(() => deserializeDocument(envelope({ ...good, groundElevation: 'high' }))).toThrow(/groundElevation/);

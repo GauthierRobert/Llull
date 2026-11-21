@@ -39,7 +39,7 @@ import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
-import type { DocumentSettingsFields } from './siteContext';
+import type { DocumentSettingsFields } from './documentSettings';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };

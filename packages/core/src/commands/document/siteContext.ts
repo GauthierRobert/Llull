@@ -32,9 +32,11 @@ export const setSiteContext = defineCommand({
     dateTime: dateTimeField,
     northAngleDeg: z
       .number()
+      .min(-360)
+      .max(360)
       .optional()
       .describe(
-        'Plan rotation of true north in degrees, counter-clockwise seen from +Z, measured from the model +Y axis (0 = +Y is north, 90 = true north points along -X). Default 0.',
+        'Plan rotation of true north in degrees, counter-clockwise seen from +Z, measured from the model +Y axis (0 = +Y is north, 90 = true north points along -X). Range [-360, 360]. Default 0.',
       ),
     groundElevation: z.number().optional().describe('Ground level in document units (default: the model Z = 0 plane).'),
   }),
@@ -89,8 +91,10 @@ export const sunPosition = defineCommand({
       .describe('Longitude override in degrees; required when no site context is stored.'),
     northAngleDeg: z
       .number()
+      .min(-360)
+      .max(360)
       .optional()
-      .describe('North angle override in degrees (see set_site_context); default the stored one, else 0.'),
+      .describe('North angle override in degrees in [-360, 360] (see set_site_context); default the stored one, else 0.'),
   }),
   run: (doc, params): CommandResult => {
     const stored = doc.siteContext;

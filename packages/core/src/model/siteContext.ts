@@ -1,7 +1,6 @@
 /** Site context of a document (plant 09 VIS FR-VIS-18): where and when the model stands, and the sun that follows from it; `CadDocument.siteContext`. */
 
 import { parseIsoWithOffset, solarPosition, sunDirection } from '../lib/solarPosition';
-import type { DimensionStyleFields } from './dimensionStyle';
 import type { Vec3 } from './vectors';
 
 export interface SiteContext {
@@ -17,8 +16,8 @@ export interface SiteContext {
   readonly groundElevation?: number;
 }
 
-/** `CadDocument` settings slices: dimension styles, and the site context (absent until `set_site_context`; drives the sun of the renderers, plant 09 VIS-M8). */
-export interface DocumentSettingsFields extends DimensionStyleFields {
+/** `CadDocument` slice: the site context (absent until `set_site_context`; drives the sun of the renderers, plant 09 VIS-M8). */
+export interface SiteContextFields {
   siteContext?: SiteContext;
 }
 
@@ -44,7 +43,8 @@ export function siteContextProblem(site: unknown): string | null {
   if (!finite('latitudeDeg') || Math.abs(num('latitudeDeg')) > 90) return 'siteContext.latitudeDeg must be a finite number in [-90, 90]';
   if (!finite('longitudeDeg') || Math.abs(num('longitudeDeg')) > 180)
     return 'siteContext.longitudeDeg must be a finite number in [-180, 180]';
-  if (!finite('northAngleDeg')) return 'siteContext.northAngleDeg must be a finite number';
+  if (!finite('northAngleDeg') || Math.abs(num('northAngleDeg')) > 360)
+    return 'siteContext.northAngleDeg must be a finite number in [-360, 360]';
   if (typeof s['dateTime'] !== 'string' || parseIsoWithOffset(s['dateTime']) === null)
     return 'siteContext.dateTime must be an ISO-8601 date-time with an explicit UTC offset (e.g. 2026-06-21T14:30:00+02:00 or ...Z), years 1800-2200';
   if (s['groundElevation'] !== undefined && !finite('groundElevation')) return 'siteContext.groundElevation must be a finite number';
