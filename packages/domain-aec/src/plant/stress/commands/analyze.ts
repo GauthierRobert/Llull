@@ -96,7 +96,7 @@ function summary(analysis: Analysis, model: StressModel): Record<string, unknown
       sections:
         'stiffness and expansion stress on the nominal wall; sustained and occasional stress on the wall less the corrosion allowance',
       limits:
-        'end and interior extremum stations of each element; OCC cases combined by scalar or srss are evaluated at the element end stations (nodes) only',
+        'end and interior extremum stations of each element; OCC and EXP cases combined by scalar or srss are evaluated at the element end stations (nodes) only',
     },
   };
 }
@@ -111,7 +111,7 @@ export const analyzePipeStress = defineCommand({
   description:
     'Analyse a stress model: rebuild the finite element model from the current pipes and supports, solve every load case (weight, thermal, pressure, force primitives with non-linear supports re-evaluated per case) and apply the code check. ' +
     'Read-only. Default output is the summary: model size, solver residual and iterations per case, the largest displacement per case, the governing station per code case (ratio = stress / allowable), the findings with codes and remediation, the input hash and the support status. ' +
-    '`include` adds details: "displacements" (node, mm, degrees; not for OCC cases combined by scalar or srss, whose displacements and reactions are not physical states), "reactions" (force N and moment N.mm at every anchor / support node per case), "stresses" (every station with stress, allowable, ratio, rule, SIFs); "geometry" (data.geometry: nodes { id, positionMm }, elements { id, pipeId, kind, nodeIds, pointsMm, odMm, wallMm, bendRadiusMm } and pipes { id, kind, pointsMm centreline, elementIds }, mm, building pipes and routed runs alike; use it to place support and reaction arrows); `cases` and `nodes` (ids like N3 from the summary) filter the details. ' +
+    '`include` adds details: "displacements" (node, mm, degrees; not for OCC or EXP cases combined by scalar or srss, whose displacements and reactions are not physical states), "reactions" (force N and moment N.mm at every anchor / support node per case), "stresses" (every station with stress, allowable, ratio, rule, SIFs); "geometry" (data.geometry: nodes { id, positionMm }, elements { id, pipeId, kind, nodeIds, pointsMm, odMm, wallMm, bendRadiusMm } and pipes { id, kind, pointsMm centreline, elementIds }, mm, building pipes and routed runs alike; use it to place support and reaction arrows); `cases` and `nodes` (ids like N3 from the summary) filter the details. ' +
     'Large models: give `limit` (details per list) to page the details; the answer then carries data.page { limit, offset, total per list, nextCursor } and the next call passes cursor = nextCursor (the same limit and filters); a cursor from other inputs or with another limit / include / cases / nodes is PST_CURSOR_STALE; every page re-solves the model. ' +
     'Units: mm, N, N.mm, MPa. reviewRequired is always true: a qualified engineer reviews the result. Refusals carry PST_* codes (PST_UNSTABLE names the free node and DOF; add an anchor or guide there). Next: check_pipe_stress, record_pipe_stress_results.',
   params: z.object({

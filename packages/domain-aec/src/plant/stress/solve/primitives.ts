@@ -99,6 +99,7 @@ export function caseLoads(
   name: string,
   basic: readonly string[],
   environment: Pick<StressModel, 'wind' | 'seismic'>,
+  modulusMPa: number = conditions.material.youngsModulusMPa,
 ): CaseLoads | PrimitiveFailure {
   const { elements } = built.layout;
   const nodal: NonNullable<FrameLoadCase['nodal']>[number][] = [];
@@ -108,7 +109,7 @@ export function caseLoads(
   let maxTempC: number | null = null;
   const unverified: string[] = [];
   const prescribed = new Map<number, readonly number[]>();
-  const E = conditions.material.youngsModulusMPa;
+  const E = modulusMPa;
   for (const primitive of basic) {
     if (primitive === 'W' || primitive === 'WW') {
       const field = weightField(

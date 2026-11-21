@@ -204,7 +204,7 @@ export const setPipeOperatingConditions = defineCommand({
 
 /**
  * @affects plant.stress.models[modelId].loadCases and .forces: replaced; the approval is dropped
- * @invariant OPE / SUS / OCC cases are solved from their primitive loads together (never superposed); EXP is the algebraic combination of solved cases (OPE - SUS)
+ * @invariant OPE / SUS / OCC cases are solved from their primitive loads together (never superposed); EXP is the algebraic combination of solved cases (OPE - SUS), or with method scalar / srss the sum / root-sum-square of the term displacement-range stresses
  * @failure unknown model -> PST_MODEL_NOT_FOUND; preset without conditions -> PST_CONDITIONS_MISSING; preset without T1, unknown primitive / case, duplicate name -> PST_LOADCASE_INVALID; force pipe not in the model -> PST_PIPE_NOT_FOUND
  */
 export const setStressLoadCases = defineCommand({
