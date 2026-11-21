@@ -201,6 +201,13 @@ function sizeOf(faces: readonly NurbsSurfaceData[]): number {
   return hypotOf(extent);
 }
 
+/** The section vertices of a ruled polygon loft whose sections share one vertex count (>= 3): the native kernel's polygon path. */
+function polygonRings(entity: LoftEntity): readonly (readonly Vec3[])[] | null {
+  if (entity.polygon !== true || !entity.ruled || entity.sections !== undefined || entity.rings.length < 2) return null;
+  const count = entity.rings[0]?.length ?? 0;
+  return count >= 3 && entity.rings.every((ring) => ring.length === count) ? entity.rings : null;
+}
+
 function loftBuild(entity: LoftEntity): SweptBuild | Refusal {
   if (entity.faces !== undefined && entity.faces.length > 0) {
     const pieces = entity.faces.map(spans);
@@ -212,7 +219,8 @@ function loftBuild(entity: LoftEntity): SweptBuild | Refusal {
     return { kind: 'faces', faces, cap: (entity.caps ?? 2) > 0, tolerance: Math.max(1e-7, 1e-6 * sizeOf(faces)) };
   }
   if (entity.closed === true) return refusal('is closed but carries no exact faces');
-  return { kind: 'loft', sections: loftSections(entity), ruled: entity.ruled };
+  const polygons = polygonRings(entity);
+  return { kind: 'loft', sections: loftSections(entity), ruled: entity.ruled, ...(polygons === null ? {} : { polygons }) };
 }
 
 const fallbackCache = new WeakMap<object, readonly number[]>();

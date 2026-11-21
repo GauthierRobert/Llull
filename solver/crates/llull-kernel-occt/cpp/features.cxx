@@ -59,6 +59,7 @@
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <Precision.hxx>
 #include <ShapeFix_Solid.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <Standard_Failure.hxx>
@@ -1101,6 +1102,8 @@ TopoDS_Shape outward_solid(const std::vector<TopoDS_Shape> &faces, double tolera
   GProp_GProps volume;
   BRepGProp::VolumeProperties(solid, volume);
   if (volume.Mass() < 0) solid.Reverse();
+  // A self-crossing index pairing (bow-tie side, crossing sides) still sews shut: refuse an invalid solid so the caller falls back to the chains.
+  if (!BRepCheck_Analyzer(solid, Standard_True).IsValid()) return TopoDS_Shape();
   return solid;
 }
 
@@ -1133,7 +1136,7 @@ std::unique_ptr<Shape> skinned_polygon_solid(rust::Slice<const double> points, r
       if (side.IsNull()) return nullptr;
       faces.push_back(side);
     }
-  const TopoDS_Shape solid = outward_solid(faces, 1e-7 * size);
+  const TopoDS_Shape solid = outward_solid(faces, std::max(1e-7 * size, Precision::Confusion()));
   return solid.IsNull() ? nullptr : wrap(solid);
 }
 

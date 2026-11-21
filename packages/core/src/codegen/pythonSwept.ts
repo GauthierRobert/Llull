@@ -5,7 +5,7 @@
  * @invariant a build tuple is one of
  *   `("faces", label, key, cap, tolerance)` (fitted faces from `_SWG_FACES[key]`),
  *   `("pipe", label, spine, section, mitre, bore)`, `("helix", label, origin, axis, x_axis, radius, pitch, turns, left, start, section, bore)`,
- *   `("loft", label, sections, ruled)`; a spine segment is 2 points (line), 3 (arc through) or 4 (cubic Bezier); a section is
+ *   `("loft", label, sections, ruled[, polygons])` (polygons = the vertices of a ruled polygon loft: CadQuery / build123d build planar or ruled side faces from them, the others loft the chains); a spine segment is 2 points (line), 3 (arc through) or 4 (cubic Bezier); a section is
  *   `("circle", centre, normal, radius)` or `("polygon", [point…])`
  * @failure a build the kernel cannot close or validate -> ValueError "SWG_CODEGEN_UNSUPPORTED: <label>: <why>" (never a different solid)
  */
@@ -289,10 +289,93 @@ def _section_wire(section):
     return _wire_of(edges)
 
 
-def _make_loft(label, sections, ruled):
-    """Thru-sections solid of exact section wires (the native llull kernel builds lofts the same way)."""
+def _ruled_side(a, b, c, d, size):
+    """One ruled side between the edge a-b of a section and d-c of the next: a planar face when the corners are coplanar, else the bilinear ruled surface (the native construction)."""
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace, BRepBuilderAPI_MakePolygon
+    from OCP.BRepFill import BRepFill
+    from OCP.gp import gp_Pnt
+
+    corners = []
+    for corner in (a, b, c, d):
+        if not corners or math.dist(corners[-1], corner) > 1e-9 * size:
+            corners.append(corner)
+    if len(corners) > 1 and math.dist(corners[0], corners[-1]) <= 1e-9 * size:
+        corners.pop()
+    if len(corners) < 3:
+        return None
+    normal, centre = [0.0, 0.0, 0.0], [sum(corner[axis] for corner in corners) / len(corners) for axis in range(3)]
+    for index, p in enumerate(corners):
+        q = corners[(index + 1) % len(corners)]
+        normal[0] += p[1] * q[2] - p[2] * q[1]
+        normal[1] += p[2] * q[0] - p[0] * q[2]
+        normal[2] += p[0] * q[1] - p[1] * q[0]
+    length = math.sqrt(sum(n * n for n in normal))
+    if length <= 1e-12 * size * size:
+        return None
+    normal = [n / length for n in normal]
+    if all(abs(sum((corner[axis] - centre[axis]) * normal[axis] for axis in range(3))) <= 1e-9 * size for corner in corners):
+        polygon = BRepBuilderAPI_MakePolygon()
+        for corner in corners:
+            polygon.Add(gp_Pnt(*corner))
+        polygon.Close()
+        return BRepBuilderAPI_MakeFace(polygon.Wire(), True).Face()
+    first = BRepBuilderAPI_MakeEdge(gp_Pnt(*a), gp_Pnt(*b)).Edge()
+    second = BRepBuilderAPI_MakeEdge(gp_Pnt(*d), gp_Pnt(*c)).Edge()
+    return BRepFill.Face_s(first, second)
+
+
+def _polygon_loft(polygons):
+    """ASC M5 ruled polygon loft: planar caps and ruled sides (vertex k pairs with vertex k) sewn into one solid; None when it does not close into a valid solid (the caller then lofts the chains)."""
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_MakePolygon, BRepBuilderAPI_MakeSolid, BRepBuilderAPI_Sewing
+    from OCP.BRepCheck import BRepCheck_Analyzer
+    from OCP.BRepGProp import BRepGProp
+    from OCP.GProp import GProp_GProps
+    from OCP.gp import gp_Pnt
+    from OCP.TopAbs import TopAbs_SHELL
+    from OCP.TopoDS import TopoDS
+
+    flat = [point for polygon in polygons for point in polygon]
+    size = max(1e-9, math.dist([min(p[axis] for p in flat) for axis in range(3)], [max(p[axis] for p in flat) for axis in range(3)]))
+    faces = []
+    for polygon in (polygons[0], polygons[-1]):
+        outline = BRepBuilderAPI_MakePolygon()
+        for point in polygon:
+            outline.Add(gp_Pnt(*point))
+        outline.Close()
+        faces.append(BRepBuilderAPI_MakeFace(outline.Wire(), True).Face())
+    count = len(polygons[0])
+    for lower, upper in zip(polygons, polygons[1:]):
+        for k in range(count):
+            side = _ruled_side(lower[k], lower[(k + 1) % count], upper[(k + 1) % count], upper[k], size)
+            if side is None:
+                return None
+            faces.append(side)
+    sewing = BRepBuilderAPI_Sewing(max(1e-7 * size, 1e-7), True, True, True, False)
+    for face in faces:
+        sewing.Add(face)
+    sewing.Perform()
+    shells = _subshapes(sewing.SewedShape(), TopAbs_SHELL) if sewing.NbFreeEdges() == 0 else []
+    if len(shells) != 1:
+        return None
+    solid = BRepBuilderAPI_MakeSolid()
+    solid.Add((getattr(TopoDS, "Shell_s", None) or TopoDS.Shell)(shells[0]))
+    solid.Build()
+    topods = solid.Shape()
+    properties = GProp_GProps()
+    BRepGProp.VolumeProperties_s(topods, properties)
+    if properties.Mass() < 0:
+        topods = topods.Reversed()
+    return topods if BRepCheck_Analyzer(topods).IsValid() else None
+
+
+def _make_loft(label, sections, ruled, polygons=None):
+    """Thru-sections solid of exact section wires (the native llull kernel builds lofts the same way); a ruled polygon loft builds its planar / ruled side faces first, as the native kernel does."""
     from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
 
+    if polygons and ruled:
+        solid = _polygon_loft(polygons)
+        if solid is not None:
+            return _checked(label, solid)
     maker = BRepOffsetAPI_ThruSections(True, bool(ruled), 1e-6)
     maker.CheckCompatibility(False)
     for section in sections:
@@ -460,7 +543,7 @@ def _section_wire(section):
     return Part.Wire(edges)
 
 
-def _make_loft(label, sections, ruled):
+def _make_loft(label, sections, ruled, polygons=None):
     return _checked(label, Part.makeLoft([_section_wire(section) for section in sections], True, bool(ruled)))
 
 

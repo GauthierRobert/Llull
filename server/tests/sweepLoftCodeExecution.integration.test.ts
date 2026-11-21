@@ -327,6 +327,36 @@ for (const { language, python, driver, available } of backends)
         },
       );
 
+      it('a ruled polygon loft (ASC M5) builds planar and ruled side faces: the frustum and a twisted non-planar pair keep the exact volume', () => {
+        const square = (half: number, z: number, turn = 0): number[][] =>
+          [0, 1, 2, 3].map((k) => {
+            const angle = turn + Math.PI / 4 + (k * Math.PI) / 2;
+            return [half * Math.SQRT2 * Math.cos(angle), half * Math.SQRT2 * Math.sin(angle), z];
+          });
+        const frustum = created(createEmptyDocument(), 'loft_sections', {
+          sections: [
+            { section: square(1, 0).map(([x, y]) => [x, y]), center: [0, 0, 0] },
+            { section: square(0.5, 0).map(([x, y]) => [x, y]), center: [0, 0, 2] },
+          ],
+          ruled: true,
+        });
+        const twisted = created(frustum.doc, 'loft_sections', {
+          sections: [
+            { section: square(1, 0).map(([x, y]) => [x, y]), center: [10, 0, 0] },
+            { section: square(1, 0, 0.4).map(([x, y]) => [x, y]), center: [10, 0, 2] },
+          ],
+          ruled: true,
+        });
+        const doc = twisted.doc;
+        const code = codeOf(doc, language);
+        if (language !== 'freecad') expect(code).toContain('_polygon_loft(polygons)');
+        const run = runScript(code, python, driver);
+        const expected = (id: string): number => (execute(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
+        expect(relError(run.volumes[0] as number, expected(frustum.id)), language + ' frustum').toBeLessThan(1e-6);
+        // exact bilinear sides (the display mesh triangulates them coarsely): the volume of the ruled ThruSections of the straight chains
+        expect(relError(run.volumes[1] as number, 7.789495984), language + ' twisted').toBeLessThan(1e-6);
+      });
+
       it('library constructions on more paths: a polygon pipe on a bent planar path, a closed smooth round ring, an asymmetric mitre on a non-planar polyline', () => {
         const triangle = [
           [-4, -2],
