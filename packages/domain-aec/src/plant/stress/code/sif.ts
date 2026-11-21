@@ -26,6 +26,8 @@ export interface SifInput {
   readonly wallMm: number;
   readonly bendRadiusMm?: number | undefined;
   readonly padMm?: number | undefined;
+  /** Bend / elbow only: ends of the bend that are flanged (0, 1 or 2); the flange stiffening correction c = h^(1/6) / h^(1/3) multiplies h (PSI b311.py note 3, B31.1 App. D). */
+  readonly flangedEnds?: 0 | 1 | 2 | undefined;
 }
 
 export interface SifValues {
@@ -74,7 +76,9 @@ export function computeSif(set: RuleSet, input: SifInput): SifValues | SifRefusa
           reason: `bendRadiusMm ${radius} is below the pipe mean radius ${meanRadius.toFixed(2)} mm: not a bend`,
           path: 'bendRadiusMm',
         };
-      const h = (wallMm * radius) / meanRadius ** 2;
+      const plain = (wallMm * radius) / meanRadius ** 2;
+      const flanged = input.flangedEnds === undefined ? 0 : input.flangedEnds;
+      const h = flanged === 0 ? plain : plain * (flanged === 1 ? pow(plain, 1 / 6) : pow(plain, 1 / 3));
       const raw = [1.65 / h, 0.9 / power(h), 0.75 / power(h)];
       const clamped =
         h > 1 ? `h = ${h.toFixed(3)} > 1` : raw.some((value) => value < 1) ? 'a factor was raised to its floor of 1.0' : undefined;
@@ -85,10 +89,12 @@ export function computeSif(set: RuleSet, input: SifInput): SifValues | SifRefusa
         k: atLeastOne(1.65 / h),
         ii,
         io,
-        ruleRow: 'SIF-BEND',
-        grade: 'A',
+        ruleRow: flanged === 0 ? 'SIF-BEND' : 'SIF-BEND-FLANGED',
+        grade: flanged === 0 ? 'A' : 'B',
         ...(clamped === undefined ? {} : { clamped }),
-        formula: 'h = T R1 / r2^2; k = 1.65 / h; ii = 0.9 / h^(2/3); io = 0.75 / h^(2/3) (B31.1: i = 0.9 / h^(2/3) for both); each >= 1',
+        formula:
+          'h = T R1 / r2^2; k = 1.65 / h; ii = 0.9 / h^(2/3); io = 0.75 / h^(2/3) (B31.1: i = 0.9 / h^(2/3) for both); each >= 1' +
+          (flanged === 0 ? '' : `; flanged ends ${flanged}: h = h0 x h0^(${flanged === 1 ? '1/6' : '1/3'}), h0 = T R1 / r2^2`),
       };
     }
     case 'unreinforced_tee':

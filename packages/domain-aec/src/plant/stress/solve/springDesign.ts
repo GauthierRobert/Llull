@@ -10,6 +10,7 @@ import type { Contact } from '../model/restraints';
 import type { OperatingConditions, SpringSelection, StressModel } from '../model/schema';
 import { solveWithContacts, type NonlinearResult } from './nonlinear';
 import { caseLoads } from './primitives';
+import { hotModulusOf } from './hotModulus';
 import { frameElements, springSupports, withHangerLoads } from './run';
 
 export interface HangerTarget {
@@ -50,7 +51,7 @@ export const sameLocation = (a: SpringSelection['at'], b: SpringSelection['at'])
     : 'pipeId' in b && a.pipeId === b.pipeId && Math.abs(a.atMm - b.atMm) < 1;
 
 /**
- * @invariant the restrained-weight state holds each hanger point rigid in Z (two-way) with every other support as modelled; the other selected springs of the model act as they are
+ * @invariant with model.hotModulus set the travel solve of an OPE case with a T primitive uses E(T) (the restrained-weight state is statics, independent of a uniform E); the restrained-weight state holds each hanger point rigid in Z (two-way) with every other support as modelled; the other selected springs of the model act as they are
  * @failure no OPE case or one without the weight W -> PST_LOADCASE_INVALID; a hanger that carries no downward load -> PST_SPRING_NO_SIZE; build and solve failures with their codes
  */
 export function hangerLoads(
@@ -59,7 +60,15 @@ export function hangerLoads(
   conditions: OperatingConditions,
   targets: readonly HangerTarget[],
   operatingCase: string | undefined,
-): { readonly ok: true; readonly loads: HangerLoad[]; readonly operatingCase: string } | DesignFailure {
+):
+  | {
+      readonly ok: true;
+      readonly loads: HangerLoad[];
+      readonly operatingCase: string;
+      readonly hotModulusMPa?: number;
+      readonly hotModulusTempC?: number;
+    }
+  | DesignFailure {
   const ope =
     operatingCase === undefined
       ? model.loadCases.find((entry) => entry.type === 'OPE')
@@ -115,12 +124,14 @@ export function hangerLoads(
     basic: readonly string[],
     contacts: readonly Contact[],
     extra: NonNullable<FrameLoadCase['nodal']>,
+    modulusMPa?: number,
   ): Extract<NonlinearResult, { ok: true }> | DesignFailure => {
-    const loads = caseLoads(doc, built, conditions, name, basic, model);
+    const loads = caseLoads(doc, built, conditions, name, basic, model, modulusMPa);
     if ('ok' in loads) return failure(loads.code, loads.message, [], [loads.path]);
     const anchors = built.restraints.anchors.map((anchor) => ({ node: anchor.node, values: loads.prescribed.get(anchor.node) }));
     const load = withHangerLoads({ ...loads.load, nodal: [...(loads.load.nodal ?? []), ...extra] }, others.constantEffort);
-    const solved = solveWithContacts(frame, anchors, contacts, load, undefined, others.variable);
+    const caseFrame = modulusMPa === undefined ? frame : { nodes: frame.nodes, elements: frameElements(built, conditions, modulusMPa) };
+    const solved = solveWithContacts(caseFrame, anchors, contacts, load, undefined, others.variable);
     if (solved.ok) return solved;
     const named = solved.dofs.map((dof) => `N${dof.node + 1} ${DOF_NAMES[dof.dof]}`);
     return failure(solved.code, `${name}: ${solved.message}${named.length > 0 ? ` (${named.join(', ')})` : ''}`, [
@@ -140,11 +151,14 @@ export function hangerLoads(
       [id],
     );
   }
+  const hotE = hotModulusOf(doc, model, conditions, ope);
+  if (hotE !== null && !hotE.ok) return failure(hotE.code, `case ${ope.name}: ${hotE.message}`, [model.id], [hotE.path]);
   const operating = solve(
     'TRAVEL',
     ope.basic ?? [],
     built.restraints.contacts,
     nodes.map((node, index) => ({ node, force: [0, 0, hot[index] as number] as const })),
+    hotE === null ? undefined : hotE.modulusMPa,
   );
   if ('code' in operating) return operating;
   return {
@@ -156,5 +170,6 @@ export function hangerLoads(
       hotLoadN: hot[index] as number,
       travelUpMm: operating.result.displacements[(nodes[index] as number) * 6 + 2] as number,
     })),
+    ...(hotE === null ? {} : { hotModulusMPa: hotE.modulusMPa, hotModulusTempC: hotE.tempC }),
   };
 }

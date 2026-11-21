@@ -110,6 +110,7 @@ describe('toolset pipestress', () => {
       'nozzle_load_check',
       'pipe_sif',
       'pipe_stress_allowables',
+      'pipe_stress_pcf_attributes',
       'pipe_stress_report',
       'record_pipe_stress_results',
       'select_spring_hangers',
