@@ -4,6 +4,8 @@ import { useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Environment, Lightformer, ContactShadows } from '@react-three/drei';
 import type * as THREE from 'three';
+import { sunAt, type SunState } from '@core/model/siteContext';
+import type { Vec3 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { mergedEntityBounds } from './fitBounds';
 import { computeContactShadowPlane } from './contactShadowPlane';
@@ -95,18 +97,22 @@ function SceneKeyLight({
   shadowRadius,
   castShadow,
   bounds,
+  sunDirection,
+  intensity,
 }: {
   shadowMapSize: number;
   shadowRadius: number;
   castShadow: boolean;
   bounds: SceneBounds;
+  sunDirection: Vec3 | undefined;
+  intensity: number;
 }): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
   const invalidate = useThree((s) => s.invalidate);
   const lightRef = useRef<THREE.DirectionalLight>(null);
   const targetRef = useRef<THREE.Object3D>(null);
 
-  const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin), [bounds, renderOrigin]);
+  const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin, sunDirection), [bounds, renderOrigin, sunDirection]);
 
   useLayoutEffect(() => {
     const light = lightRef.current;
@@ -136,7 +142,7 @@ function SceneKeyLight({
       <directionalLight
         ref={lightRef}
         position={rig.position}
-        intensity={1.8}
+        intensity={intensity}
         castShadow={castShadow}
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0004}
@@ -145,6 +151,12 @@ function SceneKeyLight({
       />
     </>
   );
+}
+
+/** The site-context sun (null without a site context): recomputed only when the site changes. */
+function useSiteSun(): SunState | null {
+  const site = useStore((s) => s.document.siteContext);
+  return useMemo(() => (site === undefined ? null : sunAt(site)), [site]);
 }
 
 /** Only this subscribes to the document, so edits never re-render the Environment (its cube map would re-bake). */
@@ -167,17 +179,27 @@ function SceneShadowRig({
 }): React.ReactElement {
   const bounds = useSceneBounds();
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin), [bounds, renderOrigin]);
+  const sun = useSiteSun();
+  const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin, sun?.direction), [bounds, renderOrigin, sun]);
+  // Sun below the horizon (site context): no key light, no sun shadow; sky light only.
+  const sunUp = sun === null || sun.up;
   // Cascades (High) replace the single key light; with them off the single light is the whole path.
-  const useCascades = cascaded && keyShadows;
+  const useCascades = cascaded && keyShadows && sunUp;
   return (
     <>
       {useCascades ? (
         <CascadedShadows rig={rig} shadowRadius={shadowRadius} />
       ) : (
-        <SceneKeyLight shadowMapSize={shadowMapSize} shadowRadius={shadowRadius} castShadow={keyShadows} bounds={bounds} />
+        <SceneKeyLight
+          shadowMapSize={shadowMapSize}
+          shadowRadius={shadowRadius}
+          castShadow={keyShadows && sunUp}
+          bounds={bounds}
+          sunDirection={sun?.direction}
+          intensity={sunUp ? 1.8 : 0}
+        />
       )}
-      {keyShadows && <GroundShadowCatcher opacity={groundShadowOpacity} bounds={bounds} />}
+      {keyShadows && sunUp && <GroundShadowCatcher opacity={groundShadowOpacity} bounds={bounds} />}
       {contactShadows && <SceneContactShadows opacity={contactShadowOpacity} bounds={bounds} />}
     </>
   );

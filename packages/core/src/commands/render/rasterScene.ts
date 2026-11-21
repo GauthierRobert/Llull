@@ -8,7 +8,7 @@
 
 import type { Vec3 } from '../../model/types';
 import type { RasterScene } from '../../model/raster';
-import { type Camera, cameraBasis, makeProjector, projectPoint } from './camera';
+import { type Camera, type RenderLight, cameraBasis, makeProjector, projectPoint } from './camera';
 import type { Polygon3D, SurfaceShading } from './types';
 import { appendAll } from '../../lib/appendAll';
 
@@ -47,10 +47,10 @@ const tint = (metalness: number, albedo: number): number => 1 - metalness + (met
  * Blinn-Phong highlight of a face for a material class (spec 5.6): k_s (n.h)^s with k_s = 0.04 + 0.5 * metalness and
  * s = round(2 / roughness^2 - 2) clamped to [1, 256]. Square root and basic arithmetic only, so the number is identical on every platform.
  */
-function highlight(facing: Vec3, toEye: Vec3, shading: SurfaceShading): number {
-  const hx = LIGHT[0] + toEye[0];
-  const hy = LIGHT[1] + toEye[1];
-  const hz = LIGHT[2] + toEye[2];
+function highlight(facing: Vec3, toEye: Vec3, shading: SurfaceShading, toLight: Vec3): number {
+  const hx = toLight[0] + toEye[0];
+  const hy = toLight[1] + toEye[1];
+  const hz = toLight[2] + toEye[2];
   const length = Math.sqrt(hx * hx + hy * hy + hz * hz);
   if (!(length > 1e-12)) return 0;
   const nh = Math.max(0, (facing[0] * hx + facing[1] * hy + facing[2] * hz) / length);
@@ -145,7 +145,9 @@ export function prepareRasterScene(
   width: number,
   height: number,
   sceneRadius: number,
+  light?: RenderLight,
 ): RasterScene | null {
+  const toLight: Vec3 = light === undefined ? LIGHT : (light.direction ?? [0, 0, 0]);
   const filled = polygons.filter((p) => !p.stroke);
   if (polygons.length === 0) return null;
   const samples = supersampleFor(width, height);
@@ -188,11 +190,11 @@ export function prepareRasterScene(
     const view = projection.viewAt(polygon.verts[0] ?? [0, 0, 0]);
     const facingAway = nx * view[0] + ny * view[1] + nz * view[2] > 0;
     const facing: Vec3 = facingAway ? [-nx, -ny, -nz] : polygon.normal;
-    const diffuse = Math.max(0, facing[0] * LIGHT[0] + facing[1] * LIGHT[1] + facing[2] * LIGHT[2]);
+    const diffuse = Math.max(0, facing[0] * toLight[0] + facing[1] * toLight[1] + facing[2] * toLight[2]);
     const factor = AMBIENT + (1 - AMBIENT) * diffuse;
     const colour = [r * factor, g * factor, b * factor];
     if (polygon.shading !== undefined) {
-      const spec = highlight(facing, [-view[0], -view[1], -view[2]], polygon.shading);
+      const spec = light?.direction === null ? 0 : highlight(facing, [-view[0], -view[1], -view[2]], polygon.shading, toLight);
       const metal = unit(polygon.shading.metalness);
       const albedo = [r, g, b];
       for (let k = 0; k < 3; k += 1) colour[k] = Math.min(255, (colour[k] ?? 0) + 255 * spec * tint(metal, albedo[k] ?? 0));

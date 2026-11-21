@@ -1,7 +1,7 @@
 import type { ImageEntity, Vec3 } from '../../model/types';
 import type { PixelStage, Polygon3D } from './types';
 import { add3, dot3, scale3 } from '../../lib/vec3';
-import { type Camera, type Projector, cameraBasis, makeProjector, shade } from './camera';
+import { type Camera, type Projector, type RenderLight, cameraBasis, makeProjector, shade } from './camera';
 import { underlaySvg } from './underlays';
 import { rasterLayer } from './raster';
 
@@ -52,6 +52,7 @@ export function buildSvg(
   background: string | null = DEFAULT_BACKGROUND,
   raster: RasterSettings | null = null,
   caption = true,
+  light?: RenderLight,
 ): string {
   const perspective = cam.fovDeg !== undefined;
   const project = makeProjector(cam, orthoHalf, width, height);
@@ -71,10 +72,10 @@ export function buildSvg(
       ...(hasCap ? [HATCH_PATTERN] : []),
       ...(perspective ? [] : [buildGroundGrid(project, cam.target, orthoHalf), ...underlays.map((image) => underlaySvg(image, project))]),
       ...(raster === null
-        ? [...filled, ...stroked].map((poly) => polygonSvg(poly, project))
+        ? [...filled, ...stroked].map((poly) => polygonSvg(poly, project, light))
         : filled.length === 0 && !perspective && raster.pixels === undefined
-          ? stroked.map((poly) => polygonSvg(poly, project))
-          : [rasterLayer([...filled, ...stroked], cam, orthoHalf, width, height, raster.radius, raster.pixels)]),
+          ? stroked.map((poly) => polygonSvg(poly, project, light))
+          : [rasterLayer([...filled, ...stroked], cam, orthoHalf, width, height, raster.radius, raster.pixels, light)]),
       ...(caption
         ? [
             ...(perspective ? [] : [buildAxisTriad(project, cam.target, width, height, orthoHalf)]),
@@ -126,12 +127,12 @@ function gapBridgeWidth(poly: Polygon3D, project: Projector): number {
   return Math.min(4, 0.5 + (Math.sqrt(poly.inflate) - 1) * Math.hypot(ax - bx, ay - by));
 }
 
-function polygonSvg(poly: Polygon3D, project: Projector): string {
+function polygonSvg(poly: Polygon3D, project: Projector, light?: RenderLight): string {
   if (poly.loops) return capSvg(poly.loops, poly.color, project);
   const points = screenPoints(poly.verts, project, ' ');
   if (poly.stroke)
     return `  <polyline points="${points}" fill="none" stroke="${poly.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const fill = shade(poly.normal, poly.color);
+  const fill = shade(poly.normal, poly.color, light);
   if (poly.seamless) return `  <polygon points="${points}" fill="${fill}" stroke="${fill}" stroke-width="0.6" stroke-linejoin="round"/>`;
   if (poly.inflate)
     return `  <polygon points="${points}" fill="${fill}" stroke="${fill}" stroke-width="${r2(gapBridgeWidth(poly, project))}" stroke-linejoin="round"/>`;

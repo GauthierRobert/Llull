@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 
 type OptionalKey = { [K in keyof CadDocument]-?: undefined extends CadDocument[K] ? K : never }[keyof CadDocument];
 /** Optional slices carried over by clear_document (document settings) — every other optional key must be cleared. */
-type KeptKey = 'kernelSettings' | 'nextStepNumber';
+type KeptKey = 'kernelSettings' | 'siteContext' | 'nextStepNumber';
 
 /** Exhaustive by type: adding an optional key to CadDocument fails compilation here until a probe value is listed. */
 const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {
@@ -57,7 +57,7 @@ describe('clear_document clears every optional document slice', () => {
     expect(key in result.document).toBe(false);
   });
 
-  it('clears all slices at once and keeps units, camera, displayPrecision and kernelSettings', () => {
+  it('clears all slices at once and keeps units, camera, displayPrecision, kernelSettings and siteContext', () => {
     const kernelSettings = { maxImportTolerance: 0.5 } as unknown as CadDocument['kernelSettings'];
     const doc = {
       ...createEmptyDocument(),
@@ -65,12 +65,14 @@ describe('clear_document clears every optional document slice', () => {
       units: 'in' as const,
       displayPrecision: 5,
       kernelSettings,
+      siteContext: { latitudeDeg: 1, longitudeDeg: 2, dateTime: '2026-06-21T12:00:00Z', northAngleDeg: 0 },
       nextStepNumber: 9,
     } as CadDocument;
     const { document } = execute(doc, 'clear_document', {});
     const leftovers = Object.keys(SLICE_PROBES).filter((key) => key in document);
     expect(leftovers).toEqual([]);
     expect(document).toMatchObject({ units: 'in', displayPrecision: 5, kernelSettings, camera: doc.camera });
+    expect(document.siteContext).toEqual(doc.siteContext);
     expect(document.entities).toEqual({});
   });
 

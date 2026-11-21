@@ -80,9 +80,15 @@ export function makeProjector(cam: Camera, orthoHalf: number, width: number, hei
 const LIGHT_DIR: Vec3 = normalize3([0.6, -0.8, 1.0]);
 const AMBIENT = 0.35;
 
-/** Lambert-shade `baseColor` (`#rrggbb`) for a face with unit `normal`; returns `rgb(r,g,b)`. */
-export function shade(normal: Vec3, baseColor: string): string {
-  const diff = Math.max(0, dot3(normal, LIGHT_DIR));
+/** Key light override of a render (site-context sun): `direction` is the unit vector toward the light in model axes; null = sky light only (sun below the horizon). */
+export interface RenderLight {
+  readonly direction: Vec3 | null;
+}
+
+/** Lambert-shade `baseColor` (`#rrggbb`) for a face with unit `normal`; returns `rgb(r,g,b)`. Default light unless `light` overrides it. */
+export function shade(normal: Vec3, baseColor: string, light?: RenderLight): string {
+  const toLight = light === undefined ? LIGHT_DIR : light.direction;
+  const diff = toLight === null ? 0 : Math.max(0, dot3(normal, toLight));
   const factor = AMBIENT + (1 - AMBIENT) * diff;
   const hex = baseColor.replace('#', '');
   const [r, g, b] = [0, 2, 4].map((i) => Math.min(255, Math.round(parseInt(hex.substring(i, i + 2), 16) * factor)));

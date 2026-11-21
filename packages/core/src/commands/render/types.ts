@@ -1,6 +1,6 @@
 import type { Vec3 } from '../../model/types';
 import type { Bounds } from '../../geometry/bounds';
-import type { Camera, ViewName } from './camera';
+import type { Camera, RenderLight, ViewName } from './camera';
 import type { OverlayKind, OverlayStats } from '../../model/renderOverlay';
 import type { RasterScene } from '../../model/raster';
 
@@ -96,6 +96,8 @@ export interface RenderOptions {
   caption?: boolean;
   /** Explicit camera (a viewpoint or a perspective view) replacing the framed named view; `orthoHalf` sizes its frustum / scale. */
   view?: { readonly camera: Camera; readonly orthoHalf: number };
+  /** Key light replacing the default one (the site-context sun); absent = the default light. */
+  light?: RenderLight;
   /** Replaces the reference per-pixel stage of raster mode (a host's native raster, `ctx.raster`). */
   pixels?: PixelStage;
   /** Entity id -> material class surface (metalness, roughness): the entity's faces get the Blinn-Phong highlight in raster mode. */

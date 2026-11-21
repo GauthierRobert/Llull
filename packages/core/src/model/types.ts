@@ -39,7 +39,7 @@ import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
-import type { DimensionStyleFields } from './dimensionStyle';
+import type { DocumentSettingsFields } from './siteContext';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -635,7 +635,7 @@ export interface DriveRelation {
 }
 
 /** Document units default to 'mm'; every map/list below is initialized empty by createEmptyDocument. */
-export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields, DimensionStyleFields, DocumentExtensions {
+export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields, DocumentSettingsFields, DocumentExtensions {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
   order: EntityId[];
@@ -709,7 +709,7 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   composites?: import('./composites').CompositesModel;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: import('./sheetMetal').SheetMetalModel;
-  /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`), dimension styles (`DimensionStyleFields`) are inherited. */
+  /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`), dimension styles and the site context (`DocumentSettingsFields`) are inherited. */
 }
 
 export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode };

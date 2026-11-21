@@ -15,6 +15,7 @@ const MIN_HALF_EXTENT = 1e-3;
  * side throws every shadow behind the part, out of sight; from the left they fall across the ground to the right, where they read.
  */
 const BASE_LIGHT_OFFSET: Vec3 = [-4, -9, 14];
+const BASE_LIGHT_DISTANCE = Math.hypot(...BASE_LIGHT_OFFSET);
 const BASE_NEAR = 0.5;
 const BASE_FAR = 200;
 /** Over the bounding sphere: room for the shadows the scene casts on the ground beside itself (the light is ~50 degrees high). */
@@ -29,18 +30,20 @@ export interface KeyLightRig {
   readonly far: number;
 }
 
-/** @invariant bounds null (empty scene) -> the base rig at the origin; else halfExtent = bounding-sphere radius × PADDING */
-export function computeKeyLightRig(bounds: Bounds | null, renderOrigin: Vec3): KeyLightRig {
+/** @invariant sunDirection (unit, toward the sun) replaces the default light direction, keeping its distance
+ * @invariant bounds null (empty scene) -> the base rig at the origin; else halfExtent = bounding-sphere radius × PADDING */
+export function computeKeyLightRig(bounds: Bounds | null, renderOrigin: Vec3, sunDirection?: Vec3): KeyLightRig {
   const centre: Vec3 = bounds ? toRenderPosition(boundsCenter(bounds), renderOrigin) : [0, 0, 0];
   const halfExtent = bounds ? Math.max(boundsDiagonalRadius(bounds) * PADDING, MIN_HALF_EXTENT) : BASE_SHADOW_HALF_EXTENT;
   const scale = halfExtent / BASE_SHADOW_HALF_EXTENT;
+  // Site-context sun: same distance as the default light, along the computed direction.
+  const offset: Vec3 =
+    sunDirection === undefined
+      ? BASE_LIGHT_OFFSET
+      : [sunDirection[0] * BASE_LIGHT_DISTANCE, sunDirection[1] * BASE_LIGHT_DISTANCE, sunDirection[2] * BASE_LIGHT_DISTANCE];
   return {
     target: centre,
-    position: [
-      centre[0] + BASE_LIGHT_OFFSET[0] * scale,
-      centre[1] + BASE_LIGHT_OFFSET[1] * scale,
-      centre[2] + BASE_LIGHT_OFFSET[2] * scale,
-    ],
+    position: [centre[0] + offset[0] * scale, centre[1] + offset[1] * scale, centre[2] + offset[2] * scale],
     halfExtent,
     near: BASE_NEAR * scale,
     far: BASE_FAR * scale,
