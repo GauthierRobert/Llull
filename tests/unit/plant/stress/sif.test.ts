@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import { pow } from '@lib/pow';
 import { createEmptyDocument } from '@core/model/types';
 import { data, expectRefusal } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
@@ -167,32 +168,44 @@ describe('refusals (unchanged document, stable code, path)', () => {
   });
 });
 
-describe('pipe_sif flangedEnds (PST-FU2, PSI b311.py note 3)', () => {
+describe('pipe_sif flangedEnds (PST-FU2, code correction factor C1 on k and i)', () => {
   const base = { component: 'bend', odMm: 168.275, wallMm: 7.112, bendRadiusMm: 228.6, rule: 'B31.3-2018' } as const;
   const h0 = 0.250379;
   const empty = createEmptyDocument();
 
-  it('one flanged end: h = h0^(7/6), both: h0^(4/3); k, ii, io follow with the corrected h (hand numbers)', () => {
+  it('k and i are multiplied by C1 = h^(1/6) (one end) or h^(1/3) (both); h is unchanged (hand numbers)', () => {
     const plain = data<Sif>(empty, 'pipe_sif', base);
     expectRel(plain.h as number, h0, 1e-5);
     expect(plain.grade).toBe('A');
     const one = data<Sif>(empty, 'pipe_sif', { ...base, flangedEnds: 1 });
-    expectRel(one.h as number, 0.198776, 1e-4, 'h one end');
-    expectRel(one.k, 1.65 / 0.198776, 1e-4, 'k');
-    expectRel(one.ii, 0.9 / 0.340598, 2e-4, 'ii');
+    expectRel(one.h as number, h0, 1e-5, 'h unchanged');
+    expectRel(one.k, 5.2318, 2e-4, 'k one');
+    expectRel(one.ii, 1.7986, 2e-4, 'ii one');
+    expectRel(one.io, 1.4989, 2e-4, 'io one');
     expect(one.grade).toBe('B');
     expect(one.ruleRows.map((row) => row.id)).toContain('SIF-BEND-FLANGED');
     const both = data<Sif>(empty, 'pipe_sif', { ...base, flangedEnds: 2 });
-    expectRel(both.h as number, h0 ** (4 / 3), 1e-5, 'h both');
-    expect(both.ii).toBeGreaterThan(one.ii);
-    expect(data<Sif>(empty, 'pipe_sif', { ...base, flangedEnds: 0 }).h).toBe(plain.h);
+    expectRel(both.k, 4.1535, 2e-4, 'k both');
+    expectRel(both.ii, 1.4279, 2e-4, 'ii both');
+    expectRel(both.io, 1.19, 2e-4, 'io both');
+    expect(both.k).toBeLessThan(one.k);
+    expect(one.k).toBeLessThan(plain.k);
+    expectRel(both.k, (pow(h0, 1 / 3) * 1.65) / h0, 1e-6, 'k = C1 x 1.65 / h');
+    expect(data<Sif>(empty, 'pipe_sif', { ...base, flangedEnds: 0 }).k).toBe(plain.k);
   });
 
-  it('refuses flangedEnds on a component that is not a bend', () => {
+  it('refuses flangedEnds on a component that is not a bend and with rule user', () => {
     expectRefusal(
       empty,
       'pipe_sif',
       { component: 'welding_tee', odMm: 168.275, wallMm: 7.112, rule: 'B31.3-2018', flangedEnds: 1 },
+      'PST_PARAM_INVALID',
+      'flangedEnds',
+    );
+    expectRefusal(
+      empty,
+      'pipe_sif',
+      { ...base, rule: 'user', flangedEnds: 1, userSif: { ii: 2, io: 2, k: 3, source: 'test' } },
       'PST_PARAM_INVALID',
       'flangedEnds',
     );

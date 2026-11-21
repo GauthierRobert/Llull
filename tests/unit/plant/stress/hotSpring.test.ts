@@ -16,7 +16,12 @@ const H = 4000;
 const L = 6000;
 const ALPHA = 1.2e-5;
 
-function scene(rows: unknown[]): { doc: CadDocument; id: string; pipe: string } {
+function scene(
+  rows: unknown[],
+  conditionsOver: Record<string, unknown> = {},
+  opeBasic: string[] = ['W', 'T1'],
+  anchor = true,
+): { doc: CadDocument; id: string; pipe: string } {
   const pipe = withPipe(
     withEModulus(baseDoc(), rows),
     [
@@ -27,11 +32,16 @@ function scene(rows: unknown[]): { doc: CadDocument; id: string; pipe: string } 
     DN100.odMm,
   );
   const model = withModel(pipe.doc, [pipe.id]);
-  let doc = conditioned(model.doc, model.id, { temperatures: [{ name: 'T1', tempC: 221.1 }] }, { thermal: { meanCtePerK: ALPHA } });
-  doc = apply(doc, 'add_stress_restraint', { modelId: model.id, at: { pipeId: pipe.id, atMm: 0 }, kind: 'anchor' });
+  let doc = conditioned(
+    model.doc,
+    model.id,
+    { temperatures: [{ name: 'T1', tempC: 221.1 }], ...conditionsOver },
+    { thermal: { meanCtePerK: ALPHA } },
+  );
+  if (anchor) doc = apply(doc, 'add_stress_restraint', { modelId: model.id, at: { pipeId: pipe.id, atMm: 0 }, kind: 'anchor' });
   doc = cases(doc, model.id, [
     { name: 'SUS', type: 'SUS', basic: ['W'] },
-    { name: 'OPE', type: 'OPE', basic: ['W', 'T1'] },
+    { name: 'OPE', type: 'OPE', basic: opeBasic },
   ]);
   doc = apply(doc, 'import_spring_table', {
     modelId: model.id,
@@ -71,5 +81,58 @@ describe('select_spring_hangers with hotModulus', () => {
     expect(out.summary).toContain('PST_TEMPERATURE_OUT_OF_TABLE');
     expect(out.document).toBe(doc);
     expect(out.affected).toEqual([]);
+  });
+
+  it('with pressure strain only (no thermal growth) the travel is exactly E_stated / E(T) times the stated-E travel', () => {
+    const over = { temperatures: [{ name: 'T1', tempC: 21.1 }], pressures: [{ name: 'P1', gaugeBar: 40 }], poissonPressure: true };
+    const s = scene(rows, over, ['W', 'T1', 'P1']);
+    const travelOf = (doc: CadDocument): number =>
+      (run({ ...s, doc }).data as { springs: { travelUpMm: number }[] }).springs[0]?.travelUpMm as number;
+    const stated = travelOf(s.doc);
+    expect(Math.abs(stated)).toBeGreaterThan(1e-3);
+    const hot = travelOf(apply(s.doc, 'set_hot_modulus', { modelId: s.id, materialId: 'FIX' }));
+    expectRel(hot / stated, 200000 / 199931.25, 1e-6, 'travel ratio = E_stated / E(21.1 degC)');
+  });
+
+  it('refuses an unknown or data-less hot-modulus material through the spring design, document unchanged', () => {
+    const s = scene(rows);
+    for (const [materialId, code] of [
+      ['GHOST', 'PST_MATERIAL_NOT_FOUND'],
+      ['BARE', 'PST_MATERIAL_NO_DATA'],
+    ] as const) {
+      let doc = apply(s.doc, 'create_material', { name: 'BARE', density: 7850, densityUnit: 'kg/m^3' });
+      doc = apply(doc, 'set_hot_modulus', { modelId: s.id, materialId: 'FIX' });
+      const model = doc.plant?.stress?.models[s.id];
+      if (model === undefined) throw new Error('model');
+      const patched = {
+        ...doc,
+        plant: { ...doc.plant, stress: { ...doc.plant?.stress, models: { [s.id]: { ...model, hotModulus: { materialId } } } } },
+      } as CadDocument;
+      const out = run({ ...s, doc: patched });
+      expect(out.rejected).toBe(true);
+      expect(out.summary).toContain(code);
+      expect(out.document).toBe(patched);
+      expect(out.affected).toEqual([]);
+    }
+  });
+
+  it('refuses an under-restrained frame (solve failure) and a hanger point that carries no downward load', () => {
+    const loose = scene(rows, {}, ['W', 'T1'], false);
+    const mechanism = run(loose);
+    expect(mechanism.rejected).toBe(true);
+    expect(mechanism.summary).toContain('PST_UNSTABLE');
+    const s = scene(rows);
+    const up = execute(s.doc, 'select_spring_hangers', {
+      modelId: s.id,
+      hangers: [
+        { pipeId: s.pipe, atMm: 5000 },
+        { pipeId: s.pipe, atMm: 5500 },
+      ],
+      tableId: 'T',
+    });
+    expect(up.rejected).toBe(true);
+    expect(up.summary).toContain('PST_SPRING_NO_SIZE');
+    expect(up.summary).toContain('carries no downward load');
+    expect(up.document).toBe(s.doc);
   });
 });

@@ -42,7 +42,7 @@ export const pipeSif = defineCommand({
     flangedEnds: z
       .union([z.literal(0), z.literal(1), z.literal(2)])
       .describe(
-        'Elbow / bend only: number of flanged ends (0, 1 or 2). The stiffening correction multiplies h by h^(1/6) (one) or h^(1/3) (both), grade B (PSI b311.py); default 0. Refused on other components.',
+        'Elbow / bend only: number of flanged ends (0, 1 or 2). k and i are multiplied by C1 = h^(1/6) (one) or h^(1/3) (both), grade B; default 0. Refused on other components and with rule user.',
       )
       .optional(),
     padMm: z.number().positive().describe('Thickness tr of the reinforcing pad or saddle in mm (reinforced_tee only).').optional(),
@@ -66,6 +66,8 @@ export const pipeSif = defineCommand({
     };
     if (params.flangedEnds !== undefined && params.component !== 'elbow' && params.component !== 'bend')
       return fail(`flangedEnds applies to elbow / bend only, not ${params.component}`, 'flangedEnds');
+    if (params.rule === 'user' && params.flangedEnds !== undefined)
+      return fail('flangedEnds has no effect with rule "user": give the corrected factors in userSif', 'flangedEnds');
     if (params.rule === 'user') {
       if (params.userSif === undefined) return fail('rule "user" needs userSif { ii, io, k, source }', 'userSif');
       const { ii, io, k, source } = params.userSif;
