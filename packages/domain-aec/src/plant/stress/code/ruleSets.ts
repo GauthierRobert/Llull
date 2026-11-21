@@ -148,8 +148,8 @@ export const RULE_ROWS: Readonly<Record<string, RuleRow>> = {
   'SIF-BEND-FLANGED': {
     id: 'SIF-BEND-FLANGED',
     clause: 'B31.1 App. D note 3 (flanged ends of a bend); B31.3 up to 2018 App. D',
-    formula: 'h = h0 c, c = h0^(1/6) (one flanged end) or h0^(1/3) (both), h0 = T R1 / r2^2; then as SIF-BEND with the corrected h',
-    sources: ['S3 (psi/codes/b311.py h(), sha256 edac26f8...)'],
+    formula: 'k and i of SIF-BEND multiplied by C1 = h^(1/6) (one flanged end) or h^(1/3) (both), h = T R1 / r2^2 unchanged; each >= 1',
+    sources: ['B31.3 <= 2018 App. D / B31.1 Table D-1 correction factor C1 (PSI b311.py h = c h contradicts it and is not used)'],
     grade: 'B',
   },
   'SIF-TEE-UNREINFORCED': {

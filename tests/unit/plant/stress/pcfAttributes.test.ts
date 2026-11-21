@@ -88,4 +88,20 @@ describe('pipe_stress_pcf_attributes', () => {
     expectRefusal(bare.doc, 'pipe_stress_pcf_attributes', { modelId: bare.id }, 'PST_CONDITIONS_MISSING');
     expectPure(s.doc, () => execute(s.doc, 'pipe_stress_pcf_attributes', { modelId: s.id }));
   });
+
+  it('reports a run-scoped model under runIds and no pipeIds', () => {
+    const s = scene();
+    const model = s.doc.plant?.stress?.models[s.id];
+    if (model === undefined) throw new Error('model');
+    const runs = {
+      ...s.doc,
+      plant: {
+        ...s.doc.plant,
+        stress: { ...s.doc.plant?.stress, models: { [s.id]: { ...model, scope: { kind: 'runs', ids: ['run-1'] } } } },
+      },
+    } as typeof s.doc;
+    const out = data<Attributes & { runIds: string[] }>(runs, 'pipe_stress_pcf_attributes', { modelId: s.id });
+    expect(out.runIds).toEqual(['run-1']);
+    expect(out.pipeIds).toEqual([]);
+  });
 });

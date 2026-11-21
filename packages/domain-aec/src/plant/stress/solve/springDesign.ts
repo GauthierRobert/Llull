@@ -139,7 +139,9 @@ export function hangerLoads(
       ...solved.sources,
     ]);
   };
-  const restrained = solve('HOT', ['W'], [...built.restraints.contacts, ...rigid], []);
+  const hotE = hotModulusOf(doc, model, conditions, ope);
+  if (hotE !== null && !hotE.ok) return failure(hotE.code, `case ${ope.name}: ${hotE.message}`, [model.id], [hotE.path]);
+  const restrained = solve('HOT', ['W'], [...built.restraints.contacts, ...rigid], [], hotE === null ? undefined : hotE.modulusMPa);
   if ('code' in restrained) return restrained;
   const hot = nodes.map((node) => restrained.result.reactions[node * 6 + 2] as number);
   const empty = hot.findIndex((load) => !(load > 0));
@@ -151,8 +153,6 @@ export function hangerLoads(
       [id],
     );
   }
-  const hotE = hotModulusOf(doc, model, conditions, ope);
-  if (hotE !== null && !hotE.ok) return failure(hotE.code, `case ${ope.name}: ${hotE.message}`, [model.id], [hotE.path]);
   const operating = solve(
     'TRAVEL',
     ope.basic ?? [],

@@ -56,7 +56,7 @@ function values(conditions: OperatingConditions): { readonly slots: (string | nu
 }
 
 /**
- * @affects none (query); data = { modelId, pipeIds, attributes { "COMPONENT-ATTRIBUTE<n>": text }, lines, slots[{ key, meaning, unit, value }], omitted, unitsGrade, reviewRequired }
+ * @affects none (query); data = { modelId, pipeIds, runIds, attributes { "COMPONENT-ATTRIBUTE<n>": text }, lines, slots[{ key, meaning, unit, value }], omitted, unitsGrade, reviewRequired }
  * @invariant read-only; the slot meanings are the CAESAR II PCF import map of the 05 ISO keyword table (grade B); design pressure = the largest stored P gauge pressure, max temperature = the largest stored T; a slot with no stored value is omitted with its reason, never defaulted
  * @failure unknown model -> PST_MODEL_NOT_FOUND; model without operating conditions -> PST_CONDITIONS_MISSING
  */
@@ -65,7 +65,7 @@ export const pipeStressPcfAttributes = defineCommand({
   description:
     'Query: the stress-relevant PCF component attributes of a pipe stress model, as CAESAR II reads COMPONENT-ATTRIBUTE1..10 from a PCF: 1 design pressure, 2 max temperature, 3 material name, 4 wall thickness, 5 insulation thickness, 6 insulation density, 7 corrosion allowance, 8 component weight, 9 fluid density, 10 hydro test pressure (the map is secondary-source, grade B). ' +
     'Values come from the stored operating conditions (set_pipe_operating_conditions): design pressure is the largest stored P gauge pressure in bar, max temperature the largest T in degC, then mm and kg/m3; the PCF does not state units for these attributes, so check them against the receiving tool (unitsGrade C). A slot with no stored value (material name, component weight, an unset wall / insulation / hydrotest) is listed in `omitted` with its reason, never defaulted. ' +
-    'Returns data { modelId, pipeIds (the PCF lines of these pipes carry the attributes), attributes, lines (one "COMPONENT-ATTRIBUTE<n> <value>" text per slot, ready for a PCF component record), slots, omitted, unitsGrade, reviewRequired }. Support-type attributes are not produced (the SUPPORT attribute names of the PCF writer are an open question, OQ-ISO-01). Read-only.',
+    'Returns data { modelId, pipeIds (building pipes of the model scope; [] for a run-scoped model), runIds (run ids of a run-scoped model; [] otherwise), the PCF lines of these pipes / runs carry the attributes, attributes, lines (one "COMPONENT-ATTRIBUTE<n> <value>" text per slot, ready for a PCF component record), slots, omitted, unitsGrade, reviewRequired }. Support-type attributes are not produced (the SUPPORT attribute names of the PCF writer are an open question, OQ-ISO-01). Read-only.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({ modelId: z.string().min(1).describe('Id of the stress model.') }),
   run: (doc, { modelId }): CommandResult => {
