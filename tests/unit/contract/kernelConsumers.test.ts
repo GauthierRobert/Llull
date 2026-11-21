@@ -95,6 +95,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'sideFaces',
   'spineStations',
   'unionRecipe',
+  'withFrames',
   // helpers that take the ExecutionContext and read ctx.kernel
   'runFaceBlend',
   'runFaceOp',

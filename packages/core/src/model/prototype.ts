@@ -24,6 +24,43 @@ export interface InterferenceIntent {
   declaredBy: DeclaredBy;
 }
 
+/** Entity property bag of the assembly check (`set_fastener`): a fastener-to-host overlap is FPR_FASTENER_THREAD (info), not a clash. */
+export interface EntityTags {
+  fastener?: true;
+}
+
+export const CONNECTION_KINDS = ['bolted', 'bonded', 'welded', 'press_fit', 'thread'] as const;
+type ConnectionKind = (typeof CONNECTION_KINDS)[number];
+export const CONNECTION_CYLINDRICAL = ['include', 'exclude', 'only'] as const;
+
+/** Parts a connection group joins, resolved at check time so patterns, layers and groups stay live (FR-ASC-10 / 11). */
+export type ConnectionMembers =
+  | { readonly ids: readonly string[] }
+  | { readonly patternOf: string }
+  | { readonly layerId: string }
+  | { readonly groupId: string };
+
+/** Contact filter of a group: only member pairs that touch within `toleranceMm` with facing faces (<= `faceAngleDeg` off antiparallel) are joined. */
+export interface ConnectionDetect {
+  readonly toleranceMm: number;
+  readonly faceAngleDeg: number;
+  readonly cylindrical: (typeof CONNECTION_CYLINDRICAL)[number];
+}
+
+/**
+ * A declared rigid connection over a set of parts (TECHNICAL_SPEC 3, 4.3).
+ * @invariant id `conn-<step>.<k>`; reason non-empty; touching faces never imply a connection (D2): only a group does
+ */
+export interface ConnectionGroup {
+  readonly id: string;
+  name: string;
+  kind: ConnectionKind;
+  members: ConnectionMembers;
+  detect?: ConnectionDetect;
+  reason: string;
+  declaredBy: 'agent' | 'user';
+}
+
 export const REFERENCE_QUANTITIES = [
   'brake_torque_Nm',
   'brake_power_kW',
@@ -85,6 +122,8 @@ export interface Disposition {
 }
 
 export interface PrototypeModel {
+  /** Connection groups keyed by id (`add_connection_group`); absent = none. */
+  connections?: Record<string, ConnectionGroup>;
   /** Reference data keyed by id (`compare_to_reference`); absent = none. */
   references?: Record<string, ReferenceData>;
   /** Reviewer dispositions keyed by finding key (`set_review_disposition`); absent = none. */

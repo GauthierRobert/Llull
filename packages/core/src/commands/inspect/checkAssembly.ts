@@ -62,6 +62,25 @@ export const checkAssembly = defineCommand({
       .max(20000)
       .optional()
       .describe(`Thickness samples per part. Default 2000; parts × samples must stay under ${MAX_RAYS_TOTAL}.`),
+    symmetry: z
+      .enum(['auto', 'off'])
+      .optional()
+      .describe(
+        '"auto" (default) evaluates each distinct relative placement of unit-scale component instances once (rigid patterns: master vs copy d, ' +
+          'folded) and reports the result for every concrete pair; "off" evaluates every pair (audits).',
+      ),
+    cache: z
+      .boolean()
+      .optional()
+      .describe('Reuse pair results from the host pair cache (keyed by shape hashes, relative placement, tolerances). Default true.'),
+    narrowPhase: z
+      .enum(['auto', 'exact'])
+      .optional()
+      .describe(
+        '"auto" (default): mesh narrow phase drops pairs that cannot touch, the installed kernel classifies the rest (exact with the native ' +
+          'kernel, mesh-accurate with the mesh kernel; data.narrowPhase.exactKernel says which). "exact": only with the native kernel, else the ' +
+          'pairs are not_run.',
+      ),
     includeJoints: z
       .boolean()
       .optional()
@@ -76,12 +95,17 @@ export const checkAssembly = defineCommand({
     if (selected !== null && selected.size === 0) return noop(doc, 'check_assembly: the selected body or component has no parts; no-op.');
     const missing = [...(selected ?? [])].filter((id) => doc.entities[id] === undefined);
     if (missing.length > 0) return noop(doc, `check_assembly: unknown id(s) ${missing.join(', ')}; no-op.`);
-    const outcome = runAssemblyCheck(doc, kernel, params, ctx?.geometryQueries);
+    const outcome = runAssemblyCheck(doc, kernel, params, {
+      geometryQueries: ctx?.geometryQueries,
+      spatialIndex: ctx?.spatialIndex,
+      pairCache: ctx?.pairCache,
+      resolveMemo: ctx?.resolveMemo,
+    });
     if (outcome.refused)
       return rejection(
         doc,
         `check_assembly refused: ${outcome.limit}. ${outcome.remediation}`,
-        commandError('FPR_BUDGET_EXCEEDED', outcome.remediation, [], []),
+        commandError(outcome.code ?? 'FPR_BUDGET_EXCEEDED', outcome.remediation, [], []),
       );
     const { result, extras } = outcome;
     const count = (status: string): number => result.items.filter((item) => item.status === status).length;
