@@ -33,6 +33,8 @@ export function memberPosition(members: readonly number[], value: number): numbe
 export function bucketRaycast(
   bucket: Pick<DrawBucket, 'members'>,
   candidates: CandidateSource,
+  /** Geometry hit-tested per instance instead of the mesh's own (an impostor bucket draws a quad but is picked on the real LOD1 mesh). */
+  pickGeometry?: THREE.BufferGeometry,
 ): (this: THREE.InstancedMesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) => void {
   return function raycast(this: THREE.InstancedMesh, raycaster, intersects): void {
     if (this.material === undefined || this.geometry === undefined) return;
@@ -40,7 +42,7 @@ export function bucketRaycast(
     scratchRay.copy(raycaster.ray).applyMatrix4(scratchInverse);
     const { origin, direction } = scratchRay;
     const hits = candidates([origin.x, origin.y, origin.z], [direction.x, direction.y, direction.z]);
-    scratchMesh.geometry = this.geometry;
+    scratchMesh.geometry = pickGeometry ?? this.geometry;
     scratchMesh.material = this.material;
     for (const sceneIndex of hits) {
       const instanceId = memberPosition(bucket.members, sceneIndex);
