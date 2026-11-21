@@ -31,6 +31,7 @@ import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { CANVAS_DPR_RANGE, RenderRig } from './RenderRig';
+import { CaptureRig } from './capture/CaptureRig';
 import { MechanismOverlay } from './MechanismOverlay';
 import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
 import { AeroOverlay } from './aero/AeroOverlay';
@@ -197,6 +198,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
       <RenderRig />
+      <CaptureRig />
       {effects && <HighQualityEffects edges={edges} ambientOcclusion={ambientOcclusion} />}
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={effects ? 2 : 1}>

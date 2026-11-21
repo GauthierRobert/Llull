@@ -82,8 +82,13 @@ export const MESH_ENGINE_PENDING = 'MESH_ENGINE_PENDING';
 
 /** The answer of an engine whose result is not there yet (the host awaits it and runs the command again); counted by `deferralCount`. */
 export function deferMeshOp(op: MeshOpName): MeshEngineFailure {
-  deferrals += 1;
+  noteDeferral();
   return { code: MESH_ENGINE_PENDING, message: `the '${op}' result is still being computed` };
+}
+
+/** Count one deferred answer of a host port other than the mesh engine (`capture_viewport`): the host awaits its job and runs the command again. */
+export function noteDeferral(): void {
+  deferrals += 1;
 }
 
 /** How many answers were deferred so far: a caller that sees it change across a run knows that run saw a refusal it must not keep or memoize. */
