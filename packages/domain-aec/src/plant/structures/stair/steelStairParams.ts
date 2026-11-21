@@ -2,6 +2,7 @@
 
 import { vec3, z } from '@core/commands/schema';
 import { levelIdParam } from '../../../building/levelParams';
+import { STEEL_STAIR_TURNS } from '@aec/building/types';
 import { RULESET_NAMES } from '../rules/ruleTable';
 
 export const stairParams = z.object({
@@ -48,6 +49,12 @@ export const stairParams = z.object({
           .min(2)
           .describe('The landing follows this riser (counted from 1 at the bottom); each flight needs 2+ risers.'),
         length: z.number().positive().optional().describe('Landing length along the climb, DOCUMENT UNITS. Default landingLength.'),
+        turn: z
+          .enum(STEEL_STAIR_TURNS)
+          .optional()
+          .describe(
+            'Turn of the stair at this landing: quarter_left / quarter_right (90 degrees; the next flight leaves through the side edge, flush with the far edge of the landing) or half_left / half_right (180 degrees; the next flight returns beside this one from the near edge, the landing spans both flights). Omit for a straight landing. A turning landing needs length >= the stair width. The climb direction of later flights follows the turn.',
+          ),
       }),
     )
     .optional()

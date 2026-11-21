@@ -7,7 +7,15 @@ import { npsToDn, parseNps } from '../../catalog/nominal';
 import { nozzleHardware, ratingText } from '../geometry/nozzleHardware';
 import { nozzleWarnings, type NozzleIssue } from '../geometry/nozzleChecks';
 import { equipmentPorts } from '../geometry/ports';
-import { PLANT_EQUIPMENT_SCHEMA, type NozzleFacing, type NozzleLocation, type NozzleRecord, type PlantEquipmentData } from '../plantData';
+import {
+  NOZZLE_KINDS,
+  PLANT_EQUIPMENT_SCHEMA,
+  type NozzleFacing,
+  type NozzleKind,
+  type NozzleLocation,
+  type NozzleRecord,
+  type PlantEquipmentData,
+} from '../plantData';
 import { fromNorthClockwise, toNorthClockwise, type AngleConvention } from './angles';
 import { appendAll } from '@lib/appendAll';
 
@@ -56,6 +64,12 @@ export const PROJECTION_TEXT =
 
 export const nozzleFields = {
   service: z.string().optional().describe('Service of the nozzle, e.g. "inlet", "PSV", "manway".'),
+  kind: z
+    .enum(NOZZLE_KINDS)
+    .optional()
+    .describe(
+      'nozzle (default) = process / instrument connection; manway = an access opening a person enters: check_reachability targetsFrom ["manways"] reads this field (a service text no longer decides).',
+    ),
   dn: z.number().int().positive().optional().describe('Nominal size DN (15..600 of the EN 10220 series). Give dn OR nps.'),
   nps: z
     .union([z.string(), z.number()])
@@ -122,6 +136,7 @@ export interface NozzleSpec {
   readonly projection: number;
   readonly location: NozzleLocation;
   readonly service?: string | undefined;
+  readonly kind?: NozzleKind | undefined;
 }
 
 /** A complete nozzle record (hardware from the 01 PSC catalogue), or the issue; `defaulted` receives the named defaults. */
@@ -140,6 +155,7 @@ export function nozzleRecord(doc: CadDocument, mark: string, spec: NozzleSpec, d
   return {
     mark,
     ...(spec.service === undefined ? {} : { service: spec.service }),
+    ...(spec.kind === undefined ? {} : { kind: spec.kind }),
     dn: spec.dn,
     rating: ratingText(spec.rating),
     facing: spec.facing,

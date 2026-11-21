@@ -103,7 +103,15 @@ export const addNozzle = defineCommand({
     const record = nozzleRecord(
       doc,
       mark,
-      { dn, rating: params.rating, facing: params.facing ?? 'RF', projection: params.projection, location, service: params.service },
+      {
+        dn,
+        rating: params.rating,
+        facing: params.facing ?? 'RF',
+        projection: params.projection,
+        location,
+        service: params.service,
+        kind: params.kind,
+      },
       defaulted,
     );
     if (isNozzleIssue(record)) return refuseIssue(doc, 'add_nozzle', record, [element.id]);
@@ -148,7 +156,7 @@ export const updateNozzle = defineCommand({
     if (current === undefined)
       return refuse(doc, 'update_nozzle', 'EQP_NOZZLE_NOT_FOUND', `${element.mark} has no nozzle ${params.mark}`, [element.id], ['mark']);
     const convention: AngleConvention = params.angleConvention ?? 'north_cw';
-    const changes = ['service', 'dn', 'nps', 'rating', 'facing', 'location', 'projection'].filter(
+    const changes = ['service', 'kind', 'dn', 'nps', 'rating', 'facing', 'location', 'projection'].filter(
       (name) => params[name as keyof typeof params] !== undefined,
     );
     if (changes.length === 0)
@@ -168,6 +176,7 @@ export const updateNozzle = defineCommand({
         projection: params.projection ?? current.projection,
         location,
         service: params.service ?? current.service,
+        kind: params.kind ?? current.kind,
       },
       defaulted,
     );

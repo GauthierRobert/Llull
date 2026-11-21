@@ -249,10 +249,15 @@ export interface NozzleFlange {
   readonly source?: string | undefined;
 }
 
+export const NOZZLE_KINDS = ['nozzle', 'manway'] as const;
+export type NozzleKind = (typeof NOZZLE_KINDS)[number];
+
 export interface NozzleRecord {
   /** Unique per equipment: N1, M1, S1 ... */
   readonly mark: string;
   readonly service?: string;
+  /** `manway` = an access opening a person enters (06 STA reachability reads it); absent or `nozzle` = a process / instrument nozzle. */
+  readonly kind?: NozzleKind;
   readonly dn: number;
   /** `CL150` ... `CL2500` or `PN16` ... */
   readonly rating: string;

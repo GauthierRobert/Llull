@@ -63,6 +63,8 @@ const REMEDIATION = {
   STA_STAIR_WIDTH: 'Increase the stair width to at least the limit (steel stair: update_steel_stair { width }).',
   STA_STAIR_HEADROOM:
     'Raise the obstruction named in the finding location above the stair, or lower the stair (delete it and add_steel_stair again with another start or toSurfaceId): the free height over the pitch line must reach the limit.',
+  STA_STAIR_LANDING:
+    'Lengthen the turning landing (update_steel_stair { landings: [{ afterRiser, length, turn }] }) to at least the limit; its width is the stair width.',
   STA_STAIR_FLIGHT_RISE:
     'Add an intermediate landing (add_stair landingAt, add_steel_stair landingEvery) so no flight rises more than the limit.',
   STA_EDGE_UNPROTECTED:

@@ -2,6 +2,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { noop } from '@core/commands/noop';
 import { fromMm, toMm } from '@core/model/units';
+import { STEEL_STAIR_TURNS } from '@aec/building/types';
 import type { BuildingModel, RailingElement, SteelStairElement, SteelStairLanding, SteelStairTread } from '@aec/building/types';
 import { elementsOf, getBuilding, withElement } from '../../../building/model';
 import { commitBuilding } from '../../../building/evaluate/evaluateElements';
@@ -9,10 +10,11 @@ import { round } from '../../../shared/numeric';
 import { findProfile } from '../../../steel/profiles';
 import { refuse } from '../codes';
 import { findGratingType } from '../grating/gratingTypes';
+import { landingOf } from './steelStairPhases';
 import { distanceToRing, walkingSurfaces } from '../ladder/ladderSurface';
 import { railingProblem } from '../railing/railingValidate';
 import { ruleById } from '../rules/ruleTable';
-import { handrailPath, stairFlights } from './steelStairLayout';
+import { handrailPath, stairEnd, stairFlights } from './steelStairLayout';
 import { stairGeometryMm, stairSizes } from './steelStairMeasure';
 
 const MAX_RISERS = 200;
@@ -68,6 +70,12 @@ export const updateSteelStair = defineCommand({
             .min(2)
             .describe('The landing follows this riser (from 1 at the bottom); each flight needs 2+ risers.'),
           length: z.number().positive().optional().describe('Landing length along the climb, DOCUMENT UNITS. Default landingLength.'),
+          turn: z
+            .enum(STEEL_STAIR_TURNS)
+            .optional()
+            .describe(
+              'quarter_left / quarter_right (90 degrees) or half_left / half_right (180 degrees, the next flight returns beside this one); omit = straight. Needs length >= the stair width.',
+            ),
         }),
       )
       .optional()
@@ -121,14 +129,13 @@ export const updateSteelStair = defineCommand({
     const landingLength = params.landingLength ?? Math.max(width, mm(oshaLanding));
 
     let landings: SteelStairLanding[] = stair.landings;
-    if (params.landings !== undefined)
-      landings = params.landings.map((landing) => ({ afterRiser: landing.afterRiser, length: landing.length ?? landingLength }));
+    if (params.landings !== undefined) landings = params.landings.map((landing) => landingOf(landing, landingLength));
     else if (params.landingEvery !== undefined) {
       const flights = Math.ceil(stair.rise / params.landingEvery - 1e-9);
       const perFlight = Math.ceil(riserCount / flights);
       landings = Array.from({ length: flights - 1 }, (_, index) => ({ afterRiser: (index + 1) * perFlight, length: landingLength }));
     } else if (params.landingLength !== undefined)
-      landings = landings.map((landing) => ({ afterRiser: landing.afterRiser, length: params.landingLength as number }));
+      landings = landings.map((landing) => ({ ...landing, length: params.landingLength as number }));
     if (
       landings.some(
         (landing, index) =>
@@ -140,6 +147,14 @@ export const updateSteelStair = defineCommand({
         'STA_INVALID_GEOMETRY',
         `landings ${landings.map((landing) => landing.afterRiser).join(', ') || '(none)'} are not ascending, are past the last riser or leave a flight of fewer than 2 of ${riserCount} risers: give landings or landingEvery`,
         ['landings', 'riserMax'],
+      );
+
+    const narrow = landings.find((landing) => landing.turn !== undefined && landing.length < width);
+    if (narrow !== undefined)
+      return fail(
+        'STA_INVALID_GEOMETRY',
+        `the ${narrow.turn} landing after riser ${narrow.afterRiser} is ${round(toMm(doc, narrow.length), 1)} mm long, less than the stair width ${round(toMm(doc, width), 1)} mm: a turning landing needs length >= width`,
+        ['landings', 'width'],
       );
 
     const edited: SteelStairElement = {
@@ -156,8 +171,8 @@ export const updateSteelStair = defineCommand({
       return noop(doc, `update_steel_stair: ${stair.id} already has these values; nothing changed.`);
 
     const level = building.levels[stair.levelId];
-    const run = (riserCount - 1 - landings.length) * going + landings.reduce((sum, landing) => sum + landing.length, 0);
-    const top: [number, number] = [stair.start[0] + Math.cos(stair.angle) * run, stair.start[1] + Math.sin(stair.angle) * run];
+    const sizes = stairSizes(doc, { stringerProfile });
+    const top = stairEnd(edited, sizes);
     const arrival = walkingSurfaces(building).find((surface) => surface.id === stair.arrivalSurfaceId);
     if (level !== undefined && arrival !== undefined && distanceToRing(top, arrival.ring) > mm(ARRIVAL_REACH_MM))
       return fail(
@@ -167,7 +182,6 @@ export const updateSteelStair = defineCommand({
         [id, arrival.id],
       );
 
-    const sizes = stairSizes(doc, { stringerProfile });
     let model = withElement(building, edited);
     const railingIds: string[] = [];
     for (const { railing, side } of handrailsOf(building, id)) {
