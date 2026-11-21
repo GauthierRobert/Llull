@@ -6,6 +6,8 @@
  */
 
 import { maxOf } from '../../lib/arrayExtrema';
+import { minimumDegree } from './g1Ordering';
+import { factorNumeric, symbolicFill } from './g1SparseLdl';
 
 /** A condition: coefficient x unknown pairs (the same shape as `SparseRow` of `g1Linear.ts`, which imports this file). */
 type SparseRow = ReadonlyArray<readonly [number, number]>;
@@ -102,24 +104,50 @@ function reverseCuthillMcKee(graph: readonly number[][]): number[] {
   return order.reverse();
 }
 
-/**
- * The factored projector of the rows over `unknowns` unknowns, or null when it does not fit: the envelope above MAX_ENVELOPE entries, or a factorisation (plus `projections` projections
- * and `pseudoInverses` pseudo-inverse solves per axis, three axes) over `maxWork` multiply-adds.
- */
-export function factorRows(
-  rows: readonly SparseRow[],
-  unknowns: number,
-  maxWork: number,
-  projections: number,
-  pseudoInverses: number,
-): Projector | null {
-  const count = rows.length;
-  if (count === 0) return null;
-  const merge = merged(rows);
-  const graph = adjacency(merge, unknowns);
-  const order = reverseCuthillMcKee(graph);
-  const position = new Int32Array(count);
+export interface FactorOptions {
+  /** "auto": the cheaper of the reverse Cuthill-McKee envelope and the minimum-degree sparse factor that fit; the others force one ordering. */
+  readonly ordering?: 'auto' | 'rcm' | 'minimum-degree';
+  /** Envelope entries above which RCM is not built (default 4e7). */
+  readonly envelopeLimit?: number;
+  /** Entries of L above which minimum degree is not built (default 4e7). */
+  readonly fillLimit?: number;
+}
+
+type Rows = ReadonlyArray<ReadonlyArray<readonly [number, number]>>;
+
+/** A solver of M z = r (r and z indexed by row). */
+type Normal = (r: Float64Array) => Float64Array;
+
+/** An ordering's factor before any numeric work: its stored entries and costs are known; `build` factors. */
+interface Plan {
+  readonly entries: number;
+  readonly flops: number;
+  readonly perSolve: number;
+  readonly build: () => Normal;
+}
+
+/** A pivot that cancelled (to DEPENDENT of its own diagonal) or a row far below the largest diagonal is a dependent row. */
+const isDependent = (pivot: number, diagonal: number, diagonalMax: number): boolean =>
+  !(pivot > DEPENDENT * diagonal) || diagonal < NEGLIGIBLE * diagonalMax;
+
+/** For each unknown the (permuted row, coefficient) pairs of the rows that use it, in row order. */
+function touchingLists(merge: Rows, unknowns: number, position: Int32Array): Array<Array<readonly [number, number]>> {
+  const touching: Array<Array<readonly [number, number]>> = Array.from({ length: unknowns }, () => []);
+  merge.forEach((row, i) => row.forEach(([k, c]) => (touching[k] as Array<readonly [number, number]>).push([position[i] as number, c])));
+  return touching;
+}
+
+const positionsOf = (order: readonly number[]): Int32Array => {
+  const position = new Int32Array(order.length);
   order.forEach((row, p) => (position[row] = p));
+  return position;
+};
+
+/** The envelope (skyline) LDL^T in reverse Cuthill-McKee order. */
+function envelopePlan(merge: Rows, unknowns: number, graph: readonly number[][]): Plan {
+  const count = merge.length;
+  const order = reverseCuthillMcKee(graph);
+  const position = positionsOf(order);
   // envelope: row p stores the columns first[p]..p
   const first = new Int32Array(count);
   const offset = new Float64Array(count + 1);
@@ -134,67 +162,133 @@ export function factorRows(
   }
   const size = offset[count] as number;
   const nonzeros = merge.reduce((sum, row) => sum + row.length, 0);
-  const perProjection = 4 * size + 2 * nonzeros;
-  if (size > MAX_ENVELOPE || flops + 3 * (projections + pseudoInverses) * perProjection > maxWork) return null;
-  // M = A A^T into the envelope
-  const entries = new Float64Array(size);
-  const touching: Array<Array<readonly [number, number]>> = Array.from({ length: unknowns }, () => []);
-  merge.forEach((row, i) => row.forEach(([k, c]) => (touching[k] as Array<readonly [number, number]>).push([position[i] as number, c])));
-  for (const list of touching)
-    for (const [a, ca] of list)
-      for (const [b, cb] of list) {
-        const at = (offset[a] as number) + b - (first[a] as number);
-        if (b <= a) entries[at] = (entries[at] as number) + ca * cb;
-      }
-  // LDL^T by rows: L unit lower triangular in place (the diagonal slot holds D), a dropped row has D = 0 and an empty L row
-  const diagonalMax = Math.max(
-    maxOf(Array.from({ length: count }, (_, p) => entries[(offset[p] as number) + p - (first[p] as number)] as number)),
-    1e-300,
-  );
+  const perSolve = 4 * size + 2 * nonzeros;
+  const build = (): Normal => {
+    // M = A A^T into the envelope
+    const entries = new Float64Array(size);
+    for (const list of touchingLists(merge, unknowns, position))
+      for (const [a, ca] of list)
+        for (const [b, cb] of list) {
+          const at = (offset[a] as number) + b - (first[a] as number);
+          if (b <= a) entries[at] = (entries[at] as number) + ca * cb;
+        }
+    // LDL^T by rows: L unit lower triangular in place (the diagonal slot holds D), a dropped row has D = 0 and an empty L row
+    const diagonalMax = Math.max(
+      maxOf(Array.from({ length: count }, (_, p) => entries[(offset[p] as number) + p - (first[p] as number)] as number)),
+      1e-300,
+    );
 
-  const y = new Float64Array(count);
-  for (let i = 0; i < count; i++) {
-    const [fi, oi] = [first[i] as number, offset[i] as number];
-    const diagonal = entries[oi + i - fi] as number;
-    let pivot = diagonal;
-    for (let j = fi; j < i; j++) {
-      const [fj, oj] = [first[j] as number, offset[j] as number];
-      let sum = entries[oi + j - fi] as number;
-      for (let k = Math.max(fi, fj); k < j; k++) sum -= (y[k] as number) * (entries[oj + k - fj] as number);
-      y[j] = sum;
-      const d = entries[oj + j - fj] as number;
-      const l = d > 0 ? sum / d : 0;
-      entries[oi + j - fi] = l;
-      pivot -= l * sum;
-    }
-    const dependent = !(pivot > DEPENDENT * diagonal) || diagonal < NEGLIGIBLE * diagonalMax;
-    if (dependent) {
-      for (let j = fi; j < i; j++) entries[oi + j - fi] = 0;
-      entries[oi + i - fi] = 0;
-    } else entries[oi + i - fi] = pivot;
-  }
-  const normal = (r: Float64Array): Float64Array => {
-    // M^-1 r through the factor, r and the result indexed by row
-    const z = new Float64Array(count);
+    const y = new Float64Array(count);
     for (let i = 0; i < count; i++) {
       const [fi, oi] = [first[i] as number, offset[i] as number];
-      let sum = r[order[i] as number] as number;
-      for (let j = fi; j < i; j++) sum -= (entries[oi + j - fi] as number) * (z[j] as number);
-      z[i] = sum;
+      const diagonal = entries[oi + i - fi] as number;
+      let pivot = diagonal;
+      for (let j = fi; j < i; j++) {
+        const [fj, oj] = [first[j] as number, offset[j] as number];
+        let sum = entries[oi + j - fi] as number;
+        for (let k = Math.max(fi, fj); k < j; k++) sum -= (y[k] as number) * (entries[oj + k - fj] as number);
+        y[j] = sum;
+        const d = entries[oj + j - fj] as number;
+        const l = d > 0 ? sum / d : 0;
+        entries[oi + j - fi] = l;
+        pivot -= l * sum;
+      }
+      if (isDependent(pivot, diagonal, diagonalMax)) {
+        for (let j = fi; j < i; j++) entries[oi + j - fi] = 0;
+        entries[oi + i - fi] = 0;
+      } else entries[oi + i - fi] = pivot;
     }
-    for (let i = 0; i < count; i++) {
-      const d = entries[(offset[i] as number) + i - (first[i] as number)] as number;
-      z[i] = d > 0 ? (z[i] as number) / d : 0;
-    }
-    for (let i = count - 1; i >= 0; i--) {
-      const [fi, oi] = [first[i] as number, offset[i] as number];
-      const zi = z[i] as number;
-      if (zi !== 0) for (let j = fi; j < i; j++) z[j] = (z[j] as number) - (entries[oi + j - fi] as number) * zi;
-    }
-    const out = new Float64Array(count);
-    for (let i = 0; i < count; i++) out[order[i] as number] = z[i] as number;
-    return out;
+    const normal = (r: Float64Array): Float64Array => {
+      // M^-1 r through the factor, r and the result indexed by row
+      const z = new Float64Array(count);
+      for (let i = 0; i < count; i++) {
+        const [fi, oi] = [first[i] as number, offset[i] as number];
+        let sum = r[order[i] as number] as number;
+        for (let j = fi; j < i; j++) sum -= (entries[oi + j - fi] as number) * (z[j] as number);
+        z[i] = sum;
+      }
+      for (let i = 0; i < count; i++) {
+        const d = entries[(offset[i] as number) + i - (first[i] as number)] as number;
+        z[i] = d > 0 ? (z[i] as number) / d : 0;
+      }
+      for (let i = count - 1; i >= 0; i--) {
+        const [fi, oi] = [first[i] as number, offset[i] as number];
+        const zi = z[i] as number;
+        if (zi !== 0) for (let j = fi; j < i; j++) z[j] = (z[j] as number) - (entries[oi + j - fi] as number) * zi;
+      }
+      const out = new Float64Array(count);
+      for (let i = 0; i < count; i++) out[order[i] as number] = z[i] as number;
+      return out;
+    };
+    return normal;
   };
+  return { entries: size, flops, perSolve, build };
+}
+
+/** The sparse LDL^T in approximate-minimum-degree order. */
+function minimumDegreePlan(merge: Rows, unknowns: number, graph: readonly number[][]): Plan {
+  const count = merge.length;
+  const order = minimumDegree(graph);
+  const position = positionsOf(order);
+  const upper = order.map((row, p) => (graph[row] as number[]).map((w) => position[w] as number).filter((w) => w < p));
+  const symbolic = symbolicFill(upper);
+  const nonzeros = merge.reduce((sum, row) => sum + row.length, 0);
+  const perSolve = 4 * (symbolic.fill + count) + 2 * nonzeros;
+  const build = (): Normal => {
+    // column k of M = A A^T in the permuted order, rows <= k: accumulated in a dense work vector through the unknowns of row k
+    const touching = touchingLists(merge, unknowns, position);
+    const work = new Float64Array(count);
+    const diagonalMax = Math.max(maxOf(merge.map((row) => row.reduce((sum, [, c]) => sum + c * c, 0))), 1e-300);
+    const column = (k: number): readonly [readonly number[], readonly number[]] => {
+      const own = merge[order[k] as number] as ReadonlyArray<readonly [number, number]>;
+      for (const [u, cu] of own)
+        for (const [a, ca] of touching[u] as Array<readonly [number, number]>) work[a] = (work[a] as number) + cu * ca;
+      const rows = [...(upper[k] as number[]), k];
+      const values = rows.map((a) => work[a] as number);
+      for (const [u] of own) for (const [a] of touching[u] as Array<readonly [number, number]>) work[a] = 0;
+      return [rows, values];
+    };
+    const solve = factorNumeric(symbolic, column, (pivot, diagonal) => isDependent(pivot, diagonal, diagonalMax));
+    const normal = (r: Float64Array): Float64Array => {
+      const z = solve(Float64Array.from(order, (row) => r[row] as number));
+      const out = new Float64Array(count);
+      for (let p = 0; p < count; p++) out[order[p] as number] = z[p] as number;
+      return out;
+    };
+    return normal;
+  };
+  return { entries: symbolic.fill + count, flops: symbolic.flops, perSolve, build };
+}
+
+/**
+ * The factored projector of the rows over `unknowns` unknowns, or null when it does not fit: no ordering within its entry limit (an envelope in reverse Cuthill-McKee order, or minimum
+ * degree; the cheaper of those that fit is built), or a factorisation (plus `projections` projections and `pseudoInverses` pseudo-inverse solves per axis, three axes) over `maxWork`
+ * multiply-adds.
+ */
+export function factorRows(
+  rows: readonly SparseRow[],
+  unknowns: number,
+  maxWork: number,
+  projections: number,
+  pseudoInverses: number,
+  options: FactorOptions = {},
+): Projector | null {
+  if (rows.length === 0) return null;
+  const { ordering = 'auto', envelopeLimit = MAX_ENVELOPE, fillLimit = MAX_ENVELOPE } = options;
+  const merge = merged(rows);
+  const graph = adjacency(merge, unknowns);
+  const fits = (flops: number, perSolve: number): boolean => flops + 3 * (projections + pseudoInverses) * perSolve <= maxWork;
+  // the cheaper of the orderings that fit (the envelope on a tie): minimum degree beats the envelope by 100x on the cage rows
+  const plans = [
+    ...(ordering === 'minimum-degree' ? [] : [{ plan: envelopePlan(merge, unknowns, graph), limit: envelopeLimit }]),
+    ...(ordering === 'rcm' ? [] : [{ plan: minimumDegreePlan(merge, unknowns, graph), limit: fillLimit }]),
+  ]
+    .filter(({ plan, limit }) => plan.entries <= limit && fits(plan.flops, plan.perSolve))
+    .map(({ plan }) => plan);
+  const cost = (plan: Plan): number => plan.flops + 3 * (projections + pseudoInverses) * plan.perSolve;
+  const best = plans.reduce<Plan | null>((chosen, plan) => (chosen === null || cost(plan) < cost(chosen) ? plan : chosen), null);
+  if (best === null) return null;
+  const normal = best.build();
   const times = (v: Float64Array): Float64Array =>
     Float64Array.from(merge, (row) => row.reduce((sum, [k, c]) => sum + c * (v[k] as number), 0));
   const timesTransposed = (w: Float64Array): Float64Array => {
@@ -213,8 +307,8 @@ export function factorRows(
     return z.map((v, i) => v + (correction[i] as number));
   };
   return {
-    flops,
-    perProjection,
+    flops: best.flops,
+    perProjection: best.perSolve,
     project: (v) => {
       const part = timesTransposed(refined(times(v)));
       return v.map((value, k) => value - (part[k] as number));
