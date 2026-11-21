@@ -7,6 +7,7 @@ import { createRecoverySession, type SlotBinding } from './recoverySession';
 import type { Response } from 'express';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
+import { getGeometryKernel } from '@core/geometry/kernel';
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { errorMessage } from '@lib/errorMessage';
 import { withoutConfirmations } from '@lib/withoutConfirmations';
@@ -46,7 +47,7 @@ function startState(): StartState {
   if (active === null || found === null) return fresh;
   try {
     return {
-      doc: deserializeDocument(found.json),
+      doc: deserializeDocument(found.json, { kernel: getGeometryKernel() }),
       binding: { id: active.id, path: found.meta.path, base: metaBase(found.meta) },
       resumed: true,
     };
@@ -62,7 +63,7 @@ const started = startState();
 export const recoverySession = createRecoverySession({
   store: recoveryStore,
   debounceMs: positiveInteger(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'], 300),
-  serialize: serializeDocument,
+  serialize: (doc) => serializeDocument(doc, { keepKernelMeshes: true }),
   onStatus: (status) => reportAutosaveStatus(status),
   initial: started.binding,
   announceActive: AUTOSAVE_ENABLED && !started.resumed,

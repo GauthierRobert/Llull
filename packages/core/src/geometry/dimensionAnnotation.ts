@@ -4,11 +4,13 @@
  * references' z (rotated work planes are honoured through `planeToWorld`).
  */
 
-import type { DimensionEntity, Entity, Vec2 } from '../model/types';
+import type { CadDocument, DimensionEntity, Entity, Vec2 } from '../model/types';
+import type { DimensionArrowStyle, DimensionStyle, DimensionStyleSettings } from '../model/dimensionStyle';
 import { planeToWorld } from './workPlane';
 
 export const DEFAULT_DIMENSION_OFFSET = 5;
-const DEFAULT_ARROW_SIZE = 0.3;
+export const DEFAULT_ARROW_SIZE = 0.3;
+const DOT_SEGMENTS = 8;
 const ANGULAR_ARC_SEGMENTS = 32;
 /** Default angular arc radius as a fraction of the shorter arm. */
 const ANGULAR_ARC_ARM_FRACTION = 0.4;
@@ -46,20 +48,55 @@ const toWorld = (e: Entity, local: Vec2): Vec2 => {
 const centroid = (e: Locatable): Vec2 =>
   e.kind === 'point' ? toWorld(e, [0, 0]) : toWorld(e, [(e.start[0] + e.end[0]) / 2, (e.start[1] + e.end[1]) / 2]);
 
-/** Two wing segments of an arrowhead at `tip` pointing along (dx, dy). */
-function arrowhead(tip: Vec2, dx: number, dy: number, size: number): DimensionSegment[] {
+/** Stroke look of a dimension: arrowhead shape and extension-line gap / overshoot (`DimensionStyle` fields). */
+export type DimensionLook = Pick<DimensionStyleSettings, 'arrowStyle' | 'extensionGap' | 'extensionBeyond'>;
+
+/** Strokes of an arrowhead at `tip` pointing along (dx, dy): open (two wings, default), closed (wings + base), tick (45° slash), dot, none. */
+function arrowhead(tip: Vec2, dx: number, dy: number, size: number, style: DimensionArrowStyle = 'open'): DimensionSegment[] {
   const length = Math.hypot(dx, dy);
-  if (length < EPSILON) return [];
+  if (length < EPSILON || style === 'none') return [];
   const [nx, ny] = [dx / length, dy / length];
-  const wing = (side: number): DimensionSegment => [
-    tip,
-    [tip[0] - nx * size - ny * side * size * 0.5, tip[1] - ny * size + nx * side * size * 0.5],
+  if (style === 'tick') {
+    const [tx, ty] = [(nx - ny) * size * Math.SQRT1_2, (ny + nx) * size * Math.SQRT1_2];
+    return [
+      [
+        [tip[0] - tx / 2, tip[1] - ty / 2],
+        [tip[0] + tx / 2, tip[1] + ty / 2],
+      ],
+    ];
+  }
+  if (style === 'dot') {
+    const radius = size * 0.25;
+    const rim = Array.from({ length: DOT_SEGMENTS + 1 }, (_, i): Vec2 => {
+      const angle = (i * Math.PI * 2) / DOT_SEGMENTS;
+      return [tip[0] + Math.cos(angle) * radius, tip[1] + Math.sin(angle) * radius];
+    });
+    return rim.slice(1).map((end, i): DimensionSegment => [rim[i] as Vec2, end]);
+  }
+  const corner = (side: number): Vec2 => [tip[0] - nx * size - ny * side * size * 0.5, tip[1] - ny * size + nx * side * size * 0.5];
+  const wings: DimensionSegment[] = [
+    [tip, corner(1)],
+    [tip, corner(-1)],
   ];
-  return [wing(1), wing(-1)];
+  return style === 'closed' ? [...wings, [corner(1), corner(-1)]] : wings;
+}
+
+/** Extension line from the geometry point `from` towards the dimension-line point `to`, shortened by `gap` and extended by `beyond`. */
+function extensionLine(from: Vec2, to: Vec2, look: DimensionLook): DimensionSegment {
+  const [dx, dy] = [to[0] - from[0], to[1] - from[1]];
+  const length = Math.hypot(dx, dy);
+  const [gap, beyond] = [look.extensionGap ?? 0, look.extensionBeyond ?? 0];
+  if (length < EPSILON || (gap === 0 && beyond === 0)) return [from, to];
+  const [ux, uy] = [dx / length, dy / length];
+  const start = Math.min(gap, length);
+  return [
+    [from[0] + ux * start, from[1] + uy * start],
+    [to[0] + ux * beyond, to[1] + uy * beyond],
+  ];
 }
 
 /** Linear (horizontal or vertical, whichever dominates) or aligned (true distance) between two points. */
-function linearDrawing(a: Vec2, b: Vec2, offset: number, aligned: boolean, size: number): Omit<DimensionDrawing, 'z'> {
+function linearDrawing(a: Vec2, b: Vec2, offset: number, aligned: boolean, size: number, look: DimensionLook): Omit<DimensionDrawing, 'z'> {
   const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
   const length = Math.hypot(dx, dy);
   if (length < EPSILON) return { value: 0, textAt: [a[0], a[1] + offset], direction: [1, 0], segments: [] };
@@ -84,12 +121,18 @@ function linearDrawing(a: Vec2, b: Vec2, offset: number, aligned: boolean, size:
     value: aligned ? length : vertical ? Math.abs(dy) : Math.abs(dx),
     textAt: [(dimA[0] + dimB[0]) / 2, (dimA[1] + dimB[1]) / 2],
     direction: [dirX / Math.hypot(dirX, dirY), dirY / Math.hypot(dirX, dirY)],
-    segments: [[a, dimA], [b, dimB], [dimA, dimB], ...arrowhead(dimA, -dirX, -dirY, size), ...arrowhead(dimB, dirX, dirY, size)],
+    segments: [
+      extensionLine(a, dimA, look),
+      extensionLine(b, dimB, look),
+      [dimA, dimB],
+      ...arrowhead(dimA, -dirX, -dirY, size, look.arrowStyle),
+      ...arrowhead(dimB, dirX, dirY, size, look.arrowStyle),
+    ],
   };
 }
 
 /** Radius (leader from the centre) or diameter (leader through the centre); `offset` doubles as the leader angle in radians when in (0, 2π). */
-function radialDrawing(ref: Radial, offset: number, diameter: boolean, size: number): Omit<DimensionDrawing, 'z'> {
+function radialDrawing(ref: Radial, offset: number, diameter: boolean, size: number, look: DimensionLook): Omit<DimensionDrawing, 'z'> {
   const [cx, cy] = toWorld(ref, ref.center);
   const radius = ref.kind === 'ellipse' ? ref.radiusX : ref.radius;
   const angle = offset > 0 && offset < Math.PI * 2 ? offset : Math.PI / 4;
@@ -100,7 +143,11 @@ function radialDrawing(ref: Radial, offset: number, diameter: boolean, size: num
     value: diameter ? radius * 2 : radius,
     textAt: [cx + ux * radius * 1.15, cy + uy * radius * 1.15],
     direction: [ux, uy],
-    segments: [[diameter ? far : [cx, cy], rim], ...arrowhead(rim, ux, uy, size), ...(diameter ? arrowhead(far, -ux, -uy, size) : [])],
+    segments: [
+      [diameter ? far : [cx, cy], rim],
+      ...arrowhead(rim, ux, uy, size, look.arrowStyle),
+      ...(diameter ? arrowhead(far, -ux, -uy, size, look.arrowStyle) : []),
+    ],
   };
 }
 
@@ -158,6 +205,7 @@ export function dimensionDrawing(
   refs: Refs,
   offset: number,
   arrowSize: number = DEFAULT_ARROW_SIZE,
+  look: DimensionLook = {},
 ): DimensionDrawing | null {
   const [first, second, third] = refs;
   const z = first ? planeToWorld(first.position, first.rotation, [0, 0])[2] : 0;
@@ -166,11 +214,11 @@ export function dimensionDrawing(
     case 'linear':
     case 'aligned':
       return isLocatable(first) && isLocatable(second)
-        ? at(linearDrawing(centroid(first), centroid(second), offset, kind === 'aligned', arrowSize))
+        ? at(linearDrawing(centroid(first), centroid(second), offset, kind === 'aligned', arrowSize, look))
         : null;
     case 'radial':
     case 'diameter':
-      return isRadial(first) ? at(radialDrawing(first, offset, kind === 'diameter', arrowSize)) : null;
+      return isRadial(first) ? at(radialDrawing(first, offset, kind === 'diameter', arrowSize, look)) : null;
     case 'angular': {
       if (third === undefined && isLine(first) && isLine(second)) {
         const corner = lineAngle(first, second);
@@ -183,19 +231,47 @@ export function dimensionDrawing(
   }
 }
 
-/** Value as drawn: `precision` decimals for lengths (diameter prefixed Ø), one decimal and ° for angles. */
-export function formatDimensionValue(kind: DimensionEntity['dimensionKind'], value: number, precision: number): string {
-  if (kind === 'angular') return `${value.toFixed(1)}°`;
-  return `${kind === 'diameter' ? 'Ø' : ''}${value.toFixed(precision)}`;
+/** Number format of a dimension value (`DimensionStyle` fields). */
+export type DimensionFormat = Pick<DimensionStyleSettings, 'angularPrecision' | 'decimalSeparator' | 'prefix' | 'suffix'>;
+
+/**
+ * Value as drawn: `precision` decimals for lengths (diameter prefixed Ø), `format.angularPrecision` (default 1) decimals and ° for angles;
+ * then the style's decimal separator, prefix (after Ø) and suffix.
+ */
+export function formatDimensionValue(
+  kind: DimensionEntity['dimensionKind'],
+  value: number,
+  precision: number,
+  format: DimensionFormat = {},
+): string {
+  const digits = kind === 'angular' ? value.toFixed(format.angularPrecision ?? 1) : value.toFixed(precision);
+  const number = format.decimalSeparator === ',' ? digits.replace('.', ',') : digits;
+  const unit = kind === 'angular' ? '°' : '';
+  return `${kind === 'diameter' ? 'Ø' : ''}${format.prefix ?? ''}${number}${unit}${format.suffix ?? ''}`;
 }
 
-/** Text of a dimension: `label` verbatim when set, else the formatted value followed by its `tolerance`. */
+/**
+ * Text of a dimension: `label` verbatim when set, else the formatted value followed by its `tolerance`. Precision: the dimension's own, then
+ * the style's, then `displayPrecision`.
+ */
 export function dimensionText(
   dimension: Pick<DimensionEntity, 'dimensionKind' | 'label' | 'precision' | 'tolerance'>,
   value: number,
   displayPrecision: number,
+  style: DimensionStyleSettings = {},
 ): string {
   if (dimension.label) return dimension.label;
-  const text = formatDimensionValue(dimension.dimensionKind, value, dimension.precision ?? displayPrecision);
+  const text = formatDimensionValue(dimension.dimensionKind, value, dimension.precision ?? style.precision ?? displayPrecision, style);
   return dimension.tolerance ? `${text} ${dimension.tolerance}` : text;
+}
+
+/** The style a dimension names (`styleId`), or an empty settings object (every renderer default) when it names none or a missing one. */
+export function dimensionStyleOf(
+  doc: Pick<CadDocument, 'dimensionStyles'>,
+  dimension: Pick<DimensionEntity, 'styleId'>,
+): DimensionStyleSettings {
+  const id = dimension.styleId;
+  const style: DimensionStyle | undefined =
+    id !== undefined && doc.dimensionStyles !== undefined && Object.hasOwn(doc.dimensionStyles, id) ? doc.dimensionStyles[id] : undefined;
+  return style ?? {};
 }

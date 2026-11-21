@@ -20,6 +20,9 @@ function kernelSettingsProblems(settings: unknown): string[] {
   if (settings['kernel'] !== 'occt' && settings['kernel'] !== 'manifold') errors.push("kernelSettings.kernel must be 'occt' or 'manifold'");
   for (const key of ['occtVersion', 'build'])
     if (settings[key] !== undefined && typeof settings[key] !== 'string') errors.push(`kernelSettings.${key} must be a string`);
+  const storage = settings['meshStorage'];
+  if (storage !== undefined && storage !== 'full' && storage !== 'recipe')
+    errors.push("kernelSettings.meshStorage must be 'full' or 'recipe'");
   const tolerance = settings['modelingTolerance'];
   if (!isRecord(tolerance)) return [...errors, 'kernelSettings.modelingTolerance must be an object'];
   for (const key of TOLERANCE_KEYS) {

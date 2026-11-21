@@ -7,7 +7,13 @@ import { fromMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
 import { noop, report, exportRefusal } from '@core/commands/noop';
 import { buildPlanDrawing } from '../drawings/planDrawing';
-import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing, dimensionText } from '@core/geometry/dimensionAnnotation';
+import {
+  DEFAULT_ARROW_SIZE,
+  DEFAULT_DIMENSION_OFFSET,
+  dimensionDrawing,
+  dimensionStyleOf,
+  dimensionText,
+} from '@core/geometry/dimensionAnnotation';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { technicalView } from '@core/geometry/technicalView';
 import { TOP_VIEW } from '@core/geometry/viewProjection';
@@ -17,10 +23,13 @@ import { CENTER_LAYERS, DxfWriter, HIDDEN_LAYERS, writePrimitive, writeRegion } 
 /** Strokes + label of a dimension (R12 DXF has no associative DIMENSION without anonymous blocks); false when its references are gone. */
 function writeDimension(writer: DxfWriter, doc: CadDocument, entity: DimensionEntity, layer: string): boolean {
   const refs = entity.entityIds.map((refId) => doc.entities[refId]);
-  const drawing = dimensionDrawing(entity.dimensionKind, refs, entity.offset ?? DEFAULT_DIMENSION_OFFSET);
+  const style = dimensionStyleOf(doc, entity);
+  const offset = entity.offset ?? DEFAULT_DIMENSION_OFFSET;
+  const drawing = dimensionDrawing(entity.dimensionKind, refs, offset, style.arrowSize ?? DEFAULT_ARROW_SIZE, style);
   if (!drawing) return false;
   for (const [a, b] of drawing.segments) writer.line(layer, a, b);
-  writer.text(layer, drawing.textAt, DIMENSION_TEXT_HEIGHT, dimensionText(entity, drawing.value, doc.displayPrecision), 'center');
+  const text = dimensionText(entity, drawing.value, doc.displayPrecision, style);
+  writer.text(layer, drawing.textAt, style.textHeight ?? DIMENSION_TEXT_HEIGHT, text, 'center');
   return true;
 }
 

@@ -8,7 +8,7 @@ import { is3D } from '@core/model/types';
 import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/geometry/bounds';
 import { closedShapeArea } from '@core/geometry/shapeArea';
 import { underlayCorners } from '@core/geometry/imageUnderlay';
-import { dimensionText } from '@core/geometry/dimensionAnnotation';
+import { dimensionStyleOf, dimensionText } from '@core/geometry/dimensionAnnotation';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
 import { currentSectionCutDepth } from './sectionCut';
@@ -145,20 +145,23 @@ interface LabelBox {
 
 /** World box of an (associative) dimension's label. @failure dangling or wrong-kind references -> null */
 export function dimensionLabelBox(document: CadDocument, dimension: DimensionEntity): LabelBox | null {
+  const style = dimensionStyleOf(document, dimension);
   const drawing = dimensionDrawing(
     dimension.dimensionKind,
     dimension.entityIds.map((id) => document.entities[id]),
     dimension.offset ?? DEFAULT_OFFSET,
     dimension.color,
+    style,
   );
   if (drawing === null) return null;
   drawing.lines?.geometry.dispose();
   (drawing.lines?.material as THREE.Material | undefined)?.dispose();
-  const text = dimensionText(dimension, drawing.value, document.displayPrecision);
+  const text = dimensionText(dimension, drawing.value, document.displayPrecision, style);
+  const height = style.textHeight ?? DIMENSION_LABEL_HEIGHT;
   return {
     center: [dimension.position[0] + drawing.textX, dimension.position[1] + drawing.textY],
-    halfWidth: (text.length * DIMENSION_LABEL_HEIGHT * GLYPH_WIDTH_RATIO) / 2,
-    halfHeight: DIMENSION_LABEL_HEIGHT / 2,
+    halfWidth: (text.length * height * GLYPH_WIDTH_RATIO) / 2,
+    halfHeight: height / 2,
   };
 }
 

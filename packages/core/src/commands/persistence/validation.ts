@@ -24,6 +24,7 @@ import { validateCamera, validateLayer, validateEntityValue, validateMaterialVal
 import { materialLibraryProblems } from './materialRecordValidation';
 import { mechanismProblems } from './mechanismValidation';
 import { sketchPlaneProblems } from './sketchPlaneValidation';
+import { dimensionStyleProblems } from './dimensionStyleValidation';
 import { appendAll } from '../../lib/appendAll';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
@@ -136,6 +137,7 @@ const PROTOTYPE_KEYED_RECORDS = [
   'explodedViews',
   'sketchPlanes',
   'sketchLinks',
+  'dimensionStyles',
 ] as const;
 
 /** Commands that rewrite or replay `featureHistory`; recorded as a step they would re-enter replay. Other legacy meta/read-only steps replay inertly. */
@@ -294,5 +296,6 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   validateSection(v['driveRelations'], validateDriveRelationValue);
   appendAll(errors, mechanismProblems(v));
   appendAll(errors, sketchPlaneProblems(v));
+  appendAll(errors, dimensionStyleProblems(v));
   return errors;
 }

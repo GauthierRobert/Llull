@@ -60,7 +60,7 @@ EllipseEntity    'ellipse'    center: Vec2; radiusX; radiusY
 SplineEntity     'spline'     points: Vec2[]; closed
 RegionEntity     'region'     loops: Vec2[][] (loops[0] outer, even-odd nesting); curves?: exact loop chains; hatch?: {pattern: solid|lines|cross, angle, spacing}
 TextEntity       'text'       content; height; anchor?
-DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'diameter'|'angular'; entityIds; offset?; precision?; tolerance?; label?
+DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'diameter'|'angular'; entityIds; offset?; precision?; tolerance?; label?; styleId? (key of doc.dimensionStyles: text height, arrows, extension lines, number format; model/dimensionStyle.ts, resolved by geometry/dimensionAnnotation dimensionStyleOf)
 ImageEntity      'image'      dataUrl (png/jpeg base64); pixelWidth/Height; width/height (units, lower-left at position); opacity; locked — raster underlay, pixel (0,0) = top-left (geometry/imageUnderlay.ts)
 // CurveSegment<P> (model/curve.ts): {type:'line', points:[a,b]} | {type:'arc', points:[start,through,end]} | {type:'bezier', points:[p0,p1,p2,p3]}
 // Assembly
@@ -141,6 +141,11 @@ entities (building) and re-derives them on load (`DocumentExtension.restore`); v
 still read and migrated (`migrate2to3`). v3 adds `kernelSettings` (kernel provenance + modelling
 tolerances, stamped on save) and `blobs` (sha256-keyed healed B-rep / STEP payloads that `brep`
 recipe leaves reference; checked on load: KRN_BLOB_MISSING / KRN_BLOB_HASH_MISMATCH).
+`kernelSettings.meshStorage` (`set_mesh_storage`, absent = 'full'): in 'recipe' a save (not `includeDerived`) writes
+top-level `mesh` entities with `brep` (no `{ op: 'brep' }` leaf) and no `asset` / `meshSource` empty and adds envelope version 4
+`derivedMeshes` `{ id: { triangles, sha256 } }` (only in v4, always in v4); `deserializeDocument(json, { kernel, acceptMeshDrift? })`
+validates each listed entity, then re-evaluates its recipe (KRN_DERIVED_MESH_NO_KERNEL / _INVALID / _UNBUILT / _DRIFT when the rebuilt
+hash differs). Hosts pass `getGeometryKernel()`; recovery / autosave / crash / vault writes pass `keepKernelMeshes: true`.
 
 ## Invariants commands must preserve
 

@@ -50,7 +50,7 @@ describe('llull-document v3', () => {
     const V2_READABLE: ReadonlySet<unknown> = new Set([1, 2]); // the reader before this step
     const version = (JSON.parse(serializeDocument(createEmptyDocument())) as { version: number }).version;
     expect(V2_READABLE.has(version)).toBe(false);
-    expect(loadError(envelope(4, createEmptyDocument()))).toMatch(/unsupported version 4 — expected 1, 2 or 3/);
+    expect(loadError(envelope(5, createEmptyDocument()))).toMatch(/unsupported version 5 — expected 1 to 4/);
   });
 });
 

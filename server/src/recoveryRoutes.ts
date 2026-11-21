@@ -14,6 +14,7 @@
 
 import { Router, type RequestHandler } from 'express';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
+import { getGeometryKernel } from '@core/geometry/kernel';
 import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
 import { documentHash } from '@protocol/liveSync';
@@ -99,7 +100,7 @@ export function buildRecoveryRouter(restLimiter: RequestHandler): Router {
     const { json, path: documentPath, changeCount } = bodyOf(req.body);
     if (typeof json !== 'string') return void res.status(400).json({ error: 'json must be a serialized document.' });
     try {
-      deserializeDocument(json);
+      deserializeDocument(json, { kernel: getGeometryKernel() });
     } catch (err) {
       return void res.status(400).json({ error: `json is not a document: ${errorMessage(err)}` });
     }

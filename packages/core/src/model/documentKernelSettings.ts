@@ -5,6 +5,8 @@ export interface DocumentKernelSettings {
   readonly occtVersion?: string;
   /** Binary identity of the kernel, e.g. "llull-kernel@0.1.0". */
   readonly build?: string;
+  /** 'full' (default, absent) stores kernel-result triangles; 'recipe' omits them from files and rebuilds them on load (needs a kernel). */
+  readonly meshStorage?: 'full' | 'recipe';
   readonly modelingTolerance: {
     /** mm; default 1e-4; range [1e-7, 1e-2]. Heal / sew / import precision. */
     readonly linear: number;

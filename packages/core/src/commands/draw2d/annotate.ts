@@ -322,9 +322,15 @@ export const addDimension = defineCommand({
       .string()
       .describe("Custom text to display instead of the computed value, e.g. 'REF' or '≈ 42 mm'. Omit to show the computed measurement.")
       .optional(),
+    style: z
+      .string()
+      .describe(
+        'Dimension style id (create_dimension_style, list_dimension_styles): text height, arrows, extension lines, number format. Omit for the active style (set_active_dimension_style), if any.',
+      )
+      .optional(),
     layer: layerIdField(),
   }),
-  run: (doc, { dimensionKind, entityIds, offset, precision, tolerance, label, layer }): CommandResult => {
+  run: (doc, { dimensionKind, entityIds, offset, precision, tolerance, label, style, layer }): CommandResult => {
     const rule = DIMENSION_RULES[dimensionKind];
     if (!rule)
       return noop(
@@ -356,6 +362,9 @@ export const addDimension = defineCommand({
       return noop(doc, 'add_dimension: an angular dimension from 2 ids needs two line entities (use 3 ids for points).');
     const drawing = dimensionDrawing(kind, refs, offset ?? DEFAULT_DIMENSION_OFFSET);
     if (!drawing) return noop(doc, 'add_dimension: the two lines are parallel (or degenerate), so there is no angle to dimension.');
+    if (style !== undefined && !Object.hasOwn(doc.dimensionStyles ?? {}, style))
+      return noop(doc, `add_dimension: no dimension style '${style}' (create_dimension_style, list_dimension_styles).`);
+    const styleId = style ?? doc.activeDimensionStyleId;
     const id = nextId('dim');
     const toleranceText = tolerance?.trim();
     const entity: DimensionEntity = {
@@ -371,6 +380,7 @@ export const addDimension = defineCommand({
       ...(precision !== undefined ? { precision } : {}),
       ...(toleranceText ? { tolerance: toleranceText } : {}),
       ...(label !== undefined ? { label } : {}),
+      ...(styleId !== undefined ? { styleId } : {}),
     };
     const measured = formatDimensionValue(kind, drawing.value, precision ?? doc.displayPrecision);
     const unit = kind === 'angular' ? '' : ` ${doc.units}`;
@@ -378,7 +388,7 @@ export const addDimension = defineCommand({
       doc,
       entity,
       `add_dimension: created ${MEASURED[dimensionKind]} ${measured}${unit} (entity ${id}) referencing [${entityIds.join(', ')}]` +
-        `${offset !== undefined ? `, offset ${offset}` : ''}${toleranceText ? `, tolerance ${toleranceText}` : ''}${label !== undefined ? `, label '${label}'` : ''}.`,
+        `${offset !== undefined ? `, offset ${offset}` : ''}${toleranceText ? `, tolerance ${toleranceText}` : ''}${label !== undefined ? `, label '${label}'` : ''}${styleId !== undefined ? `, style ${styleId}` : ''}.`,
     );
   },
 });
