@@ -9,6 +9,7 @@ import { findProfile } from '../../steel/profiles';
 import { findGratingType } from './grating/gratingTypes';
 import { platformParamsValid } from './platform/platformSpec';
 import { rackParamsValid } from './rack/rackSpec';
+import { radialStairErrors } from './radial/radialValidate';
 import { railingStructureProblem } from './railing/railingValidate';
 import { appendAll } from '@lib/appendAll';
 
@@ -176,6 +177,7 @@ export function accessElementErrors(key: string, element: Record<string, unknown
   }
   if (category === 'ladder') appendAll(errors, ladderErrors(key, element));
   if (category === 'steelStair') appendAll(errors, steelStairErrors(key, element));
+  if (category === 'radialStair') appendAll(errors, radialStairErrors(key, element));
   if (category === 'assembly') appendAll(errors, assemblyErrors(key, element, elements));
   return errors;
 }

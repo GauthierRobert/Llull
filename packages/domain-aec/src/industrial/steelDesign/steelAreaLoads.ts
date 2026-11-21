@@ -92,7 +92,7 @@ function insideFootprint(point: Point2, footprint: Footprint): boolean {
 }
 
 /** Beams whose top of steel lies within the band under a surface at `top` (thickness folded in). */
-function beamsUnder(beams: ReadonlyArray<BeamLoads>, bottom: number, top: number): BeamLoads[] {
+export function beamsUnder(beams: ReadonlyArray<BeamLoads>, bottom: number, top: number): BeamLoads[] {
   return beams.filter((beam) => beam.top >= bottom - BEAM_BAND_BELOW && beam.top <= top + BEAM_BAND_ABOVE);
 }
 
@@ -166,7 +166,7 @@ function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, params: 
 }
 
 /** Beams whose plan extent meets the polygon's bounding box grown by `margin` (mm): a beam far away in plan cannot carry the plate. */
-function nearInPlan(beams: ReadonlyArray<BeamLoads>, polygon: ReadonlyArray<Point2>, margin: number): BeamLoads[] {
+export function nearInPlan(beams: ReadonlyArray<BeamLoads>, polygon: ReadonlyArray<Point2>, margin: number): BeamLoads[] {
   const xs = polygon.map((point) => point[0]);
   const ys = polygon.map((point) => point[1]);
   const [x0, x1, y0, y1] = [minOf(xs) - margin, maxOf(xs) + margin, minOf(ys) - margin, maxOf(ys) + margin];
