@@ -46,3 +46,13 @@ export function lineRecords(
   const geometry = derived.length > 0 ? derived : created.length > 0 ? [...created] : changed;
   return { ids, geometry, entities: records.length > 0 ? [...created] : ids };
 }
+
+/** Why an anchored line may miss its face: the anchors are bounding-box sides, not exact faces (null when none). */
+export function anchorHintText(anchors: readonly string[]): string | null {
+  if (anchors.length === 0) return null;
+  return (
+    `${anchors.join(', ')} is the centre of a side of the bounding box (this kernel has no exact faces), which ` +
+    'can miss the face: anchor on the part that owns the face (wall.top rather than body.top), give the point yourself ' +
+    '(face.near=[x, y, z]), or use the OCC kernel (LLULL_KERNEL=occt).'
+  );
+}

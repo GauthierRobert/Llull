@@ -167,7 +167,7 @@ function stringParamKeys(name: string): ReadonlySet<string> {
 async function paramsOf(name: string, tokens: readonly string[], io: CliIo, paramFile?: string): Promise<unknown> {
   const params = paramFile === undefined ? await rawParamsOf(name, tokens, io) : await paramFileParams(name, tokens, io, paramFile);
   const read = (source: string): Buffer => asUsage(() => fs.readFileSync(source), `cannot read ${source}: `);
-  return asUsage(() => withModuleFiles(name, params, resolveFileRefs(params, read), (path) => fs.readFileSync(path)));
+  return asUsage(() => withModuleFiles(name, params, resolveFileRefs(params, read)));
 }
 
 /**

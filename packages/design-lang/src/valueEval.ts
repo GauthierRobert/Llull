@@ -13,6 +13,7 @@ import { similarNames } from '@lib/similarNames';
 import { DesignError, type DesignErrorCode } from './errors';
 import { pickAt, pickSlice } from './aliasRef';
 import type { Expr } from './valueExpr';
+import type { RunBudget } from './budget';
 
 /** An alias (or a part of one) as a value: the ids it names; `name` is set only for a whole alias (for `.entity`). */
 export class RefValue {
@@ -40,6 +41,8 @@ export interface EvalHost {
   readonly line: number;
   /** Loop variables (not visible inside functions). */
   readonly vars: Readonly<Record<string, number>>;
+  /** Shared by every value of the run (a hostile design cannot add up many near-limit values); absent = per-value limits only. */
+  readonly budget?: RunBudget;
   /** Document parameters. */
   readonly parameters: Readonly<Record<string, number>>;
   readonly functions: ReadonlyMap<string, FnDef>;
@@ -125,6 +128,7 @@ class Evaluator {
   /** One budget for steps and cells: building or walking `count` list items costs `count` steps. */
   private charge(count: number): void {
     this.steps += count;
+    this.host.budget?.spend(count, this.host.line);
     if (this.steps > MAX_EVAL_STEPS)
       throw this.error(
         'DESIGN_EVAL_LIMIT',

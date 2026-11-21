@@ -11,6 +11,9 @@ import { evaluateValue } from '@design/valueEval';
 import { coerceValue } from '@design/valueSchema';
 import { DesignError } from '@design/errors';
 import { RefValue } from '@design/valueEval';
+import { stepIdSource } from '@lib/id';
+import { getGeometryKernel } from '@core/geometry/kernel';
+import type { ExecutionContext } from '@core/commands/types';
 
 beforeAll(async () => {
   setGeometryKernel(await createManifoldKernel());
@@ -107,22 +110,18 @@ describe('guide and slots', () => {
 });
 
 describe('expand_design inside another step', () => {
-  it('does not shift the ids of later steps', () => {
-    const plain = execute(createEmptyDocument(), 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [1, 1, 1] } },
-        { command: 'add_box', params: { size: [2, 2, 2] } },
-      ],
-    });
-    const withExpand = execute(createEmptyDocument(), 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [1, 1, 1] } },
-        { command: 'expand_design', params: { source: 'add_box q size=[1, 1, 1]' } },
-        { command: 'add_box', params: { size: [2, 2, 2] } },
-      ],
-    });
-    expect(plain.error).toBeUndefined();
-    expect(Object.keys(withExpand.document.entities)).toEqual(Object.keys(plain.document.entities));
+  it('draws no ids and writes no provenance in the caller step', () => {
+    const scope = { degraded: null };
+    const ctx = {
+      kernel: getGeometryKernel(),
+      ids: stepIdSource('7'),
+      stepKey: '7',
+      provenanceScope: scope,
+    } as unknown as ExecutionContext;
+    const r = execute(createEmptyDocument(), 'expand_design', { source: 'add_box q size=[1, 1, 1]\nadd_box r size=[1, 1, 1]' }, ctx);
+    expect(r.error).toBeUndefined();
+    expect(ctx.ids.next('probe')).toBe('probe-7.1');
+    expect(scope.degraded).toBeNull();
   });
 });
 

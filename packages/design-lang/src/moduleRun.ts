@@ -50,6 +50,19 @@ export interface ModuleHost {
   interpolate(text: string, env: Readonly<Record<string, number>>, line: number): string;
 }
 
+/** @failure `name` is a module namespace (an instance or a prefix of namespaced aliases), or with `alias` also a plain alias -> DESIGN_MODULE_NAMESPACE */
+export function assertFreeName(host: Pick<ModuleHost, 'aliases' | 'instances'>, name: string, line: number, alias = true): void {
+  const taken =
+    [...host.aliases.keys()].some((k) => (alias && k === name) || k.startsWith(`${name}.`)) || host.instances.some((i) => i.ns === name);
+  if (taken)
+    throw new DesignError(
+      'DESIGN_MODULE_NAMESPACE',
+      line,
+      `"${name}" is already used as an alias or module namespace`,
+      'Give it another name.',
+    );
+}
+
 const ROOT_ENV: Readonly<Record<string, number>> = {};
 
 export function runModule(host: ModuleHost, use: UseStatement, env: Readonly<Record<string, number>>): void {
@@ -58,14 +71,7 @@ export function runModule(host: ModuleHost, use: UseStatement, env: Readonly<Rec
   if (def === undefined)
     throw new DesignError('DESIGN_MODULE_NOT_FOUND', line, `module "${use.path}" is not loaded`, 'Pass its text in `modules`.');
   const ns = `${host.scope.prefix}${host.interpolate(use.ns, env, line)}`;
-  const prefix = `${ns}.`;
-  if ([...host.aliases.keys()].some((k) => k === ns || k.startsWith(prefix)) || host.instances.some((i) => i.ns === ns))
-    throw new DesignError(
-      'DESIGN_MODULE_NAMESPACE',
-      line,
-      `namespace "${ns}" is already used`,
-      'Give each instance its own name: as fan2, or as fan{i} in a loop.',
-    );
+  assertFreeName(host, ns, line);
   if (host.instances.length >= MAX_MODULE_INSTANCES)
     throw new DesignError('DESIGN_MODULE_LIMIT', line, `more than ${MAX_MODULE_INSTANCES} module instances`, 'Use fewer instances.');
   const overlay = moduleArguments(def, use.pairs, line, (text, type, bound) =>
@@ -73,7 +79,7 @@ export function runModule(host: ModuleHost, use: UseStatement, env: Readonly<Rec
   );
   const outer = { scope: host.scope, functions: host.functions };
   const before = new Set(Object.keys(host.doc.entities));
-  host.scope = { prefix, overlay, file: def.path };
+  host.scope = { prefix: `${ns}.`, overlay, file: def.path };
   try {
     host.functions = buildFunctions(def.body, host.doc);
     host.block(def.body, ROOT_ENV);
@@ -84,7 +90,7 @@ export function runModule(host: ModuleHost, use: UseStatement, env: Readonly<Rec
     host.scope = outer.scope;
     host.functions = outer.functions;
   }
-  hideUnexported(host, prefix, def.exports);
+  hideUnexported(host, `${ns}.`, def.exports);
   const created = Object.keys(host.doc.entities).filter((id) => !before.has(id));
   host.instances.push(placeOnOwnLayer(host, ns, def.path, created, line));
 }
