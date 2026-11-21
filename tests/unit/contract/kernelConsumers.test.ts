@@ -16,6 +16,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'runFlight', // domain-dynamics flight/flightRun: the flight model's mass properties through a kernel
   'prepareVehicle', // domain-dynamics flight/flightRun: the same vehicle set-up (trim, linearisation) through a kernel
   'prepareVehicle', // domain-dynamics flight/flightRun: the same vehicle set-up (trim, linearisation) through a kernel
+  'kernelEntityBounds', // geometry/bounds: the kernel's tight box of a placed entity (measure_bounding_box is kernelOptional)
   'exactLeafVolume',
   'massProvenance',
   'buildSimulationModel', // domain-dynamics: body mass properties through a kernel

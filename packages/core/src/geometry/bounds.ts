@@ -1,4 +1,6 @@
 import type { CadDocument, DimensionEntity, Entity, InstanceEntity, TextEntity, Vec3 } from '../model/types';
+import type { GeometryKernel } from './kernel';
+import { recipeOf } from './shapeRecipe';
 import { instanceToWorld } from './instanceTransform';
 import { pointsExtent, tupleExtent } from '../lib/extent';
 import { ORIGIN, add3, vec3At } from '../lib/vec3';
@@ -393,4 +395,38 @@ export function mergeBounds(a: Bounds, b: Bounds): Bounds {
     min: [Math.min(a.min[0], b.min[0]), Math.min(a.min[1], b.min[1]), Math.min(a.min[2], b.min[2])],
     max: [Math.max(a.max[0], b.max[0]), Math.max(a.max[1], b.max[1]), Math.max(a.max[2], b.max[2])],
   };
+}
+
+/** Where a bounds answer came from: the kernel's tight box of the placed shape, or the analytic / corner estimate (a superset of the geometry). */
+export type BoundsSource = 'exact' | 'conservative';
+
+/** Kinds the kernel builds from the entity alone and whose analytic bounds are loose once placed (box, cylinder and sphere are closed-form). */
+const KERNEL_BOUNDS_KINDS: ReadonlySet<Entity['kind']> = new Set([
+  'extrusion',
+  'revolution',
+  'sweep',
+  'loft',
+  'wedge',
+  'pyramid',
+  'cone',
+  'torus',
+]);
+
+/**
+ * Tight world AABB of a kernel-backed solid: `BRepBndLib::AddOptimal` of its exact shape as placed (position and rotation applied), through
+ * `kernel.shapeBounds`. Null when there is no such kernel, the entity has no exact shape (box, mesh without B-rep, 2D, instance), or the
+ * kernel refuses; callers then keep `orientedEntityBounds` and report `'conservative'`.
+ * @invariant kernel-optional: never throws for a kernel failure
+ */
+export function kernelEntityBounds(e: Entity, kernel: GeometryKernel | null | undefined): Bounds | null {
+  if (kernel?.shapeBounds === undefined) return null;
+  const backed = e.kind === 'mesh' ? e.brep !== undefined : KERNEL_BOUNDS_KINDS.has(e.kind);
+  if (!backed) return null;
+  try {
+    const shape = kernel.evaluate(recipeOf(e));
+    const box = shape === null ? null : kernel.shapeBounds(shape);
+    return box === null ? null : { min: box.min, max: box.max };
+  } catch {
+    return null;
+  }
 }

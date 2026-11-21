@@ -339,6 +339,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     writeExchange,
     importExchange: (format, text, options) => call('importExchange', [format, text, options]) as ImportExchangeResult | null,
     analyze: (shape) => shapeCall('analyze', [shape], false) as ShapeAnalysis | null,
+    shapeBounds: (shape) => shapeCall('shapeBounds', [shape], false) as ReturnType<NonNullable<GeometryKernel['shapeBounds']>>,
     massProperties: (shape) => shapeCall('massProperties', [shape], false) as ExactMassProperties | null,
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,
     loadBlob: (sha256, brep) => void blobs.set(sha256, brep),

@@ -201,6 +201,9 @@ export interface GeometryKernel {
   /** Exact volume, area, centroid and inertia at unit density (TR-KRN-40); null when the kernel cannot integrate the shape. */
   massProperties?(shape: ShapeHandle): ExactMassProperties | null;
 
+  /** Tight axis-aligned box of the shape as placed (`BRepBndLib::AddOptimal`, no mass integration: TR-ASC-15); null for an empty or unbounded shape. */
+  shapeBounds?(shape: ShapeHandle): { readonly min: Vec3; readonly max: Vec3 } | null;
+
   /** Read and heal an exchange file into exact solids (TR-KRN-20/24); `text` is the Part 21 file content. */
   importShapes?(format: 'step' | 'iges', text: string, options: ImportShapesOptions): ImportShapesResult | null;
 

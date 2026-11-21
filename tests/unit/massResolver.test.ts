@@ -353,7 +353,7 @@ describe('exact kernel path', () => {
       kernel: { ...kernel, massProperties: (): ExactMassProperties => ({ ...EXACT, bounds: { min: [-2, -3, -4], max: [5, 6, 7] } }) },
     };
     const one = execute(doc, 'measure_bounding_box', { entityId: id }, ctx).data as { min: Vec3; max: Vec3; size: Vec3 };
-    expect(one).toEqual({ min: [-2, -3, -4], max: [5, 6, 7], size: [7, 9, 11] });
+    expect(one).toEqual({ min: [-2, -3, -4], max: [5, 6, 7], size: [7, 9, 11], bounds: 'exact' });
     const all = execute(doc, 'measure_bounding_box', {}, ctx).data as { min: Vec3; max: Vec3 };
     expect(all.min).toEqual([-2, -3, -4]);
     const silent = { ...defaultContext(), kernel: { ...kernel, massProperties: () => null } };

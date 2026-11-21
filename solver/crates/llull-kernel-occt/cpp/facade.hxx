@@ -137,6 +137,8 @@ std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix);
 
 MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_deflection);
 double bounding_diagonal(const Shape &shape);
+// Tight box (BRepBndLib::AddOptimal, no enlargement) as [xmin, ymin, zmin, xmax, ymax, zmax]; empty for an empty or unbounded shape.
+rust::Vec<double> shape_bounds(const Shape &shape);
 MassOut mass_properties(const Shape &shape);
 AnalysisOut analyze(const Shape &shape);
 

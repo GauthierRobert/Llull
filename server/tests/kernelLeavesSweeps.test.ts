@@ -124,3 +124,27 @@ it('a loft with exact faces is a sheetSolid node cut at its knots; a plain ring 
   expect(sheet(loft, {})).toBeNull();
   expect(sheetSolidOf({ ...loft, faces: undefined } as unknown as LoftEntity, { sheetSolid: true })).toBeNull();
 });
+
+it('a ruled polygon loft carries its vertices as native.polygons and straight-edge chains (ASC M5)', () => {
+  const square = (half: number, z: number): unknown => ({
+    section: [
+      [-half, -half],
+      [half, -half],
+      [half, half],
+      [-half, half],
+    ],
+    center: [0, 0, z],
+  });
+  const made = execute(createEmptyDocument(), 'loft_sections', { sections: [square(5, 0), square(2, 10)], ruled: true });
+  const loft = made.document.entities[made.affected[0] as string] as LoftEntity;
+  const payload = (nativeLeaf(loft) as unknown as { native: { polygons: number[][]; chains: number[][]; ruled: boolean } }).native;
+  expect(payload.ruled).toBe(true);
+  expect(payload.polygons).toHaveLength(2);
+  expect(payload.polygons.every((polygon) => polygon.length === 12)).toBe(true);
+  expect(payload.chains.every((chain) => chain.length === 4 * 7)).toBe(true);
+  const smooth = execute(createEmptyDocument(), 'loft_sections', { sections: [square(5, 0), square(2, 10)] });
+  const plain = nativeLeaf(smooth.document.entities[smooth.affected[0] as string] as LoftEntity) as unknown as {
+    native: Record<string, unknown>;
+  };
+  expect(plain.native['polygons']).toBeUndefined();
+});

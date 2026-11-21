@@ -16,7 +16,7 @@ use llull_kernel_occt::recipe::{EvalError, Evaluator, RECIPE_OPS, SOLID_KINDS};
 use llull_kernel_occt::{
     analyze, bounding_diagonal, export_step, mass_properties,
     mesh::{display_mesh, mesh_at, MAX_DIAGONAL_PER_DEFLECTION},
-    occt_version, Shape,
+    occt_version, shape_bounds, Shape,
 };
 use serde_json::{json, Value};
 use std::rc::Rc;
@@ -32,8 +32,18 @@ pub const TESSELLATION_BUDGET: &str = "NATIVE_TESSELLATION_BUDGET";
 pub const NOT_CACHED: &str = "shape not cached";
 
 /// Operations answered natively besides `queries::QUERY_OPS`; every other op replies `NATIVE_UNSUPPORTED`.
-pub const OPS: [&str; 9] =
-    ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep", "blendReport", "deformReport", "booleanReport"];
+pub const OPS: [&str; 10] = [
+    "info",
+    "evaluate",
+    "tessellate",
+    "shapeBounds",
+    "massProperties",
+    "analyze",
+    "exportStep",
+    "blendReport",
+    "deformReport",
+    "booleanReport",
+];
 
 /// Every op the session answers (`info().ops`).
 pub fn native_ops() -> Vec<&'static str> {
@@ -93,6 +103,7 @@ fn bounds_json(values: &[f64]) -> Value {
 fn info() -> Value {
     let capabilities: Vec<&str> = [
         "analyze",
+        "shapeBounds",
         "massProperties",
         "exportStep",
         "bsplineSections",
@@ -206,6 +217,7 @@ impl Session {
                     Err(error) => Reply::fail(OCC_FAILURE, error),
                 }
             }
+            "shapeBounds" => self.with_shape(first, |shape| Ok(shape_bounds(shape)?.map_or(Value::Null, |values| bounds_json(&values)))),
             "massProperties" => self.with_shape(first, |shape| {
                 let mass = mass_properties(shape)?;
                 let finite = [mass.volume, mass.area].iter().chain(&mass.centroid).chain(&mass.inertia).all(|value| value.is_finite());
@@ -431,6 +443,15 @@ mod tests {
         assert_eq!(evaluated, json!({ "id": 7, "result": { "key": "k1" } }));
         let mass = call(&mut session, "massProperties", json!([{ "key": "k1" }]));
         assert!((mass["result"]["volume"].as_f64().unwrap() - 8.0).abs() < 1e-9);
+        let bounds = call(&mut session, "shapeBounds", json!([{ "key": "k1" }]));
+        for k in 0..3 {
+            assert!(
+                (bounds["result"]["min"][k].as_f64().unwrap() + 1.0).abs() < 1e-6
+                    && (bounds["result"]["max"][k].as_f64().unwrap() - 1.0).abs() < 1e-6,
+                "{bounds}"
+            );
+        }
+        assert!(native_ops().contains(&"shapeBounds"));
         let mesh = call(&mut session, "tessellate", json!([{ "key": "k1" }]));
         let indices = base64::engine::general_purpose::STANDARD.decode(mesh["result"]["indices"].as_str().unwrap()).unwrap();
         assert_eq!(indices.len(), 36 * 4);

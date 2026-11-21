@@ -235,7 +235,7 @@ function nativeHandle(handle: unknown, features: FeatureLowerings, wire: WireOpt
 }
 
 /** Ops whose first argument is a shape handle (every `faceQuery.<method>` too). */
-const FIRST_ARG_SHAPE_OPS: ReadonlySet<string> = new Set(['tessellate', 'massProperties', 'analyze', 'topology']);
+const FIRST_ARG_SHAPE_OPS: ReadonlySet<string> = new Set(['tessellate', 'massProperties', 'shapeBounds', 'analyze', 'topology']);
 
 export function takesShapeFirst(op: string): boolean {
   return FIRST_ARG_SHAPE_OPS.has(op) || op.startsWith('faceQuery.');

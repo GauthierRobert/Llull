@@ -18,6 +18,8 @@
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepFill.hxx>
+#include <Bnd_Box.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
@@ -1055,6 +1057,84 @@ std::unique_ptr<Shape> skinned_solid(rust::Slice<const double> chains, rust::Sli
   }
   maker.Build();
   return maker.IsDone() ? wrap(maker.Shape()) : nullptr;
+}
+
+namespace {
+
+// ASC M5: one ruled side of a polygon loft between the edge a-b of a section and the edge d-c of the next (vertex k pairs with vertex k): a planar face when
+// the corners are coplanar (the Newell plane, 1e-9 of the loft size), else the bilinear ruled surface. Coincident corners drop out (a triangle). Null when degenerate.
+TopoDS_Shape ruled_side(const gp_Pnt &a, const gp_Pnt &b, const gp_Pnt &c, const gp_Pnt &d, double size) {
+  std::vector<gp_Pnt> corners;
+  for (const gp_Pnt &corner : {a, b, c, d})
+    if (corners.empty() || corners.back().Distance(corner) > 1e-9 * size) corners.push_back(corner);
+  if (corners.size() > 1 && corners.front().Distance(corners.back()) <= 1e-9 * size) corners.pop_back();
+  if (corners.size() < 3) return TopoDS_Shape();
+  gp_XYZ normal(0, 0, 0);
+  gp_XYZ centre(0, 0, 0);
+  for (size_t i = 0; i < corners.size(); ++i) {
+    normal += corners[i].XYZ().Crossed(corners[(i + 1) % corners.size()].XYZ());
+    centre += corners[i].XYZ();
+  }
+  centre /= static_cast<double>(corners.size());
+  if (normal.Modulus() <= 1e-12 * size * size) return TopoDS_Shape();
+  normal.Normalize();
+  bool planar = true;
+  for (const gp_Pnt &corner : corners) planar = planar && std::fabs((corner.XYZ() - centre).Dot(normal)) <= 1e-9 * size;
+  if (planar) {
+    BRepBuilderAPI_MakePolygon polygon;
+    for (const gp_Pnt &corner : corners) polygon.Add(corner);
+    polygon.Close();
+    if (!polygon.IsDone()) return TopoDS_Shape();
+    BRepBuilderAPI_MakeFace face(polygon.Wire(), Standard_True);
+    return face.IsDone() ? TopoDS_Shape(face.Face()) : TopoDS_Shape();
+  }
+  BRepBuilderAPI_MakeEdge first(a, b);
+  BRepBuilderAPI_MakeEdge second(d, c);
+  if (!first.IsDone() || !second.IsDone()) return TopoDS_Shape();
+  return BRepFill::Face(first.Edge(), second.Edge());
+}
+
+// A solid from faces sewn into one closed shell, outward oriented (the signed volume is positive); null when the shell is open or not single.
+TopoDS_Shape outward_solid(const std::vector<TopoDS_Shape> &faces, double tolerance) {
+  TopoDS_Shape solid = sewn_solid(faces, tolerance);
+  if (solid.IsNull()) return solid;
+  GProp_GProps volume;
+  BRepGProp::VolumeProperties(solid, volume);
+  if (volume.Mass() < 0) solid.Reverse();
+  return solid;
+}
+
+}  // namespace
+
+std::unique_ptr<Shape> skinned_polygon_solid(rust::Slice<const double> points, rust::Slice<const uint32_t> counts, bool ruled) {
+  if (counts.size() < 2) throw std::invalid_argument("polygon loft: need at least 2 sections");
+  const size_t count = counts[0];
+  for (uint32_t each : counts)
+    if (each != count || each < 3) throw std::invalid_argument("polygon loft: sections need the same vertex count (>= 3)");
+  if (points.size() != 3 * count * counts.size()) throw std::invalid_argument("polygon loft: vertex data length mismatch");
+  if (!ruled) throw std::invalid_argument("polygon loft: only the ruled skin is built from polygons");
+  const auto vertex = [&](size_t section, size_t k) { return point_at(points, 3 * (section * count + k % count)); };
+  Bnd_Box box;
+  for (size_t i = 0; i < points.size(); i += 3) box.Add(point_at(points, i));
+  const double size = std::max(1e-9, box.IsVoid() ? 0.0 : std::sqrt(box.SquareExtent()));
+  std::vector<TopoDS_Shape> faces;
+  for (size_t section : {size_t(0), counts.size() - 1}) {
+    BRepBuilderAPI_MakePolygon polygon;
+    for (size_t k = 0; k < count; ++k) polygon.Add(vertex(section, k));
+    polygon.Close();
+    if (!polygon.IsDone()) return nullptr;
+    BRepBuilderAPI_MakeFace cap(polygon.Wire(), Standard_True);
+    if (!cap.IsDone()) return nullptr;
+    faces.push_back(cap.Face());
+  }
+  for (size_t section = 0; section + 1 < counts.size(); ++section)
+    for (size_t k = 0; k < count; ++k) {
+      const TopoDS_Shape side = ruled_side(vertex(section, k), vertex(section, k + 1), vertex(section + 1, k + 1), vertex(section + 1, k), size);
+      if (side.IsNull()) return nullptr;
+      faces.push_back(side);
+    }
+  const TopoDS_Shape solid = outward_solid(faces, 1e-7 * size);
+  return solid.IsNull() ? nullptr : wrap(solid);
 }
 
 std::unique_ptr<Shape> skinned_solid_bsplines(rust::Slice<const double> curves, rust::Slice<const uint32_t> lengths, bool ruled) {

@@ -187,9 +187,11 @@ function sweepBuild(entity: SweepEntity): SweptBuild | Refusal {
   return helixBuild(entity) ?? facesBuild(entity);
 }
 
-/** Sections of a basic loft: its exact curves (a B-spline each, closed by a straight edge when its ends differ) or the Catmull-Rom curves of its rings. */
+/** Sections of a basic loft: its exact curves (a B-spline each, closed by a straight edge when its ends differ) or the Catmull-Rom curves of its rings (a polygon loft: its straight edges). */
 function loftSections(entity: LoftEntity): LoftSection[] {
   if (entity.sections !== undefined) return entity.sections.map((curve) => ({ kind: 'bspline', curve, closing: hasClosingEdge(curve) }));
+  if (entity.polygon === true)
+    return entity.rings.map((ring) => ({ kind: 'chain', segments: ring.map((p, k) => [p, ring[(k + 1) % ring.length] as Vec3]) }));
   return entity.rings.map((ring) => ({ kind: 'chain', segments: ringCurves(ring).map((segment) => [...segment.points]) }));
 }
 

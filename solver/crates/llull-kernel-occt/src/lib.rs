@@ -168,6 +168,7 @@ mod ffi {
 
         fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<MeshOut>;
         fn bounding_diagonal(shape: &Shape) -> Result<f64>;
+        fn shape_bounds(shape: &Shape) -> Result<Vec<f64>>;
         fn mass_properties(shape: &Shape) -> Result<MassOut>;
         fn analyze(shape: &Shape) -> Result<AnalysisOut>;
 
@@ -373,6 +374,12 @@ pub fn bounding_diagonal(shape: &Shape) -> OcctResult<f64> {
     let diagonal = occt(ffi::bounding_diagonal(inner(shape)?))?;
     shape.1.diagonal.set(Some(diagonal));
     Ok(diagonal)
+}
+
+/// Tight box `[min xyz, max xyz]` (AddOptimal of the shape as placed; no mass integration); `None` for an empty or unbounded shape.
+pub fn shape_bounds(shape: &Shape) -> OcctResult<Option<[f64; 6]>> {
+    let values = occt(ffi::shape_bounds(inner(shape)?))?;
+    Ok(<[f64; 6]>::try_from(values).ok())
 }
 
 pub fn mass_properties(shape: &Shape) -> OcctResult<MassOut> {

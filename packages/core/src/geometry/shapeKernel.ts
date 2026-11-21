@@ -91,6 +91,8 @@ export interface KernelOps<S> {
   analyze?(shape: S): ShapeAnalysis | null;
   /** Optional exact mass properties at unit density; a kernel without it leaves `GeometryKernel.massProperties` undefined. */
   massProperties?(shape: S): ExactMassProperties | null;
+  /** Optional tight box of the shape as placed; a kernel without it leaves `GeometryKernel.shapeBounds` undefined. */
+  shapeBounds?(shape: S): { readonly min: Vec3; readonly max: Vec3 } | null;
   /** Optional minimum distance (searched up to `maxDistance`); a kernel without it leaves `GeometryKernel.distance` undefined. */
   distance?(a: S, b: S, maxDistance: number): ShapeDistance | null;
   /** Optional face-level queries (01 §5.9); a kernel without it leaves `GeometryKernel.faceQuery` undefined. */
@@ -386,6 +388,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     }),
   );
   const massOps = ops.massProperties?.bind(ops);
+  const boundsOps = ops.shapeBounds?.bind(ops);
   const loadBlobOps = ops.loadBlob?.bind(ops);
   const loadedBlobs = new Set<string>();
   const importOps = ops.importShapes?.bind(ops);
@@ -403,6 +406,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               ...(analyzeOps === undefined ? [] : ['analyze']),
               ...(distanceOps === undefined ? [] : ['distance']),
               ...(massOps === undefined ? [] : ['massProperties']),
+              ...(boundsOps === undefined ? [] : ['shapeBounds']),
               ...(importOps === undefined ? [] : ['importShapes']),
               ...(assemblyOps === undefined ? [] : ['exportStepAssembly']),
               ...(faceQuery === undefined ? [] : ['faceQuery']),
@@ -474,6 +478,15 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
             call(() => {
               const shape = nativeOf(handle);
               return shape === null ? null : massOps(shape);
+            }),
+        }),
+    ...(boundsOps === undefined
+      ? {}
+      : {
+          shapeBounds: (handle: ShapeHandle): { readonly min: Vec3; readonly max: Vec3 } | null =>
+            call(() => {
+              const shape = nativeOf(handle);
+              return shape === null ? null : boundsOps(shape);
             }),
         }),
     ...(distanceOps === undefined

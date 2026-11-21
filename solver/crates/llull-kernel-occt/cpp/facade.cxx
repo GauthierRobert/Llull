@@ -476,6 +476,14 @@ double bounding_diagonal(const Shape &shape) {
   return box.CornerMin().Distance(box.CornerMax());
 }
 
+rust::Vec<double> shape_bounds(const Shape &shape) {
+  const Bnd_Box box = bounds_of(shape.shape);
+  rust::Vec<double> out;
+  if (box.IsVoid() || box.IsOpen()) return out;
+  push_bounds(out, box);
+  return out;
+}
+
 MassOut mass_properties(const Shape &shape) {
   // Part frame (TR-KRN-41): integrate about the bounding-box centre rounded to 1 mm, then shift the centroid back.
   const Bnd_Box box = bounds_of(shape.shape);

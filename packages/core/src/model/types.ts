@@ -256,6 +256,11 @@ export interface LoftEntity extends BaseEntity, LoftSkin {
   rings: ReadonlyArray<ReadonlyArray<Vec3>>;
   ruled: boolean;
   /**
+   * Ruled loft of polygon sections (ASC M5): `rings` hold the section vertices themselves (equal count, paired by index), not resamples. The exact kernel builds
+   * each section from straight segments (`BRepBuilderAPI_MakePolygon`).
+   */
+  polygon?: true;
+  /**
    * Exact sections (loft v3, local to `position`): one open cubic curve per section, closed by a straight edge when its ends differ. The
    * exact kernel skins them unresampled; `rings` is then only the dense display / Manifold fallback sampled from them.
    * @invariant one per ring; equal Bézier span counts and closing-edge status
