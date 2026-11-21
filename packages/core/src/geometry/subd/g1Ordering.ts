@@ -1,18 +1,22 @@
 /**
  * Fill-reducing ordering of the normal matrix of the G1 rows (`g1Factored.ts`, DES-4c): approximate minimum degree on a quotient graph (variables, absorbed elements, the AMD external
- * degree bound; no supervariables). Used when the reverse Cuthill-McKee envelope does not fit.
+ * degree bound; no supervariables; dense rows last). Used when the reverse Cuthill-McKee envelope does not fit.
  * @invariant pure; deterministic: degree buckets with last-in-first-out ties, loops in index order, no hash iteration
  */
 
 /** `order[position] = row`: the elimination order of the symmetric pattern `graph` (sorted adjacency lists, no self loops). */
 export function minimumDegree(graph: readonly number[][]): number[] {
   const n = graph.length;
-  const variables: number[][] = graph.map((list) => [...list]);
+  // dense rows (AMD rule: degree above 10 sqrt(n)) are ordered last and left out of the graph: a hub would make every update quadratic
+  const denseAbove = Math.max(16, 10 * Math.sqrt(n));
+  const dense = graph.map((list) => list.length > denseAbove);
+  const sparseCount = dense.filter((flag) => !flag).length;
+  const variables: number[][] = graph.map((list) => list.filter((w) => !dense[w]));
   const elementsOf: number[][] = graph.map(() => []);
   const members: number[][] = graph.map(() => []);
-  const alive = new Uint8Array(n).fill(1);
+  const alive = Uint8Array.from(dense, (flag) => (flag ? 0 : 1));
   const elementAlive = new Uint8Array(n);
-  const degree = Int32Array.from(graph, (list) => list.length);
+  const degree = Int32Array.from(variables, (list) => list.length);
   const inPivotList = new Int32Array(n).fill(-1);
   const outside = new Int32Array(n);
   const outsideStamp = new Int32Array(n).fill(-1);
@@ -34,9 +38,9 @@ export function minimumDegree(graph: readonly number[][]): number[] {
     else next[before] = after;
     if (after !== -1) previous[after] = before;
   };
-  for (let v = 0; v < n; v++) insert(v, degree[v] as number);
+  for (let v = 0; v < n; v++) if (!dense[v]) insert(v, degree[v] as number);
   const order: number[] = [];
-  for (let step = 0; step < n; step++) {
+  for (let step = 0; step < sparseCount; step++) {
     while (head[lowest] === -1) lowest++;
     const pivot = head[lowest] as number;
     remove(pivot);
@@ -74,7 +78,7 @@ export function minimumDegree(graph: readonly number[][]): number[] {
         }
         outside[e] = (outside[e] as number) - 1;
       }
-    const remaining = n - step - 2;
+    const remaining = sparseCount - step - 2;
     for (const i of list) {
       // an element inside the new one is absorbed; the variables inside it are covered by it
       const elements = (elementsOf[i] as number[]).filter((e) => {
@@ -95,5 +99,6 @@ export function minimumDegree(graph: readonly number[][]): number[] {
       insert(i, Math.max(0, Math.min(remaining, (degree[i] as number) + list.length - 1, bound)));
     }
   }
+  for (let v = 0; v < n; v++) if (dense[v]) order.push(v);
   return order;
 }

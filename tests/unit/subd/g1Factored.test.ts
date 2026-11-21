@@ -1,7 +1,7 @@
 /** 04 DIR §5.8, DES-4c: the direct projector (envelope LDL^T of A A^T) behind the limit-surface objective of the big groups: agreement with the dense and iterative paths, dependent rows, scale, budget. */
 
 import { describe, expect, it } from 'vitest';
-import { factorRows } from '@core/geometry/subd/g1Factored';
+import { factorRows, isDependent } from '@core/geometry/subd/g1Factored';
 import { minimumDegree } from '@core/geometry/subd/g1Ordering';
 import { factorNumeric, symbolicFill } from '@core/geometry/subd/g1SparseLdl';
 import { type Sample, type SparseRow, solveDense, solveSparse } from '@core/geometry/subd/g1Linear';
@@ -192,16 +192,63 @@ describe('minimum degree ordering and the sparse LDL^T (DES-4c leftover 2)', () 
     expect([...order].sort()).toEqual([0, 1, 2, 3, 4]);
     expect(order.indexOf(0)).toBeGreaterThanOrEqual(3);
     expect(minimumDegree(star)).toEqual(order);
-    const { rows } = grid(9);
-    const adjacent = (side: number): number[][] =>
-      Array.from({ length: side * side }, (_, k) =>
-        [k - side, k + side, k % side ? k - 1 : -1, (k + 1) % side ? k + 1 : -1]
-          .filter((v) => v >= 0 && v < side * side)
-          .sort((p, q) => p - q),
-      );
-    const lattice = minimumDegree(adjacent(12));
-    expect(new Set(lattice).size).toBe(144);
-    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('on a 12 x 12 lattice the minimum-degree order has less fill than the natural order and than its (banded, RCM-like) envelope', () => {
+    const side = 12;
+    const lattice: number[][] = Array.from({ length: side * side }, (_, k) =>
+      [k - side, k + side, k % side ? k - 1 : -1, (k + 1) % side ? k + 1 : -1]
+        .filter((v) => v >= 0 && v < side * side)
+        .sort((p, q) => p - q),
+    );
+    const fillOf = (order: readonly number[]): number => {
+      const position = new Map(order.map((row, p) => [row, p]));
+      return symbolicFill(order.map((row, p) => (lattice[row] as number[]).map((w) => position.get(w) as number).filter((w) => w < p)))
+        .fill;
+    };
+    const natural = Array.from({ length: side * side }, (_, k) => k);
+    const envelope = natural.reduce((sum, k) => sum + k - Math.min(k, ...(lattice[k] as number[])), 0);
+    const ordered = minimumDegree(lattice);
+    expect(new Set(ordered).size).toBe(side * side);
+    expect(fillOf(ordered)).toBeLessThan(fillOf(natural));
+    expect(fillOf(ordered)).toBeLessThan(envelope);
+  });
+
+  it('a star of 40,000 nodes is ordered fast (the hub is a dense row, ordered last) and the leaves cost no fill beyond the hub column', () => {
+    const count = 40_000;
+    const star: number[][] = [Array.from({ length: count - 1 }, (_, k) => k + 1), ...Array.from({ length: count - 1 }, () => [0])];
+    const started = performance.now();
+    const order = minimumDegree(star);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(order[count - 1]).toBe(0);
+    expect(new Set(order).size).toBe(count);
+  });
+
+  it('with the production dependence rule a dropped row whose descendants in the elimination tree follow it leaves M z = r on the kept rows', () => {
+    // A rows over 4 unknowns: r1 = 2 r0 (dependent), r2 and r3 chain below it in the elimination tree
+    const a = [
+      [1, 0, 0, 0],
+      [2, 0, 0, 0],
+      [1, 1, 0, 0],
+      [0, 1, 1, 0],
+    ];
+    const m = a.map((p) => a.map((q) => p.reduce((sum, v, k) => sum + v * (q[k] as number), 0)));
+    const symbolic = symbolicFill([[], [0], [0, 1], [2]]);
+    expect(symbolic.parent[1]).toBe(2);
+    const solve = factorNumeric(
+      symbolic,
+      (k) => {
+        const rowsOf = [0, 1, 2, 3].filter((i) => i <= k && (m[i] as number[])[k] !== 0);
+        return [rowsOf, rowsOf.map((i) => (m[i] as number[])[k] as number)];
+      },
+      (pivot, diagonal) => isDependent(pivot, diagonal, 6),
+    );
+    const x = [1, 2, 3, 4];
+    const r = Float64Array.from(a, (row) => row.reduce((sum, v, k) => sum + v * (x[k] as number), 0));
+    const z = solve(r);
+    expect(z[1]).toBe(0);
+    for (const i of [0, 2, 3])
+      expect((m[i] as number[]).reduce((sum, v, k) => sum + v * (z[k] as number), 0)).toBeCloseTo(r[i] as number, 10);
   });
 
   it('symbolicFill + factorNumeric solve a small SPD system (an arrow matrix) exactly and drop a dependent row', () => {
@@ -239,7 +286,7 @@ describe('minimum degree ordering and the sparse LDL^T (DES-4c leftover 2)', () 
               [0, 1],
               [1, 1],
             ],
-      (pivot) => !(pivot > 1e-12),
+      (pivot, diagonal) => isDependent(pivot, diagonal, 2),
     );
     expect(copy(Float64Array.from([2, 2]))[1]).toBe(0);
   });

@@ -236,27 +236,81 @@ export function solveSparse(
   const nonzeros = rows.reduce((sum, row) => sum + row.length, 0);
   const sampleNonzeros = samples.reduce((sum, sample) => sum + sample.terms.length, 0);
   // direct: the factor of A A^T (`g1Factored.ts`) when it fits the budget: it gives the feasibility step x0 + A^+ (b - A x0) and, with samples, every projection of the objective
-  const direct =
+  const factored =
     projector === 'direct'
       ? factorRows(
           rows,
           n,
-          (maxWork ?? DIRECT_MAX_WORK) - (samples.length > 0 ? 3 * PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros) : 0),
+          (maxWork ?? (samples.length > 0 ? DIRECT_MAX_WORK : SPARSE_MAX_WORK)) -
+            (samples.length > 0 ? 3 * PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros) : 0),
           samples.length > 0 ? PROJECTIONS : 0,
           samples.length > 0 ? 2 * REPAIR_ROUNDS : REPAIR_ROUNDS,
           factorOptions,
         )
       : null;
+  // a factor of a semidefinite A A^T can keep a nearly dependent row and amplify it: its feasible point and its projector are trusted only when they pass the checks, else CGLS
+  const through = factored === null ? null : feasibleThrough(rows, b, start, factored, samples.length > 0);
+  const direct = through === null ? null : factored;
   const iterations = Math.min(6 * n, Math.floor((maxWork ?? SPARSE_MAX_WORK) / Math.max(1, 12 * nonzeros)));
+  const feasible = through ?? feasibleByCgls(rows, b, start, iterations);
+  const { columns } = feasible;
+  const solution: Solution = {
+    x: asPoints(columns, n),
+    residual: violation(rows, b, columns),
+    status: feasible.capped ? 'budget' : 'ok',
+    objective: 'start',
+  };
+  if (feasible.capped || samples.length === 0) return solution;
+  return spendFreedom(rows, b, columns, samples, solution, direct, (maxWork ?? SPARSE_MAX_WORK) - feasible.iterations * 12 * nonzeros);
+}
+
+/** Largest absolute entry of the targets (the scale of the residual bound). */
+const targetScale = (b: readonly Vec3[]): number =>
+  Math.max(1, maxOf(b.map((t) => Math.max(Math.abs(t[0]), Math.abs(t[1]), Math.abs(t[2])))));
+
+/**
+ * The feasible point through the factor, or null when the factor is not trusted: the rows violated by more than 1e-9 of the target scale after the repair (a consistent system the factor
+ * amplified wrongly; CGLS decides whether the system is really contradictory), or, with samples, a projection of a probe vector that still moves the rows (A P v not ~ 0).
+ */
+function feasibleThrough(
+  rows: readonly SparseRow[],
+  b: readonly Vec3[],
+  start: Vec3[],
+  factor: Projector,
+  projects: boolean,
+): { columns: Float64Array[]; capped: false; iterations: 0 } | null {
+  const columns = [0, 1, 2].map((axis) =>
+    repair(
+      rows,
+      b,
+      Float64Array.from(start, (p) => p[axis] as number),
+      axis,
+      factor.pseudoInverse,
+    ),
+  );
+  if (!(violation(rows, b, columns) <= 1e-9 * targetScale(b))) return null;
+  if (projects) {
+    const probe = Float64Array.from(start, (_, k) => Math.sin(k + 1));
+    const moved = factor.project(probe);
+    const [before, after] = [rows.map((row) => rowDot(row, probe)), rows.map((row) => rowDot(row, moved))];
+    if (!(maxOf(after.map(Math.abs)) <= 1e-8 * Math.max(1, maxOf(before.map(Math.abs))))) return null;
+  }
+  return { columns, capped: false, iterations: 0 };
+}
+
+/** CGLS feasibility from `start` per axis: the nearest solution when consistent, least-squares otherwise; `capped` when the iteration budget ran out before convergence. */
+function feasibleByCgls(
+  rows: readonly SparseRow[],
+  b: readonly Vec3[],
+  start: Vec3[],
+  iterations: number,
+): { columns: Float64Array[]; capped: boolean; iterations: number } {
+  const n = start.length;
   let feasibilityIterations = 0;
   const columns: Float64Array[] = [];
   let capped = false;
   for (let axis = 0; axis < 3; axis++) {
     const x = Float64Array.from(start, (p) => p[axis] as number);
-    if (direct !== null) {
-      columns.push(repair(rows, b, x, axis, direct.pseudoInverse));
-      continue;
-    }
     const applyT = (r: Float64Array): Float64Array => {
       const out = new Float64Array(n);
       rows.forEach((row, i) => {
@@ -287,14 +341,7 @@ export function solveSparse(
     if (it >= iterations && gamma > stop && iterations < 6 * n) capped = true;
     columns.push(x);
   }
-  const solution: Solution = {
-    x: asPoints(columns, n),
-    residual: violation(rows, b, columns),
-    status: capped ? 'budget' : 'ok',
-    objective: 'start',
-  };
-  if (capped || samples.length === 0) return solution;
-  return spendFreedom(rows, b, columns, samples, solution, direct, (maxWork ?? SPARSE_MAX_WORK) - feasibilityIterations * 12 * nonzeros);
+  return { columns, capped, iterations: feasibilityIterations };
 }
 
 /**

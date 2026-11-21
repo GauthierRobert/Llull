@@ -17,6 +17,8 @@ const MAX_ENVELOPE = 4e7;
 /** A pivot that cancelled to this fraction of its own diagonal (1e-6 of the row norm, squared) is a dependent row; a row below 1e-8 of the largest norm (squared) is no condition. */
 const DEPENDENT = 1e-12;
 const NEGLIGIBLE = 1e-16;
+/** An envelope factor costing no more than this many multiply-adds (factorisation plus its solves) is kept without planning minimum degree. */
+const CHEAP_COST = 5e6;
 
 export interface Projector {
   /** Multiply-adds of the factorisation (known from the ordering alone). */
@@ -127,7 +129,7 @@ interface Plan {
 }
 
 /** A pivot that cancelled (to DEPENDENT of its own diagonal) or a row far below the largest diagonal is a dependent row. */
-const isDependent = (pivot: number, diagonal: number, diagonalMax: number): boolean =>
+export const isDependent = (pivot: number, diagonal: number, diagonalMax: number): boolean =>
   !(pivot > DEPENDENT * diagonal) || diagonal < NEGLIGIBLE * diagonalMax;
 
 /** For each unknown the (permuted row, coefficient) pairs of the rows that use it, in row order. */
@@ -278,14 +280,18 @@ export function factorRows(
   const merge = merged(rows);
   const graph = adjacency(merge, unknowns);
   const fits = (flops: number, perSolve: number): boolean => flops + 3 * (projections + pseudoInverses) * perSolve <= maxWork;
-  // the cheaper of the orderings that fit (the envelope on a tie): minimum degree beats the envelope by 100x on the cage rows
-  const plans = [
-    ...(ordering === 'minimum-degree' ? [] : [{ plan: envelopePlan(merge, unknowns, graph), limit: envelopeLimit }]),
-    ...(ordering === 'rcm' ? [] : [{ plan: minimumDegreePlan(merge, unknowns, graph), limit: fillLimit }]),
-  ]
-    .filter(({ plan, limit }) => plan.entries <= limit && fits(plan.flops, plan.perSolve))
-    .map(({ plan }) => plan);
+  // the cheaper of the orderings that fit (the envelope on a tie): minimum degree beats the envelope by 100x on the cage rows; it is not planned when the envelope is already cheap
   const cost = (plan: Plan): number => plan.flops + 3 * (projections + pseudoInverses) * plan.perSolve;
+  const usable = (plan: Plan, limit: number): boolean => plan.entries <= limit && fits(plan.flops, plan.perSolve);
+  const envelope = ordering === 'minimum-degree' ? null : envelopePlan(merge, unknowns, graph);
+  const envelopeUsable = envelope !== null && usable(envelope, envelopeLimit);
+  const skipMinimumDegree =
+    ordering === 'rcm' || (ordering === 'auto' && envelope !== null && envelopeUsable && cost(envelope) <= CHEAP_COST);
+  const sparse = skipMinimumDegree ? null : minimumDegreePlan(merge, unknowns, graph);
+  const plans = [
+    ...(envelope !== null && envelopeUsable ? [envelope] : []),
+    ...(sparse !== null && usable(sparse, fillLimit) ? [sparse] : []),
+  ];
   const best = plans.reduce<Plan | null>((chosen, plan) => (chosen === null || cost(plan) < cost(chosen) ? plan : chosen), null);
   if (best === null) return null;
   const normal = best.build();
