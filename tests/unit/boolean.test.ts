@@ -194,12 +194,14 @@ describe('boolean edge cases', () => {
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[idA]).toBeUndefined();
   });
-  it('rejects component instances with a pointer to explode_instance', () => {
-    setGeometryKernel(kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }));
+  it('accepts component instances on the kernel path (expanded at the kernel boundary) and refuses them for the mesh engine', () => {
+    setGeometryKernel(kernelReturning(TETRA));
     const component = execute(doc, 'create_component', { name: 'Part', entityIds: [idA], componentId: 'comp-part' });
     const instanceId = component.affected[0]!;
+    const mesh = execute(component.document, 'boolean', { op: 'union', a: instanceId, b: idB, engine: 'mesh' });
+    expect(mesh.document).toBe(component.document);
+    expect(mesh.summary).toContain('explode_instance');
     const result = execute(component.document, 'boolean', { op: 'union', a: instanceId, b: idB });
-    expect(result.document).toBe(component.document);
-    expect(result.summary).toContain('explode_instance');
+    expect(result.document.entities[instanceId]).toBeUndefined();
   });
 });
