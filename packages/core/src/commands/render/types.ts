@@ -27,6 +27,8 @@ export interface RenderViewData {
   simplifiedEntityIds: string[];
   /** Entities not drawn at all because the budget was smaller than the number of entities. */
   skippedEntityIds: string[];
+  /** Filled polygons before the budget; present only when the budget reduced the picture (`drawnShare` = polygonCount / polygonTotal). */
+  polygonTotal?: number;
   /** Entities clipped by `cut` (empty without a cut). */
   cutEntityIds: string[];
   /** What the `overlay` kinds drew (04 DIR FR-DIR-40): entity ids and the counts of segments and dots in the SVG; absent without `overlay`. */

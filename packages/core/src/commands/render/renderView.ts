@@ -30,6 +30,7 @@ import type { RenderViewData } from './types';
 import { cutKeep, overlayOptionsParams, resolveOverlayOptions } from './overlayOptions';
 import { clamp } from '../../lib/clamp';
 import { withExplodedPositions } from '../../geometry/explodedOffsets';
+import { routeOverBudget } from './renderViewRouting';
 
 /** `doc` without its 2D entities (read-only view for rendering; the input is untouched). */
 function withoutEntities2D(doc: CadDocument): CadDocument {
@@ -81,6 +82,247 @@ function drawCageNet(request: CageNetRequest): { svg: string; overlays: RenderVi
   return { svg: drawn.svg, overlays: drawn.stats, summary };
 }
 
+const renderViewParams = z.object({
+  view: z
+    .enum(['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'])
+    .optional()
+    .describe(
+      'Camera direction. One of: "iso" (isometric — default, good for orienting in 3D), ' +
+        '"top" (looking down the +Z axis), "bottom" (looking up the -Z axis), ' +
+        '"front" (looking along the +Y axis), "back" (looking along the -Y axis), ' +
+        '"left" (looking along the +X axis), "right" (looking along the -X axis). Omit for the default "iso" view.',
+    ),
+  width: z.number().optional().describe('Output image width in pixels. Clamped to [64, 2000]. Default: 800.'),
+  height: z.number().optional().describe('Output image height in pixels. Clamped to [64, 2000]. Default: 600.'),
+  turntable: z
+    .object({
+      frames: z.number().int().describe('Number of frames (1..12). Each frame is a separate rotated view stitched into one wide strip.'),
+    })
+    .optional()
+    .describe(
+      'Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. ' +
+        'frames: integer 1..12. When omitted, behavior is unchanged (single frame).',
+    ),
+  isolate: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe(
+      'Entity id (or array of ids) to highlight. All other entities are rendered ' +
+        'dimmed/desaturated; the specified id(s) are shown at full color.',
+    ),
+  section: z
+    .object({
+      axis: z.enum(['x', 'y', 'z']).describe('Axis normal to the cut plane: "x", "y", or "z".'),
+      offset: z.number().describe('World-space position of the cut plane along the axis.'),
+    })
+    .optional()
+    .describe(
+      'Render a section-plane view: entities on the negative side of the cut plane are dimmed; ' +
+        'a colored dashed line marks the cut. axis: "x"|"y"|"z"; offset: world-space position of the plane.',
+    ),
+  zoom: z
+    .number()
+    .optional()
+    .describe('Magnification of the framed scene, clamped to [0.1, 50]. 1 (default) fits the whole scene; 3 shows a third of it.'),
+  direction: vec3(
+    'Custom viewing direction: a non-zero [x, y, z] vector pointing from the scene center toward the camera (Z-up). ' +
+      'Overrides `view`; e.g. [1,-1,0.5] looks from +X/-Y above. Result `view` is "custom".',
+  ).optional(),
+  target: vec3(
+    'World point the camera looks at (default: center of the scene bounds). Combine with `zoom` to inspect a detail.',
+  ).optional(),
+  title: z.string().optional().describe('Text drawn top-left of the image (max 120 characters, longer is truncated).'),
+  background: z
+    .string()
+    .optional()
+    .describe('Background CSS color: "#rrggbb", "#rgb", a color name ("white") or rgb()/hsl(). Default "#1a1a2e" (dark navy).'),
+  mode: z
+    .enum(['raster', 'vector'])
+    .optional()
+    .describe(
+      '"raster" (default): solids are depth-buffered per pixel (always correct occlusion, crisp outlines) and embedded as a PNG in the SVG; ' +
+        '"vector": every face is an SVG polygon sorted back to front (editable, but faces can draw through each other in dense scenes).',
+    ),
+  maxPolygons: z
+    .number()
+    .optional()
+    .describe(
+      'Polygon budget of vector mode, clamped to [500, 100000], default 20000 (raster mode allows at least 400000). Entities over their fair share are decimated (see data.simplifiedEntityIds); raise it for finer detail at the cost of a larger SVG.',
+    ),
+  cut: z
+    .object({
+      planes: z
+        .array(
+          z.object({
+            normal: vec3('Plane normal [x, y, z] (any non-zero length). It points to the REMOVED side.'),
+            offset: z.number().describe('Plane position: points p with dot(unitNormal, p) = offset lie on the plane.'),
+          }),
+        )
+        .describe('1 to 6 cut planes. Each removes the half-space dot(unitNormal, p) > offset.'),
+      mode: z
+        .enum(['intersection', 'union'])
+        .optional()
+        .describe(
+          '"intersection" (default): remove only the region on the cut side of ALL planes (e.g. a quadrant or octant notch). "union": remove everything on the cut side of ANY plane.',
+        ),
+      entityIds: z.array(z.string()).optional().describe('Entity ids to cut. Omit to cut every solid; other entities stay whole.'),
+    })
+    .optional()
+    .describe(
+      'Cutaway: clips the selected 3D solids against the planes (triangles are split exactly) and draws the exposed section as a light, hatched, outlined cap so solids do not look hollow. Rendered together with isolate/section/turntable.',
+    ),
+  showDimensions: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, overlay the bounding-box dimensions (W × D × H) as text labels on the image. ' +
+        'Labels are placed near the bounding box edges in screen space.',
+    ),
+  showAxes: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true (default), overlay a world-frame X/Y/Z axis triad anchored at the world origin. ' +
+        'X=red, Y=green, Z=blue. A scale label (e.g. "1 mm = 42 px") is also shown. Set to false to suppress.',
+    ),
+  showGrid: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
+        'object placement relative to the world origin. Set to false to suppress.',
+    ),
+  overlay: z
+    .union([overlayKind, z.array(overlayKind).min(1)])
+    .optional()
+    .describe(
+      '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. Plugins add kinds (see the tools of their toolset; an installed plugin lists its kinds in its own command descriptions); an unregistered kind is refused as invalid params. One kind or an array of kinds. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective, viewpoint or turntable renders (the summary says so); instances are not expanded (only the entities of the document, in document order); data.overlays reports the entity ids and the counts of segments and dots.',
+    ),
+  hide2D: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, 2D sketch entities (lines, arcs, circles, polylines, rectangles, text, dimensions...) are neither drawn nor counted in the framing/bounds, ' +
+        'so leftover construction sketches used for extrusions do not shrink the 3D part in the frame. Default: false (2D shapes are drawn and framed).',
+    ),
+  showLabels: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, overlay per-entity id/name labels and key-point markers on the image. ' +
+        'Each entity shows its name (or id) at the centroid of its key points (endpoints, center, ' +
+        'corners, AABB corners for solids). Markers are color-coded by category: ' +
+        'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
+        'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
+    ),
+  ...overlayOptionsParams,
+  ...viewParams,
+  ...reviewParams,
+});
+
+type RenderViewParams = z.infer<typeof renderViewParams>;
+
+/** One render of the request; `budget` (a routed native render) replaces the polygon budget. */
+function renderOnce(doc: CadDocument, params: RenderViewParams, ctx: ExecutionContext | undefined, budget?: number): CommandResult {
+  const exploded = withExplodedPositions(doc);
+  const unstyled = params.hide2D === true ? withoutEntities2D(exploded) : exploded;
+  const resolved = resolveRenderOptions(unstyled, params);
+  if ('error' in resolved) return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
+  const { options } = resolved;
+  if (budget !== undefined) options.maxPolygons = budget;
+  const requestedKinds = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
+  const overlayOptions = resolveOverlayOptions(doc, params.overlayOptions, requestedKinds);
+  if (!('options' in overlayOptions)) return overlayOptions;
+  const view: ViewName = options.direction || params.viewpointId !== undefined ? 'custom' : (params.view ?? 'iso');
+  const width = clampPixels(params.width, 800);
+  const height = clampPixels(params.height, 600);
+  const samples =
+    params.turntable === undefined
+      ? renderSamples(width, height)
+      : renderSamples(width * clamp(params.turntable.frames, 1, 12), height, true);
+  if (samples > MAX_RENDER_SAMPLES)
+    return reviewRejection(doc, 'render_view', 'VIS_RENDER_BUDGET', `${samples} samples exceed ${MAX_RENDER_SAMPLES}`, [], ['width']);
+  const reviewed = resolveReviewStyle(doc, params);
+  if ('code' in reviewed) return reviewRejection(doc, 'render_view', reviewed.code, reviewed.message, [], reviewed.paths);
+  const { style } = reviewed;
+  const styled = applyReviewStyle(unstyled, style, ctx, options.background ?? undefined);
+  const scene = styled.scene;
+  const shading = surfaceShadingOf(scene, ctx);
+  if (shading !== undefined) options.shading = shading;
+  if (style.box !== null) options.cut = sectionBoxCut(style.box);
+  if (styled.hiddenIds.length > 0) options.frame = computeSceneSnapshot(unstyled).bounds;
+  const setup = prepareView(unstyled, params, options, width, height, ctx);
+  if ('code' in setup) return reviewRejection(doc, 'render_view', setup.code, setup.message, [], setup.paths);
+  const { perspective, finish } = setup;
+  const base = renderDocument(scene, view, width, height, options);
+  const notes = renderNotes(base, options.cut);
+  const reviewNotes = [styled.summary, ...style.notes, ...(style.box === null ? [] : [`Section box ${style.box.id} applied.`])].filter(
+    (n) => n !== '',
+  );
+  const withNotes = (text: string): string => [text, notes, ...reviewNotes].filter((n) => n !== '').join(' ');
+  const withReview = (data: RenderViewData): RenderViewData => ({ ...data, ...reviewData(styled, style, data, !params.turntable) });
+  const decorate = (svg: string): string => {
+    const captions = [
+      params.title === undefined
+        ? ''
+        : `  <text x="8" y="44" font-family="sans-serif" font-size="16" font-weight="bold" fill="#e8e8f4" stroke="#1a1a2e" stroke-width="3" paint-order="stroke">${escapeXml(params.title.slice(0, 120))}</text>`,
+      options.cut
+        ? `  <text x="${width - 8}" y="${height - 10}" text-anchor="end" font-family="monospace" font-size="11" fill="#ffb060">CUTAWAY (${options.cut.mode}, ${options.cut.planes.length} plane(s))</text>`
+        : '',
+    ].filter((c) => c !== '');
+    return captions.length === 0 ? svg : appendBeforeClose(svg, captions.join('\n'));
+  };
+  if (params.turntable) {
+    const frames = clamp(params.turntable.frames, 1, 12);
+    const strip = buildTurntableSvg(scene, frames, view, width, height, options);
+    const dropped = params.overlay === undefined ? '' : ' Overlay not drawn on a turntable strip.';
+    return finish(
+      doc,
+      withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.${dropped}`),
+      withReview({ ...base, width: strip.width, svg: decorate(strip.svg) }),
+    );
+  }
+  let svg = base.svg;
+  const plural = base.entityCount === 1 ? 'y' : 'ies';
+  let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
+  if (params.isolate !== undefined) {
+    const ids = typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
+    svg = buildIsolateSvg(scene, ids, view, width, height, options);
+    summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${width}×${height}.`;
+  } else if (params.section) {
+    const { axis, offset } = params.section;
+    svg = buildSectionSvg(scene, axis, offset, view, width, height, options);
+    summary = `Rendered section view: cut at ${axis}=${offset}, ${width}×${height}.`;
+  }
+  svg = composeOverlays(svg, base, scene, {
+    showDimensions: !perspective && params.showDimensions === true,
+    showAxes: !perspective && params.showAxes !== false,
+    showGrid: !perspective && params.showGrid !== false,
+    showLabels: !perspective && params.showLabels === true,
+  });
+  const kinds = requestedKinds;
+  let overlays: RenderViewData['overlays'];
+  if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
+  else if (kinds.length > 0) {
+    const drawn = drawCageNet({
+      svg,
+      doc,
+      base,
+      scene,
+      kinds,
+      isolate: params.isolate,
+      cut: options.cut,
+      dim: style.highlight !== null,
+      options: overlayOptions.options,
+      ctx,
+    });
+    svg = drawn.svg;
+    overlays = drawn.overlays;
+    summary += drawn.summary;
+  }
+  return finish(doc, withNotes(summary), withReview({ ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) }));
+}
+
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.svg is a self-contained <svg> string; document === input doc (referential equality)
@@ -109,240 +351,8 @@ export const renderView = defineCommand({
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
     'showLabels (entity id/name labels + key-point markers, default off), overlay ("cage": the cage edges and vertices of subdivision solids, "net": the control net of nurbs_surface sheets and the control polygon of nurbs_curve entities, drawn over the picture, not occluded; one kind or an array of both; with `isolate` only the isolated entities; orthographic views only). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
     'Plugin overlay kinds take their options in `overlayOptions` ({ <kind>: options }; per-kind options: see the plugin tool docs); what a kind drew is in data.overlays.<kind>.detail. ' +
+    'OVER BUDGET (the polygon budget decimated or skipped entities of a plain request): the picture is drawn by the open desktop viewport when the host has one (`--app`: all geometry, perspective, app lighting; data.routedTo "viewport"), else by the native GPU raster (data.routedTo "raster"), else the best effort stays with the warning RENDER_BUDGET_EXCEEDED and data.drawnShare (share of polygons drawn) in data.warnings. A routed picture is not a reference: data.deterministic false, no svgSha256; the summary says how it differs. ' +
     'Does NOT modify the document; `affected` is always [].',
-  params: z.object({
-    view: z
-      .enum(['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'])
-      .optional()
-      .describe(
-        'Camera direction. One of: "iso" (isometric — default, good for orienting in 3D), ' +
-          '"top" (looking down the +Z axis), "bottom" (looking up the -Z axis), ' +
-          '"front" (looking along the +Y axis), "back" (looking along the -Y axis), ' +
-          '"left" (looking along the +X axis), "right" (looking along the -X axis). Omit for the default "iso" view.',
-      ),
-    width: z.number().optional().describe('Output image width in pixels. Clamped to [64, 2000]. Default: 800.'),
-    height: z.number().optional().describe('Output image height in pixels. Clamped to [64, 2000]. Default: 600.'),
-    turntable: z
-      .object({
-        frames: z.number().int().describe('Number of frames (1..12). Each frame is a separate rotated view stitched into one wide strip.'),
-      })
-      .optional()
-      .describe(
-        'Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. ' +
-          'frames: integer 1..12. When omitted, behavior is unchanged (single frame).',
-      ),
-    isolate: z
-      .union([z.string(), z.array(z.string())])
-      .optional()
-      .describe(
-        'Entity id (or array of ids) to highlight. All other entities are rendered ' +
-          'dimmed/desaturated; the specified id(s) are shown at full color.',
-      ),
-    section: z
-      .object({
-        axis: z.enum(['x', 'y', 'z']).describe('Axis normal to the cut plane: "x", "y", or "z".'),
-        offset: z.number().describe('World-space position of the cut plane along the axis.'),
-      })
-      .optional()
-      .describe(
-        'Render a section-plane view: entities on the negative side of the cut plane are dimmed; ' +
-          'a colored dashed line marks the cut. axis: "x"|"y"|"z"; offset: world-space position of the plane.',
-      ),
-    zoom: z
-      .number()
-      .optional()
-      .describe('Magnification of the framed scene, clamped to [0.1, 50]. 1 (default) fits the whole scene; 3 shows a third of it.'),
-    direction: vec3(
-      'Custom viewing direction: a non-zero [x, y, z] vector pointing from the scene center toward the camera (Z-up). ' +
-        'Overrides `view`; e.g. [1,-1,0.5] looks from +X/-Y above. Result `view` is "custom".',
-    ).optional(),
-    target: vec3(
-      'World point the camera looks at (default: center of the scene bounds). Combine with `zoom` to inspect a detail.',
-    ).optional(),
-    title: z.string().optional().describe('Text drawn top-left of the image (max 120 characters, longer is truncated).'),
-    background: z
-      .string()
-      .optional()
-      .describe('Background CSS color: "#rrggbb", "#rgb", a color name ("white") or rgb()/hsl(). Default "#1a1a2e" (dark navy).'),
-    mode: z
-      .enum(['raster', 'vector'])
-      .optional()
-      .describe(
-        '"raster" (default): solids are depth-buffered per pixel (always correct occlusion, crisp outlines) and embedded as a PNG in the SVG; ' +
-          '"vector": every face is an SVG polygon sorted back to front (editable, but faces can draw through each other in dense scenes).',
-      ),
-    maxPolygons: z
-      .number()
-      .optional()
-      .describe(
-        'Polygon budget of vector mode, clamped to [500, 100000], default 20000 (raster mode allows at least 400000). Entities over their fair share are decimated (see data.simplifiedEntityIds); raise it for finer detail at the cost of a larger SVG.',
-      ),
-    cut: z
-      .object({
-        planes: z
-          .array(
-            z.object({
-              normal: vec3('Plane normal [x, y, z] (any non-zero length). It points to the REMOVED side.'),
-              offset: z.number().describe('Plane position: points p with dot(unitNormal, p) = offset lie on the plane.'),
-            }),
-          )
-          .describe('1 to 6 cut planes. Each removes the half-space dot(unitNormal, p) > offset.'),
-        mode: z
-          .enum(['intersection', 'union'])
-          .optional()
-          .describe(
-            '"intersection" (default): remove only the region on the cut side of ALL planes (e.g. a quadrant or octant notch). "union": remove everything on the cut side of ANY plane.',
-          ),
-        entityIds: z.array(z.string()).optional().describe('Entity ids to cut. Omit to cut every solid; other entities stay whole.'),
-      })
-      .optional()
-      .describe(
-        'Cutaway: clips the selected 3D solids against the planes (triangles are split exactly) and draws the exposed section as a light, hatched, outlined cap so solids do not look hollow. Rendered together with isolate/section/turntable.',
-      ),
-    showDimensions: z
-      .boolean()
-      .optional()
-      .describe(
-        'When true, overlay the bounding-box dimensions (W × D × H) as text labels on the image. ' +
-          'Labels are placed near the bounding box edges in screen space.',
-      ),
-    showAxes: z
-      .boolean()
-      .optional()
-      .describe(
-        'When true (default), overlay a world-frame X/Y/Z axis triad anchored at the world origin. ' +
-          'X=red, Y=green, Z=blue. A scale label (e.g. "1 mm = 42 px") is also shown. Set to false to suppress.',
-      ),
-    showGrid: z
-      .boolean()
-      .optional()
-      .describe(
-        'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
-          'object placement relative to the world origin. Set to false to suppress.',
-      ),
-    overlay: z
-      .union([overlayKind, z.array(overlayKind).min(1)])
-      .optional()
-      .describe(
-        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. Plugins add kinds (see the tools of their toolset; an installed plugin lists its kinds in its own command descriptions); an unregistered kind is refused as invalid params. One kind or an array of kinds. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective, viewpoint or turntable renders (the summary says so); instances are not expanded (only the entities of the document, in document order); data.overlays reports the entity ids and the counts of segments and dots.',
-      ),
-    hide2D: z
-      .boolean()
-      .optional()
-      .describe(
-        'When true, 2D sketch entities (lines, arcs, circles, polylines, rectangles, text, dimensions...) are neither drawn nor counted in the framing/bounds, ' +
-          'so leftover construction sketches used for extrusions do not shrink the 3D part in the frame. Default: false (2D shapes are drawn and framed).',
-      ),
-    showLabels: z
-      .boolean()
-      .optional()
-      .describe(
-        'When true, overlay per-entity id/name labels and key-point markers on the image. ' +
-          'Each entity shows its name (or id) at the centroid of its key points (endpoints, center, ' +
-          'corners, AABB corners for solids). Markers are color-coded by category: ' +
-          'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
-          'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
-      ),
-    ...overlayOptionsParams,
-    ...viewParams,
-    ...reviewParams,
-  }),
-  run: (doc, params, ctx): CommandResult => {
-    const exploded = withExplodedPositions(doc);
-    const unstyled = params.hide2D === true ? withoutEntities2D(exploded) : exploded;
-    const resolved = resolveRenderOptions(unstyled, params);
-    if ('error' in resolved) return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
-    const { options } = resolved;
-    const requestedKinds = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
-    const overlayOptions = resolveOverlayOptions(doc, params.overlayOptions, requestedKinds);
-    if (!('options' in overlayOptions)) return overlayOptions;
-    const view: ViewName = options.direction || params.viewpointId !== undefined ? 'custom' : (params.view ?? 'iso');
-    const width = clampPixels(params.width, 800);
-    const height = clampPixels(params.height, 600);
-    const samples =
-      params.turntable === undefined
-        ? renderSamples(width, height)
-        : renderSamples(width * clamp(params.turntable.frames, 1, 12), height, true);
-    if (samples > MAX_RENDER_SAMPLES)
-      return reviewRejection(doc, 'render_view', 'VIS_RENDER_BUDGET', `${samples} samples exceed ${MAX_RENDER_SAMPLES}`, [], ['width']);
-    const reviewed = resolveReviewStyle(doc, params);
-    if ('code' in reviewed) return reviewRejection(doc, 'render_view', reviewed.code, reviewed.message, [], reviewed.paths);
-    const { style } = reviewed;
-    const styled = applyReviewStyle(unstyled, style, ctx, options.background ?? undefined);
-    const scene = styled.scene;
-    const shading = surfaceShadingOf(scene, ctx);
-    if (shading !== undefined) options.shading = shading;
-    if (style.box !== null) options.cut = sectionBoxCut(style.box);
-    if (styled.hiddenIds.length > 0) options.frame = computeSceneSnapshot(unstyled).bounds;
-    const setup = prepareView(unstyled, params, options, width, height, ctx);
-    if ('code' in setup) return reviewRejection(doc, 'render_view', setup.code, setup.message, [], setup.paths);
-    const { perspective, finish } = setup;
-    const base = renderDocument(scene, view, width, height, options);
-    const notes = renderNotes(base, options.cut);
-    const reviewNotes = [styled.summary, ...style.notes, ...(style.box === null ? [] : [`Section box ${style.box.id} applied.`])].filter(
-      (n) => n !== '',
-    );
-    const withNotes = (text: string): string => [text, notes, ...reviewNotes].filter((n) => n !== '').join(' ');
-    const withReview = (data: RenderViewData): RenderViewData => ({ ...data, ...reviewData(styled, style, data, !params.turntable) });
-    const decorate = (svg: string): string => {
-      const captions = [
-        params.title === undefined
-          ? ''
-          : `  <text x="8" y="44" font-family="sans-serif" font-size="16" font-weight="bold" fill="#e8e8f4" stroke="#1a1a2e" stroke-width="3" paint-order="stroke">${escapeXml(params.title.slice(0, 120))}</text>`,
-        options.cut
-          ? `  <text x="${width - 8}" y="${height - 10}" text-anchor="end" font-family="monospace" font-size="11" fill="#ffb060">CUTAWAY (${options.cut.mode}, ${options.cut.planes.length} plane(s))</text>`
-          : '',
-      ].filter((c) => c !== '');
-      return captions.length === 0 ? svg : appendBeforeClose(svg, captions.join('\n'));
-    };
-    if (params.turntable) {
-      const frames = clamp(params.turntable.frames, 1, 12);
-      const strip = buildTurntableSvg(scene, frames, view, width, height, options);
-      const dropped = params.overlay === undefined ? '' : ' Overlay not drawn on a turntable strip.';
-      return finish(
-        doc,
-        withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.${dropped}`),
-        withReview({ ...base, width: strip.width, svg: decorate(strip.svg) }),
-      );
-    }
-    let svg = base.svg;
-    const plural = base.entityCount === 1 ? 'y' : 'ies';
-    let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
-    if (params.isolate !== undefined) {
-      const ids = typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      svg = buildIsolateSvg(scene, ids, view, width, height, options);
-      summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${width}×${height}.`;
-    } else if (params.section) {
-      const { axis, offset } = params.section;
-      svg = buildSectionSvg(scene, axis, offset, view, width, height, options);
-      summary = `Rendered section view: cut at ${axis}=${offset}, ${width}×${height}.`;
-    }
-    svg = composeOverlays(svg, base, scene, {
-      showDimensions: !perspective && params.showDimensions === true,
-      showAxes: !perspective && params.showAxes !== false,
-      showGrid: !perspective && params.showGrid !== false,
-      showLabels: !perspective && params.showLabels === true,
-    });
-    const kinds = requestedKinds;
-    let overlays: RenderViewData['overlays'];
-    if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
-    else if (kinds.length > 0) {
-      const drawn = drawCageNet({
-        svg,
-        doc,
-        base,
-        scene,
-        kinds,
-        isolate: params.isolate,
-        cut: options.cut,
-        dim: style.highlight !== null,
-        options: overlayOptions.options,
-        ctx,
-      });
-      svg = drawn.svg;
-      overlays = drawn.overlays;
-      summary += drawn.summary;
-    }
-    return finish(doc, withNotes(summary), withReview({ ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) }));
-  },
+  params: renderViewParams,
+  run: (doc, params, ctx): CommandResult => routeOverBudget(doc, params, ctx, renderOnce(doc, params, ctx), renderOnce),
 });

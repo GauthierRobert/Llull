@@ -17,6 +17,8 @@ export interface BudgetResult {
   polygons: PreDepthPolygon[];
   simplifiedEntityIds: string[];
   skippedEntityIds: string[];
+  /** Filled polygons the entities have before the budget (the denominator of `drawnShare`). */
+  totalPolygons: number;
 }
 
 /** Push without spreading (a mesh can exceed the argument limit). */
@@ -69,5 +71,5 @@ export function applyBudget(items: readonly EntityPolygons[], budget: number): B
       append(polygons, extras);
     }
   }
-  return { polygons, simplifiedEntityIds, skippedEntityIds };
+  return { polygons, simplifiedEntityIds, skippedEntityIds, totalPolygons: order.reduce((sum, { count }) => sum + count, 0) };
 }
