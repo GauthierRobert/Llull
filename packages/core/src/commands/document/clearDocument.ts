@@ -2,7 +2,7 @@
  * @affects nothing surfaced; affected:[]
  * @invariant exhaustive by construction: the result is `createEmptyDocument()` plus ONLY the keys in KEPT_KEYS (view and document settings), so a
  *   new document slice is cleared by default and never needs listing here
- * @invariant keeps units, camera, displayPrecision, kernelSettings (modeling tolerances) and nextStepNumber (step-scoped ids are never reused);
+ * @invariant keeps units, camera, displayPrecision, kernelSettings (modeling tolerances), siteContext and nextStepNumber (step-scoped ids are never reused);
  *   resets layers to the default unless keepLayers
  * @invariant clears plm too: the PLM release lock deliberately exempts clear_document ("PLM data is removed only by load / clear"); the
  *   audit record of a document is not a setting
@@ -20,6 +20,7 @@ const KEPT_KEYS = [
   'units',
   'displayPrecision',
   'kernelSettings',
+  'siteContext',
   'nextStepNumber',
 ] as const satisfies readonly (keyof CadDocument)[];
 const LAYER_KEYS = ['layers', 'layerOrder'] as const satisfies readonly (keyof CadDocument)[];
@@ -48,7 +49,7 @@ export const clearDocument = defineCommand({
     'Reset the working document to an empty state, removing all entities, groups, ' +
     'animations, parameters, configurations, materials, recipes, components, constraints, joints, drive relations and every domain slice ' +
     '(building, civil, analysis, aero, exchange, PLM record, ...). ' +
-    'Preserves units, camera, displayPrecision and kernelSettings (modeling tolerances) so view framing and tolerances survive. ' +
+    'Preserves units, camera, displayPrecision, kernelSettings (modeling tolerances) and siteContext so view framing, tolerances and the site survive. ' +
     'Set keepLayers=true to also preserve layers and the active layer scheme; ' +
     'by default layers are reset to a single default "Layer 0".',
   annotations: { destructive: true, layerManagement: true },

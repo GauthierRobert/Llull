@@ -11,7 +11,7 @@
 import type { RasterScene } from '../../model/raster';
 import { encodePng } from '../../lib/png';
 import { uint8ArrayToBase64 } from '../../lib/base64';
-import type { Camera } from './camera';
+import type { Camera, RenderLight } from './camera';
 import type { PixelStage, Polygon3D } from './types';
 import { prepareRasterScene } from './rasterScene';
 
@@ -226,7 +226,8 @@ export function rasterLayer(
   height: number,
   sceneRadius: number,
   pixels: PixelStage = rasterScenePixels,
+  light?: RenderLight,
 ): string {
-  const scene = prepareRasterScene(polygons, cam, orthoHalf, width, height, sceneRadius);
+  const scene = prepareRasterScene(polygons, cam, orthoHalf, width, height, sceneRadius, light);
   return scene === null ? '' : rasterImageSvg(width, height, pixels(scene));
 }

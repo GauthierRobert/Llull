@@ -19,6 +19,7 @@ import { prototypeProblems } from './prototypeValidation';
 import { reviewProblems } from './reviewValidation';
 import { displayProblems } from './displayValidation';
 import { instanceArrayProblems } from './instanceArrayValidation';
+import { siteContextProblem } from '../../model/siteContext';
 import { kernelSliceProblems } from './kernelValidation';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 import { materialLibraryProblems } from './materialRecordValidation';
@@ -292,6 +293,10 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   appendAll(errors, displayProblems(v['display']));
   appendAll(errors, instanceArrayProblems(v['instanceArrays'], v));
   appendAll(errors, kernelSliceProblems(v));
+  if (v['siteContext'] !== undefined) {
+    const problem = siteContextProblem(v['siteContext']);
+    if (problem !== null) errors.push(problem);
+  }
   for (const extension of documentExtensions()) appendAll(errors, extension.validate(v));
   validateSection(v['driveRelations'], validateDriveRelationValue);
   appendAll(errors, mechanismProblems(v));

@@ -4,6 +4,7 @@ import type { CadDocument, Vec3 } from '../../model/types';
 import { isValidCut } from './clip';
 import { MAX_POLYGONS } from './budget';
 import type { CutSpec, RenderOptions, RenderViewData } from './types';
+import { siteLightOf } from './siteLight';
 import { clamp } from '../../lib/clamp';
 
 const COLOR_PATTERN = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|(rgb|hsl)a?\([0-9.,%\s/-]+\))$/;
@@ -66,6 +67,8 @@ export function resolveRenderOptions(doc: CadDocument, params: RenderParams): { 
       ...(params.cut.entityIds ? { entityIds: params.cut.entityIds } : {}),
     };
   }
+  const site = siteLightOf(doc);
+  if (site !== null) options.light = site.light;
   return { options };
 }
 

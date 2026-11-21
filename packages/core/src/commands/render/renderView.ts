@@ -16,6 +16,7 @@ import { appendCageNetOverlays, overlayKinds } from './overlayCage';
 import { orderedEntities } from '../entity/entityOps';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
+import { siteLightOf } from './siteLight';
 import { surfaceShadingOf } from './surfaceShading';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
 import { is2D } from '../../model/types';
@@ -255,7 +256,7 @@ function renderOnce(doc: CadDocument, params: RenderViewParams, ctx: ExecutionCo
   if ('code' in setup) return reviewRejection(doc, 'render_view', setup.code, setup.message, [], setup.paths);
   const { perspective, finish } = setup;
   const base = renderDocument(scene, view, width, height, options);
-  const notes = renderNotes(base, options.cut);
+  const notes = [renderNotes(base, options.cut), siteLightOf(unstyled)?.note ?? ''].filter((n) => n !== '').join(' ');
   const reviewNotes = [styled.summary, ...style.notes, ...(style.box === null ? [] : [`Section box ${style.box.id} applied.`])].filter(
     (n) => n !== '',
   );

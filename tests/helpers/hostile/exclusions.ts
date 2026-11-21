@@ -11,6 +11,8 @@ export const EXCLUDED_COMMANDS: Readonly<Record<string, string>> = {
 };
 
 export const EXCLUDED_FUNCTIONS: Readonly<Record<string, string>> = {
+  'core/src/lib/solarPosition.ts:parseIsoWithOffset':
+    'one anchored regex over a short string (no backtracking, null on anything else); tested in tests/unit/siteContext.test.ts and on load in the siteContext refusals',
   'core/src/model/instanceArray.ts:parseInstanceMemberId':
     'splits one id string with a digits-only suffix (linear, no allocation, null on anything else); tested in tests/unit/instanceArray.test.ts',
   'core/src/commands/brep/faceBlendEdges.ts:readEdgeResult': 'reads the in-process CommandResult of a kernel call, not external input',

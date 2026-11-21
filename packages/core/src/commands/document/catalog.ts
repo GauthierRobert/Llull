@@ -16,6 +16,7 @@ import { checkMaterialModels } from './checkMaterialModels';
 import { kernelInfo } from './kernelInfo';
 import { setModelingTolerance } from './modelingTolerance';
 import { setMeshStorage } from './meshStorage';
+import { setSiteContext, clearSiteContext, sunPosition } from './siteContext';
 import { setSelection } from './setSelection';
 
 export const documentCommands = commandCatalog(
@@ -43,4 +44,7 @@ export const documentCommands = commandCatalog(
   setModelingTolerance,
   setMeshStorage,
   setSelection,
+  setSiteContext,
+  clearSiteContext,
+  sunPosition,
 );

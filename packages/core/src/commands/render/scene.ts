@@ -105,7 +105,20 @@ export function renderDocument(
   const underlays = drawables.filter((d): d is ImageEntity => d.kind === 'image');
   const rasterSettings = raster ? { radius, ...(options.pixels !== undefined ? { pixels: options.pixels } : {}) } : null;
   const caption = options.caption !== false;
-  const svg = buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount, background, rasterSettings, caption);
+  const svg = buildSvg(
+    polygons,
+    underlays,
+    cam,
+    orthoHalf,
+    width,
+    height,
+    view,
+    snapshot.entityCount,
+    background,
+    rasterSettings,
+    caption,
+    options.light,
+  );
   return {
     view,
     width,

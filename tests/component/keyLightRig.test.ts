@@ -25,6 +25,12 @@ describe('computeKeyLightRig', () => {
     expect(rig.position[1]).toBeLessThan(rig.target[1]);
     expect(rig.position[2]).toBeGreaterThan(rig.target[2]);
   });
+  it('aims along a given sun direction at the base light distance', () => {
+    const rig = computeKeyLightRig(null, [0, 0, 0], [1, 0, 0]);
+    expect(rig.position[0]).toBeCloseTo(Math.hypot(-4, -9, 14), 9);
+    expect(rig.position[1]).toBeCloseTo(0, 9);
+    expect(rig.position[2]).toBeCloseTo(0, 9);
+  });
   it('works in render space: the target is shifted by the floating origin', () => {
     const rig = computeKeyLightRig({ min: [9000, 0, 0], max: [11000, 0, 0] }, [10000, 0, 0]);
     expect(rig.target[0]).toBeCloseTo(0);
