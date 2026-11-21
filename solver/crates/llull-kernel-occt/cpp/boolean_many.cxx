@@ -1,8 +1,9 @@
 // Multi-tool boolean (ASC TR-ASC-03, TECHNICAL_SPEC 5.1): ONE General Fuse / Cut of `a` with every tool, no pre-union.
-// Options: parallel, oriented bounding boxes, the inverted-solid check off once every input passed one validity check, non-destructive
+// Options: parallel, oriented bounding boxes, the inverted-solid check ON (OCCT's default: BRepCheck_Analyzer does not detect an inside-out solid, so it cannot gate it off), non-destructive
 // (the cached input shapes stay valid); the history stays on because persistent face names are carried through it (naming.hxx).
 // A result that is null, errored or invalid answers null with `ToolList::note` set: the host then runs the balanced-tree recipe.
 // A deadline / cancel (progress.hxx) raises KRN_TIMEOUT instead.
+#include <atomic>
 #include <stdexcept>
 
 #include <BRepAlgoAPI_Cut.hxx>
@@ -25,18 +26,16 @@ rust::String tool_list_note(const ToolList &list) { return rust::String(list.not
 
 namespace {
 
-bool many_fault = false;
+std::atomic<bool> many_fault{false};
 
 template <class Builder>
 std::unique_ptr<Shape> run_many(const Shape &a, const ToolList &tools, bool unify) {
   TopTools_ListOfShape arguments, toolShapes;
   arguments.Append(a.shape);
-  bool inputsValid = BRepCheck_Analyzer(a.shape).IsValid();
   bool refined = a.refined_mass;
   std::vector<naming::Named> inputs{naming::named(a)};
   for (const Shape *tool : tools.items) {
     toolShapes.Append(tool->shape);
-    inputsValid = inputsValid && BRepCheck_Analyzer(tool->shape).IsValid();
     refined = refined || tool->refined_mass;
     inputs.push_back(naming::named(*tool));
   }
@@ -45,7 +44,7 @@ std::unique_ptr<Shape> run_many(const Shape &a, const ToolList &tools, bool unif
   builder.SetTools(toolShapes);
   builder.SetRunParallel(Standard_True);
   builder.SetUseOBB(Standard_True);
-  builder.SetCheckInverted(inputsValid ? Standard_False : Standard_True);
+  builder.SetCheckInverted(Standard_True);
   builder.SetNonDestructive(Standard_True);
   builder.SetToFillHistory(Standard_True);
   Handle(OpProgress) progress = new OpProgress;
@@ -56,7 +55,7 @@ std::unique_ptr<Shape> run_many(const Shape &a, const ToolList &tools, bool unif
     return nullptr;
   }
   const TopoDS_Shape result = builder.Shape();
-  if (many_fault || result.IsNull() || !BRepCheck_Analyzer(result).IsValid()) {
+  if (many_fault.load() || result.IsNull() || !BRepCheck_Analyzer(result).IsValid()) {
     tools.note = "the General Fuse result is not valid";
     return nullptr;
   }
@@ -80,7 +79,7 @@ std::unique_ptr<Shape> run_many(const Shape &a, const ToolList &tools, bool unif
 
 }  // namespace
 
-void set_many_fault(bool on) { many_fault = on; }
+void set_many_fault(bool on) { many_fault.store(on); }
 
 std::unique_ptr<Shape> boolean_many(const Shape &a, const ToolList &tools, int32_t operation, bool unify) {
   tools.note.clear();

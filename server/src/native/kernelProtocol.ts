@@ -44,8 +44,10 @@ export function encodeRequest(id: number, op: string, args: readonly unknown[], 
   return `${JSON.stringify({ id, op, args, ...(deadlineMs === undefined ? {} : { deadlineMs }) })}\n`;
 }
 
-/** The cancel message of the host channel: the running op stops at its next progress poll with `KRN_TIMEOUT`. */
-export const CANCEL_LINE = '{"cancel":true}\n';
+/** The cancel message of the host channel for request `id`: that request, if it is the running one, stops at its next progress poll with `KRN_TIMEOUT`; any other id is ignored. */
+export function cancelLine(id: number): string {
+  return `${JSON.stringify({ cancel: id })}\n`;
+}
 
 /** A reply line, or null for anything else on stdout (a stray library print must not break the session). */
 export function parseReplyLine(line: string): NativeReply | null {

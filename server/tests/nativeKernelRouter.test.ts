@@ -29,7 +29,7 @@ function harness(answer: Answer, native: NativeInfo = NATIVE, deadlineMs?: numbe
       return Promise.resolve(answer(op, args));
     },
     alive: () => true,
-    cancel: () => void nativeCalls.push({ op: '__cancel', args: [] }),
+    cancel: () => undefined,
     close: () => undefined,
   };
   return {
@@ -48,14 +48,15 @@ describe('native kernel router', () => {
     expect(h.nativeCalls.map((call) => call.op)).toEqual(['evaluate', 'massProperties']);
   });
 
-  it('gives every native request the call deadline and forwards a cancel to the sidecar', async () => {
-    const { router, nativeCalls } = harness(() => ({ result: 'native' }), NATIVE, 4000);
+  it('gives every native request the remaining part of one call deadline, blob loads included', async () => {
+    const { router, nativeCalls } = harness(() => ({ result: null }), { ...NATIVE, ops: [...NATIVE.ops, 'loadBlob'] }, 4000);
+    await router.route({ op: 'loadBlob', args: ['a'.repeat(64), 'BREP'] });
     await router.route({ op: 'evaluate', args: [cube] });
-    router.cancel();
-    expect(nativeCalls.map((call) => [call.op, call.deadlineMs])).toEqual([
-      ['evaluate', 4000],
-      ['__cancel', undefined],
-    ]);
+    expect(nativeCalls.map((call) => call.op)).toEqual(['loadBlob', 'evaluate']);
+    for (const call of nativeCalls) {
+      expect(call.deadlineMs).toBeGreaterThan(0);
+      expect(call.deadlineMs).toBeLessThanOrEqual(4000);
+    }
   });
 
   it('decodes native meshes into plain arrays', async () => {

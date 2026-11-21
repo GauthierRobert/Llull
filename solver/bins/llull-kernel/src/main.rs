@@ -14,10 +14,12 @@ use std::io::{BufRead, Write};
 use std::process::ExitCode;
 use std::sync::mpsc;
 
-/// The cancel message of the host channel: a JSON object with `cancel: true` and no `op`.
-fn is_cancel(line: &str) -> bool {
-    line.starts_with("{\"cancel\"")
-        && serde_json::from_str::<serde_json::Value>(line).is_ok_and(|value| value.get("cancel") == Some(&serde_json::Value::Bool(true)))
+/// The cancel message of the host channel: `{"cancel": <request id>}` with no `op`; the id of the request to stop.
+fn cancel_id(line: &str) -> Option<i64> {
+    if !line.starts_with("{\"cancel\"") {
+        return None;
+    }
+    serde_json::from_str::<serde_json::Value>(line).ok()?.get("cancel")?.as_i64().filter(|id| *id > 0)
 }
 
 fn main() -> ExitCode {
@@ -33,9 +35,11 @@ fn main() -> ExitCode {
     std::thread::spawn(move || {
         for line in std::io::stdin().lock().lines() {
             let Ok(line) = line else { break };
-            // `{"cancel": true}` is not a request: it stops the running operation at its next progress poll (KRN_TIMEOUT), at once
-            if is_cancel(&line) {
-                llull_kernel_occt::request_cancel();
+            // `{"cancel": <id>}` is not a request: it stops the running operation of request <id> at its next progress poll (KRN_TIMEOUT), at once
+            if line.starts_with("{\"cancel\"") {
+                if let Some(id) = cancel_id(&line) {
+                    llull_kernel_occt::request_cancel(id);
+                }
                 continue;
             }
             if sender.send(line).is_err() {
@@ -63,13 +67,15 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::is_cancel;
+    use super::cancel_id;
 
     #[test]
-    fn only_a_cancel_object_is_a_cancel_message() {
-        assert!(is_cancel(r#"{"cancel":true}"#));
-        assert!(!is_cancel(r#"{"cancel":false}"#));
-        assert!(!is_cancel(r#"{"id":1,"op":"info","args":[]}"#));
-        assert!(!is_cancel("not json"));
+    fn only_a_cancel_object_with_a_positive_id_is_a_cancel_message() {
+        assert_eq!(cancel_id(r#"{"cancel":7}"#), Some(7));
+        assert_eq!(cancel_id(r#"{"cancel":true}"#), None);
+        assert_eq!(cancel_id(r#"{"cancel":0}"#), None);
+        assert_eq!(cancel_id(r#"{"cancel":-3}"#), None);
+        assert_eq!(cancel_id(r#"{"id":1,"op":"info","args":[]}"#), None);
+        assert_eq!(cancel_id("not json"), None);
     }
 }

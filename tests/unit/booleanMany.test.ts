@@ -133,5 +133,16 @@ describe('boolean with a list of tools (multi-tool kernel op)', () => {
     expect(validateShapeRecipe(node(1.5), () => null)).toContain('many must be an integer');
     expect(validateShapeRecipe(node(1), () => null)).toContain('many must be an integer');
     expect(validateShapeRecipe(node(2), () => null)).toBeNull();
+    expect(validateShapeRecipe(node(1000), () => null)).toBeNull();
+  });
+
+  it('refuses a hostile many count by name, never as an allocation size', () => {
+    const leaf = { op: 'solid', entity: { kind: 'box', id: 'b', size: [1, 1, 1], position: [0, 0, 0], rotation: [0, 0, 0] } };
+    for (const many of [1e15, 2 ** 53, 1001, Infinity, -0, Number.MAX_SAFE_INTEGER]) {
+      for (const boolean of ['union', 'subtract', 'intersect']) {
+        const error = validateShapeRecipe({ op: 'boolean', boolean, a: leaf, b: leaf, many }, () => null);
+        expect(error, `${boolean} many=${String(many)}`).toMatch(/many must be/);
+      }
+    }
   });
 });

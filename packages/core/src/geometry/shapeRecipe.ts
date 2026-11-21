@@ -390,6 +390,9 @@ function faceBlendError(node: Record<string, unknown>, child: ChildCheck): strin
   );
 }
 
+/** At most this many tool solids in one boolean (`many` and the tool list of `boolean`; also bounds what a loaded recipe may ask a kernel). */
+export const MAX_BOOLEAN_TOOLS = 1000;
+
 function brepError(node: Record<string, unknown>): string | null {
   if (typeof node['blob'] !== 'string' || !/^[0-9a-f]{64}$/.test(node['blob'])) return 'brep: blob must be a lowercase sha256 hex string';
   if (node['format'] !== 'occt-brep-v1') return `brep: unsupported format '${String(node['format'])}'`;
@@ -405,6 +408,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       if (!['union', 'subtract', 'intersect'].includes(String(node['boolean']))) return `unknown boolean '${String(node['boolean'])}'`;
       if (node['many'] !== undefined && !(Number.isInteger(node['many']) && (node['many'] as number) >= 2))
         return 'boolean: many must be an integer >= 2';
+      if (typeof node['many'] === 'number' && node['many'] > MAX_BOOLEAN_TOOLS)
+        return `boolean: many must be <= ${MAX_BOOLEAN_TOOLS} (refused: a recipe cannot size a kernel allocation)`;
       return child(node['a']) ?? child(node['b']);
     case 'fillet':
     case 'chamfer':

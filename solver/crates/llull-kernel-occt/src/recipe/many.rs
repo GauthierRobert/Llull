@@ -8,6 +8,9 @@ use crate::{BooleanOp, ManyOutcome};
 use serde_json::{json, Value};
 use std::rc::Rc;
 
+/// Most tools one node may name (the TS `MAX_BOOLEAN_TOOLS`); a larger `many` is untrusted input and evaluates as the plain tree.
+const MAX_MANY: usize = 1000;
+
 /// The `n` leaves of a balanced union built by splitting at `ceil(n / 2)`; None when `tree` is not that shape.
 fn tools_of(tree: &Value, count: usize, out: &mut Vec<Value>) -> Option<()> {
     if count == 1 {
@@ -22,14 +25,34 @@ fn tools_of(tree: &Value, count: usize, out: &mut Vec<Value>) -> Option<()> {
     tools_of(tree.get("b")?, count - head, out)
 }
 
+/// Ops whose parameters are topology indices (`edges`, `faces`, ...) of their source: they read the source's edge / face ORDER, which the
+/// General Fuse and the balanced tree do not share (same faces, another edge order), so such a node never evaluates a `many` below it.
+pub(super) const INDEXED_OPS: [&str; 6] = ["fillet", "chamfer", "blend", "faceOp", "faceBlend", "fullRound"];
+
+/// `recipe` with every `many` of the boolean nodes along its `a` / `b` / `source` paths removed (the plain balanced trees); None when it has none.
+pub(super) fn without_many(recipe: &Value) -> Option<Value> {
+    let mut changed = false;
+    let mut copy = recipe.clone();
+    if let Some(fields) = copy.as_object_mut() {
+        changed |= fields.remove("many").is_some();
+        for field in ["a", "b", "source"] {
+            if let Some(stripped) = fields.get(field).and_then(without_many) {
+                fields.insert(field.to_string(), stripped);
+                changed = true;
+            }
+        }
+    }
+    changed.then_some(copy)
+}
+
 impl Evaluator {
     /// The node as one multi-tool operation, or None when it is not one (no / bad `many`, intersect, a `b` that is not the balanced tree).
     pub(super) fn boolean_many(&mut self, recipe: &Value, operation: BooleanOp, threaded: bool) -> Option<Evaluated> {
-        let count = usize::try_from(recipe.get("many")?.as_u64()?).ok().filter(|count| *count >= 2)?;
+        let count = usize::try_from(recipe.get("many")?.as_u64()?).ok().filter(|count| (2..=MAX_MANY).contains(count))?;
         if operation == BooleanOp::Intersect {
             return None;
         }
-        let mut tools = Vec::with_capacity(count);
+        let mut tools = Vec::new();
         tools_of(recipe.get("b")?, count, &mut tools)?;
         Some(self.fuse_or_cut(recipe, operation, &tools, threaded))
     }

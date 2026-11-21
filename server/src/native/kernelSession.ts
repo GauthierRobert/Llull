@@ -7,7 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { CANCEL_LINE, encodeRequest, NATIVE_DIED, parseReplyLine, parseUnmatchedError, type NativeReply } from './kernelProtocol';
+import { cancelLine, encodeRequest, NATIVE_DIED, parseReplyLine, parseUnmatchedError, type NativeReply } from './kernelProtocol';
 import { nativeRuntimeEnv } from './nativeBinary';
 
 /** The process as the session sees it (a fake in unit tests). */
@@ -21,7 +21,7 @@ export interface KernelChild {
 export interface NativeKernelSession {
   /** `deadlineMs`: the sidecar answers `KRN_TIMEOUT` after it (ASC TR-ASC-04); absent = no deadline. */
   request(op: string, args: readonly unknown[], deadlineMs?: number): Promise<Omit<NativeReply, 'id'>>;
-  /** Stops the op the sidecar is running (it answers `KRN_TIMEOUT`); idle, it does nothing. */
+  /** Cancels every request still pending, by id (the one the sidecar is running answers `KRN_TIMEOUT`; a finished or queued one is untouched). */
   cancel(): void;
   alive(): boolean;
   close(): void;
@@ -75,7 +75,7 @@ export function createKernelSession(child: KernelChild): NativeKernelSession {
     cancel: () => {
       if (exitReason !== null) return;
       try {
-        child.write(CANCEL_LINE);
+        for (const id of pending.keys()) child.write(cancelLine(id));
       } catch {
         // a dead sidecar settles through its exit event
       }

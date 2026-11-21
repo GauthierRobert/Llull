@@ -114,7 +114,7 @@ fn info() -> Value {
         // output.preserveAnalytic: faces that stayed a plane / cylinder / cone / sphere are rebuilt analytic (the report has `analyticFaces`)
         "deform-analytic",
         "emboss",
-        // a `boolean` node with `many`: one General Fuse / Cut of the tools (`booleanReport` says how it ran); request `deadlineMs` + `{"cancel":true}` stop a
+        // a `boolean` node with `many`: one General Fuse / Cut of the tools (`booleanReport` says how it ran); request `deadlineMs` + `{"cancel": <id>}` stop a
         // boolean at its next progress poll with KRN_TIMEOUT
         "booleanMany",
         // tessellate takes a second argument { linearDeflection, angularDeflection }: a sidecar without it would answer the display mesh
@@ -156,6 +156,7 @@ impl Session {
         let op = request.get("op").and_then(Value::as_str).unwrap_or("").to_string();
         let args = request.get("args").and_then(Value::as_array).cloned().unwrap_or_default();
         let deadline = request.get("deadlineMs").and_then(Value::as_f64).filter(|ms| ms.is_finite() && *ms > 0.0).unwrap_or(0.0);
+        llull_kernel_occt::set_request_id(request.get("id").and_then(Value::as_i64).unwrap_or(0));
         llull_kernel_occt::set_deadline_ms(deadline);
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.dispatch(&op, &args)));
         llull_kernel_occt::clear_deadline();

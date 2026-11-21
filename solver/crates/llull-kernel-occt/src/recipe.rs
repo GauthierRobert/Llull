@@ -389,6 +389,11 @@ impl Evaluator {
 
     fn build(&mut self, recipe: &Value) -> Evaluated {
         let op = recipe.get("op").and_then(Value::as_str).unwrap_or("");
+        if many::INDEXED_OPS.contains(&op) {
+            if let Some(plain) = many::without_many(recipe) {
+                return self.evaluate(&plain);
+            }
+        }
         match op {
             "solid" => match recipe.get("entity") {
                 Some(entity) => named_solid(entity),

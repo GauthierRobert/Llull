@@ -10,7 +10,7 @@ import { workerData, type MessagePort } from 'node:worker_threads';
 import { debugWarn } from './debugLog';
 import { errorMessage } from '@lib/errorMessage';
 import { isTestHook, runTestHook } from './kernelTestHooks';
-import { CANCEL_OPERATION, STATUS_READY, STATUS_REPLY, type KernelReply, type KernelRequest } from './kernelWorkerProtocol';
+import { STATUS_READY, STATUS_REPLY, type KernelReply, type KernelRequest } from './kernelWorkerProtocol';
 import { parseNativeInfo } from './native/kernelProtocol';
 import { createKernelRouter } from './native/kernelRouter';
 import { createKernelSession, spawnKernelChild, type NativeKernelSession } from './native/kernelSession';
@@ -52,10 +52,6 @@ async function main(): Promise<void> {
 
   init.port.on('message', (request: KernelRequest) => {
     const { op } = request;
-    if (op === CANCEL_OPERATION) {
-      router.cancel();
-      return;
-    }
     const answer = isTestHook(op)
       ? new Promise<KernelReply>((resolve) => resolve({ result: runTestHook(op, init.testHooks) }))
       : router.route(request);

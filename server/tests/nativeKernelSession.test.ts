@@ -96,7 +96,8 @@ describe('native kernel session', () => {
     expect(child.written.map((line) => JSON.parse(line) as object)).toEqual([
       { id: 1, op: 'evaluate', args: [], deadlineMs: 1500 },
       { id: 2, op: 'info', args: [] },
-      { cancel: true },
+      { cancel: 1 },
+      { cancel: 2 },
     ]);
     child.emitLine('{"id":1,"result":null,"error":"KRN_TIMEOUT: stage=Fuse fraction=0.5"}');
     expect(await pending).toEqual({ result: null, error: 'KRN_TIMEOUT: stage=Fuse fraction=0.5' });

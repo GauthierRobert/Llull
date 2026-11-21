@@ -15,7 +15,7 @@ import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { meshLeafTriangles } from '../../geometry/operandRecipe';
 import { instanceSolids, recipeOfPart } from '../../geometry/assemblyParts';
-import { recipeOf } from '../../geometry/shapeRecipe';
+import { MAX_BOOLEAN_TOOLS, recipeOf } from '../../geometry/shapeRecipe';
 import { KERNEL_MESH_LEAF_CAP } from '../kernelMeshGuard';
 import { noop } from '../noop';
 import { isTriangleOnly, meshBoolean } from './meshBoolean';
@@ -34,9 +34,6 @@ function enclosesNoVolume(positions: readonly number[], indices: readonly number
   const boxVolume = sx * sy * sz;
   return Math.abs(signedMeshVolume(positions, indices)) <= VANISHED_VOLUME_RATIO * boxVolume;
 }
-
-/** At most this many tool solids in one boolean (a plan step lists them; a kernel without the multi-tool op unions them as a balanced tree). */
-const MAX_TOOLS = 1000;
 
 /**
  * Union of `recipes` as a balanced tree: depth log2(n), so hundreds of patterned tools neither nest the recipe hundreds deep (a sequential
@@ -220,7 +217,7 @@ export const booleanOperation = defineCommand({
     op: z.enum(['union', 'subtract', 'intersect']).describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),
     a: z.string().describe('Id of the first 3D solid operand (the base solid for subtract).'),
     b: z
-      .union([z.string(), z.array(z.string()).min(1).max(MAX_TOOLS)])
+      .union([z.string(), z.array(z.string()).min(1).max(MAX_BOOLEAN_TOOLS)])
       .describe(
         'Id of the second 3D solid operand (the tool solid for subtract), or a list of tool ids for union / subtract: the tools are ' +
           'unioned (the exact kernel applies them in ONE general fuse / cut, others as a balanced tree) and applied in ONE boolean — use a list for patterned cuts (coolant channels, bolt holes) instead ' +

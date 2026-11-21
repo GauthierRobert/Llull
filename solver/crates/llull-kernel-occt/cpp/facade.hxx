@@ -130,7 +130,8 @@ rust::String tool_list_note(const ToolList &list);
 // Deadline (milliseconds from now; 0 = none) and cancel of the running request (progress.cxx).
 void set_deadline_ms(double milliseconds);
 void clear_deadline();
-void request_cancel();
+void request_cancel(int64_t id);
+void set_request_id(int64_t id);
 // The same shape with every face name prefixed "<prefix>:" (a leaf entity id).
 std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix);
 

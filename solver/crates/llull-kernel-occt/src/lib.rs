@@ -162,7 +162,8 @@ mod ffi {
         fn tool_list_note(list: &ToolList) -> String;
         fn set_deadline_ms(milliseconds: f64);
         fn clear_deadline();
-        fn request_cancel();
+        fn request_cancel(id: i64);
+        fn set_request_id(id: i64);
         fn prefixed(shape: &Shape, prefix: &str) -> Result<UniquePtr<Shape>>;
 
         fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<MeshOut>;
@@ -335,19 +336,24 @@ pub fn boolean_many(op: BooleanOp, a: &Shape, tools: &[&Shape], unify: bool) -> 
     }
 }
 
-/// The running request stops with `KRN_TIMEOUT` once `milliseconds` have passed (0: no deadline); also clears an earlier cancel.
+/// The running request stops with `KRN_TIMEOUT` once `milliseconds` have passed (0: no deadline).
 pub fn set_deadline_ms(milliseconds: f64) {
     ffi::set_deadline_ms(milliseconds);
 }
 
-/// Ends the deadline / cancel state of a finished request.
+/// Ends the deadline / request id / pending cancel of a finished request.
 pub fn clear_deadline() {
     ffi::clear_deadline();
 }
 
-/// Asks the running operation to stop at its next progress poll (callable from any thread).
-pub fn request_cancel() {
-    ffi::request_cancel();
+/// Names the request the calling thread runs (a positive wire id; anything else: none), so `request_cancel(id)` can stop it.
+pub fn set_request_id(id: i64) {
+    ffi::set_request_id(id);
+}
+
+/// Asks the operation of request `id` to stop at its next progress poll (callable from any thread); another id, or none running: nothing.
+pub fn request_cancel(id: i64) {
+    ffi::request_cancel(id);
 }
 
 /// The same shape with every persistent face name prefixed `<prefix>:` (SC-N1: a leaf names its faces after its entity id).

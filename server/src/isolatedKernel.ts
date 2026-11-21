@@ -22,15 +22,7 @@ import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import { unsupportedOp } from '@core/geometry/operandRecipe';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
-import {
-  CANCEL_OPERATION,
-  STATUS_DIED,
-  STATUS_READY,
-  STATUS_REPLY,
-  type KernelOperation,
-  type KernelReply,
-  type TestHook,
-} from './kernelWorkerProtocol';
+import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './kernelWorkerProtocol';
 
 export interface IsolatedKernelOptions {
   readonly entry: string; // worker entry (nativeKernelWorker.ts/.js)
@@ -45,8 +37,6 @@ export interface IsolatedKernelOptions {
 export interface IsolatedKernel extends GeometryKernel {
   crashCount(): number; // worker died or was killed mid-call
   forceFailure(hook: TestHook): void;
-  /** Stops the native op that is running (from another thread: a synchronous call blocks this one); it answers KRN_TIMEOUT. */
-  cancel(): void;
   /** Spawn the worker now (idempotent); false + warning when it cannot start. */
   start(): boolean;
   dispose(): void;
@@ -362,7 +352,6 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     info,
     crashCount: () => crashes,
     forceFailure: (hook) => void call(hook, []),
-    cancel: () => live?.port.postMessage({ op: CANCEL_OPERATION, args: [] }),
     start: () => {
       try {
         ensureLive();

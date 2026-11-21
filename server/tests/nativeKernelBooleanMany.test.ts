@@ -70,7 +70,8 @@ describeMany('native multi-tool boolean (ASC M1a)', () => {
     expect(many.volume).toBeCloseTo(80 * 80 * 2 - 400 * Math.PI * 2, 4);
     const tree = measure(kernel, drilledPlate(20, 20, false));
     console.warn(`[asc m1a] 400 cylinder tools: one general cut ${Math.round(many.ms)} ms, balanced tree ${Math.round(tree.ms)} ms`);
-    expect(many.ms).toBeLessThan(10_000);
+    // relative to the tree on the same machine and load (absolute budgets live in npm run perf)
+    expect(many.ms).toBeLessThan(3 * tree.ms + 2000);
   }, 180_000);
 });
 
