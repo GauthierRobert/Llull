@@ -36,7 +36,7 @@ const catalog = {
       standard: 'company test table',
       ends: ['THD'],
       unit: 'mm',
-      sizes: [row({ nps: 1, class: 3000, length: 70, bodyOd: 60, threadLength: 15 })],
+      sizes: [row({ nps: 1, class: 3000, length: 70, bodyOd: 60, threadLength: 15, threadEngagement: 12 })],
     },
     {
       id: 'cpl-nolength',
@@ -245,5 +245,32 @@ describe('coupling and union are drawn (CAT-FU2)', () => {
     const part = parts[0] as (typeof parts)[number];
     expect(partEntities({ ...part, typeKey: 'union' }, line)[0]?.name).toMatch(/^Union /);
     expect(partEntities({ ...part, typeKey: 'instrument' }, line)).toEqual([]);
+  });
+
+  it('a union routed on a threaded rule is drawn (70 mm, bodyOd 60), counted in the takeoff and an IFC connector', () => {
+    const base = scene();
+    const doc = apply(base.doc, 'edit_pipe_spec', {
+      specId: 'SW800',
+      ops: [{ op: 'setHeader', fields: { connections: [{ end: 'SC', pipeEnd: 'PL', joint: 'threaded' }] } }],
+    });
+    const result = execute(doc, 'route_pipe', {
+      lineId: base.line,
+      from: { portId: base.tie },
+      legs,
+      inline: [{ type: 'union', at: { leg: 0, centreDistance: 500 } }],
+    });
+    expect(result.rejected, result.summary).toBeUndefined();
+    const runId = (result.data as Placed).runId;
+    const part = derivedOf(result.document, runId).parts.find((candidate) => candidate.kind === 'inline');
+    expect(part?.typeKey).toBe('union');
+    const drawn = Object.values(result.document.entities).filter((entity) => entity.id === part?.id) as unknown as Array<{
+      profile: number[][];
+    }>;
+    expect(drawn).toHaveLength(1);
+    expect(drawn[0]?.profile.map((point) => point[0])).toEqual([0, 30, 30, 0]);
+    expect(drawn[0]?.profile[2]?.[1]).toBeCloseTo(70, 6);
+    expect((ok(result.document, 'piping_takeoff', {}).data as { counts: Record<string, number> }).counts).toMatchObject({ union: 1 });
+    const ifc = (ok(result.document, 'export_ifc', {}).data as { ifc: string }).ifc;
+    expect(ifc.match(/=IFCPIPEFITTING\(.*\.CONNECTOR\.\);/g)?.length).toBe(1);
   });
 });

@@ -7,8 +7,10 @@
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { sub3 } from '@lib/vec3';
+import type { PipeRun } from '@aec/plant/types';
+import { deriveRun } from '../routeParts';
 import { addBranch } from '../commands/addBranch';
-import { getPiping, runPoints } from '../model';
+import { getPiping } from '../model';
 import type { LineOutcome } from './lines';
 
 export type BranchAt = { point: [number, number, number] } | { leg: number; distance: number } | { nearTo: [number, number, number] };
@@ -18,6 +20,7 @@ export interface BranchRequest {
   readonly headerLineId: string;
   readonly at: BranchAt;
   readonly dn?: number | undefined;
+  readonly angleToleranceDeg?: number | undefined;
   readonly to?: Parameters<typeof addBranch.run>[1]['to'];
   readonly legs?: Parameters<typeof addBranch.run>[1]['legs'];
   readonly via?: Parameters<typeof addBranch.run>[1]['via'];
@@ -35,23 +38,38 @@ export interface BranchOutcome {
   readonly message?: string;
 }
 
-/** The leg and distance of the point of the header centreline nearest to `target`, clamped inside its leg (add_branch refuses a point on a fitting). */
-function nearest(points: readonly Vec3[], target: Vec3): { leg: number; distance: number } | null {
-  let best: { leg: number; distance: number; gap: number } | null = null;
-  for (let leg = 0; leg + 1 < points.length; leg++) {
-    const [a, b] = [points[leg] as Vec3, points[leg + 1] as Vec3];
-    const axis = sub3(b, a);
+/**
+ * The leg and distance of the point of the header's straight pipe nearest to `target`. Only the derived pipe pieces count: the ends of a leg
+ * belong to elbows, flange sets and port faces, so a target beyond the header end, or off a corner, is clamped to the nearest piece end.
+ * @failure no pipe piece of positive length (header not derivable) -> null
+ */
+function nearest(doc: CadDocument, run: PipeRun, target: Vec3): { leg: number; distance: number; clamped: boolean } | null {
+  const derived = deriveRun(doc, run);
+  if (!derived.ok) return null;
+  let best: { leg: number; distance: number; gap: number; clamped: boolean } | null = null;
+  for (const part of derived.parts) {
+    const [first, second] = part.ports;
+    const origin = part.leg === undefined ? undefined : derived.legs[part.leg]?.start;
+    if (part.kind !== 'pipe' || first === undefined || second === undefined || origin === undefined) continue;
+    const axis = sub3(second.position, first.position);
     const length = Math.hypot(axis[0], axis[1], axis[2]);
     if (!(length > 0)) continue;
-    const offset = sub3(target, a);
+    const offset = sub3(target, first.position);
     const raw = (offset[0] * axis[0] + offset[1] * axis[1] + offset[2] * axis[2]) / length;
-    const distance = Math.min(Math.max(raw, 0), length);
-    const foot: Vec3 = [a[0] + (axis[0] / length) * distance, a[1] + (axis[1] / length) * distance, a[2] + (axis[2] / length) * distance];
+    const along = Math.min(Math.max(raw, 0), length);
+    const foot: Vec3 = [
+      first.position[0] + (axis[0] / length) * along,
+      first.position[1] + (axis[1] / length) * along,
+      first.position[2] + (axis[2] / length) * along,
+    ];
     const delta = sub3(target, foot);
     const gap = Math.hypot(delta[0], delta[1], delta[2]);
-    if (best === null || gap < best.gap - 1e-9) best = { leg, distance, gap };
+    if (best === null || gap < best.gap - 1e-9) {
+      const fromStart = sub3(foot, origin);
+      best = { leg: part.leg as number, distance: Math.hypot(fromStart[0], fromStart[1], fromStart[2]), gap, clamped: along !== raw };
+    }
   }
-  return best === null ? null : { leg: best.leg, distance: best.distance };
+  return best === null ? null : { leg: best.leg, distance: best.distance, clamped: best.clamped };
 }
 
 const skipped = (request: BranchRequest, code: string, message: string): BranchOutcome => ({
@@ -76,44 +94,55 @@ export function applyBranches(
   for (const branch of branches) {
     const header = headers.find((outcome) => outcome.lineId === branch.headerLineId);
     const headerRunId = header?.status === 'routed' ? header.runId : undefined;
-    const headerRun = headerRunId === undefined ? undefined : getPiping(current).runs[headerRunId];
-    if (headerRunId === undefined || headerRun === undefined) {
+    if (headerRunId === undefined) {
       outcomes.push(skipped(branch, 'RTE_AUTOROUTE_BRANCH_UNREACHABLE', `header line ${branch.headerLineId} was not routed`));
       continue;
     }
-    const at = 'nearTo' in branch.at ? nearest(runPoints(headerRun), branch.at.nearTo) : branch.at;
-    const dn = branch.dn ?? getPiping(current).lines[branch.lineId]?.dn;
-    if (at === null || dn === undefined) {
-      outcomes.push({
-        lineId: branch.lineId,
-        headerLineId: branch.headerLineId,
-        status: 'failed',
-        code: 'RTE_AUTOROUTE_BRANCH_UNREACHABLE',
-        message:
-          at === null
-            ? `header run ${headerRunId} has no leg near the branch`
-            : `no pipe line "${branch.lineId}" to take the size from (give dn)`,
-      });
+    const failedWith = (message: string): BranchOutcome => ({
+      lineId: branch.lineId,
+      headerLineId: branch.headerLineId,
+      status: 'failed',
+      code: 'RTE_AUTOROUTE_BRANCH_UNREACHABLE',
+      message,
+    });
+    const found = 'nearTo' in branch.at ? nearest(current, getPiping(current).runs[headerRunId] as PipeRun, branch.at.nearTo) : null;
+    if ('nearTo' in branch.at && found === null) {
+      outcomes.push(failedWith(`header run ${headerRunId} has no straight pipe piece to branch from (nearTo falls on its fittings)`));
       continue;
     }
-    const result = addBranch.run(current, {
+    const at = found === null ? (branch.at as { point: [number, number, number] } | { leg: number; distance: number }) : found;
+    const dn = branch.dn ?? getPiping(current).lines[branch.lineId]?.dn;
+    if (dn === undefined) {
+      outcomes.push(failedWith(`no pipe line "${branch.lineId}" to take the size from (give dn)`));
+      continue;
+    }
+    const built = {
       runId: headerRunId,
-      at,
+      at: 'distance' in at ? { leg: at.leg, distance: at.distance } : at,
       dn,
       lineId: branch.lineId,
+      ...(branch.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: branch.angleToleranceDeg }),
       ...(branch.to === undefined ? {} : { to: branch.to }),
       ...(branch.legs === undefined ? {} : { legs: branch.legs }),
       ...(branch.via === undefined ? {} : { via: branch.via }),
-    });
+    };
+    const clamp =
+      found?.clamped === true ? ' (nearTo was clamped to the straight pipe: it lies beyond the header end or on a fitting)' : '';
+    const valid = addBranch.paramsValidator?.safeParse(built);
+    if (valid !== undefined && !valid.success) {
+      outcomes.push(
+        failedWith(
+          `invalid branch params: ${valid.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}${clamp}`,
+        ),
+      );
+      continue;
+    }
+    const result = addBranch.run(current, built);
     const data = (result.data ?? {}) as Record<string, unknown>;
     if (result.rejected === true) {
-      outcomes.push({
-        lineId: branch.lineId,
-        headerLineId: branch.headerLineId,
-        status: 'failed',
-        code: 'RTE_AUTOROUTE_BRANCH_UNREACHABLE',
-        message: `branch cannot reach header run ${headerRunId}: ${result.error?.code ?? 'add_branch'}: ${result.summary}`,
-      });
+      outcomes.push(
+        failedWith(`branch cannot reach header run ${headerRunId}: ${result.error?.code ?? 'add_branch'}: ${result.summary}${clamp}`),
+      );
       continue;
     }
     current = result.document;

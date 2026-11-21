@@ -74,6 +74,14 @@ const branchSchema = z.object({
       'Where the branch leaves the header, as add_branch at, or { nearTo } to take the nearest centreline point (the header is not routed yet when the request is written).',
     ),
   dn: z.number().int().positive().optional().describe('Branch size DN (default the size of the branch line).'),
+  angleToleranceDeg: z
+    .number()
+    .positive()
+    .max(22.5)
+    .optional()
+    .describe(
+      'Overrides the spec angle tolerance for the perpendicular check and the branch elbows, degrees, 22.5 at most (as add_branch). Stored on the branch run.',
+    ),
   to: portOrPoint.optional().describe('Branch end: a free port of the branch size or an open point, as add_branch to.'),
   legs: legsInput,
   via: viaInput,
@@ -85,7 +93,7 @@ const branchesField = z
   .max(MAX_LINES)
   .describe(
     'Branches routed together with their headers: after the header lines are routed (and before the commit) each branch is taken off its header run with add_branch (the spec branch-table tee / olet / stub-in), in this order. ' +
-      'All or nothing like the lines: a branch that cannot reach its header refuses RTE_AUTOROUTE_BRANCH_UNREACHABLE (with partial the branch is reported and skipped).',
+      'All or nothing like the lines: a branch that cannot reach its header refuses RTE_AUTOROUTE_BRANCH_UNREACHABLE (with partial the routed lines and the branches that placed are kept and the others reported, as for lines). Branch run and branch point ids are minted in request order of branches (a failed branch under partial can shift the ids of the later ones; keep the order to keep the ids).',
   );
 
 const orderedOutcome = (outcome: LineOutcome): Record<string, unknown> => ({
@@ -144,9 +152,9 @@ export const routeLinesOrder = defineCommand({
 });
 
 /**
- * @affects creates one pipe run per routed line (plant.piping) + their derived, read-only part entities; ids minted once per request (`run-<step>.<k>`, k = request position)
- * @invariant all-or-nothing unless partial; each routed run is an obstacle for the next line; the same document and params give the same order, attempts and ids
- * @failure duplicate lineId or solutions without order: given (RTE_AUTOROUTE_LINES_INVALID); a line that cannot be routed in any tried order (RTE_AUTOROUTE_LINES_FAILED, no line routed with partial)
+ * @affects creates one pipe run per routed line (plant.piping) + their derived, read-only part entities; ids minted once per request (`run-<step>.<k>`, k = request position); with branches also one branch run + branch point per placed branch (ids minted after the lines, in branch request order) and the header run's `branches` (re-derived: tee / olet part, shortened pieces)
+ * @invariant all-or-nothing unless partial; each routed run is an obstacle for the next line; the same document and params give the same order, attempts and ids; branch ids follow the branch order (a failed branch under partial can shift the later ones)
+ * @failure duplicate lineId or solutions without order: given, a branch whose header is not in lines / is left out of sequence (RTE_AUTOROUTE_LINES_INVALID); a branch that cannot be placed or whose header is not routed (RTE_AUTOROUTE_BRANCH_UNREACHABLE, nothing changes unless partial); a line that cannot be routed in any tried order (RTE_AUTOROUTE_LINES_FAILED, no line routed with partial)
  */
 export const autoRouteLines = defineCommand({
   name: 'auto_route_lines',
@@ -159,7 +167,7 @@ export const autoRouteLines = defineCommand({
     'reports the others. Each line is routed as auto_route_pipe does (spec fittings, clash-body obstacles, rack elevations) and becomes an ordinary run. ' +
     'data = { order (routing order of the committed pass), attempts: [{ order, routed, lines }], lines: [{ lineId, status routed|failed|skipped, runId, bends, ' +
     'centrelineToPiLengthMm, cost, engine, code, message }], routed, failed, complete }. Run ids are minted once per request position, so any order and any retry gives the same ids. ' +
-    'branches [{ lineId, headerLineId, at, to / legs / via }] route a branch together with its header: the header (a line of lines) is routed first, then each branch is taken off the routed header run with add_branch (the header spec branch-table tee, olet or stub-in; at { point } | { leg, distance } | { nearTo } = nearest centreline point), all in this one call; data.branches = [{ lineId, headerLineId, status, runId, branchId, headerRunId, fitting, code, message }]; a branch that cannot reach its header is RTE_AUTOROUTE_BRANCH_UNREACHABLE (nothing changes, unless partial). Branches are placed by the TypeScript command only (llull auto_route with lines routes the lines). ' +
+    'branches [{ lineId, headerLineId, at, dn, angleToleranceDeg, to / legs / via }] route a branch together with its header: the header (a line of lines) is routed first, then each branch is taken off the routed header run with add_branch (the header spec branch-table tee, olet or stub-in; at { point } | { leg, distance } | { nearTo } = nearest centreline point), all in this one call; data.branches = [{ lineId, headerLineId, status, runId, branchId, headerRunId, fitting, code, message }]; a branch that cannot reach its header is RTE_AUTOROUTE_BRANCH_UNREACHABLE (nothing changes, unless partial: then the routed lines and the placed branches are kept and the rest reported). A branch whose header line is left out of sequence is RTE_AUTOROUTE_LINES_INVALID. Branches are placed by the TypeScript command only (llull auto_route with lines routes the lines). ' +
     'In-process search is capped per first-move candidate (maxExpansions); for large grids use llull auto_route with lines (native router). Refusals: RTE_AUTOROUTE_LINES_INVALID, RTE_AUTOROUTE_LINES_FAILED, RTE_AUTOROUTE_BRANCH_UNREACHABLE.',
   params: z.object({
     lines: linesField,
@@ -217,6 +225,16 @@ export const autoRouteLines = defineCommand({
         `branch ${branches[badBranch]?.lineId}: its headerLineId must be a line of lines, and the branch line must not be one of lines nor listed twice`,
         [branches[badBranch]?.lineId ?? ''],
         [`branches.${badBranch}`],
+      );
+    const unsequenced = branches.findIndex((branch) => params.sequence !== undefined && !params.sequence.includes(branch.headerLineId));
+    if (unsequenced >= 0)
+      return refuse(
+        doc,
+        'auto_route_lines',
+        'RTE_AUTOROUTE_LINES_INVALID',
+        `branch ${branches[unsequenced]?.lineId}: its header ${branches[unsequenced]?.headerLineId} is left out of sequence, so it would not be routed`,
+        [branches[unsequenced]?.lineId ?? ''],
+        [`branches.${unsequenced}.headerLineId`],
       );
     const solved = params.lines.findIndex((line) => line.solution !== undefined);
     if (solved >= 0 && mode !== 'given')
@@ -282,9 +300,9 @@ export const autoRouteLines = defineCommand({
       );
     }
     const placed = applyBranches(best.document, branches, best.outcomes);
-    const unreached = placed.outcomes.filter((outcome) => outcome.status === 'failed');
+    const unreached = placed.outcomes.filter((outcome) => outcome.status !== 'routed');
     const branchData = { ...data, branches: placed.outcomes.map((outcome) => ({ ...outcome })) };
-    if (unreached.length > 0 && (params.partial !== true || !placed.outcomes.some((outcome) => outcome.status === 'routed')))
+    if (unreached.length > 0 && params.partial !== true)
       return refuse(
         doc,
         'auto_route_lines',
