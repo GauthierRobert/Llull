@@ -1,5 +1,6 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
+import type { CadDocument } from '@core/model/types';
 import { changed } from '@core/commands/noop';
 import type { Vec3 } from '@core/model/vectors';
 import type { InlineComponent, PipeRun } from '@aec/plant/types';
@@ -25,10 +26,19 @@ import {
   type ResolvedEndpoint,
 } from './routeInput';
 
+type Closure = 'cap' | 'blindFlange';
+const closureFlag = (closure: Closure | undefined): { cap?: true; blind?: true } =>
+  closure === undefined ? {} : closure === 'cap' ? { cap: true } : { blind: true };
+
 function routedRun(
   id: string,
   lineId: string,
-  params: { readonly angleToleranceDeg?: number | undefined; readonly bendRadius?: number | undefined },
+  params: {
+    readonly angleToleranceDeg?: number | undefined;
+    readonly bendRadius?: number | undefined;
+    readonly startClosure?: Closure | undefined;
+    readonly endClosure?: Closure | undefined;
+  },
   from: ResolvedEndpoint,
   to: ResolvedEndpoint | undefined,
   path: PathOk,
@@ -41,11 +51,13 @@ function routedRun(
       point: path.points[0] as Vec3,
       ...(from.end.direction === undefined ? {} : { direction: from.end.direction }),
       ...(from.ref === undefined ? {} : { ref: from.ref }),
+      ...closureFlag(params.startClosure),
     },
     end: {
       point: path.points.at(-1) as Vec3,
       ...(to?.end.direction === undefined ? {} : { direction: to.end.direction }),
       ...(to?.ref === undefined ? {} : { ref: to.ref }),
+      ...closureFlag(params.endClosure),
     },
     pis: path.points.slice(1, -1),
     ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
@@ -53,6 +65,29 @@ function routedRun(
     ...(params.bendRadius === undefined ? {} : { bendRadiusMm: params.bendRadius }),
     ...(inline.length === 0 ? {} : { inline }),
   };
+}
+
+/** The refusal of a closure that cannot be placed (a branch start, or a port end), or undefined: only an open end can be closed. */
+function closureProblem(
+  doc: CadDocument,
+  params: { from: object; to?: object | undefined; startClosure?: Closure | undefined; endClosure?: Closure | undefined },
+  lineId: string,
+): CommandResult | undefined {
+  if (params.startClosure === undefined && params.endClosure === undefined) return undefined;
+  const refuseAt = (message: string, path: string): CommandResult =>
+    refuse(doc, 'route_pipe', 'RTE_CAP_INVALID', message, [lineId], [path]);
+  if ('onRun' in params.from)
+    return refuseAt(
+      'closures are not placed while branching: route the branch, then set_run_end_cap on data.runId',
+      params.startClosure === undefined ? 'endClosure' : 'startClosure',
+    );
+  const port = (endpoint: object | undefined): string | undefined =>
+    endpoint !== undefined && 'portId' in endpoint ? String((endpoint as { portId: unknown }).portId) : undefined;
+  if (params.startClosure !== undefined && port(params.from) !== undefined)
+    return refuseAt(`the start is a port (${port(params.from)}): only an open end can be closed`, 'startClosure');
+  if (params.endClosure !== undefined && port(params.to) !== undefined)
+    return refuseAt(`the end is a port (${port(params.to)}): only an open end can be closed`, 'endClosure');
+  return undefined;
 }
 
 /**
@@ -116,6 +151,18 @@ export const routePipe = defineCommand({
       .max(22.5)
       .optional()
       .describe('Overrides the spec tolerance for port directions and elbow angles, degrees, 22.5 at most (named in the result).'),
+    startClosure: z
+      .enum(['cap', 'blindFlange'])
+      .optional()
+      .describe(
+        'Close the START of the run in this call, as set_run_end_cap would afterwards: "cap" (the spec cap row at the run size) or "blindFlange" (flange set + spec flangeBlind row). Only an open start ({ point }); a port start is refused (RTE_CAP_INVALID). The run start point is the closed end.',
+      ),
+    endClosure: z
+      .enum(['cap', 'blindFlange'])
+      .optional()
+      .describe(
+        'Close the END of the run in this call (same closures as startClosure). Only without `to`, or with an open `to` { point }; a port end is refused (RTE_CAP_INVALID). The last point is the closed end: the spec closure takes its length out of the last leg (RTE_SPEC_NO_COMPONENT when the spec has no such row).',
+      ),
     inline: z
       .array(z.object({ ...inlineFields, at: inlineAt.describe('Where the centre sits: { leg, centreDistance }.') }))
       .optional()
@@ -132,6 +179,8 @@ export const routePipe = defineCommand({
     const piping = getPiping(doc);
     const line = piping.lines[params.lineId];
     if (line === undefined) return refuse(doc, 'route_pipe', 'RTE_UNKNOWN_LINE', `no pipe line "${params.lineId}"`, [], ['lineId']);
+    const closureRefused = closureProblem(doc, params, line.id);
+    if (closureRefused !== undefined) return closureRefused;
     if ('onRun' in params.from) return branchFromRun(doc, params, params.from.onRun, line.dn, ctx);
     const lookup = createSpecLookup(doc, line.spec);
     if (isMiss(lookup)) return refuse(doc, 'route_pipe', lookup.miss, lookup.detail, [line.id, ...lookup.ids], ['lineId']);
@@ -228,6 +277,7 @@ export const routePipe = defineCommand({
         partIds: derived.parts.map((part) => part.id),
         inlineIds: inline.map((item) => item.id),
         dn: derived.dn,
+        closures: { start: params.startClosure ?? null, end: params.endClosure ?? null },
         spec: derived.spec,
         angleTolerance: derived.angleTolerance,
         weldGap: derived.weldGap,
