@@ -39,7 +39,7 @@ spec, not measurements.
 | VC-ASC-15 | FR-ASC-15, FR-ASC-16 | `create_wing sections=[for k in 0..<3: {airfoilId: af[k], span: k*290, chord: 170+20*k}]` | wing built from 3 resolved sections; a wrong field → `DESIGN_VALUE_SCHEMA` at `sections[k].…` | exact | baseline A: `AERO_AIRFOIL_NOT_FOUND` (alias not resolved inside JSON) |
 | VC-ASC-16 | FR-ASC-21 | `loft_sections sectionIds=[af0.entity, af1.entity]` (nurbs airfoils) | exact NURBS loft (sharp trailing edge kept) | exact | baseline A: `no entity "airfoil-1.2"` |
 | VC-ASC-17 | FR-ASC-17, FR-ASC-18 | booster casing profile as a comprehension over `fn tip(x)` | profile equals the literal one point for point; stator platforms touch with 0 overlap | 0 (bit-identical expressions) | baseline A: rounded literals gave 0.001–0.005 mm overlaps / gaps |
-| VC-ASC-18 | FR-ASC-19 | `plans/target_v2_modules/engine.lld` | modules `fan`, `hpc1`, `hpc2` with own layers and groups; aliases `fan.blades` resolve | exact | target |
+| VC-ASC-18 | FR-ASC-19 | `plans/target_v2_modules/engine.lld` | modules `fan`, `hpc1`, `hpc2` with own layers and groups; aliases `fan.blades` resolve | exact | built (M4c) |
 | VC-ASC-19 | FR-ASC-19 | same, then delete the module files and `replay_history` | identical document (embedded sources); editing a file then `apply_design` → `DESIGN_MODULE_HASH_CHANGED` | exact | target; [R28] |
 | VC-ASC-20 | FR-ASC-22, TR-ASC-15 | `plans/fidelity.lld` `rotated_ring` | y/z half-extent ≤ 1060 | 1e-6 × size | baseline A: 1240.438 (×1.17) on this plan; 1445.255 (×1.366) on the engine inlet |
 | VC-ASC-21 | FR-ASC-23, TR-ASC-16 | `plans/fidelity.lld` `pylon_loft` + `mount` | side faces planar; `check_assembly` pylon × mount = `FPR_PAIR_TOUCH` | exact | baseline A: `FPR_PAIR_HARD`, penetration 0.206 mm, 6587 mm³ |
@@ -57,6 +57,6 @@ Each FR maps to at least one VC: FR-01→01, 02→02, 03→03/04, 04→05, 05→
 | [`plans/bladed_disk.lld`](plans/bladed_disk.lld) | yes | timing baseline for M1 |
 | [`plans/alias_arity.lld`](plans/alias_arity.lld) | yes (check fails today, as designed) | arity bug reproducer |
 | [`plans/fidelity.lld`](plans/fidelity.lld) | yes | bounding box and ruled loft reproducers |
-| [`plans/target_v2_modules/`](plans/target_v2_modules/) | no (M4b / M4c syntax) | target syntax for modules, functions, comprehensions, `.entity`, connection groups |
+| [`plans/target_v2_modules/`](plans/target_v2_modules/) | yes, minus `add_connection_group` (M3), by `tests/unit/design/modules.test.ts` | target syntax for modules, functions, comprehensions, `.entity`, connection groups |
 
 Expected values are indexed in [`expected_results.json`](expected_results.json); sources in [`sources.md`](sources.md).

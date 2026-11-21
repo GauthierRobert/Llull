@@ -535,3 +535,28 @@ Scope: §4.3, §5.3 steps 1-5 and 7 (TS side), TR-ASC-07, 08, 10, 11 and the TS 
 - **Tests.** `tests/unit/render/captureViewport.test.ts` (port absent / present / refusing, params, purity); `server/tests/viewportCapture.test.ts` (fake renderer: request -> frame -> re-run, renderer error, timeout, disconnect, cancel, the HTTP frame route, body validation); `desktop/tests/backend.e2e.test.ts` (real backend bundle, fake renderer on the real SSE, `llull capture_viewport --app --save`); `tests/component/capturePose.test.ts`.
 - **Left.** No display / Electron could be run here: the real draw (CaptureRig: render target, tone mapping, PNG encode) is not exercised by a test and the 1600 x 1000 <= 3 s budget is unmeasured (VC-ASC-22 on the app). The frame skips the post-processing composer (edge lines, ambient occlusion) and the ACES tone mapping of the on-screen pass. Capture needs the 3D canvas mounted (2D view or an open sheet answers `VIEWPORT_CAPTURE_FAILED`).
   The hidden `BrowserWindow` for a minimised window (D6) is not built (a minimised window may stop the renderer's frames). `render_view` over-budget routing (§4.6, M6b) is not done.
+
+### 13.5 As built (M4c) (2026-11-21)
+
+Scope: TR-ASC-14, §3 `DesignSource`, §4.4 R6, §5.5, decision D5, VC-ASC-18 / 19. Code: `packages/design-lang/src/{modules,modulePath,moduleRun,aliasBinding}.ts`;
+`parse.ts` (`module` / `use` / `export`), `run.ts` (scope, namespaced aliases), `valueEval.ts` (module namespaces in value expressions), `commands.ts`;
+host glue `server/src/cli/fileParams.ts` (`withModuleFiles`). Language reference: `docs/DESIGN_LANGUAGE.md` §5.2.
+
+- **Pure packages, host reads files.** `apply_design` / `expand_design` take `modules { path: text }`; the CLI adds them from the `use` lines of a
+  `source=@text:` design (transitively, relative to its folder; unreadable or unsafe paths are left out and refused by name by the command). There is no fs in `packages/*`.
+- **One step.** `design_source { source, reads, modules? [{ path, sha256, text }] }` (sorted by path, SHA-256 from `@lib/sha256`). Regeneration reads only the embedded
+  copy and verifies each hash. The step's own layers / groups (`layer-<step>.k`, `group-<step>.k`) are dropped from the carried document before a re-run, so replay mints them again with identical ids.
+- **Scope, not text expansion.** A `use` runs the parsed module body in a scope `{ prefix, overlay, file }`: aliases are bound as `ns.name`, arguments overlay the
+  document parameters (so module `fn`s see them), unexported aliases are removed afterwards. Dotted alias references (`fan.blades`, anchors, `.entity`, selectors) are accepted by
+  `splitAliasRef` / the anchor pattern; value expressions read `fan.blades` through a namespace value.
+- **Layer + group** per instance via `add_layer`, `set_entity_layer`, `group_entities` executed inside the step (an inner instance's entities stay on its layer).
+- **Checks inside modules are refused** (a check needs the caller's alias table and the second run of `check_design`); check exported names from the top design.
+- **D5 report.** `apply_design` compares the supplied texts with the embedded copy: changed paths are listed in the summary and `data.warnings [{ code: DESIGN_MODULE_HASH_CHANGED, path, previous, current }]`; the new text is embedded.
+- **`expand_design`** lines gain `file`; it runs with a scratch context (own ids, no step) so it cannot shift the ids of a plan it runs in.
+- **Limits (named).** 64 files, 8 deep, 256 KB per file, 256 instances (`DESIGN_MODULE_LIMIT`); instances also count toward the 5000-command limit.
+- **Validation.** `tests/unit/design/modules.test.ts` runs `validation/plans/target_v2_modules/engine.lld` (+ `fan.lld`, `stage.lld`) on the Manifold kernel: VC-ASC-18 (modules `fan`, `hpc1`, `hpc2`
+  namespaced, own layers and groups, aliases resolve) and VC-ASC-19 (`replay_history` without files gives the identical document; edited file then `apply_design` reports `DESIGN_MODULE_HASH_CHANGED`).
+  The plan runs minus two lines: `add_connection_group` (M3 command not built) and `check max of=fan.blades path=2` (the fan blade tip is 356 mm on this plan, not 867.5: a modeling matter of the plan).
+  The plan's `stage.lld` was corrected to supported syntax: `mod(i, 2)` instead of an `i mod 2` operator, and a closed casing profile (the zigzag alone was collinear).
+- **Also changed.** A bare parameter / loop-variable name inside a nested list of a schema-less slot (`profile=[[45, 60], [hubR, 60]]`) now reads as its number (it was the string).
+- **Not built.** Cross-file `fn` sharing, string / bool module params, `check` inside modules, a CLI end-to-end test of `@text:` module discovery (the helper is unit-tested).

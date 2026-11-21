@@ -7,7 +7,7 @@ import path from 'node:path';
 import { booleanFlag, missingValueFlag, paramsSource, parseArgv, stringFlag } from '../src/cli/argv';
 import { describeCommand, listCatalog, searchCatalog, shortDescription, suggestNames, toolsetCounts } from '../src/cli/catalog';
 import { filesOfData, saveDataFiles, withoutPayloads, withSaveDefaults } from '../src/cli/saveFiles';
-import { imageDataUrl, resolveFileRefs } from '../src/cli/fileParams';
+import { imageDataUrl, resolveFileRefs, withModuleFiles } from '../src/cli/fileParams';
 import { listCommands } from '@core/commands/registry';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
 import { paramsLines } from '../src/cli/describeSchema';
@@ -91,6 +91,40 @@ describe('fileParams', () => {
     const text = 'add_box b size=[1,1,1] # é\n';
     const read = (file: string): Buffer => Buffer.from(file === 'part.lld' ? text : '', 'utf8');
     expect(resolveFileRefs({ source: '@text:part.lld', set: { w: 1 } }, read)).toEqual({ source: text, set: { w: 1 } });
+  });
+});
+
+describe('withModuleFiles', () => {
+  const files: Record<string, string> = {
+    'designs/top.lld':
+      'use "fan.lld" as f\nuse "./sub//stage.lld" as s\nuse "../secret.lld" as x\nuse "/etc/y.lld" as y\nuse "gone.lld" as g\n# use "commented.lld" as c\n',
+    'designs/fan.lld': 'module fan() {\n  use "sub/stage.lld" as inner\n}\n',
+    'designs/sub/stage.lld': 'module stage() {\n}\n',
+  };
+  const read = (file: string): Buffer => {
+    const text = files[file.replaceAll('\\', '/')];
+    if (text === undefined) throw new Error(`ENOENT ${file}`);
+    return Buffer.from(text, 'utf8');
+  };
+  const raw = { source: '@text:designs/top.lld' };
+  const resolved = { source: files['designs/top.lld'] };
+
+  it('adds the files its use lines name, transitively, skipping unsafe and unreadable paths', () => {
+    const out = withModuleFiles('apply_design', raw, resolved, read) as { modules: Record<string, string> };
+    expect(Object.keys(out.modules).sort()).toEqual(['fan.lld', 'sub/stage.lld']);
+    expect(out.modules['sub/stage.lld']).toBe(files['designs/sub/stage.lld']);
+    expect(withModuleFiles('expand_design', raw, resolved, read)).toHaveProperty('modules');
+  });
+
+  it('leaves other commands, inline sources, explicit modules and file-less designs alone', () => {
+    expect(withModuleFiles('add_box', raw, resolved, read)).toBe(resolved);
+    expect(withModuleFiles('apply_design', { source: 'use "fan.lld" as f' }, resolved, read)).toBe(resolved);
+    expect(withModuleFiles('apply_design', null, resolved, read)).toBe(resolved);
+    expect(withModuleFiles('apply_design', raw, null, read)).toBeNull();
+    const explicit = { ...resolved, modules: { 'fan.lld': 'x' } };
+    expect(withModuleFiles('apply_design', raw, explicit, read)).toBe(explicit);
+    const plain = { source: 'add_box b size=[1,1,1]' };
+    expect(withModuleFiles('apply_design', raw, plain, read)).toBe(plain);
   });
 });
 

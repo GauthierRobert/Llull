@@ -13,7 +13,7 @@ import { planAliases } from './aliases';
 import { deadlineFromEnv, withDeadline } from './deadline';
 import { degradedWarning, planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
-import { resolveFileRefs } from './fileParams';
+import { resolveFileRefs, withModuleFiles } from './fileParams';
 import { saveDataFiles, withoutPayloads, withSaveDefaults } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
 import { exchangeTool, takesFileParam, withFileContent, withPlanFileContent } from './exchange';
@@ -166,7 +166,8 @@ function stringParamKeys(name: string): ReadonlySet<string> {
 /** Params of `name`, with `@img:<path>` values loaded as image data URLs and `@text:<path>` values as file text. */
 async function paramsOf(name: string, tokens: readonly string[], io: CliIo, paramFile?: string): Promise<unknown> {
   const params = paramFile === undefined ? await rawParamsOf(name, tokens, io) : await paramFileParams(name, tokens, io, paramFile);
-  return asUsage(() => resolveFileRefs(params, (source) => asUsage(() => fs.readFileSync(source), `cannot read ${source}: `)));
+  const read = (source: string): Buffer => asUsage(() => fs.readFileSync(source), `cannot read ${source}: `);
+  return asUsage(() => withModuleFiles(name, params, resolveFileRefs(params, read), (path) => fs.readFileSync(path)));
 }
 
 /**

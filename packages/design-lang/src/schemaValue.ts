@@ -12,7 +12,7 @@ import { isRecord } from '@lib/isRecord';
 import { similarNames } from '@lib/similarNames';
 import { DesignError } from './errors';
 import type { Pair, ValueNode } from './parse';
-import { convertUnits } from './units';
+import { convertUnits, siLengthUnit } from './units';
 import { isPlainRef, splitAliasRef } from './aliasRef';
 import { buildValueExpr, type Expr } from './valueExpr';
 
@@ -42,6 +42,8 @@ export class NameRef {
     readonly param = '',
     /** The param is a list: the reference resolves to a list even for one id. */
     readonly list = false,
+    /** Slot without a schema (nested list item): a name that is a parameter or loop variable reads as its number. */
+    readonly untyped = false,
   ) {}
 }
 
@@ -78,7 +80,7 @@ export interface BoundCommand {
 }
 
 export const SIDES: readonly string[] = ['top', 'bottom', 'front', 'back', 'left', 'right', 'center'];
-const ANCHOR = /^([A-Za-z_][\w{}+\-*/]*)\.(top|bottom|front|back|left|right|center)$/;
+const ANCHOR = /^([A-Za-z_][\w{}+\-*/]*(?:\.[A-Za-z_][\w{}+\-*/]*)*)\.(top|bottom|front|back|left|right|center)$/;
 const PLAIN_NAME = /^[A-Za-z_][\w{}+\-*/]*$/;
 const ALIGNS = ['front', 'back', 'left', 'right', 'top', 'bottom'];
 
@@ -190,7 +192,8 @@ function alignOf(node: ValueNode, ctx: BindContext): string {
 
 /** One value against its schema. `key` = `<command>.<param path>` (angle-unit lookup). */
 function bindValue(node: ValueNode, spec: ParamItemSpec, key: string, ctx: BindContext): Template {
-  if (node.kind === 'expr' || (node.kind === 'word' && isExpressionWord(node.text))) return valueExpression(node, spec, key, ctx);
+  if (node.kind === 'expr' || (node.kind === 'word' && isExpressionWord(node.text) && !isTextCall(node.text, spec)))
+    return valueExpression(node, spec, key, ctx);
   const branch = spec.anyOf !== undefined ? chooseBranch(node, spec.anyOf) : spec;
   if (branch.enum !== undefined) return enumValue(node, branch.enum, ctx);
   switch (branch.type) {
@@ -237,6 +240,14 @@ function isExpressionWord(text: string): boolean {
   return text.startsWith('(') && expressionSyntaxError(text.replace(/\{[^{}]*\}/g, '0')) !== null;
 }
 
+/** `label=Bracket(v2)` in a string / enum slot is text, not a call (write `(label(3))` to call a function there). */
+function isTextCall(text: string, spec: ParamItemSpec): boolean {
+  const branches = spec.anyOf ?? [spec];
+  const text_ = branches.some((b) => b.type === 'string' || b.enum !== undefined);
+  const other = branches.some((b) => ['number', 'integer', 'array', 'object'].includes(b.type ?? ''));
+  return !text.startsWith('(') && text_ && !other;
+}
+
 /** The param path of a schema key `<command>.<param path>`. */
 const paramPath = (key: string): string => key.replace(/^[^.]*\./, '');
 
@@ -278,7 +289,7 @@ function numberValue(node: ValueNode, key: string, ctx: BindContext): Template {
   if (syntaxError !== null) {
     try {
       return new ValueExprRef(
-        buildValueExpr(node.text, { units: ctx.doc.units, paramKey: angleKey, line: ctx.line }),
+        buildValueExpr(node.text, { units: siLengthUnit(angleKey) ?? ctx.doc.units, paramKey: angleKey, line: ctx.line }),
         { type: 'number' },
         paramPath(key),
       );
@@ -294,18 +305,11 @@ function numberValue(node: ValueNode, key: string, ctx: BindContext): Template {
   return result.value;
 }
 
-/** A param named in SI units (`throatDiameterM`, `spanM`: metres; `…Mm`: millimetres) takes length literals in that unit. */
-function siLengthUnit(key: string): 'm' | 'mm' | null {
-  const last = key.split('.').pop() ?? '';
-  if (/[a-z]Mm$/.test(last)) return 'mm';
-  return /[a-z]M$/.test(last) ? 'm' : null;
-}
-
 function untypedValue(node: ValueNode, key: string, ctx: BindContext): Template {
   if (node.kind === 'string') return node.value;
   if (node.kind === 'list') return node.items.map((item) => untypedValue(item, key, ctx));
   if (node.kind !== 'word') return null;
   if (node.text === 'true' || node.text === 'false') return node.text === 'true';
-  if (isPlainRef(node.text)) return new NameRef(node.text, true, key);
+  if (isPlainRef(node.text)) return new NameRef(node.text, true, key, false, true);
   return numberValue(node, key, ctx);
 }

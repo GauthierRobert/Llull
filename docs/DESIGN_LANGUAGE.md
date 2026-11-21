@@ -100,7 +100,7 @@ examples/         one .lld per toolset (tests/unit/design/examples.test.ts runs 
 
 ```ebnf
 line      = [ statement ] [ "#" comment ] ;                (* "#" starts a comment at line start or after a space *)
-statement = header | param | fn | command | check | for | "}" ;
+statement = header | param | fn | command | check | for | use | module | export | "}" ;
 header    = "design" NAME [ "units=" UNIT ] ;             (* first statement; sets the document unit *)
 param     = "param" NAME "=" expr ;                        (* a default *)
 fn        = "fn" NAME "(" [ NAME [ "=" expr ] { "," NAME [ "=" expr ] } ] ")" "=" vexpr ;   (* top level only; pure *)
@@ -111,6 +111,9 @@ key       = NAME { "." NAME } ;                            (* dotted keys fill o
 value     = NUMBER-or-EXPR | NAME | ALIAS "." SIDE | ALIAS "[" SELECTOR "]" | ALIAS "." ("entity" | "entities") [ "[" SELECTOR "]" ] | "[" value { "," value } "]" | "[" "for" NAME "in" vexpr [ "if" vexpr ] ":" vexpr "]" | "{" key ":" vexpr { "," … } "}" | "(" vexpr ")" | CALL | STRING | true | false ;
 vexpr     = "if" vexpr "then" vexpr "else" vexpr | "let" NAME "=" vexpr "in" vexpr | vexpr (+ - * / == != < <= > >= && || !) vexpr
           | vexpr ".." vexpr | vexpr "..<" vexpr | vexpr "[" SELECTOR "]" | vexpr "." NAME | CALL | value ;   (* §5.1 *)
+use        = "use" STRING "as" NAME [ "with" ] { key "=" vexpr } ;   (* run a module file; NAME may hold {expr} *)
+module    = "module" NAME "(" [ NAME ":" ("length" | "number" | "int") [ "=" expr ] { "," … } ] ")" "{" ;   (* the only block of a module file *)
+export    = "export" ALIAS { "," ALIAS } ;                 (* directly inside a module *)
 ALIAS     = NAME with optional {expr} placeholders: post{i}
 SELECTOR  = EXPR | EXPR ".." EXPR | EXPR "..<" EXPR ;   (* index (negative counts from the end) | inclusive range | end-exclusive range *)
 OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
@@ -118,7 +121,7 @@ OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
 
 - A `key=value` pair has no spaces outside `( ) [ ] { } "…"`. Expected values and tolerances in a check may have spaces, and
   `[1,2,3]±1%` is accepted.
-- Reserved words: `design param check expect for in fn`. A value with spaces (`if`, `let`, a call with spaces) is written in parentheses. A contract test checks none is a command name.
+- Reserved words: `design param check expect for in fn module use export`. A value with spaces (`if`, `let`, a call with spaces) is written in parentheses. A contract test checks none is a command name.
 - `expect` on a command line is a syntax error pointing to `check`. A duplicate key is refused.
 
 ## 5. Values: read by the target param's schema
@@ -172,7 +175,29 @@ expected values may call user functions too.
 `expand_design { source? }` (read-only) runs the design on a scratch document and returns `data.lines[] { line, command, alias, params }`,
 the commands in order with their resolved values (default source: the document's design). A design may not call it.
 
-Not built: the `each` form of R4 (use a comprehension) and modules (M4c).
+Not built: the `each` form of R4 (use a comprehension).
+
+### 5.2 Modules (as built M4c)
+
+`use "fan.lld" as fan with tipR=fanR blades=36` runs the module file `fan.lld`, which holds ONE block `module fan(tipR: length = 867.5, blades: int = 36) { … export disk, blades }`.
+Pure packages never read files: the host passes the texts (`apply_design` / `expand_design` take `modules { "fan.lld": text }`; the CLI fills it from
+the `use` lines of a `source=@text:dir/top.lld` design, transitively, relative to that folder).
+
+- **Params.** Typed numbers: `length` (unit literals convert to the document unit), `number`, `int` (a fraction is `DESIGN_MODULE_PARAM`). Defaults may read
+  earlier params. Arguments are evaluated in the caller's scope; inside the module they shadow document parameters and are visible to its `fn`s. Unknown, missing,
+  repeated or non-numeric arguments are `DESIGN_MODULE_PARAM`.
+- **Namespacing.** Aliases of the instance are `ns.name`; only `export`ed names stay visible (`export x` also keeps `x.…`). Read them anywhere an alias goes:
+  `fan.blades`, `fan.blades[2]`, `fan.blades.entity`, `on=fan.disk.top`, and in value expressions (`len(fan.blades)`). A module sees only its own aliases,
+  never the caller's loop variables. `check` / `param` / `design` lines are not allowed inside a module (check its exports from the top design).
+- **Layer + group.** Each instance gets a layer and (with two or more entities) a group named like its namespace (nested: `outer.inner`). They are minted inside the single step.
+- **DAG.** Modules may `use` other modules (paths always relative to the root design's folder, inside it). A cycle is `DESIGN_MODULE_CYCLE` naming the path.
+  Namespaces are unique per run (`DESIGN_MODULE_NAMESPACE`; in a loop write `as m{i}`).
+- **Embedded sources (D5).** The step stores `modules [{ path, sha256, text }]`; regeneration, undo and load use only that copy (a mismatching hash is
+  `DESIGN_MODULE_HASH_CHANGED`). `apply_design` again with edited files embeds the new text and reports the changed paths (summary + `data.warnings`); omitted
+  paths keep the embedded copy.
+- **Limits.** 64 files, 8 deep, 256 KB per file, 256 instances; `DESIGN_MODULE_LIMIT`. Missing text is `DESIGN_MODULE_NOT_FOUND` (+ close names), a bad path
+  (absolute, `..`, backslash, not `.lld`) `DESIGN_MODULE_PATH`. An error inside a module names its file: `[fan.lld] …`.
+- `expand_design` lines carry `file` (the module file, null for the design itself) and namespaced aliases.
 
 ## 6. Aliases, anchors, placement
 
@@ -230,15 +255,15 @@ Not built: the `each` form of R4 (use a comprehension) and modules (M4c).
 
 | Command | Annotations | Role |
 | --- | --- | --- |
-| `apply_design { source, set? }` | metaHistory | units + param defaults, then records (or replaces) the `design_source` step; `data { checks, aliases }` |
-| `design_source { source, reads }` | requiresKernel | the recorded step (do not call directly); a regeneration without kernel is refused, never silently empty |
+| `apply_design { source, set?, modules? }` | metaHistory | units + param defaults, then records (or replaces) the `design_source` step; `data { checks, aliases, moduleInstances?, modules?, warnings? }` |
+| `design_source { source, reads, modules? }` | requiresKernel | the recorded step (do not call directly); a regeneration without kernel is refused, never silently empty |
 | `check_design {}` | readOnly | evaluates the design's checks on the current document; gates |
 | `export_design {}` | readOnly | `data { text, fileName }` (`--save x.lld`) |
 | `describe_design_syntax { command? }` | readOnly | the guide, or one command's generated line (read-only commands as `check …`) |
 
 A design may not call these commands, nor a read-only or metaHistory command as a line (§1).
 
-CLI: the only addition is the generic `@text:PATH` (`server/src/cli/fileParams.ts`, next to `@img:`), which reads a file as a string value.
+CLI: the generic `@text:PATH` (`server/src/cli/fileParams.ts`, next to `@img:`) reads a file as a string value; for `apply_design` / `expand_design` the same file also supplies the `modules` its `use` lines name (`withModuleFiles`).
 
 ## 9. Errors
 
@@ -246,7 +271,7 @@ Every error names its line (`error.paths = ["line N"]`), the offending text and 
 (+ close names), `DESIGN_UNKNOWN_PARAM` (+ the params), `DESIGN_BAD_VALUE`, `DESIGN_BAD_ENUM` (+ members), `DESIGN_UNKNOWN_ALIAS` /
 `DESIGN_UNKNOWN_ANCHOR` / `DESIGN_UNKNOWN_PARAMETER` (+ close names), `DESIGN_ALIAS_CONSUMED` (+ live heir), `DESIGN_ALIAS_ARITY` / `DESIGN_INDEX_RANGE` / `DESIGN_NO_ENTITY`, `DESIGN_VALUE_SCHEMA` / `DESIGN_EXPR_TYPE` / `DESIGN_LIST_LIMIT` / `DESIGN_EVAL_LIMIT` / `DESIGN_FN_RECURSION` / `DESIGN_FN_ARGS` (§5.1), `DESIGN_UNIT_NOT_SUPPORTED`,
 `DESIGN_LOOP_LIMIT` (1000 iterations per loop, 5000 commands, 1000 checks), `DESIGN_STEP_FAILED` (the command's own refusal and remediation),
-`DESIGN_CHECK_FAILED`, `DESIGN_NO_DESIGN`. A design that runs no command is refused (`DESIGN_SYNTAX`). Any failure leaves the document unchanged. A failure during a regeneration surfaces as
+`DESIGN_MODULE_NOT_FOUND` / `_CYCLE` / `_PATH` / `_PARAM` / `_NAMESPACE` / `_LIMIT` / `_HASH_CHANGED` (§5.2), `DESIGN_CHECK_FAILED`, `DESIGN_NO_DESIGN`. A design that runs no command is refused (`DESIGN_SYNTAX`). Any failure leaves the document unchanged. A failure during a regeneration surfaces as
 core's `HIST_STEP_FAILED`, naming the design line.
 
 ## 10. Validation

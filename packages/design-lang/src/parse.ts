@@ -6,6 +6,7 @@
 
 import { DesignError } from './errors';
 import { isComma, isSpace, sourceLines, splitTop, type SourceLine } from './lexer';
+import { normalizeModulePath } from './modulePath';
 
 export type ValueNode =
   | { readonly kind: 'list'; readonly items: readonly ValueNode[] }
@@ -27,6 +28,8 @@ interface Tolerance {
   /** '%' (relative), a length unit, or null (document units). */
   readonly unit: string | null;
 }
+
+export type ModuleParamType = 'length' | 'number' | 'int';
 
 export type Statement =
   | { readonly kind: 'header'; readonly line: number; readonly name: string; readonly pairs: readonly Pair[] }
@@ -56,6 +59,23 @@ export type Statement =
       readonly tolerance: Tolerance | null;
     }
   | {
+      readonly kind: 'module';
+      readonly line: number;
+      readonly name: string;
+      readonly params: readonly { readonly name: string; readonly type: ModuleParamType; readonly fallback: string | null }[];
+      readonly body: readonly Statement[];
+    }
+  | {
+      readonly kind: 'use';
+      readonly line: number;
+      /** Normalized module file path (relative to the root design folder). */
+      readonly path: string;
+      /** Namespace (may hold `{expr}` placeholders). */
+      readonly ns: string;
+      readonly pairs: readonly Pair[];
+    }
+  | { readonly kind: 'export'; readonly line: number; readonly names: readonly string[] }
+  | {
       readonly kind: 'for';
       readonly line: number;
       readonly variable: string;
@@ -65,21 +85,29 @@ export type Statement =
     };
 
 /** Words that start a statement and can never be a command name (contract-tested against the registry). */
-export const RESERVED_WORDS: readonly string[] = ['design', 'param', 'check', 'expect', 'for', 'in', 'fn'];
+export const RESERVED_WORDS: readonly string[] = ['design', 'param', 'check', 'expect', 'for', 'in', 'fn', 'module', 'use', 'export'];
 
 const IDENTIFIER = /^[A-Za-z_]\w*$/;
 const ALIAS = /^[A-Za-z_][\w{}+\-*/]*$/;
+const NAMESPACE = /^[A-Za-z_][\w{}]*$/;
 const CHECK_OPS: readonly CheckOp[] = ['==', '~=', '<=', '>=', '<', '>'];
 
 /** Nesting limit of `for` blocks and `[…]` lists: deeper input is refused instead of overflowing the call stack. */
 const MAX_NESTING = 64;
+
+interface Cursor {
+  index: number;
+  depth: number;
+  /** True while parsing a module body: `fn` and `export` are allowed in it, `param`, `check`, `design` and `module` are not. */
+  inModule: boolean;
+}
 
 const syntax = (line: number, detail: string, fix: string): DesignError => new DesignError('DESIGN_SYNTAX', line, detail, fix);
 
 /** The statements of `source`. */
 export function parseDesign(source: string): Statement[] {
   const lines = sourceLines(source);
-  const cursor = { index: 0, depth: 0 };
+  const cursor: Cursor = { index: 0, depth: 0, inModule: false };
   const statements = parseBlock(lines, cursor, null);
   const headerAt = statements.findIndex((s) => s.kind === 'header');
   if (headerAt > 0) {
@@ -89,7 +117,7 @@ export function parseDesign(source: string): Statement[] {
   return statements;
 }
 
-function parseBlock(lines: readonly SourceLine[], cursor: { index: number; depth: number }, openedAt: number | null): Statement[] {
+function parseBlock(lines: readonly SourceLine[], cursor: Cursor, openedAt: number | null): Statement[] {
   if (cursor.depth >= MAX_NESTING) throw syntax(openedAt ?? 0, `blocks nested deeper than ${MAX_NESTING}`, 'Flatten the nested loops.');
   cursor.depth++;
   const statements: Statement[] = [];
@@ -108,12 +136,21 @@ function parseBlock(lines: readonly SourceLine[], cursor: { index: number; depth
   return statements;
 }
 
-function parseStatement(source: SourceLine, lines: readonly SourceLine[], cursor: { index: number; depth: number }): Statement {
+function parseStatement(source: SourceLine, lines: readonly SourceLine[], cursor: Cursor): Statement {
   const { line, text } = source;
   const first = /^\S+/.exec(text)?.[0] ?? '';
+  if (cursor.inModule && ['param', 'check', 'design', 'module'].includes(first))
+    throw syntax(
+      line,
+      `"${first}" is not allowed inside a module`,
+      'A module has typed params in its header; check its exports from the top design.',
+    );
   if (first === 'param') return parseParam(line, text);
   if (first === 'check') return parseCheck(line, text);
-  if (first === 'fn') return parseFn(line, text, cursor.depth);
+  if (first === 'fn') return parseFn(line, text, cursor.depth - (cursor.inModule ? 1 : 0));
+  if (first === 'module') return parseModule(line, text, lines, cursor);
+  if (first === 'use') return parseUse(line, text);
+  if (first === 'export') return parseExport(line, text, cursor);
   if (first === 'for') {
     const m = /^for\s+([A-Za-z_]\w*)\s+in\s+(.+?)\s*\.\.\s*(.+?)\s*\{$/.exec(text);
     if (!m?.[1] || !m[2] || !m[3]) throw syntax(line, `malformed loop "${text}"`, 'Write: for i in 0..n-1 {');
@@ -126,6 +163,49 @@ function parseStatement(source: SourceLine, lines: readonly SourceLine[], cursor
     return { kind: 'header', line, name, pairs: tokens.slice(2).map((t) => parsePair(t, line)) };
   }
   return parseCommand(line, tokens);
+}
+
+function parseModule(line: number, text: string, lines: readonly SourceLine[], cursor: Cursor): Statement {
+  const head = /^module\s+([A-Za-z_]\w*)\s*\((.*)\)\s*\{$/.exec(text);
+  if (!head?.[1]) throw syntax(line, `malformed module "${text}"`, 'Write: module fan(tipR: length = 867.5, blades: int = 36) {');
+  if (cursor.depth !== 1) throw syntax(line, 'a module is only allowed at the top level of its file', 'Move it out of the block.');
+  const seen = new Set<string>();
+  const params = splitTop(head[2] ?? '', isComma, line).map((piece) => {
+    const m = /^([A-Za-z_]\w*)\s*:\s*(length|number|int)\s*(?:=\s*(.+))?$/.exec(piece);
+    if (!m?.[1] || !m[2])
+      throw syntax(line, `"${piece}" is not a module parameter`, 'Write: name: length = 10 (types: length, number, int).');
+    if (seen.has(m[1])) throw syntax(line, `module parameter ${m[1]} is declared twice`, 'Give each parameter its own name.');
+    seen.add(m[1]);
+    return { name: m[1], type: m[2] as ModuleParamType, fallback: m[3]?.trim() ?? null };
+  });
+  cursor.inModule = true;
+  const body = parseBlock(lines, cursor, line);
+  cursor.inModule = false;
+  return { kind: 'module', line, name: head[1], params, body };
+}
+
+function parseUse(line: number, text: string): Statement {
+  const tokens = splitTop(text, isSpace, line);
+  const path = tokens[1];
+  const ns = tokens[3];
+  const form = 'Write: use "fan.lld" as fan with tipR=867.5 blades=36';
+  if (path === undefined || !path.startsWith('"') || tokens[2] !== 'as' || ns === undefined)
+    throw syntax(line, `malformed use "${text}"`, form);
+  if (!NAMESPACE.test(ns))
+    throw syntax(line, `"${ns}" is not a valid module namespace`, 'Use letters, digits and _ (and {expr} placeholders).');
+  if (tokens[4] !== undefined && tokens[4] !== 'with') throw syntax(line, `unexpected "${tokens[4]}" in use`, form);
+  const file = parseValue(path, line);
+  if (file.kind !== 'string') throw syntax(line, `malformed use "${text}"`, form);
+  return { kind: 'use', line, path: normalizeModulePath(file.value, line), ns, pairs: tokens.slice(5).map((t) => parsePair(t, line)) };
+}
+
+function parseExport(line: number, text: string, cursor: Cursor): Statement {
+  if (!cursor.inModule || cursor.depth !== 2)
+    throw syntax(line, 'export is only allowed directly inside a module', 'Put it at the end of the module body.');
+  const names = splitTop(text.slice('export'.length), isComma, line);
+  if (names.length === 0 || !names.every((n) => /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/.test(n)))
+    throw syntax(line, `malformed export "${text}"`, 'Write: export disk, blades');
+  return { kind: 'export', line, names };
 }
 
 function parseFn(line: number, text: string, depth: number): Statement {
