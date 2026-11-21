@@ -11,7 +11,7 @@ import { buildCmap } from './cmap';
 import { glyphContours, phantomAdvanceDeltas, type GlyphSource } from './glyf';
 import { readGvar } from './gvar';
 import { readMetricDeltas } from './mvar';
-import { buildGposKerning } from './gpos';
+import { buildGposKerning, gdefKerningDelta } from './gpos';
 import { buildKerning } from './kern';
 import { isStrokeFont, readStrokeFont } from './stroke';
 import {
@@ -372,7 +372,9 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
     namedInstances,
     namedInstanceProblems: space?.instanceProblems ?? [],
     instance,
-    kerning: buildGposKerning(tables.table('GPOS')) ?? buildKerning(tables.table('kern')),
+    kerning:
+      buildGposKerning(tables.table('GPOS'), moved ? gdefKerningDelta(tables.table('GDEF'), coords) : null) ??
+      buildKerning(tables.table('kern')),
     outline,
     scanGlyphs: () => {
       let points = 0;

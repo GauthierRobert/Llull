@@ -34,6 +34,8 @@ cd docs/design/03-wrap-emboss/validation
 mkdir -p data/reference/firasans && curl -sL -o data/reference/firasans/FiraSans-Regular.ttf \
   https://raw.githubusercontent.com/google/fonts/45e3d5269e4a17d823f6d84470bc084dc5ae46f6/ofl/firasans/FiraSans-Regular.ttf
 node generate_wrap_refs.mjs && node generate_font_refs.mjs && node make_plans.mjs && node generate_expected.mjs
+# real CFF2 variable font references (the font itself is committed under data/reference/sourcesans3/, sources.md R28)
+python3 -m venv venv && venv/bin/pip install fonttools==4.68.0 uharfbuzz==0.57.0 && venv/bin/python generate_cff2_refs.py
 ```
 
 Commands named in the plans that **do not exist yet**: `import_font`, `text_outline`, `emboss_on_face`, `wrap_to_face`,
