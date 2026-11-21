@@ -1,3 +1,5 @@
+import type { CadDocument } from './types';
+
 /**
  * Optional viewport-capture port (ASC M6a, TR-ASC-17): `ctx.viewportCapture` asks the host for one frame of the open desktop viewport
  * drawn with a TEMPORARY camera (never the user's) and returns its PNG. Synchronous like every port: a host whose frame comes from another
@@ -31,7 +33,8 @@ export type ViewportCaptureOutcome =
 export interface ViewportCapturePort {
   /**
    * @failure no desktop renderer connected -> VIEWPORT_UNAVAILABLE; the frame is still being drawn -> VIEWPORT_PENDING (the host runs the command again);
-   * no answer in time -> VIEWPORT_TIMEOUT; the renderer could not draw it -> VIEWPORT_CAPTURE_FAILED
+   * no answer in time -> VIEWPORT_TIMEOUT; the renderer could not draw it -> VIEWPORT_CAPTURE_FAILED; `doc` (the document of this run) is not the one the
+   * viewport shows (a plan with earlier steps, an uncommitted run, a renderer that has not caught up) -> VIEWPORT_STALE; stopped by the caller -> VIEWPORT_CANCELLED
    */
-  capture(request: ViewportCaptureRequest): ViewportCaptureOutcome;
+  capture(request: ViewportCaptureRequest, doc: CadDocument): ViewportCaptureOutcome;
 }

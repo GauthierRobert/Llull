@@ -296,15 +296,17 @@ export function Entities(): React.ReactElement {
 
       {/* Always wrapped (stable tree): a live transition must not remount the entity's geometry when it starts or ends. */}
       {nonBatchableEntities.map((entity) => (
-        <LiveTransitionGroup key={entity.id} entity={entity}>
-          <EntityRenderer
-            entity={entity}
-            selected={selectionSet.has(entity.id)}
-            onSelect={handleSelect}
-            components={entity.kind === 'instance' ? document.components : undefined}
-            pbrMaterial={pbrById.get(entity.id)}
-          />
-        </LiveTransitionGroup>
+        <group key={entity.id} userData={{ entityId: entity.id }}>
+          <LiveTransitionGroup entity={entity}>
+            <EntityRenderer
+              entity={entity}
+              selected={selectionSet.has(entity.id)}
+              onSelect={handleSelect}
+              components={entity.kind === 'instance' ? document.components : undefined}
+              pbrMaterial={pbrById.get(entity.id)}
+            />
+          </LiveTransitionGroup>
+        </group>
       ))}
 
       <LiveFxLayer renderGhost={renderGhost3D} />

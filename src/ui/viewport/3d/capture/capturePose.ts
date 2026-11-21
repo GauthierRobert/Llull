@@ -17,17 +17,22 @@ export interface CapturePose {
 const FRAME_MARGIN = 1.15;
 const EMPTY_SCENE_RADIUS = 1;
 
-/** Ids of the entities a frame shows: on a visible layer and not on a layer the request hides. */
-function shownIds(doc: CadDocument, hideLayers: ReadonlySet<string>): string[] {
+/** Ids of the entities a frame shows: on a visible layer, not on a layer the request or the user's viewport filter hides, not hidden themselves. */
+function shownIds(doc: CadDocument, hideLayers: ReadonlySet<string>, hiddenEntityIds: ReadonlySet<string>): string[] {
   return doc.order.filter((id) => {
     const layerId = doc.entities[id]?.layerId;
-    return layerId !== undefined && doc.layers[layerId]?.visible !== false && !hideLayers.has(layerId);
+    return layerId !== undefined && doc.layers[layerId]?.visible !== false && !hideLayers.has(layerId) && !hiddenEntityIds.has(id);
   });
 }
 
 /** Pose that frames the shown entities (`zoom` 1 = they fit) from the requested direction; an empty scene is framed around the origin. */
-export function capturePose(request: ViewportCaptureRequest, doc: CadDocument): CapturePose {
-  const bounds = mergedEntityBounds(doc, shownIds(doc, new Set(request.hideLayers)));
+export function capturePose(
+  request: ViewportCaptureRequest,
+  doc: CadDocument,
+  hiddenLayerIds: ReadonlySet<string> = new Set(),
+  hiddenEntityIds: ReadonlySet<string> = new Set(),
+): CapturePose {
+  const bounds = mergedEntityBounds(doc, shownIds(doc, new Set([...request.hideLayers, ...hiddenLayerIds]), hiddenEntityIds));
   const aspect = request.width / request.height;
   const framing = bounds
     ? fitFraming(bounds, aspect, FRAME_MARGIN, { degenerateBelow: 0, degenerateRadius: EMPTY_SCENE_RADIUS })

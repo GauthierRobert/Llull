@@ -12,6 +12,7 @@ import { float64ToBase64 } from '@lib/float64Base64';
 import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
+import { pngHeader } from '@lib/pngHeader';
 import { parseUnit } from '@lib/quantity';
 import { parseIsoMetric, parseThreadDimensions } from '@lib/threadForm';
 import { parseBody } from '@plm/pdm/args';
@@ -567,6 +568,20 @@ export const CORE_READERS: readonly HostileReader[] = [
     build: (records) => `data:image/png;base64,${toBase64(Uint8Array.from([...png1x1(), ...new Array<number>(records * 8).fill(0)]))}`,
     read: (input) => parseImageDataUrl(asText(input)),
     accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'core: pngHeader (size of a PNG frame received from the renderer)',
+    covers: ['core/src/lib/pngHeader.ts:pngHeader'],
+    input: 'bytes',
+    build: (records) => Uint8Array.from([...png1x1(), ...new Array<number>(records * 8).fill(0)]),
+    read: (input) => pngHeader(asBytes(input)),
+    accepts: (result) => (result as { width: number } | null)?.width === 1,
+    extra: [
+      { name: 'signature only', input: () => Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]) },
+      { name: 'IHDR of the wrong length', input: () => Uint8Array.from([...png1x1().slice(0, 11), 99, ...png1x1().slice(12)]) },
+      { name: 'zero width', input: () => Uint8Array.from([...png1x1().slice(0, 16), 0, 0, 0, 0, ...png1x1().slice(20)]) },
+      { name: 'not a PNG', input: () => new Uint8Array(64).fill(255) },
+    ],
   },
   {
     name: 'core: parseMaterialLibrary (llull-material-library JSON)',

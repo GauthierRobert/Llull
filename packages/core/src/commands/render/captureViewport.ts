@@ -10,6 +10,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   VIEWPORT_PENDING: 'The frame is still being drawn: run the command again (the host does this itself under `--app`).',
   VIEWPORT_TIMEOUT: 'The viewport did not answer in time: check the app window is open and not busy, then run again.',
   VIEWPORT_CAPTURE_FAILED: 'Show the 3D view in the app (not the 2D view or a sheet) and run again.',
+  VIEWPORT_STALE:
+    'The viewport shows another document state than this run (e.g. steps of a plan before the capture, or the app has not caught up): run capture_viewport as its own call after the change is applied.',
+  VIEWPORT_CANCELLED: 'The capture was stopped; run it again.',
   VIEWPORT_UNKNOWN_LAYER: 'Use layer ids or names from describe_scene.',
 };
 const remediationOf = (code: string): string => REMEDIATION[code] ?? 'See the message.';
@@ -21,7 +24,7 @@ const NAME = 'capture_viewport';
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant the user's camera, selection and layer visibility are not touched; hideLayers applies to this frame only
- * @failure no ctx.viewportCapture -> VIEWPORT_UNAVAILABLE; unknown hideLayers entry -> VIEWPORT_UNKNOWN_LAYER; renderer refusals keep the port's code (VIEWPORT_PENDING, VIEWPORT_TIMEOUT, VIEWPORT_CAPTURE_FAILED)
+ * @failure no ctx.viewportCapture -> VIEWPORT_UNAVAILABLE; unknown hideLayers entry -> VIEWPORT_UNKNOWN_LAYER; renderer refusals keep the port's code (VIEWPORT_PENDING, VIEWPORT_TIMEOUT, VIEWPORT_CAPTURE_FAILED, VIEWPORT_STALE, VIEWPORT_CANCELLED)
  */
 export const captureViewport = defineCommand({
   name: NAME,
@@ -31,7 +34,7 @@ export const captureViewport = defineCommand({
     "the user's camera, selection, layers and the document are not changed and no window needs focus. Use with `--app`: `llull capture_viewport view=iso width=1600 height=1000 --save engine.png --app`. " +
     'Camera: `view` (iso default, top, bottom, front, back, left, right), `direction` ([x,y,z] from the scene toward the camera, overrides view), `target` (point looked at), `zoom` (1 fits the scene). ' +
     '`background` is a CSS colour; `hideLayers` (layer ids or names) leaves layers out of this frame only. Size 64..4096 per side (default 1600x1000). ' +
-    'Returns data { image (PNG, base64; written by --save), width, height, view }. Without the app: VIEWPORT_UNAVAILABLE (use `--app`, or `render_view renderer=native`). Other codes: VIEWPORT_TIMEOUT, VIEWPORT_CAPTURE_FAILED, VIEWPORT_UNKNOWN_LAYER.',
+    "Returns data { image (PNG, base64; written by --save), width, height, view }. Without the app: VIEWPORT_UNAVAILABLE (use `--app`, or `render_view renderer=native`). Other codes: VIEWPORT_TIMEOUT, VIEWPORT_CAPTURE_FAILED, VIEWPORT_STALE (the app does not show this run's document: capture in its own call, not inside build_project), VIEWPORT_UNKNOWN_LAYER.",
   params: z.object({
     view: z.enum(['top', 'bottom', 'front', 'back', 'left', 'right', 'iso']).optional().describe('Named camera direction; default "iso".'),
     direction: vec3('Viewing direction [x, y, z] pointing from the scene toward the camera (Z-up), non-zero; overrides `view`.').optional(),
@@ -91,7 +94,7 @@ export const captureViewport = defineCommand({
       ...(params.background !== undefined ? { background: params.background } : {}),
       hideLayers: layerIds,
     };
-    const outcome = port.capture(request);
+    const outcome = port.capture(request, doc);
     if (!outcome.ok) return codedRejection(doc, NAME, outcome.code, outcome.message, remediationOf(outcome.code));
     return report(doc, `Captured the viewport: ${outcome.width}x${outcome.height} PNG (${outcome.png.length} bytes), view ${view}.`, {
       image: uint8ArrayToBase64(outcome.png),
