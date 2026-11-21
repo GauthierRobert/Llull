@@ -20,7 +20,8 @@ export interface PlantBucketMeshProps {
   bucket: DrawBucket;
   entities: Readonly<Record<EntityId, Entity>>;
   cache: LodGeometryCache;
-  material: THREE.MeshStandardMaterial;
+  /** The bucket's material: shaded standard material, or the impostor shader for an impostor bucket. */
+  material: THREE.Material;
   materialColour: string | undefined;
   displayMode: DisplayMode;
   selectionSet: ReadonlySet<EntityId>;
@@ -47,7 +48,9 @@ export function PlantBucketMesh({
   const count = bucket.ids.length;
   const capacity = useBatchCapacity(count);
   const first = entities[bucket.ids[0] ?? ''];
-  const geometry = first === undefined ? undefined : cache.geometry(bucket.prototypeKey, bucket.lod, first);
+  const impostor = bucket.impostor === true;
+  const realGeometry = first === undefined ? undefined : cache.geometry(bucket.prototypeKey, bucket.lod, first);
+  const geometry = impostor ? cache.impostorQuad() : realGeometry;
 
   // A new `args` makes r3f build a NEW InstancedMesh: matrices and colours are rewritten on every identity change.
   useEffect(() => {
@@ -69,12 +72,17 @@ export function PlantBucketMesh({
 
   // No per-instance opacity: in x-ray, any selected entity raises the whole bucket's opacity (as InstancedRenderer).
   useEffect(() => {
-    if (displayMode !== 'xray') return;
-    material.opacity = bucket.ids.some((id) => selectionSet.has(id)) ? XRAY_OPACITY.selected : XRAY_OPACITY.idle;
+    if (displayMode !== 'xray' || impostor) return;
+    (material as THREE.MeshStandardMaterial).opacity = bucket.ids.some((id) => selectionSet.has(id))
+      ? XRAY_OPACITY.selected
+      : XRAY_OPACITY.idle;
     material.needsUpdate = true;
-  }, [displayMode, bucket, selectionSet, material]);
+  }, [displayMode, bucket, selectionSet, material, impostor]);
 
-  const raycast = useMemo(() => bucketRaycast(bucket, candidates), [bucket, candidates]);
+  const raycast = useMemo(
+    () => bucketRaycast(bucket, candidates, impostor ? realGeometry : undefined),
+    [bucket, candidates, impostor, realGeometry],
+  );
 
   if (geometry === undefined || count === 0) return null;
 
@@ -92,8 +100,9 @@ export function PlantBucketMesh({
       userData={{ instanceIds: bucket.ids }}
       onClick={handleClick}
       raycast={raycast}
-      castShadow={bucket.lod <= plantShadowMaxLod}
-      receiveShadow={keyShadows}
+      castShadow={!impostor && bucket.lod <= plantShadowMaxLod}
+      frustumCulled={!impostor}
+      receiveShadow={keyShadows && !impostor}
     />
   );
 }

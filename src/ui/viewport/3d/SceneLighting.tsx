@@ -9,6 +9,7 @@ import { mergedEntityBounds } from './fitBounds';
 import { computeContactShadowPlane } from './contactShadowPlane';
 import { computeKeyLightRig } from './keyLightRig';
 import type { RenderQualitySettings } from './useRenderQuality';
+import { CascadedShadows } from './effects/CascadedShadows';
 import { getContactBakeTick, markShadowsDirty, subscribeContactBake } from './renderRigState';
 
 /** drei ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
@@ -148,6 +149,7 @@ function SceneKeyLight({
 
 /** Only this subscribes to the document, so edits never re-render the Environment (its cube map would re-bake). */
 function SceneShadowRig({
+  cascaded,
   shadowMapSize,
   shadowRadius,
   keyShadows,
@@ -155,6 +157,7 @@ function SceneShadowRig({
   contactShadowOpacity,
   groundShadowOpacity,
 }: {
+  cascaded: boolean;
   shadowMapSize: number;
   shadowRadius: number;
   keyShadows: boolean;
@@ -163,9 +166,17 @@ function SceneShadowRig({
   groundShadowOpacity: number;
 }): React.ReactElement {
   const bounds = useSceneBounds();
+  const renderOrigin = useStore((s) => s.renderOrigin);
+  const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin), [bounds, renderOrigin]);
+  // Cascades (High) replace the single key light; with them off the single light is the whole path.
+  const useCascades = cascaded && keyShadows;
   return (
     <>
-      <SceneKeyLight shadowMapSize={shadowMapSize} shadowRadius={shadowRadius} castShadow={keyShadows} bounds={bounds} />
+      {useCascades ? (
+        <CascadedShadows rig={rig} shadowRadius={shadowRadius} />
+      ) : (
+        <SceneKeyLight shadowMapSize={shadowMapSize} shadowRadius={shadowRadius} castShadow={keyShadows} bounds={bounds} />
+      )}
       {keyShadows && <GroundShadowCatcher opacity={groundShadowOpacity} bounds={bounds} />}
       {contactShadows && <SceneContactShadows opacity={contactShadowOpacity} bounds={bounds} />}
     </>
@@ -203,6 +214,7 @@ export function SceneLighting({
       <directionalLight position={[-6, 8, 4]} intensity={0.4} color="#a8c8ff" />
 
       <SceneShadowRig
+        cascaded={quality.cascadedShadows}
         shadowMapSize={quality.shadowMapSize}
         shadowRadius={quality.shadowRadius}
         keyShadows={quality.keyShadows}

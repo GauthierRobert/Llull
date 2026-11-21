@@ -3,7 +3,7 @@
 // scene, or while the camera is unplannable (zero-size canvas). It subscribes to camera bumps only while a scene is active.
 
 import { useMemo, useRef } from 'react';
-import type { FrustumPlane } from '@core/geometry/renderPlanCamera';
+import type { FrustumPlane, PlanCamera } from '@core/geometry/renderPlanCamera';
 import { type PlanScene, type RenderPlan, planRender } from '@core/geometry/renderPlan';
 import { useStore } from '@ui/store';
 import { usePlantCameraView } from './PlantCameraProvider';
@@ -15,6 +15,8 @@ export interface PlantPlan {
   readonly plan: RenderPlan;
   /** The camera is moving: widened frustum, size-culled instances kept as boxes. */
   readonly moving: boolean;
+  /** The (unwidened) camera the plan was made for: the impostor split reads it. */
+  readonly camera: PlanCamera;
 }
 
 export function usePlantPlan(scene: PlanScene | null): PlantPlan | null {
@@ -33,6 +35,6 @@ export function usePlantPlan(scene: PlanScene | null): PlantPlan | null {
       ...(previousLevels && { previousLevels }),
     });
     previous.current = { scene, levels: plan.levels };
-    return { scene, plan, moving: view.moving };
+    return { scene, plan, moving: view.moving, camera: base };
   }, [scene, view, bvh]);
 }

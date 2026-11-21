@@ -3,6 +3,8 @@
 
 import type { Entity, EntityId } from '@core/model/types';
 import { LEVEL_CULLED, type PlanScene, type RenderPlan } from '@core/geometry/renderPlan';
+import type { PlanCamera } from '@core/geometry/renderPlanCamera';
+import { splitImpostors } from './impostorMath';
 
 /** Visible 3D entities from which the plan renderer takes over from the per-entity path (below it the existing renderer is cheaper and exact). */
 export const PLANT_BATCH_MIN_INSTANCES = 1500;
@@ -43,6 +45,14 @@ export function plantCoveredIds(
   return covered;
 }
 
+export interface ImpostorOptions {
+  readonly camera: PlanCamera;
+  /** Scene indices drawn as impostors by the previous plan (hysteresis). */
+  readonly held?: ReadonlySet<number>;
+  /** True when the prototype has a usable atlas; `entityId` is any instance of it. Asked once per LOD1 bucket. */
+  readonly available: (prototypeKey: string, entityId: EntityId) => boolean;
+}
+
 export interface DrawBucket {
   /** Stable React key and mesh identity: `prototypeKey|materialClass|lod`. */
   readonly key: string;
@@ -55,6 +65,8 @@ export interface DrawBucket {
   readonly members: readonly number[];
   /** Prototype key per instance (a LOD2 box bucket mixes prototypes). */
   readonly prototypes: readonly string[];
+  /** Drawn as camera-facing octahedral billboards (a far LOD1 bucket); picking still tests the real LOD1 geometry. */
+  readonly impostor?: true;
 }
 
 /**
@@ -63,9 +75,15 @@ export interface DrawBucket {
  * widened frustum blinks out while orbiting; the settled plan culls them.
  * @invariant order = plan order (buckets sorted by code unit, then unique batches), members ascending, culled boxes last
  */
-export function drawBuckets(scene: PlanScene, plan: RenderPlan, covered: ReadonlySet<EntityId>, keepCulled = false): DrawBucket[] {
+export function drawBuckets(
+  scene: PlanScene,
+  plan: RenderPlan,
+  covered: ReadonlySet<EntityId>,
+  keepCulled = false,
+  impostors?: ImpostorOptions,
+): DrawBucket[] {
   const result: DrawBucket[] = [];
-  const push = (prototypeKey: string, materialClass: string, lod: 0 | 1 | 2, members: readonly number[]): void => {
+  const push = (prototypeKey: string, materialClass: string, lod: 0 | 1 | 2, members: readonly number[], impostor = false): void => {
     const ids: EntityId[] = [];
     const kept: number[] = [];
     const prototypes: string[] = [];
@@ -77,9 +95,26 @@ export function drawBuckets(scene: PlanScene, plan: RenderPlan, covered: Readonl
       prototypes.push(scene.prototypeKeys[instance.prototype] ?? '');
     }
     if (ids.length > 0)
-      result.push({ key: `${prototypeKey}|${materialClass}|${lod}`, prototypeKey, materialClass, lod, ids, members: kept, prototypes });
+      result.push({
+        key: `${prototypeKey}|${materialClass}|${lod}${impostor ? '|imp' : ''}`,
+        prototypeKey,
+        materialClass,
+        lod,
+        ids,
+        members: kept,
+        prototypes,
+        ...(impostor && { impostor: true as const }),
+      });
   };
-  for (const bucket of plan.buckets) push(bucket.prototypeKey, bucket.materialClass, bucket.lod, bucket.members);
+  for (const bucket of plan.buckets) {
+    const first = bucket.members[0];
+    const firstId = first === undefined ? undefined : scene.instances[first]?.id;
+    if (bucket.lod === 1 && impostors !== undefined && firstId !== undefined && impostors.available(bucket.prototypeKey, firstId)) {
+      const { near, far } = splitImpostors(scene, bucket.members, impostors.camera, impostors.held);
+      push(bucket.prototypeKey, bucket.materialClass, 1, near);
+      push(bucket.prototypeKey, bucket.materialClass, 1, far, true);
+    } else push(bucket.prototypeKey, bucket.materialClass, bucket.lod, bucket.members);
+  }
   for (const batch of plan.uniqueBatches) {
     for (const index of batch.members) {
       const instance = scene.instances[index];
