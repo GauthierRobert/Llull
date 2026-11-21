@@ -13,15 +13,25 @@ import { similarNames } from '@lib/similarNames';
 import { DesignError } from './errors';
 import type { Pair, ValueNode } from './parse';
 import { convertUnits } from './units';
+import { isPlainRef, splitAliasRef } from './aliasRef';
 
 /** An arithmetic expression over parameters / loop variables (units already converted). */
 export class ExprRef {
   constructor(readonly text: string) {}
 }
 
-/** A word that is an alias id when such an alias is bound at run time, else the literal text (`{expr}` placeholders filled). */
+/**
+ * A word that is an alias reference when such an alias is bound at run time, else the literal text (`{expr}` placeholders filled).
+ * `many`: the param takes several ids (a group alias binds all of them); otherwise a group alias is a DESIGN_ALIAS_ARITY error.
+ */
 export class NameRef {
-  constructor(readonly text: string) {}
+  constructor(
+    readonly text: string,
+    readonly many = false,
+    readonly param = '',
+    /** The param is a list: the reference resolves to a list even for one id. */
+    readonly list = false,
+  ) {}
 }
 
 /** `alias.side`: a world point on that side of the alias — `{ near: point }` for face pickers, the bare point for `[x, y, z]` params. */
@@ -165,11 +175,13 @@ function bindValue(node: ValueNode, spec: ParamItemSpec, key: string, ctx: BindC
       throw bad(ctx, `${key} takes true or false`, 'Write true or false.');
     case 'string':
       if (node.kind === 'string') return node.value;
-      if (node.kind === 'word') return new NameRef(node.text);
+      if (node.kind === 'word') return new NameRef(node.text, spec.anyOf?.some((b) => b.type === 'array') ?? false, key);
       throw bad(ctx, `${key} takes a single name or "text"`, 'Quote text with "…".');
     case 'array': {
       const anchor = node.kind === 'word' ? ANCHOR.exec(node.text) : null;
       if (anchor?.[1] && anchor[2] && branch.items?.type === 'number') return new AnchorRef(anchor[1], anchor[2], true);
+      if (node.kind === 'word' && branch.items?.type === 'string' && splitAliasRef(node.text) !== null)
+        return new NameRef(node.text, true, key, true);
       if (node.kind !== 'list')
         throw bad(ctx, `${key} takes a list [a, b, …]`, 'Write the value as [a, b, …] (a point may be an anchor: base.top).');
       const items = branch.items ?? {};
@@ -200,7 +212,7 @@ function chooseBranch(node: ValueNode, branches: readonly ParamItemSpec[]): Para
   if ((node.text === 'true' || node.text === 'false') && byType('boolean')) return byType('boolean') ?? first;
   const nearObject = branches.find((b) => b.type === 'object' && b.properties?.['near'] !== undefined);
   if (ANCHOR.test(node.text) && nearObject !== undefined) return nearObject;
-  if (PLAIN_NAME.test(node.text) && byType('string') !== undefined) return byType('string') ?? first;
+  if ((PLAIN_NAME.test(node.text) || splitAliasRef(node.text) !== null) && byType('string') !== undefined) return byType('string') ?? first;
   return byType('number') ?? byType('integer') ?? byType('string') ?? first;
 }
 
@@ -237,6 +249,6 @@ function untypedValue(node: ValueNode, key: string, ctx: BindContext): Template 
   if (node.kind === 'list') return node.items.map((item) => untypedValue(item, key, ctx));
   if (node.kind !== 'word') return null;
   if (node.text === 'true' || node.text === 'false') return node.text === 'true';
-  if (PLAIN_NAME.test(node.text) && !/[+\-*/]/.test(node.text)) return new NameRef(node.text);
+  if (isPlainRef(node.text)) return new NameRef(node.text, true, key);
   return numberValue(node, key, ctx);
 }
