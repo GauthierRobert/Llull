@@ -46,7 +46,7 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
     extrusion(context, scaledPolygonProfile(context, plate.corners), mm(thickness), 0, 0, mm(plate.top - thickness));
   const parts: string[] = [];
   const section = steelProfileDef(context, profile);
-  layout.stringers.forEach((run, index) => {
+  [...layout.stringers, ...layout.knuckles].forEach((run, index) => {
     const [from, to] = [mm3(run.from), mm3(run.to)];
     const frame = sweepFrame(from, to, 0);
     if (frame === null) return;

@@ -10,7 +10,8 @@ import { round } from '../../../shared/numeric';
 import { findProfile } from '../../../steel/profiles';
 import { refuse } from '../codes';
 import { findGratingType } from '../grating/gratingTypes';
-import { landingOf } from './steelStairPhases';
+import { everyLandings, landingOf } from './steelStairPhases';
+import { landingTurnParam } from './steelStairParams';
 import { distanceToRing, walkingSurfaces } from '../ladder/ladderSurface';
 import { railingProblem } from '../railing/railingValidate';
 import { ruleById } from '../rules/ruleTable';
@@ -40,7 +41,7 @@ export const updateSteelStair = defineCommand({
   description:
     'Change fields of an existing steel stair (add_steel_stair id) in place: the id, mark, start, angle, rise and arrival surface stay, and so do its hand-rail elements, which are re-laid along the new nosing line (to move the stair or change its rise, delete it and add a new one). ' +
     'Lengths in DOCUMENT UNITS. Use it to fix check_access findings: riserMax (the riser count becomes ceil(rise / riserMax), all risers equal: STA_STAIR_RISER, STA_STAIR_BLONDEL, STA_STAIR_ANGLE), going (STA_STAIR_TREAD, STA_STAIR_BLONDEL), ' +
-    'width (STA_STAIR_WIDTH), landings or landingEvery (STA_STAIR_FLIGHT_RISE: explicit [{afterRiser, length?}] or one landing between equal flights), landingLength, stringerProfile, tread. ' +
+    'width (STA_STAIR_WIDTH), landings or landingEvery (STA_STAIR_FLIGHT_RISE: explicit [{afterRiser, length?, turn?}] or one landing between equal flights, turned by landingTurn), landingLength, stringerProfile, tread. ' +
     'Omitted fields stay; a change of riserMax or going that leaves a landing past the last riser, or a flight of fewer than 2 risers, is refused with the reason. The top must stay within 600 mm in plan of the arrival surface. ' +
     'Result data: riserCount, riserHeightMm, goingMm, blondelMm, pitchDeg, runMm, widthMm, flights, railingIds, changed.',
   params: z.object({
@@ -87,6 +88,7 @@ export const updateSteelStair = defineCommand({
       .describe(
         'Largest rise of one flight, DOCUMENT UNITS: the stair is split into ceil(rise / landingEvery) equal flights, replacing the current landings.',
       ),
+    landingTurn: landingTurnParam,
     landingLength: z
       .number()
       .positive()
@@ -103,6 +105,12 @@ export const updateSteelStair = defineCommand({
       return refuse(doc, 'update_steel_stair', 'STA_UNKNOWN_ELEMENT', `${id} is not a steel stair`, [id], ['id']);
     if (params.landings !== undefined && params.landingEvery !== undefined)
       return fail('STA_INVALID_GEOMETRY', 'give landings or landingEvery, not both', ['landings', 'landingEvery']);
+    if (params.landingTurn !== undefined && params.landingEvery === undefined)
+      return fail(
+        'STA_INVALID_GEOMETRY',
+        'landingTurn turns the landings of landingEvery: give landingEvery, or put turn on each landings[]',
+        ['landingTurn'],
+      );
     const mm = (value: number): number => fromMm(doc, value);
 
     const stringerProfile = params.stringerProfile ?? stair.stringerProfile;
@@ -131,9 +139,9 @@ export const updateSteelStair = defineCommand({
     let landings: SteelStairLanding[] = stair.landings;
     if (params.landings !== undefined) landings = params.landings.map((landing) => landingOf(landing, landingLength));
     else if (params.landingEvery !== undefined) {
-      const flights = Math.ceil(stair.rise / params.landingEvery - 1e-9);
-      const perFlight = Math.ceil(riserCount / flights);
-      landings = Array.from({ length: flights - 1 }, (_, index) => ({ afterRiser: (index + 1) * perFlight, length: landingLength }));
+      const every = everyLandings(stair.rise, riserCount, params.landingEvery, landingLength, params.landingTurn, fail);
+      if (!every.ok) return every.result;
+      landings = every.value;
     } else if (params.landingLength !== undefined)
       landings = landings.map((landing) => ({ ...landing, length: params.landingLength as number }));
     if (
