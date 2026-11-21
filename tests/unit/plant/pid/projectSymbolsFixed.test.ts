@@ -1,7 +1,7 @@
 /**
  * Plant 04 PID-FU2: project symbols for instrument bubbles, actuators and off-page connectors (`define_pid_symbol` on the classes "Instrument:<location>:<display>",
  * "Actuator:<kind>", "FlowInPipeOffPageConnector" / "FlowOutPipeOffPageConnector"). The graphics are fitted into the box of the built-in symbol (bubbles 9 x 9, connectors
- * 7 x 4, actuators 3.5 x 11 anchored on the stem foot); the sheet, the list, the load validation and the sheet content hash follow.
+ * 7 x 4, actuators 7 wide x 11 high anchored on the stem foot); the sheet, the list, the load validation and the sheet content hash follow.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -78,7 +78,7 @@ describe('define_pid_symbol: instrument bubbles', () => {
 describe('define_pid_symbol: actuators', () => {
   const doc = feedPumpControlled();
 
-  it('is anchored on its foot: a 10 x 30 box with its bottom edge at y = 100 lands with the stem foot on the valve (origin); the width limit 3.5 / 5 sets the scale', () => {
+  it('is anchored on its foot: a 10 x 30 box with its bottom edge at y = 100 lands with the stem foot on the valve (origin); the height limit 11 / 30 sets the scale (the built-in actuator is 11 high)', () => {
     const tall = {
       t: 'line',
       closed: true,
@@ -92,7 +92,7 @@ describe('define_pid_symbol: actuators', () => {
     const result = ok(doc, 'define_pid_symbol', { class: 'Actuator:diaphragm', shapes: [tall] });
     expect(result.data).toMatchObject({ family: 'actuator', halfWidth: 3.5, halfHeight: 11 });
     const stored = getPid(result.document).symbols?.['Actuator:diaphragm']?.shapes[0];
-    const scale = 3.5 / 5;
+    const scale = 11 / 30;
     expect(stored).toMatchObject({
       t: 'line',
       pts: [
@@ -109,7 +109,7 @@ describe('define_pid_symbol: actuators', () => {
     const ys = polygon(glyph).map((point) => point[1] as number);
     const valveY = (Object.values(valve.items).find((item) => item.tag === 'FV-101') as unknown as { at: number[] }).at[1] as number;
     expect(Math.min(...ys)).toBeCloseTo(valveY + 3.2, 9);
-    expect(Math.max(...ys)).toBeCloseTo(valveY + 3.2 + 30 * scale, 9);
+    expect(Math.max(...ys)).toBeCloseTo(valveY + 3.2 + 11, 9);
   });
 });
 

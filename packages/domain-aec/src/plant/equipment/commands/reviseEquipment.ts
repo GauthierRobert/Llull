@@ -7,7 +7,16 @@
 import { z } from '@core/commands/schema';
 import type { CadDocument, DocumentUnit } from '@core/model/types';
 import { parseTema } from '../codecheck/tema';
-import type { EquipmentTemplate, ExchangerSideDesign, ExchangerTemplate, NozzleRecord, PumpTemplate, TankTemplate } from '../plantData';
+import type {
+  EquipmentTemplate,
+  ExchangerChannel,
+  ExchangerKettle,
+  ExchangerSideDesign,
+  ExchangerTemplate,
+  NozzleRecord,
+  PumpTemplate,
+  TankTemplate,
+} from '../plantData';
 import { buildExchangerTemplate, channelSchema, exchangerShape, sideSchema, type ExchangerInput } from './exchangerParams';
 import { buildPumpTemplate, pumpShape, type PumpInput } from './pumpParams';
 import { buildTankTemplate, tankShape, type TankInput } from './tankParams';
@@ -111,6 +120,28 @@ function mergeDefaulted(old: readonly string[], built: readonly string[], patch:
 const sideOf = (old: ExchangerSideDesign | undefined, patch: Partial<ExchangerSideDesign> | undefined): ExchangerSideDesign | undefined =>
   old === undefined && patch === undefined ? undefined : { ...old, ...defined(patch) };
 
+const shellLetter = (temaType: string): string | undefined => {
+  const parsed = parseTema(temaType);
+  return 'tema' in parsed ? parsed.tema.shell : undefined;
+};
+
+/** A stored wall that was only a named default is dropped, so the builder derives it again from the revised shell wall. */
+function keptChannel(channel: ExchangerChannel, name: string, template: ExchangerTemplate): Partial<ExchangerChannel> {
+  if (!template.defaulted.includes(`${name}.thickness`)) return channel;
+  const { thickness: _derived, ...rest } = channel;
+  return rest;
+}
+
+function keptKettle(template: ExchangerTemplate): Partial<ExchangerKettle> {
+  const { kettle } = template;
+  if (kettle === undefined) return {};
+  if (!template.defaulted.includes('kettle.enlargedThickness')) return kettle;
+  const { enlargedThickness: _derived, ...rest } = kettle;
+  return rest;
+}
+
+const KETTLE_REQUIRED = ['enlargedInsideDiameter', 'enlargedLength', 'transitionLength', 'weirHeight'] as const;
+
 function exchangerInputOf(template: ExchangerTemplate, patch: ExchangerPatch): ExchangerInput {
   const { support, tubes, design } = template;
   const temaType = patch.temaType ?? template.temaType;
@@ -130,14 +161,27 @@ function exchangerInputOf(template: ExchangerTemplate, patch: ExchangerPatch): E
   return {
     temaType,
     orientation: patch.orientation ?? template.orientation,
-    ...(template.kettle === undefined && patch.kettle === undefined ? {} : { kettle: { ...template.kettle, ...defined(patch.kettle) } }),
+    ...(shellLetter(temaType) !== 'K' || (template.kettle === undefined && patch.kettle === undefined)
+      ? {}
+      : { kettle: { ...keptKettle(template), ...defined(patch.kettle) } }),
     shellInsideDiameter: patch.shellInsideDiameter ?? template.shellInsideDiameter,
     shellThickness: patch.shellThickness ?? template.shellThickness,
     corrosionAllowance: patch.corrosionAllowance ?? template.corrosionAllowance,
     tubes: { ...tubeBase, ...tubePatch },
     tubesheetThickness: patch.tubesheetThickness ?? template.tubesheetThickness,
-    frontChannel: { ...template.frontChannel, ...defined(patch.frontChannel) },
-    ...(fixed ? { rearChannel: { ...(template.rearChannel ?? template.frontChannel), ...defined(patch.rearChannel) } } : {}),
+    frontChannel: { ...keptChannel(template.frontChannel, 'frontChannel', template), ...defined(patch.frontChannel) },
+    ...(fixed
+      ? {
+          rearChannel: {
+            ...keptChannel(
+              template.rearChannel ?? template.frontChannel,
+              template.rearChannel === undefined ? 'frontChannel' : 'rearChannel',
+              template,
+            ),
+            ...defined(patch.rearChannel),
+          },
+        }
+      : {}),
     support: patch.support ?? (support.type === 'saddles' ? { ...support, stations: [...support.stations] } : support),
     ...(design === undefined && designPatch === undefined
       ? {}
@@ -161,7 +205,18 @@ export function reviseExchanger(
   nozzles: readonly NozzleRecord[],
   patch: ExchangerPatch,
 ): Revision<ExchangerTemplate> | VesselIssue {
-  const built = buildExchangerTemplate(exchangerInputOf(old, patch), units);
+  const input = exchangerInputOf(old, patch);
+  const parsedTema = parseTema(input.temaType);
+  if ('tema' in parsedTema && parsedTema.tema.shell === 'K' && !parsedTema.tema.fixedTubesheet && input.orientation !== 'vertical') {
+    const missing = KETTLE_REQUIRED.find((field) => input.kettle?.[field] === undefined);
+    if (missing !== undefined)
+      return {
+        code: 'EQP_PARAM_INVALID',
+        message: `a kettle shell (K) needs kettle.${missing}: give the whole kettle in the patch`,
+        path: `kettle.${missing}`,
+      };
+  }
+  const built = buildExchangerTemplate(input, units);
   if (isVesselIssue(built)) return built;
   const wallKept =
     patch.tubes === undefined ||

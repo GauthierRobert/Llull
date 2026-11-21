@@ -70,18 +70,37 @@ function exchangerDesignErrors(design: unknown, at: string): string[] {
   return errors;
 }
 
-/** The kettle record: present exactly for the shell letter K, every dimension > 0, the cylinders and the cone fit in the shell. */
+/** The kettle record: present exactly for the shell letter K (horizontal, removable-bundle rear), dimensions > 0 and the same fit checks as the command. */
 function kettleErrors(template: Record<string, unknown>, at: string): string[] {
   const { tema, kettle } = template;
   const isKettle = isRecord(tema) && tema['shell'] === 'K';
   if (kettle === undefined) return isKettle ? [`${at}.kettle is required for the shell letter K`] : [];
   if (!isKettle) return [`${at}.kettle is only for the shell letter K`];
   if (!isRecord(kettle)) return [`${at}.kettle must be an object`];
-  return positive(
+  const errors = positive(
     kettle,
     ['enlargedInsideDiameter', 'enlargedLength', 'transitionLength', 'enlargedThickness', 'weirHeight'],
     `${at}.kettle`,
   );
+  if (template['orientation'] === 'vertical') errors.push(`${at}.orientation: a kettle is horizontal only`);
+  if (isRecord(tema) && tema['fixedTubesheet'] === true)
+    errors.push(`${at}.tema: a kettle takes a removable-bundle rear, not a fixed tubesheet`);
+  const { enlargedInsideDiameter: enlarged, weirHeight, enlargedLength, transitionLength } = kettle;
+  if (isPositiveNumber(enlarged) && isPositiveNumber(template['shellInsideDiameter']) && enlarged <= template['shellInsideDiameter'])
+    errors.push(`${at}.kettle.enlargedInsideDiameter must exceed shellInsideDiameter`);
+  if (isPositiveNumber(enlarged) && isPositiveNumber(weirHeight) && weirHeight >= enlarged)
+    errors.push(`${at}.kettle.weirHeight must be below enlargedInsideDiameter`);
+  const tubes = template['tubes'];
+  if (
+    isRecord(tubes) &&
+    isPositiveNumber(tubes['length']) &&
+    isPositiveNumber(template['tubesheetThickness']) &&
+    isPositiveNumber(enlargedLength) &&
+    isPositiveNumber(transitionLength) &&
+    tubes['length'] - template['tubesheetThickness'] - enlargedLength - transitionLength <= 0
+  )
+    errors.push(`${at}.kettle.enlargedLength + transitionLength leave no restricted cylinder in the shell`);
+  return errors;
 }
 
 export function exchangerErrors(template: Record<string, unknown>, at: string): string[] {

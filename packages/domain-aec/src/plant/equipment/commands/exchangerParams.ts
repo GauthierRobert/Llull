@@ -331,7 +331,11 @@ export function buildExchangerTemplate(
   let rearChannel: ExchangerChannel | undefined;
   if (tema.fixedTubesheet) {
     if (input.rearChannel === undefined) defaulted.push('rearChannel');
-    const resolved = channel(input.rearChannel ?? input.frontChannel, 'rearChannel', tema.rear === 'M');
+    const resolved = channel(
+      input.rearChannel ?? { length: input.frontChannel.length, thickness: input.frontChannel.thickness },
+      'rearChannel',
+      tema.rear === 'M',
+    );
     if (isVesselIssue(resolved)) return resolved;
     rearChannel = resolved;
   } else if (input.rearChannel !== undefined)

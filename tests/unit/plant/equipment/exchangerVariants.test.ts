@@ -83,19 +83,12 @@ describe('vertical exchanger', () => {
     expect(partsOf(ring)).toContain('base-ring');
   });
 
-  it('the bundle pull zone of a removable-bundle vertical exchanger runs downward from the front tubesheet', () => {
+  it('a removable-bundle vertical exchanger has no zone on the floor side: a skid standing on the floor is no clearance clash (the zone points up, see exchangerReview)', () => {
     const pulled = apply(mmDocument(), 'add_heat_exchanger', { ...vertical, tag: 'E-403', temaType: 'AES', rearChannel: undefined });
-    const clash = data<{ clashes: unknown[] }>(pulled, 'check_clashes', {});
-    expect(clash.clashes).toEqual([]);
-    const intruder = apply(pulled, 'add_equipment', {
-      name: 'Intruder',
-      mark: 'X-1',
-      location: [0, 8000],
-      size: [200, 200, 400],
-      clearance: 0,
-    });
-    const hits = data<{ clashes: Array<{ kind: string }> }>(intruder, 'check_clashes', {}).clashes;
-    expect(hits.some((hit) => hit.kind === 'clearance')).toBe(true);
+    const skid = apply(pulled, 'add_equipment', { name: 'Skid', mark: 'X-1', location: [0, 8000], size: [200, 200, 400], clearance: 0 });
+    expect(data<{ clashes: Array<{ kind: string }> }>(skid, 'check_clashes', {}).clashes.some((hit) => hit.kind === 'clearance')).toBe(
+      false,
+    );
   });
 
   it('is revised in place through update_equipment_parameters (orientation + support together)', () => {

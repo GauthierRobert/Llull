@@ -1,7 +1,7 @@
 /**
  * UG-37 opening reinforcement of the shell and channel nozzles of an exchanger (plant 03 EQP-FU2). Each nozzle is judged as a nozzle in the wall of an
  * equivalent horizontal vessel (the shell against `design.shellSide`, a channel against `design.tubeSide`, the channel thickness for a channel), so the
- * area replacement is `vesselReinforcement` unchanged. Pure. Bonnets, flat covers, tubesheets and free nozzles are not covered.
+ * area replacement is `vesselReinforcement` unchanged. Pure. Bonnets, flat covers, tubesheets and free nozzles are not covered; a nozzle on the kettle cone is judged as a nozzle of the equivalent cylinder of the local inside diameter (named approximation, reported by `nozzle_reinforcement` in `data.approximations`).
  */
 
 import type { ExchangerSideDesign, ExchangerTemplate, NozzleRecord, PlantEquipmentData, VesselTemplate } from '../plantData';

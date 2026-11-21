@@ -25,7 +25,7 @@ const NOT_CHECKED = [
   'tubesheet thickness (TEMA RCB) and tube-to-tubesheet joints',
   'tubes (external pressure, tube-side vs shell-side differential)',
   'flat covers (UG-34), including the thick cover of front head D',
-  'kettle transition cone (UG-33 / Appendix 1-5) and kettle weir',
+  'kettle transition cone (UG-33 / Appendix 1-5), nozzles on the kettle cone (equivalent cylinder) and kettle weir',
   'floating head, U-bends, expansion joints, differential thermal expansion',
   'nozzle reinforcement (UG-37) and nozzle loads',
   'saddle loads and nozzles over a saddle',
