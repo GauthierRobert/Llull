@@ -8,7 +8,7 @@
 
 import type { Vec3 } from '../../model/types';
 import { maxOf } from '../../lib/arrayExtrema';
-import { factorRows } from './g1Factored';
+import { type FactorOptions, type Projector, factorRows } from './g1Factored';
 
 /** A condition: coefficient x unknown pairs over the local unknowns of a group. */
 export type SparseRow = ReadonlyArray<readonly [number, number]>;
@@ -230,15 +230,33 @@ export function solveSparse(
   samples: readonly Sample[] = [],
   maxWork?: number,
   projector: 'direct' | 'iterative' = 'direct',
+  factorOptions: FactorOptions = {},
 ): Solution {
   const n = start.length;
   const nonzeros = rows.reduce((sum, row) => sum + row.length, 0);
+  const sampleNonzeros = samples.reduce((sum, sample) => sum + sample.terms.length, 0);
+  // direct: the factor of A A^T (`g1Factored.ts`) when it fits the budget: it gives the feasibility step x0 + A^+ (b - A x0) and, with samples, every projection of the objective
+  const direct =
+    projector === 'direct'
+      ? factorRows(
+          rows,
+          n,
+          (maxWork ?? DIRECT_MAX_WORK) - (samples.length > 0 ? 3 * PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros) : 0),
+          samples.length > 0 ? PROJECTIONS : 0,
+          samples.length > 0 ? 2 * REPAIR_ROUNDS : REPAIR_ROUNDS,
+          factorOptions,
+        )
+      : null;
   const iterations = Math.min(6 * n, Math.floor((maxWork ?? SPARSE_MAX_WORK) / Math.max(1, 12 * nonzeros)));
   let feasibilityIterations = 0;
   const columns: Float64Array[] = [];
   let capped = false;
   for (let axis = 0; axis < 3; axis++) {
     const x = Float64Array.from(start, (p) => p[axis] as number);
+    if (direct !== null) {
+      columns.push(repair(rows, b, x, axis, direct.pseudoInverse));
+      continue;
+    }
     const applyT = (r: Float64Array): Float64Array => {
       const out = new Float64Array(n);
       rows.forEach((row, i) => {
@@ -276,23 +294,26 @@ export function solveSparse(
     objective: 'start',
   };
   if (capped || samples.length === 0) return solution;
+  return spendFreedom(rows, b, columns, samples, solution, direct, (maxWork ?? SPARSE_MAX_WORK) - feasibilityIterations * 12 * nonzeros);
+}
+
+/**
+ * The freedom the rows leave, spent on the limit-surface objective: through the direct projector, or by CGLS inside the work `left` (the iterative path: per axis PROJECTIONS projections,
+ * each `inner` CGLS iterations of 4 nonzeros plus 2 products over the rows and 4 over the samples, and the repair of REPAIR_ROUNDS rounds of 4 x `inner` iterations of 4 nonzeros;
+ * approximate: multiply-adds by nonzeros, not vector bookkeeping). Too little work for MIN_INNER_ITERATIONS keeps the feasible solution.
+ */
+function spendFreedom(
+  rows: readonly SparseRow[],
+  b: readonly Vec3[],
+  columns: readonly Float64Array[],
+  samples: readonly Sample[],
+  solution: Solution,
+  direct: Projector | null,
+  left: number,
+): Solution {
+  const n = columns[0]?.length ?? 0;
+  const nonzeros = rows.reduce((sum, row) => sum + row.length, 0);
   const sampleNonzeros = samples.reduce((sum, sample) => sum + sample.terms.length, 0);
-  // work left after the feasibility iterations (12 nonzeros each)
-  const used = feasibilityIterations * 12 * nonzeros;
-  const left = (maxWork ?? SPARSE_MAX_WORK) - used;
-  // direct: the envelope factor of A A^T (`g1Factored.ts`) when it fits what is left; the same projected conjugate gradient then costs two sweeps per projection
-  const direct =
-    projector === 'direct'
-      ? factorRows(
-          rows,
-          n,
-          (maxWork ?? DIRECT_MAX_WORK) - used - 3 * PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros),
-          PROJECTIONS,
-          REPAIR_ROUNDS,
-        )
-      : null;
-  // iterative: per axis PROJECTIONS projections (each `inner` CGLS iterations of 4 nonzeros, plus 2 products over the rows and 4 over the samples) and the repair (REPAIR_ROUNDS rounds of
-  // 4 x `inner` iterations of 4 nonzeros); maxWork is approximate (the counts are of multiply-adds by nonzeros, not of the vector bookkeeping)
   const perAxis = left / 3 - PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros);
   const inner = Math.min(MAX_INNER_ITERATIONS, Math.floor(perAxis / Math.max(1, (PROJECTIONS * 4 + REPAIR_ROUNDS * 4 * 4) * nonzeros)));
   if (direct === null && inner < MIN_INNER_ITERATIONS) return solution;
@@ -303,17 +324,11 @@ export function solveSparse(
     repair(rows, b, column, axis, direct?.pseudoInverse ?? ((r) => cglsPseudoInverse(rows, n, r, 4 * inner))),
   );
   const residual = violation(rows, b, repaired);
-  const reported = direct === null ? inner : 0;
-  // acceptance gate: a projection too rough to keep the conditions (the repair could not bring x back onto A x = b) keeps the nearest-to-start solution
+  const reported = direct === null ? { projectionIterations: inner } : {};
+  // acceptance gate: a projection too rough to keep the conditions (the repair could not bring x back onto A x = b) keeps the feasible solution
   return residual < solution.residual * 1e3 + 1e-12
-    ? {
-        x: asPoints(repaired, n),
-        residual,
-        status: 'ok',
-        objective: 'limit',
-        ...(direct === null ? { projectionIterations: reported } : {}),
-      }
-    : { ...solution, ...(direct === null ? { projectionIterations: reported } : {}) };
+    ? { x: asPoints(repaired, n), residual, status: 'ok', objective: 'limit', ...reported }
+    : { ...solution, ...reported };
 }
 
 /** The product A^+ A v by CGLS on the rows from zero (the part of v in the row space of A), `iterations` at most. */

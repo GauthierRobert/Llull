@@ -152,7 +152,7 @@ describe('solveSparse hardening (budget, dependent rows, determinism, acceptance
     const rough = solveSparse(rows, b, start, samples, 1e5 * nonzeros, 'iterative');
     expect(rough.projectionIterations).toBeGreaterThanOrEqual(20);
     expect(rough).toMatchObject({ status: 'ok', objective: 'start' });
-    expect(rough.x).toEqual(solveSparse(rows, b, start, []).x);
+    expect(rough.x).toEqual(solveSparse(rows, b, start, [], undefined, 'iterative').x);
     expect(violationOf(rows, b, rough.x)).toBeLessThan(1e-9);
     expect(solveSparse(rows, b, start, samples, undefined, 'iterative')).toMatchObject({
       status: 'ok',
