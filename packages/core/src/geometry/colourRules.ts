@@ -224,6 +224,18 @@ export function referencedProperties(profile: ColourProfile): ReadonlySet<string
   return keys;
 }
 
+const HAZARD_PROPERTIES: ReadonlySet<string> = new Set(['service', 'fluid', 'hazard', 'contents']);
+
+/** A profile whose colours identify what a line carries: a rule with a pipe marker, a scheme row, or a test on a service / fluid / hazard / contents property (last dotted segment, any case). */
+export const isHazardProfile = (profile: ColourProfile): boolean =>
+  hasSchemeRules(profile) ||
+  profile.rules.some((rule) => rule.marker !== undefined) ||
+  [...referencedProperties(profile)].some((key) => HAZARD_PROPERTIES.has((key.split('.').pop() ?? '').toLowerCase()));
+
+/** True when a hazard profile claims no review (`reviewRequired` false) and has no approval matching its rules now: nothing proves a human reviewed it (plant 09 §12.19 O3). */
+export const unapprovedHazardProfile = (profile: ColourProfile): boolean =>
+  !profile.reviewRequired && isHazardProfile(profile) && profile.approval?.profileSha256 !== profileSha256(profile);
+
 /**
  * `display` with `profile` stored under its id (insertion order kept) and made active when `activate`; the one writer of profiles.
  * @failure reserved / empty id, bad rule or colour -> the first ProfileProblem, nothing stored

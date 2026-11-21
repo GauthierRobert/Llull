@@ -14,6 +14,7 @@ import type { CommandResult } from '../../types';
 import { confirmExportControlled, defineCommand, z } from '../../schema';
 import { exportRefusal, report } from '../../noop';
 import { reviewOf, reviewRejection } from '../../review/reviewModel';
+import { documentProjection } from '../../../plugins/host';
 import { surfaceShadingOf } from '../../render/surfaceShading';
 import { FRAME_BACKGROUND, hexRgb, renderCameraPng, sceneCenter } from '../../render/frames';
 import { nativeRun } from '../../render/rendererProvenance';
@@ -41,7 +42,7 @@ const issueComments = (review: Review, issue: ReviewIssue, viewpointGuids: Reado
     });
 
 const warningText = (unmappedCount: number, largeCount: number): string =>
-  `${unmappedCount > 0 ? ` VIS_BCF_GUID_UNMAPPED: ${unmappedCount} entit(ies) referenced by AuthoringToolId.` : ''}` +
+  `${unmappedCount > 0 ? ` VIS_BCF_GUID_UNMAPPED: ${unmappedCount} entit(ies) with no IFC GlobalId, referenced by AuthoringToolId only.` : ''}` +
   `${largeCount > 0 ? ` VIS_BCF_COLOURING_LARGE: ${largeCount} viewpoint(s) over 1000 coloured components, the profile is written as legend labels.` : ''}`;
 
 const bcfWarnings = (
@@ -71,7 +72,7 @@ export const exportBcf = defineCommand({
     'the profile goes out as legend labels of the topic and the warning VIS_BCF_COLOURING_LARGE names the viewpoints. data: { fileName, base64, bytes, sha256, version, topics, ' +
     'viewpoints, snapshots, coloured, warnings } — save with `--save review.bcf`. snapshotRenderer "reference" (default) keeps the archive ' +
     'byte-reproducible; "native" draws the snapshots on the GPU with llull-compute (CLI / desktop only; data.deterministic false). ' +
-    'Entities have no IFC GUID yet: warning VIS_BCF_GUID_UNMAPPED. Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
+    'A component of a building element also carries the IFC GlobalId the IFC export writes for that element (Component IfcGuid); other entities carry only the AuthoringToolId (warning VIS_BCF_GUID_UNMAPPED lists them).Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
   annotations: { readOnly: true },
   params: z.object({
     issueIds: z.array(z.string()).optional().describe('Issues to export (iss-<n>), in this order. Default: every issue.'),
@@ -190,7 +191,8 @@ export const exportBcf = defineCommand({
     const outcome = run?.result();
     if (outcome !== undefined && 'code' in outcome) return fail(outcome.code, outcome.message, [], ['snapshotRenderer']);
     const archive = zipStore(entries);
-    const unmapped = [...new Set(issues.flatMap((issue) => present(issue.entityIds)))];
+    const guidOf = documentProjection('ifcGuid');
+    const unmapped = [...new Set(issues.flatMap((issue) => present(issue.entityIds)))].filter((id) => guidOf?.(doc, id) === undefined);
     const warnings = bcfWarnings(unmapped, large);
     const coloured = [...styles.values()].reduce((sum, style) => sum + (style.large ? 0 : style.coloured), 0);
     const provenance =
