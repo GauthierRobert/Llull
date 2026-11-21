@@ -12,7 +12,8 @@ import { isRecord } from '@lib/isRecord';
 import { refuseScan } from './codes';
 import { cloudAccess, isAccess } from './access';
 import { isSuccess, runOp } from './compute';
-import { unverifiedReasons } from './extraction';
+import { pendingExtraction, unverifiedReasons } from './extraction';
+import { measuredSection, measuredThickness } from './steelSection';
 import { fromM, scanOf, toM, vecFromM } from './model';
 import { regionSpec, resolveRegion } from './region';
 import { cloudIdParam, regionParam, seedParam } from './schemas';
@@ -115,10 +116,14 @@ export const fitSteelMember = defineCommand({
     'section dimension, else SCN_STEEL_AXIS_AMBIGUOUS), the points are projected onto the section plane, and every catalogue outline is scored by the RMS distance ' +
     'of the section points to the outline over a roll search with the section seen from either end. Put the region around ONE member. data: ' +
     'candidates[] best first (profile, family, scoreMm, measured hMm / bMm of the rotated extents, hDeltaMm / bDeltaMm against the catalogue, ' +
-    "axis, depthDirection, widthDirection), `member` = the best candidate's axis (start, end, direction), measured section (hMm, bMm; tw / tf " +
-    'null: not resolvable from a scan below 10 sigma, reason given) and `addSteelMember` = { profile, start, end, roll } ready for add_steel_member ' +
-    '(start / end z relative to `levelId`, whose elevation is subtracted; default the active level), plus warnings: SCN_STEEL_NO_MATCH when the best score exceeds ' +
-    'the inlier band (non-catalogue or built-up section: model manually) and SCN_STEEL_LOW_COVERAGE (occluded / one-sided: h, b, centre are of the visible part). The result is a proposal; creating the member stays a separate add_steel_member call.',
+    "axis, depthDirection, widthDirection), `member` = the best candidate's axis (start, end, direction), measured section (hMm, bMm; for an " +
+    'I section IPE / HEA / HEB also twMm / tfMm with twResidualMm / tfResidualMm and the catalogue values, else null with twTfReason) and ' +
+    '`addSteelMember` = { profile, start, end, roll } ready for add_steel_member ' +
+    '(start / end z relative to `levelId`, whose elevation is subtracted; default the active level). The member axis is refined from the fitted face planes ' +
+    '(data.axisRefinement: applied, deltaDeg, faces, residual, or the reason it was kept). Warnings: SCN_STEEL_NO_MATCH when the best score exceeds ' +
+    'the inlier band (non-catalogue or built-up section: model manually), SCN_STEEL_LOW_COVERAGE (occluded / one-sided: h, b, centre are of the visible part) and ' +
+    'SCN_STEEL_THICKNESS_MISMATCH (tw or tf further from the catalogue profile than the scan band; field-verify). data.extractions[0].extraction is a record ready for ' +
+    'commit_asbuilt_extraction, which creates the as-built member; creating a member by hand stays a separate add_steel_member call.',
   annotations: { readOnly: true },
   params: z.object({
     cloudId: cloudIdParam,
@@ -177,6 +182,7 @@ export const fitSteelMember = defineCommand({
     const outlines = STEEL_PROFILES.filter((profile) => families.includes(profile.family)).map((profile) => ({
       name: profile.name,
       loopXy: profileOutline(profile).outer.map(([x, y]) => [x / 1000, y / 1000]),
+      ...(profile.shape === 'I' ? { tw: profile.tw / 1000, tf: profile.tf / 1000 } : {}),
     }));
     const native: Record<string, unknown> = { region: resolved.region, outlines, maxCandidates, seed };
     if (axisHint !== undefined) native['axisHint'] = unitHint(axisHint);
@@ -194,9 +200,14 @@ export const fitSteelMember = defineCommand({
       return refuseScan(doc, command, 'NATIVE_PROTOCOL', 'the steel fit answered without candidates', [cloudId]);
     const candidates = raw.map((candidate) => candidateOf(doc, candidate));
     const best = candidates[0];
-    const warnings = (Array.isArray(result['warnings']) ? result['warnings'] : [])
+    if (best === undefined) return refuseScan(doc, command, 'NATIVE_PROTOCOL', 'the steel fit answered without candidates', [cloudId]);
+    const nativeWarnings = (Array.isArray(result['warnings']) ? result['warnings'] : [])
       .filter(isRecord)
       .flatMap((w) => (typeof w['code'] === 'string' ? [{ code: w['code'], message: String(w['message'] ?? '') }] : []));
+    const nativeThreshold = result['threshold'];
+    const bandMm = isRecord(nativeThreshold) ? mm(nativeThreshold['value']) : Number.POSITIVE_INFINITY;
+    const thickness = measuredThickness(result['thickness'], findProfile(best.profile), bandMm);
+    const warnings = [...nativeWarnings, ...thickness.warnings];
     const reasons = unverifiedReasons(
       scanOf(doc),
       access.cloud,
@@ -205,7 +216,6 @@ export const fitSteelMember = defineCommand({
     const [startDoc, endDoc] = [vecFromM(doc, start), vecFromM(doc, end)];
     const length = fromM(doc, Number(result['length']));
     const relative = (point: Vec): Vec => [point[0], point[1], point[2] - elevation];
-    const nativeThreshold = result['threshold'];
     const threshold = isRecord(nativeThreshold)
       ? {
           ...nativeThreshold,
@@ -216,15 +226,38 @@ export const fitSteelMember = defineCommand({
       : null;
     const provenance = {
       method: 'pca axis + chamfer section match',
-      algorithmVersion: `${ran.provenance.binary}/steel-1`,
+      algorithmVersion: `${ran.provenance.binary}/steel-2`,
       seed,
       device: ran.provenance.device,
       deterministic: ran.provenance.deterministic,
     };
     const codes = [...new Set(warnings.map((w) => w.code))];
+    const extraction = pendingExtraction(
+      access.cloud,
+      regionSpec(region),
+      {
+        profile: best.profile,
+        start,
+        end,
+        direction: axis,
+        length: Number(result['length']),
+        roll: memberRoll(startDoc, endDoc, depth),
+        depthDirection: depth,
+        widthDirection: vec(raw[0]?.['widthDirection']) ?? null,
+        hMm: best.hMm,
+        bMm: best.bMm,
+        twMm: thickness.tw?.mm ?? null,
+        tfMm: thickness.tf?.mm ?? null,
+        scoreMm: best.scoreMm,
+      },
+      undefined,
+      reasons,
+      provenance,
+      'steel_member',
+    );
     return report(
       doc,
-      `fit_steel_member on ${cloudId}: best ${best?.profile} (score ${(best?.scoreMm ?? 0).toFixed(2)} mm, h ${(best?.hMm ?? 0).toFixed(1)} x b ${(best?.bMm ?? 0).toFixed(1)} mm), ` +
+      `fit_steel_member on ${cloudId}: best ${best.profile} (score ${best.scoreMm.toFixed(2)} mm, h ${best.hMm.toFixed(1)} x b ${best.bMm.toFixed(1)} mm), ` +
         `${candidates.length} candidate(s), length ${length.toPrecision(5)} ${doc.units}${codes.length > 0 ? ` [${codes.join(', ')}]` : ''}. ` +
         'Create it with add_steel_member data.addSteelMember.',
       {
@@ -234,21 +267,16 @@ export const fitSteelMember = defineCommand({
         candidates,
         axis: { direction: axis, start: startDoc, end: endDoc },
         member: { start: startDoc, end: endDoc, direction: axis, length },
-        measured: {
-          hMm: best?.hMm,
-          bMm: best?.bMm,
-          rollDeg: best?.rollDeg,
-          twMm: null,
-          tfMm: null,
-          twTfReason: 'web and flange thickness are below 10 sigma of a scan in general; read them from the catalogue candidate',
-        },
+        measured: measuredSection({ hMm: best.hMm, bMm: best.bMm, rollDeg: best.rollDeg }, thickness),
+        axisRefinement: result['axisRefinement'] ?? null,
         addSteelMember: {
-          profile: best?.profile,
+          profile: best.profile,
           start: relative(startDoc),
           end: relative(endDoc),
           roll: memberRoll(startDoc, endDoc, depth),
           ...(levelId === undefined ? {} : { levelId }),
         },
+        extractions: [{ profile: best.profile, unverified: reasons.length > 0, extraction }],
         rms: fromM(doc, Number(result['rms'])),
         pointsInRegion: result['pointsInRegion'],
         threshold,

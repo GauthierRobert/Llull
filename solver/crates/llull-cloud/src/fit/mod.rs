@@ -8,6 +8,7 @@ pub mod cylinder;
 pub mod plane;
 pub mod sphere;
 pub mod steel;
+pub mod steel_faces;
 pub mod trace;
 mod trace_next;
 pub mod trace_result;

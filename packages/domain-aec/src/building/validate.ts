@@ -281,6 +281,14 @@ const TEXT_FIELDS: Partial<Record<string, ReadonlyArray<string>>> = {
   connection: ['material'],
 };
 
+function asBuiltErrors(key: string, element: Elements): string[] {
+  const asBuilt = element['asBuilt'];
+  return asBuilt !== undefined &&
+    !(isRecord(asBuilt) && typeof asBuilt['extractionId'] === 'string' && typeof asBuilt['unverified'] === 'boolean')
+    ? [`building element ${key}: asBuilt must be { extractionId, unverified }`]
+    : [];
+}
+
 function pipeFieldErrors(key: string, element: Elements): string[] {
   const errors: string[] = [];
   for (const field of ['line', 'from', 'to']) {
@@ -292,14 +300,7 @@ function pipeFieldErrors(key: string, element: Elements): string[] {
   if (dn !== undefined && !(typeof dn === 'number' && Number.isInteger(dn) && dn > 0)) {
     errors.push(`building element ${key}: dn must be a positive integer`);
   }
-  const asBuilt = element['asBuilt'];
-  if (
-    asBuilt !== undefined &&
-    !(isRecord(asBuilt) && typeof asBuilt['extractionId'] === 'string' && typeof asBuilt['unverified'] === 'boolean')
-  ) {
-    errors.push(`building element ${key}: asBuilt must be { extractionId, unverified }`);
-  }
-  return errors;
+  return [...errors, ...asBuiltErrors(key, element)];
 }
 
 function pointListErrors(key: string, category: string, element: Elements): string[] {
@@ -361,7 +362,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
     ...(category === 'footing' ? footingErrors(key, element) : []),
     ...(category === 'stair' ? stairErrors(key, element) : []),
     ...planShapeErrors(key, category, element),
-    ...(category === 'member' ? memberGeometryErrors(key, element) : []),
+    ...(category === 'member' ? [...memberGeometryErrors(key, element), ...asBuiltErrors(key, element)] : []),
     ...(category === 'equipment' ? equipmentErrors(key, element) : []),
     ...roleErrors(key, category, element),
     ...(TEXT_FIELDS[category] ?? []).flatMap((field) =>

@@ -40,7 +40,7 @@ fn l_loop(h: f64, b: f64, t: f64) -> Vec<[f64; 2]> {
 }
 
 fn outline(name: &str, loop_xy: Vec<[f64; 2]>) -> Outline {
-    Outline { name: name.to_string(), loop_xy }
+    Outline { name: name.to_string(), loop_xy, tw: None, tf: None }
 }
 
 fn catalogue() -> Vec<Outline> {
@@ -191,6 +191,14 @@ fn vc_scn_23_on_the_pack_file_stl_a() {
     assert!(dot(&found.axis_direction, &[0.0, 1.0, 0.0]).abs() > 0.99999, "axis {:?}", found.axis_direction);
     let off = sub(&best.centre, &[5.0, best.centre[1], 4.0]);
     assert!(norm(&off) < 0.003, "centre {:?}", best.centre);
+    // The pack scan is one-sided (faces seen from +x / +z): the web (7.1 mm = 7 sigma, one face seen) is not resolved, a flange is.
+    let strict = fit(&points, &thick_catalogue(), None, 3, &FitSettings { noise_sigma: Some(0.001), ..FitSettings::default() }).unwrap();
+    let thickness = strict.thickness.expect("outline carries tw / tf");
+    assert!(thickness.tw.is_none(), "{:?}", thickness);
+    assert!(thickness.reason.unwrap().contains("tw:"));
+    assert!((thickness.tf.expect("tf").value - 0.0107).abs() < 0.001);
+    assert!(strict.axis_refinement.applied, "{:?}", strict.axis_refinement.reason);
+    assert!(dot(&strict.axis_direction, &[0.0, 1.0, 0.0]).abs() > 0.99999);
 }
 
 #[test]
@@ -276,4 +284,105 @@ fn the_steel_op_job_runs_over_an_imported_asset_and_refuses_bad_params() {
     assert_eq!(run("snake", serde_json::json!({ "outlines": snake })).unwrap_err().code, "NATIVE_JOB_INPUT");
     assert_eq!(run("hint", serde_json::json!({ "outlines": outlines, "axisHint": [0.0, 0.0, 0.0] })).unwrap_err().code, "NATIVE_JOB_INPUT");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn i_outline(name: &str, h: f64, b: f64, tw: f64, tf: f64) -> Outline {
+    Outline { name: name.to_string(), loop_xy: i_loop(h, b, tw, tf), tw: Some(tw), tf: Some(tf) }
+}
+
+fn thick_catalogue() -> Vec<Outline> {
+    vec![
+        i_outline("IPE270", 0.27, 0.135, 0.0066, 0.0102),
+        i_outline("IPE300", 0.3, 0.15, 0.0071, 0.0107),
+        i_outline("IPE330", 0.33, 0.16, 0.0075, 0.0115),
+    ]
+}
+
+fn tilted(axis: V, degrees: f64) -> V {
+    let t = degrees.to_radians();
+    unit_v(add(&scale(&axis, t.cos()), &scale(&[1.0, 0.0, 0.0], t.sin())))
+}
+
+#[test]
+fn the_web_and_flange_thickness_are_measured_with_their_residual() {
+    let mut rng = Rng::new(21);
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 8000, 2.0, 0.0005, &aligned());
+    let found = fit(&points, &thick_catalogue(), None, 3, &settings()).unwrap();
+    assert_eq!(found.candidates[0].profile, "IPE300");
+    let thickness = found.thickness.expect("outline carries tw / tf");
+    let (tw, tf) = (thickness.tw.expect("tw"), thickness.tf.expect("tf"));
+    assert!((tw.value - 0.0071).abs() < 0.0008, "tw {}", tw.value);
+    assert!((tf.value - 0.0107).abs() < 0.0008, "tf {}", tf.value);
+    assert!(tw.residual < 0.0012 && tf.residual < 0.0012, "residuals {} {}", tw.residual, tf.residual);
+    assert!(tw.samples >= 20 && tf.samples >= 40 && thickness.reason.is_none());
+}
+
+#[test]
+fn a_thicker_web_than_the_catalogue_is_measured_as_such() {
+    let mut rng = Rng::new(22);
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.011, 0.0107), 8000, 2.0, 0.0004, &aligned());
+    let found = fit(&points, &thick_catalogue(), None, 3, &settings()).unwrap();
+    let tw = found.thickness.unwrap().tw.unwrap();
+    assert!((tw.value - 0.011).abs() < 0.0008, "tw {}", tw.value);
+}
+
+#[test]
+fn an_outline_without_tw_tf_has_no_thickness_and_a_bad_pair_is_refused() {
+    let mut rng = Rng::new(23);
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 3000, 2.0, 0.0005, &aligned());
+    assert!(fit(&points, &catalogue(), None, 3, &settings()).unwrap().thickness.is_none());
+    let mut half = i_outline("IPE300", 0.3, 0.15, 0.0071, 0.0107);
+    half.tf = None;
+    assert_eq!(fit(&points, &[half], None, 3, &settings()).unwrap_err().code, "NATIVE_JOB_INPUT");
+    let mut fat = i_outline("IPE300", 0.3, 0.15, 0.0071, 0.0107);
+    fat.tf = Some(0.16);
+    assert_eq!(fit(&points, &[fat], None, 3, &settings()).unwrap_err().code, "NATIVE_JOB_INPUT");
+}
+
+#[test]
+fn a_sparse_web_leaves_tw_null_with_a_reason() {
+    let mut rng = Rng::new(24);
+    let mut points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 8000, 2.0, 0.0005, &aligned());
+    points.retain(|p| !(p[0].abs() < 0.02 && p[1].abs() < 0.12));
+    let found = fit(&points, &thick_catalogue(), Some([0.0, 0.0, 1.0]), 3, &settings()).unwrap();
+    let thickness = found.thickness.unwrap();
+    assert!(thickness.tw.is_none() && thickness.tf.is_some());
+    assert!(thickness.reason.unwrap().contains("tw"));
+}
+
+#[test]
+fn the_face_planes_pull_a_tilted_hint_back_onto_the_axis() {
+    let mut rng = Rng::new(25);
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 8000, 3.0, 0.0005, &aligned());
+    let truth = [0.0, 0.0, 1.0];
+    let found = fit(&points, &thick_catalogue(), Some(tilted(truth, 0.6)), 3, &settings()).unwrap();
+    assert_eq!(found.candidates[0].profile, "IPE300");
+    let refinement = &found.axis_refinement;
+    assert!(refinement.applied, "{:?}", refinement.reason);
+    assert!(refinement.faces >= 4 && refinement.delta_deg > 0.3 && refinement.delta_deg < 1.0, "delta {}", refinement.delta_deg);
+    assert!(refinement.residual < 0.002, "residual {}", refinement.residual);
+    let off = dot(&found.axis_direction, &truth).abs().acos().to_degrees();
+    assert!(off < 0.2, "axis {off} deg off the truth");
+    assert!(found.thickness.unwrap().tw.is_some());
+}
+
+#[test]
+fn a_hint_far_off_the_axis_is_not_refined() {
+    let mut rng = Rng::new(26);
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 8000, 3.0, 0.0005, &aligned());
+    if let Ok(found) = fit(&points, &thick_catalogue(), Some(tilted([0.0, 0.0, 1.0], 12.0)), 3, &settings()) {
+        assert!(!found.axis_refinement.applied && found.axis_refinement.reason.is_some());
+    }
+}
+
+#[test]
+fn the_principal_axis_stays_within_a_tenth_of_a_degree_after_refinement() {
+    let mut rng = Rng::new(27);
+    let z = unit_v([0.3, 0.8, 0.5]);
+    let x = unit_v(cross(&z, &[0.0, 0.0, 1.0]));
+    let y = cross(&z, &x);
+    let frame = Frame { origin: [1.0, 2.0, 3.0], x, y, z };
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 6000, 3.0, 0.0005, &frame);
+    let found = fit(&points, &thick_catalogue(), None, 3, &settings()).unwrap();
+    assert!(dot(&found.axis_direction, &z).abs().acos().to_degrees() < 0.1);
 }
