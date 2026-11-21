@@ -221,7 +221,7 @@ export function layoutSteelStair(stair: LayoutInput, sizes: StairSizes): StairLa
 /**
  * Handrail path of one side (`side` = +1 left, -1 right of the climb direction) on the nosing line: every nosing from the first to the last riser
  * and, at a landing, the point where the next flight starts; at a turn the rail follows the landing to the same-side rail of the next flight (one
- * corner at a quarter turn, two at a half turn). z is the walking surface above the level.
+ * corner at a quarter turn; at a half turn the outer rail goes round the far edge and the inner one only crosses the well). z is the walking surface above the level.
  */
 export function handrailPath(stair: LayoutInput, sizes: StairSizes, side: 1 | -1): Vec3[] {
   const { stations, riserFrames } = pathOf(stair, sizes);
@@ -243,8 +243,11 @@ export function handrailPath(stair: LayoutInput, sizes: StairSizes, side: 1 | -1
     const turn = landing.turn;
     if (turn === undefined) path.push(point(frame, beyond, offset, height));
     else if (isHalf(turn)) {
-      path.push(point(frame, beyond, offset, height));
-      path.push(point(frame, beyond, turnSign(turn) * halfTurnAxes(stair.width, sizes) - offset, height));
+      // The inner rail only crosses the well between the flights at the near edge (the landing stays walkable); the outer rail goes round the far edge.
+      if (side !== turnSign(turn)) {
+        path.push(point(frame, beyond, offset, height));
+        path.push(point(frame, beyond, turnSign(turn) * halfTurnAxes(stair.width, sizes) - offset, height));
+      } else path.push(point(frame, here, turnSign(turn) * halfTurnAxes(stair.width, sizes) - offset, height));
     } else path.push(point(frame, beyond - stair.width / 2 - turnSign(turn) * offset, offset, height));
   }
   return path;

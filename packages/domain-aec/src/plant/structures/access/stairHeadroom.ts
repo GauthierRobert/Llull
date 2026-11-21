@@ -13,7 +13,8 @@ import { fromMm, toMm } from '@core/model/units';
 import { pointInPolygon } from '@lib/polygon';
 import type { BuildingModel, SteelStairElement } from '@aec/building/types';
 import { elementsOf } from '../../../building/model';
-import { accessLinks, hostedRailings, type Hosted } from '../clash/structuresClashBodies';
+import { accessLinks, hostedRailings, stairFlightBoxes, type Hosted } from '../clash/structuresClashBodies';
+import { boxExtent } from '../../../industrial/clash/clashBoxes';
 import { boxFootprint } from '../ladder/boxFootprint';
 import { ruleById, type AccessRule, type RulesetName } from '../rules/ruleTable';
 import { directionOf, framePoint, layoutSteelStair } from '../stair/steelStairLayout';
@@ -101,7 +102,15 @@ export function stairHeadroom(
   const exclude = new Set(accessLinks(doc, building, stair, context.hosted));
   const candidates = context.candidates.filter((candidate) => !exclude.has(candidate.id) && !exclude.has(candidate.group));
   const slabs = context.slabs.filter((slab) => !exclude.has(slab.id));
-  const { stations, regions } = layoutSteelStair(stair, stairSizes(doc, stair));
+  const { stations, regions, frames } = layoutSteelStair(stair, stairSizes(doc, stair));
+  // The stair's own flights two or more above the sampled one hang over it (a switchback): the next flight is the one it leaves to, not an obstruction.
+  const own = stairFlightBoxes(doc, stair, level).map(({ flight, box }) => ({
+    flight,
+    id: stair.id,
+    group: stair.id,
+    box,
+    ...boxExtent(box),
+  }));
   const base = level.elevation + stair.start[2];
   const [step, touch] = [fromMm(doc, SAMPLE_MM), fromMm(doc, TOUCH_MM)];
   const inset = fromMm(doc, 0.01);
@@ -126,7 +135,9 @@ export function stairHeadroom(
     const corners = [at(0, lo), at(length, lo), at(length, hi), at(0, hi)];
     const [minX, maxX] = [minOf(corners.map((c) => c[0])), maxOf(corners.map((c) => c[0]))];
     const [minY, maxY] = [minOf(corners.map((c) => c[1])), maxOf(corners.map((c) => c[1]))];
-    const near = candidates.filter((c) => c.max[0] >= minX && c.min[0] <= maxX && c.max[1] >= minY && c.min[1] <= maxY);
+    const lastFlight = frames.lastIndexOf(frame);
+    const above = own.filter((part) => part.flight >= lastFlight + 2);
+    const near = [...candidates, ...above].filter((c) => c.max[0] >= minX && c.min[0] <= maxX && c.max[1] >= minY && c.min[1] <= maxY);
     const origin = at(0, 0);
     const alongEdges: number[] = [];
     const acrossEdges: number[] = [];

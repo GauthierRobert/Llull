@@ -83,7 +83,7 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
   });
   const turned = stair.landings.some((landing) => landing.turn !== undefined);
   const type = turned ? (turnType(stair) ?? '.USERDEFINED.') : (STAIR_TYPES[stair.landings.length] ?? '.USERDEFINED.');
-  const objectType = type === '.USERDEFINED.' ? ifcString('MULTI_FLIGHT_STRAIGHT_STAIR') : '$';
+  const objectType = type === '.USERDEFINED.' ? ifcString(turned ? 'MULTI_FLIGHT_TURNING_STAIR' : 'MULTI_FLIGHT_STRAIGHT_STAIR') : '$';
   const ref = writer.add(
     `IFCSTAIR('${context.guid(stair.id)}',$,${ifcString(stair.mark)},$,${objectType},${local},$,${ifcString(stair.id)},${type})`,
   );

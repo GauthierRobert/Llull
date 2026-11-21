@@ -93,6 +93,13 @@ function steelStairErrors(key: string, element: Record<string, unknown>): string
     errors.push(
       `building element ${key}: landings must be ascending { afterRiser, length, turn? (quarter_left, quarter_right, half_left, half_right) } leaving flights of 2+ risers`,
     );
+  const width = element['width'];
+  if (
+    landingsValid &&
+    isFiniteNumber(width) &&
+    (landings as Array<Record<string, unknown>>).some((landing) => landing['turn'] !== undefined && (landing['length'] as number) < width)
+  )
+    errors.push(`building element ${key}: landings[].length must be at least the stair width on a turning landing (turn set)`);
   if (element['arrivalSurfaceId'] !== undefined && typeof element['arrivalSurfaceId'] !== 'string')
     errors.push(`building element ${key}: arrivalSurfaceId must be a string`);
   return errors;
