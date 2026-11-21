@@ -16,15 +16,17 @@ import { isVesselIssue, type VesselIssue } from './vesselParams';
 export const exchangerPatchSchema = z
   .object({
     temaType: exchangerShape.temaType.optional(),
+    orientation: exchangerShape.orientation,
+    kettle: exchangerShape.kettle.unwrap().partial().optional().describe('Kettle fields to change (TEMA K only); the others are kept.'),
     shellInsideDiameter: exchangerShape.shellInsideDiameter.optional(),
     shellThickness: exchangerShape.shellThickness.optional(),
     corrosionAllowance: exchangerShape.corrosionAllowance,
     tubes: exchangerShape.tubes.partial().optional().describe('Tube fields to change; the others are kept (give wallThickness OR bwg).'),
     tubesheetThickness: exchangerShape.tubesheetThickness.optional(),
-    frontChannel: channelSchema.partial().optional().describe('Front channel fields to change { length, thickness }.'),
+    frontChannel: channelSchema.partial().optional().describe('Front channel fields to change { length, thickness, coverThickness }.'),
     rearChannel: channelSchema.partial().optional().describe('Rear channel fields to change (fixed-tubesheet rears L, M, N only).'),
     support: exchangerShape.support.describe(
-      'New support; replaces the whole support (saddles { stations, width, axisElevation } or none).',
+      'New support; replaces the whole support (saddles { stations, width, axisElevation } or none; vertical: skirt, legs or none). Changing orientation needs a suiting support in the same patch.',
     ),
     design: z
       .object({
@@ -127,7 +129,8 @@ function exchangerInputOf(template: ExchangerTemplate, patch: ExchangerPatch): E
   const designPatch = patch.design;
   return {
     temaType,
-    orientation: 'horizontal',
+    orientation: patch.orientation ?? template.orientation,
+    ...(template.kettle === undefined && patch.kettle === undefined ? {} : { kettle: { ...template.kettle, ...defined(patch.kettle) } }),
     shellInsideDiameter: patch.shellInsideDiameter ?? template.shellInsideDiameter,
     shellThickness: patch.shellThickness ?? template.shellThickness,
     corrosionAllowance: patch.corrosionAllowance ?? template.corrosionAllowance,

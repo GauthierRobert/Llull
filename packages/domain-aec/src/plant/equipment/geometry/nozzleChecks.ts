@@ -4,7 +4,7 @@
  */
 
 import type { EquipmentTemplate, ExchangerTemplate, NozzleRecord, TankTemplate, VesselTemplate } from '../plantData';
-import { resolveExchanger } from './exchangerFrame';
+import { resolveExchanger, shellOutsideRadiusAt } from './exchangerFrame';
 import { thicknessAt } from './tankFrame';
 import { headSurfaceHeight, inKnuckleZone, resolveVessel, type VesselGeometry } from './vesselFrame';
 import { neckLengthOf } from './nozzleMass';
@@ -70,7 +70,7 @@ function minimumProjection(geometry: VesselGeometry, nozzle: NozzleRecord): numb
 function exchangerProblem(template: ExchangerTemplate, nozzle: NozzleRecord): NozzleIssue | null {
   const { location } = nozzle;
   const geometry = resolveExchanger(template);
-  const wall = (thickness: number): number => geometry.radius + thickness + nozzle.flange.thickness;
+  const wall = (thickness: number, radius: number): number => radius + thickness + nozzle.flange.thickness;
   const tooShort = (minimum: number): NozzleIssue | null =>
     nozzle.projection >= minimum
       ? null
@@ -92,7 +92,7 @@ function exchangerProblem(template: ExchangerTemplate, nozzle: NozzleRecord): No
         `station ${location.station} is outside the shell 0..${geometry.shellLength}`,
         'location.station',
       );
-    return tooShort(wall(geometry.shellThickness));
+    return tooShort(shellOutsideRadiusAt(geometry, location.station) + nozzle.flange.thickness);
   }
   if (location.on === 'channel') {
     const end = location.channel === 'front' ? geometry.front : geometry.rear;
@@ -104,7 +104,7 @@ function exchangerProblem(template: ExchangerTemplate, nozzle: NozzleRecord): No
       );
     if (!(location.station >= 0 && location.station <= end.channelLength))
       return issue('EQP_NOZZLE_OFF_BODY', `station ${location.station} is outside the channel 0..${end.channelLength}`, 'location.station');
-    return tooShort(wall(end.channelThickness));
+    return tooShort(wall(end.channelThickness, end.radius));
   }
   return issue('EQP_PARAM_INVALID', 'an exchanger takes nozzles on the shell, on a channel or free, not on a head', 'location.on');
 }

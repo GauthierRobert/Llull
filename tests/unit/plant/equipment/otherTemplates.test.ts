@@ -94,6 +94,54 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
       /saddles or none/,
     ],
     [
+      'exchanger with a bad orientation',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['orientation'] = 'diagonal'),
+      /orientation must be horizontal or vertical/,
+    ],
+    [
+      'vertical exchanger on saddles',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['orientation'] = 'vertical'),
+      /skirt, legs or none for a vertical exchanger/,
+    ],
+    [
+      'kettle record on a non-K shell',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['kettle'] = { enlargedInsideDiameter: 900 }),
+      /kettle is only for the shell letter K/,
+    ],
+    [
+      'K shell without a kettle record',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['tema'] as Record<string, unknown>)['shell'] = 'K'),
+      /kettle is required for the shell letter K/,
+    ],
+    [
+      'K shell with an incomplete kettle',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        (t['tema'] as Record<string, unknown>)['shell'] = 'K';
+        t['kettle'] = { enlargedInsideDiameter: 900 };
+      },
+      /kettle\.weirHeight must be a number > 0/,
+    ],
+    [
+      'K shell with a kettle that is not an object',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        (t['tema'] as Record<string, unknown>)['shell'] = 'K';
+        t['kettle'] = 3;
+      },
+      /kettle must be an object/,
+    ],
+    [
+      'channel with a bad cover thickness',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['frontChannel'] as Record<string, unknown>)['coverThickness'] = -1),
+      /coverThickness must be a number > 0/,
+    ],
+    [
       'fixed exchanger without a rear channel',
       'equipment-1',
       (_p: Record<string, unknown>, t: Record<string, unknown>) => delete t['rearChannel'],

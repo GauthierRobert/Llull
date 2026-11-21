@@ -42,16 +42,15 @@ describe('VC-EQP-11: TEMA designation parser', () => {
     expect(parsed).toMatchObject({ code: entry['error'], path: (entry['paths'] as string[])[0] });
   });
 
-  it('AKT is a valid designation that is not modelled: the shell letter K is reported EQP_TEMA_UNSUPPORTED at index 1', () => {
-    const parsed = parseTema('AKT');
-    expect('tema' in parsed && parsed.unsupported).toMatchObject({ code: 'EQP_TEMA_UNSUPPORTED', path: 'temaType.1' });
+  it('AKT and DEM parse: K, X and D are table letters that the command builds from caller dimensions', () => {
+    expect(parseTema('AKT')).toMatchObject({ tema: { front: 'A', shell: 'K', rear: 'T', removableBundle: true } });
+    expect(parseTema('DXU')).toMatchObject({ tema: { front: 'D', shell: 'X', rear: 'U' } });
   });
 
   it('is case-insensitive and rejects non-letters and wrong lengths', () => {
     expect('tema' in parseTema(' bem ')).toBe(true);
     for (const text of ['', 'BE', 'BEMX', 'B1M', 'B M'])
       expect(parseTema(text), text).toMatchObject({ code: 'EQP_TEMA_INVALID', path: 'temaType' });
-    expect(parseTema('DEM')).toMatchObject({ tema: { front: 'D' }, unsupported: { code: 'EQP_TEMA_UNSUPPORTED', path: 'temaType.0' } });
   });
 });
 
@@ -165,8 +164,9 @@ describe('add_heat_exchanger: refusals leave the document unchanged and name the
   it.each([
     ['EQP_TEMA_INVALID', { temaType: 'BXZ' }, 'temaType.2'],
     ['EQP_TEMA_INVALID', { temaType: 'BE' }, 'temaType'],
-    ['EQP_TEMA_UNSUPPORTED', { temaType: 'AKT' }, 'temaType.1'],
-    ['EQP_TEMA_UNSUPPORTED', { temaType: 'DEM' }, 'temaType.0'],
+    ['EQP_PARAM_INVALID', { temaType: 'AKT' }, 'kettle'],
+    ['EQP_PARAM_INVALID', { temaType: 'DEM' }, 'frontChannel.thickness'],
+    ['EQP_EXCHANGER_UNSUPPORTED', { temaType: 'BKM' }, 'temaType.2'],
     ['EQP_PARAM_INVALID', { tubes: { ...bemParams.tubes, bwg: 16 } }, 'tubes.bwg'],
     ['EQP_PARAM_INVALID', { tubes: { ...bemParams.tubes, wallThickness: undefined } }, 'tubes.wallThickness'],
     ['EQP_PARAM_INVALID', { tubes: { ...bemParams.tubes, wallThickness: 9.6 } }, 'tubes.wallThickness'],

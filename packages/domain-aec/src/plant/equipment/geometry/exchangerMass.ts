@@ -7,6 +7,7 @@
 import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { ExchangerTemplate } from '../plantData';
 import { exchangerVolumes, type ExchangerEnd, type ExchangerGeometry } from './exchangerFrame';
+import { segmentMetal } from './exchangerShell';
 import { headMetalVolume } from './headOffset';
 import { TEST_WATER_KG_PER_M3, type MassPart } from './vesselMass';
 import { powInt } from '@lib/powInt';
@@ -53,24 +54,29 @@ export function exchangerMass(scale: number, template: ExchangerTemplate, geomet
     }
     const closure =
       end.closure === 'flat'
-        ? { part: `${name}Cover`, method: 'flat cover: disc of the outside radius (as drawn) x channel thickness x density' }
+        ? { part: `${name}Cover`, method: 'flat cover: disc of the outside radius (as drawn) x cover thickness x density' }
         : {
             part: end.closure === 'bonnet' ? `${name}Bonnet` : `${name}ShellCover`,
             method: 'exact solid between the inside profile and its outward offset by t, closed by the tangent plane',
           };
     const metal =
       end.closure === 'flat'
-        ? Math.PI * (radius + end.channelThickness) ** 2 * end.channelThickness
-        : headMetalVolume(end.head, radius, end.channelThickness);
+        ? Math.PI * (end.radius + end.channelThickness) ** 2 * end.coverThickness
+        : headMetalVolume(end.head, end.radius, end.channelThickness);
     parts.push({ ...closure, kg: kg(metal) });
     return parts;
   };
   const parts: MassPart[] = [
-    {
-      part: 'shell',
-      kg: kg(annulus(radius + shellThickness, radius) * geometry.shellLength),
-      method: 'pi ((R + t)^2 - R^2) x shell length x density',
-    },
+    ...geometry.segments.map(
+      (segment): MassPart => ({
+        part: segment.name,
+        kg: kg(segmentMetal(segment).volume),
+        method:
+          segment.name === 'kettleTransition'
+            ? 'frustum of the outside radii minus the inside frustum (wall measured radially) x density'
+            : 'pi ((R + t)^2 - R^2) x segment length x density',
+      }),
+    ),
     ...endParts(geometry.front, 'front'),
     ...endParts(geometry.rear, 'rear'),
     {

@@ -22,15 +22,26 @@ export interface LegacyFields {
 
 type Units = Pick<CadDocument, 'units'>;
 
-/** @invariant on the floor -> `horizontal_vessel` [outside length, D, D]; raised on saddles -> `box` of the full height; nozzles are in the ports only */
+/** @invariant vertical -> `vertical_vessel` [D, D, top of the rear closure] (D covers skirt / legs); on the floor -> `horizontal_vessel` [outside length, D, D]; raised on saddles -> `box` of the full height; nozzles are in the ports only */
 export function exchangerLegacy(doc: Units, template: ExchangerTemplate): LegacyFields {
   const geometry = resolveExchanger(template);
   const mass = exchangerMass(toMetres(doc, 1), template, geometry);
   const notes = [
     'operating weight = empty + both sides full at their specific gravity (a side without specificGravity adds nothing)',
-    'floating head, floating tubesheet, U-bends, baffles, tie rods, pass partitions, saddle plates and nozzles are not part of the weight',
+    'floating head, floating tubesheet, U-bends, baffles, tie rods, pass partitions, kettle weir, saddle plates, skirt / legs and nozzles are not part of the weight',
   ];
   if (mass.densityDefaulted) notes.push(`material density defaulted to ${STEEL_DENSITY_KG_PER_M3} kg/m3 (steel)`);
+  if (geometry.vertical) {
+    const { support } = template;
+    const supportRadius =
+      support.type === 'skirt'
+        ? geometry.outerRadius + support.thickness + support.baseRingWidth
+        : support.type === 'legs'
+          ? support.pitchDiameter / 2 + support.legWidth / 2
+          : 0;
+    const side = 2 * Math.max(geometry.outerRadius, supportRadius);
+    return { size: [side, side, geometry.rear.outsideApex + geometry.zOffset], shape: 'vertical_vessel', weight: mass.operatingKg, notes };
+  }
   const diameter = 2 * geometry.outerRadius;
   const raised = geometry.datum - geometry.outerRadius > 1e-9;
   return raised

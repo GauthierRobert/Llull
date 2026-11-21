@@ -5,7 +5,7 @@
  */
 
 import type { EquipmentTemplate, NozzleRecord, TankTemplate } from '../plantData';
-import { resolveExchanger, type ExchangerGeometry } from './exchangerFrame';
+import { resolveExchanger, shellOutsideRadiusAt, type ExchangerGeometry } from './exchangerFrame';
 import { thicknessAt } from './tankFrame';
 import type { MassPart } from './vesselMass';
 import { headSurfaceHeight, resolveVessel, type VesselGeometry } from './vesselFrame';
@@ -59,10 +59,11 @@ export const nozzleMassParts = (scale: number, geometry: VesselGeometry, nozzles
 export const exchangerWallOf =
   (geometry: ExchangerGeometry) =>
   (nozzle: NozzleRecord): number =>
-    nozzle.location.on === 'shell'
-      ? geometry.radius + geometry.shellThickness
+    nozzle.location.on === 'shell' && 'station' in nozzle.location
+      ? shellOutsideRadiusAt(geometry, nozzle.location.station)
       : nozzle.location.on === 'channel'
-        ? geometry.radius + (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).channelThickness
+        ? (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).radius +
+          (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).channelThickness
         : 0;
 
 /** Wall distance of a tank nozzle (shell by elevation: outside radius of the course at that elevation; roof / free: 0). */

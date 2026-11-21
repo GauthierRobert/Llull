@@ -5,7 +5,7 @@ import type { Vec2 } from '@core/model/vectors';
 import { refusePid } from '../dexpi/codes';
 import { PID_CONVENTIONS, type PidConvention, type PidProjectSymbol } from '../model';
 import { getPid, withPid } from '../state';
-import { normalise, SYMBOL_LIMITS, shapeProblems, symbolFamilyOf, targetBox } from '../symbols/projectSymbol';
+import { normalise, SYMBOL_LIMITS, shapeProblems, symbolAnchor, symbolFamilyOf, targetBox } from '../symbols/projectSymbol';
 
 const ARC_SEGMENTS = 16;
 const SUPPORTED = 'line, polyline, rectangle, circle, arc and text';
@@ -71,17 +71,18 @@ const shapeSchema = z
 
 /**
  * @affects plant.pid.symbols[class] (one project symbol: graphics normalised into the box of the built-in class, the conventions it applies to); no item changes
- * @invariant the definition is untrusted and validated before it is stored (shape count, points, coordinates, radii, text, finite numbers); graphics are centred and scaled uniformly to fit the half extents of the built-in class, so nozzle and inline ports stay valid; a project symbol replaces the built-in one for the conventions it names in the drawing, SVG and list_pid_symbols (source "project"); only classes of the library have symbols
+ * @invariant the definition is untrusted and validated before it is stored (shape count, points, coordinates, radii, text, finite numbers); graphics are centred and scaled uniformly to fit the half extents of the built-in class, so nozzle and inline ports stay valid; a project symbol replaces the built-in one for the conventions it names in the drawing, SVG and list_pid_symbols (source "project"); only classes of the library have symbols (equipment, piping, instrument bubble, actuator, connector); actuator graphics are anchored on their bottom middle, the others on their bounding box centre
  * @failure unknown class / not an equipment or piping class -> PID_CLASS_UNKNOWN; both or neither of fromEntities / shapes, an entity that is missing, 3D or unsupported, a shape that fails validation, graphics with no extent -> PID_SYMBOL_INVALID / PID_PARAM_INVALID; remove of an undefined symbol -> PID_SYMBOL_NOT_FOUND; document unchanged
  */
 export const definePidSymbol = defineCommand({
   name: 'define_pid_symbol',
   description:
-    'Define the project\'s own symbol for a P&ID library class (equipment such as Tank / CentrifugalPump, or an inline piping component such as BallValve): the graphics replace the built-in symbol on the sheet, in export_pid_svg, in the 2D view and in list_pid_symbols (source "project"). ' +
+    'Define the project\'s own symbol for a P&ID library class (equipment such as Tank / CentrifugalPump, an inline piping component such as BallValve, an instrument bubble, an actuator or an off-page connector): the graphics replace the built-in symbol on the sheet, in export_pid_svg, in the 2D view and in list_pid_symbols (source "project"). ' +
     'Give the graphics either as fromEntities (ids of 2D entities you drew: line, polyline, rectangle, circle, arc, text; their plan position and z rotation are applied) or as shapes ' +
     '(inline: line { pts, closed?, fill?, style? }, circle { c, r, fill?, style? }, text { at, h, s }; millimetres, +y up). The definition is validated as untrusted data (at most 64 shapes, 200 points per line, coordinates within +/-1000 mm, text of 1 to 24 characters). ' +
-    'The graphics are centred on their bounding box and scaled uniformly to fit the box of the built-in class (equipment: its half extents, e.g. Tank 25 x 25; inline components: 5 x 3.2), so the nozzle ports of equipment and the ports of inline items stay where authoring put them: ports cannot be redefined. ' +
-    '`conventions` limits it to ISA-5.1 and/or ISO-10628-2 (default both). A second call for the same class replaces the symbol; remove: true deletes it (built-in again). Instrument bubbles, actuators and connectors have no project symbols. ' +
+    'The graphics are centred on their bounding box and scaled uniformly to fit the box of the built-in class (equipment: its half extents, e.g. Tank 25 x 25; inline components: 5 x 3.2; instrument bubbles: 9 x 9; connectors: 7 x 4; actuators: 3.5 x 11 from the stem foot), so the nozzle ports of equipment and the ports of inline items stay where authoring put them: ports cannot be redefined. ' +
+    '`conventions` limits it to ISA-5.1 and/or ISO-10628-2 (default both). A second call for the same class replaces the symbol; remove: true deletes it (built-in again). ' +
+    'Instrument bubbles (class "Instrument:<location>:<display>", e.g. "Instrument:field:discrete"; the letters and loop number are still written on top), actuators ("Actuator:<kind>", e.g. "Actuator:diaphragm": the graphics stand ON the valve, their bottom middle is the stem foot, they fill the 7 x 11 mm box) and off-page connectors ("FlowInPipeOffPageConnector", "FlowOutPipeOffPageConnector") take project symbols too: define one class at a time, it applies to every item of that class (list_pid_symbols lists the class names; sheets that use it show it in the next export). ' +
     'Returns data = { class, family, name, conventions, shapes (count), halfWidth, halfHeight, replaced }. Refusals (document unchanged): PID_CLASS_UNKNOWN, PID_SYMBOL_INVALID, PID_SYMBOL_NOT_FOUND, PID_PARAM_INVALID.',
   params: z.object({
     class: z
@@ -115,7 +116,7 @@ export const definePidSymbol = defineCommand({
     if (family === null)
       return fail(
         'PID_CLASS_UNKNOWN',
-        `"${params.class}" is not an equipment or piping component class of the library (list_pid_symbols)`,
+        `"${params.class}" is not a class of the library (equipment, piping component, instrument bubble, actuator or off-page connector: list_pid_symbols)`,
         ['class'],
       );
     const existing = pid.symbols !== undefined && Object.hasOwn(pid.symbols, params.class) ? pid.symbols[params.class] : undefined;
@@ -149,7 +150,7 @@ export const definePidSymbol = defineCommand({
     if (problems.length > 0)
       return fail('PID_SYMBOL_INVALID', problems.slice(0, 5).join('; '), [params.fromEntities === undefined ? 'shapes' : 'fromEntities']);
     const box = targetBox(params.class);
-    const fitted = normalise(raw, box);
+    const fitted = normalise(raw, box, symbolAnchor(params.class));
     if (typeof fitted === 'string')
       return fail('PID_SYMBOL_INVALID', fitted, [params.fromEntities === undefined ? 'shapes' : 'fromEntities']);
     const refit = shapeProblems(fitted, 'fitted');
