@@ -29,7 +29,8 @@ function plantWithFrame(): CadDocument {
   const box = doc.order.at(-1) as string;
   const building = doc.building;
   if (building === undefined) throw new Error('no building');
-  const level = Object.values(building.elements)[0]?.levelId ?? 'level-1';
+  const first = Object.values(building.elements)[0];
+  const level = first !== undefined && 'levelId' in first ? first.levelId : 'level-1';
   const pipe = {
     id: 'pipe-9',
     mark: 'PIPE9',

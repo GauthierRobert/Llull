@@ -1,3 +1,4 @@
+import type { EquipmentElement } from '@aec/building/types';
 /**
  * Plant 08 DAT J4: which rating table `check_plant_data` uses for a nozzle against its line spec, and what it refuses to assume. The spec / table / nozzle
  * data are set straight in the document slices (a file edited by hand) so each branch is one row of the table below.
@@ -23,7 +24,9 @@ const findings = (doc: CadDocument): Finding[] =>
   );
 
 const nozzleOf = (doc: CadDocument, mark: string): string => {
-  const element = Object.values(doc.building?.elements ?? {}).find((item) => item.category === 'equipment' && item.mark === mark);
+  const element = Object.values(doc.building?.elements ?? {}).find(
+    (item): item is EquipmentElement => item.category === 'equipment' && item.mark === mark,
+  );
   return `${mark}:${element?.plant?.nozzles[0]?.mark ?? ''}`;
 };
 
