@@ -12,6 +12,7 @@ import {
   PLANT_EQUIPMENT_SCHEMA,
   type NozzleFacing,
   type NozzleKind,
+  type NozzlePad,
   type NozzleLocation,
   type NozzleRecord,
   type PlantEquipmentData,
@@ -69,6 +70,18 @@ export const nozzleFields = {
     .optional()
     .describe(
       'nozzle (default) = process / instrument connection; manway = an access opening a person enters: check_reachability targetsFrom ["manways"] reads this field (a service text no longer decides).',
+    ),
+  pad: z
+    .object({
+      outsideDiameter: z
+        .number()
+        .positive()
+        .describe('Outside diameter of the circular pad, document units; must exceed the neck outside diameter.'),
+      thickness: z.number().positive().describe('Pad plate thickness, document units; must be shorter than the neck above the wall.'),
+    })
+    .optional()
+    .describe(
+      'Reinforcing pad round the neck: drawn as a flat ring on the nozzle axis, added to the nozzle mass and listed in the data sheet. Its area is NOT credited by nozzle_reinforcement (A5 has no cited source in this pack): the check stays conservative and says so.',
     ),
   dn: z.number().int().positive().optional().describe('Nominal size DN (15..600 of the EN 10220 series). Give dn OR nps.'),
   nps: z
@@ -137,6 +150,7 @@ export interface NozzleSpec {
   readonly location: NozzleLocation;
   readonly service?: string | undefined;
   readonly kind?: NozzleKind | undefined;
+  readonly pad?: NozzlePad | undefined;
 }
 
 /** A complete nozzle record (hardware from the 01 PSC catalogue), or the issue; `defaulted` receives the named defaults. */
@@ -156,6 +170,7 @@ export function nozzleRecord(doc: CadDocument, mark: string, spec: NozzleSpec, d
     mark,
     ...(spec.service === undefined ? {} : { service: spec.service }),
     ...(spec.kind === undefined ? {} : { kind: spec.kind }),
+    ...(spec.pad === undefined ? {} : { pad: spec.pad }),
     dn: spec.dn,
     rating: ratingText(spec.rating),
     facing: spec.facing,

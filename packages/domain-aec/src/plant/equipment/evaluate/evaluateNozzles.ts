@@ -20,12 +20,24 @@ export function rotationToward(direction: Vec3): Vec3 {
   return eulerFromAxes(x, y, direction);
 }
 
-/** Neck (outside diameter, wall) and flange (outside diameter, thickness) as one L-shaped revolution section along the nozzle axis. */
+/** Neck (outside diameter, wall), flange (outside diameter, thickness) and the optional flat reinforcing pad as one revolution section along the nozzle axis. */
 function nozzleSection(nozzle: NozzleRecord, length: number): Array<[number, number]> {
   const outer = nozzle.neckOutsideDiameter / 2;
   const inner = Math.max(outer - nozzle.neckWall, outer * 0.2);
   const flangeRadius = nozzle.flange.outsideDiameter / 2;
   const shoulder = Math.max(length - nozzle.flange.thickness, 0);
+  const pad = nozzle.pad;
+  if (pad !== undefined && pad.thickness < shoulder)
+    return [
+      [inner, 0],
+      [pad.outsideDiameter / 2, 0],
+      [pad.outsideDiameter / 2, pad.thickness],
+      [outer, pad.thickness],
+      [outer, shoulder],
+      [flangeRadius, shoulder],
+      [flangeRadius, length],
+      [inner, length],
+    ];
   return [
     [inner, 0],
     [outer, 0],

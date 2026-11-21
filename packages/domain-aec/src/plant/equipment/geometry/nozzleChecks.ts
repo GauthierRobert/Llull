@@ -133,7 +133,29 @@ function tankProblem(template: TankTemplate, nozzle: NozzleRecord): NozzleIssue 
  * @failure location kind not suited to the template -> EQP_PARAM_INVALID; outside the body -> EQP_NOZZLE_OFF_BODY; face inside the wall +
  *   flange -> EQP_NOZZLE_PROJECTION_TOO_SHORT
  */
+function padIssue(nozzle: NozzleRecord): NozzleIssue | null {
+  const { pad } = nozzle;
+  if (pad === undefined) return null;
+  if (!(pad.outsideDiameter > nozzle.neckOutsideDiameter))
+    return issue(
+      'EQP_PARAM_INVALID',
+      `pad outside diameter ${pad.outsideDiameter} must exceed the neck outside diameter ${nozzle.neckOutsideDiameter}`,
+      'pad.outsideDiameter',
+    );
+  if (!(pad.thickness > 0 && pad.thickness < nozzle.projection - nozzle.flange.thickness))
+    return issue(
+      'EQP_PARAM_INVALID',
+      `pad thickness ${pad.thickness} must be above 0 and shorter than the neck (projection - flange)`,
+      'pad.thickness',
+    );
+  return null;
+}
+
 export function nozzleProblem(template: EquipmentTemplate, nozzle: NozzleRecord): NozzleIssue | null {
+  return padIssue(nozzle) ?? bodyProblem(template, nozzle);
+}
+
+function bodyProblem(template: EquipmentTemplate, nozzle: NozzleRecord): NozzleIssue | null {
   if (nozzle.location.on === 'free') {
     const [dx, dy, dz] = nozzle.location.direction;
     if (Math.hypot(dx, dy, dz) < 1e-12) return issue('EQP_PARAM_INVALID', 'direction must not be the zero vector', 'location.direction');

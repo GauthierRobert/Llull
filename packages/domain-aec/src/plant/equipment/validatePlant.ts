@@ -56,6 +56,13 @@ function nozzleErrors(nozzle: unknown, at: string): string[] {
     errors.push(`${at}.facing must be RF, FF or RTJ`);
   for (const name of ['dn', 'projection', 'neckOutsideDiameter', 'neckWall'])
     if (!isPositiveNumber(nozzle[name])) errors.push(`${at}.${name} must be a number > 0`);
+  const pad = nozzle['pad'];
+  if (pad !== undefined) {
+    if (!isRecord(pad) || !isPositiveNumber(pad['outsideDiameter']) || !isPositiveNumber(pad['thickness']))
+      errors.push(`${at}.pad needs outsideDiameter and thickness > 0`);
+    else if (isPositiveNumber(nozzle['neckOutsideDiameter']) && pad['outsideDiameter'] <= nozzle['neckOutsideDiameter'])
+      errors.push(`${at}.pad.outsideDiameter must exceed neckOutsideDiameter`);
+  }
   const flange = nozzle['flange'];
   if (!isRecord(flange) || !isPositiveNumber(flange['outsideDiameter']) || !isPositiveNumber(flange['thickness']))
     errors.push(`${at}.flange needs outsideDiameter and thickness > 0`);
