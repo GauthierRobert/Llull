@@ -115,7 +115,7 @@ function layoutRun(i: RunInputs): RunCtx | DerivationFailure {
   const endBlindId = end.blind === undefined ? null : mint('flange');
   const fits = layoutBranches(env);
   if (isFailure(fits)) return fits;
-  const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
+  const shifts = legShifts(env, inlineSlots, dirs, eps);
   if (isFailure(shifts)) return shifts;
   const slotsByLeg = new Map<number, Slot[]>();
   for (const slot of [...inlineSlots, ...fits.filter((fit) => fit.kind === 'tee').map((fit) => teeSlot(env, fit))])

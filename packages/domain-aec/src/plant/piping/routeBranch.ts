@@ -8,7 +8,8 @@
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { BranchPoint, EndType, Joint, PartPort, PipeRun, PortRef, PortSpec, RoutedPart } from '@aec/plant/types';
-import { dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { add3, dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { withBranchShifts } from './branchShift';
 import { fittingEnd, type Join } from './connections';
 import { DerivationMemo } from './derivationMemo';
 import { fail, isFailure, type DerivationFailure, type DerivedBranch } from './deriveTypes';
@@ -33,6 +34,8 @@ export interface BranchFit {
   readonly branchOd: number;
   /** Centre of the branch on the header axis, and the unit direction of the branch. */
   readonly position: Vec3;
+  /** Offset of the header axis at the branch from the stored axis: the sum of the eccentric reducers upstream on the leg (zero vector when none). */
+  readonly shift: Vec3;
   readonly direction: Vec3;
   /** Tee M, olet A (centre of the header to the outlet face), stub-in OD / 2: where the branch pipe starts along the branch. */
   readonly branchStart: number;
@@ -137,6 +140,7 @@ export function layoutBranches(env: Env): BranchFit[] | DerivationFailure {
       headerOd: headerPipe.od,
       branchOd: branchPipe.od,
       position: at(from, unitVector(sub3(to, from)), point.distance),
+      shift: [0, 0, 0] as Vec3,
       direction,
       reviewRequired: kind === 'stubIn',
     };
@@ -177,7 +181,9 @@ export function layoutBranches(env: Env): BranchFit[] | DerivationFailure {
       outletJoin,
     });
   }
-  return overlap(run.id, fits) ?? fits;
+  const clear = overlap(run.id, fits);
+  if (clear !== null) return clear;
+  return withBranchShifts(env, fits);
 }
 
 /** Footprint radius of an olet or stub-in on the header surface: half its base diameter if the row has one, else the branch pipe radius. */
@@ -248,14 +254,15 @@ export function teeSlot(env: Env, fit: BranchFit): Slot {
  * @invariant ports: the header-surface face (facing the header) and the outlet face (centre + branchStart along the branch)
  */
 export function oletPart(env: Env, fit: BranchFit, onPart: string): { part: RoutedPart; joint: Omit<Joint, 'id'> } {
-  const base = at(fit.position, fit.direction, fit.headerOd / 2);
-  const outlet = at(fit.position, fit.direction, fit.branchStart);
+  const centre = add3(fit.position, fit.shift);
+  const base = at(centre, fit.direction, fit.headerOd / 2);
+  const outlet = at(centre, fit.direction, fit.branchStart);
   const ports: PartPort[] = [
     { position: base, direction: [-fit.direction[0], -fit.direction[1], -fit.direction[2]], dn: fit.headerDn, endType: 'BW' },
     { position: outlet, direction: fit.direction, dn: fit.branchDn, endType: fit.outletEnd },
   ];
   const extra = {
-    centre: fit.position,
+    centre,
     componentId: fit.point.id,
     onPart,
     dn: fit.headerDn,
@@ -299,7 +306,7 @@ export const derivedBranch = (env: Env, fit: BranchFit): DerivedBranch => ({
   fittingCode: fit.fittingCode,
   typeKey: fit.typeKey,
   partId: fit.partId,
-  position: fit.position,
+  position: add3(fit.position, fit.shift),
   direction: fit.direction,
   headerDn: fit.headerDn,
   branchDn: fit.branchDn,
@@ -325,7 +332,7 @@ export function branchStartSetup(
   if (isFailure(fits)) return { ...fits, message: `header ${header.id}: ${fits.message}` };
   const fit = fits.find((candidate) => candidate.point.id === ref.branchId) as BranchFit;
   return {
-    length: fit.branchStart,
+    length: fit.branchStart + dot3(fit.shift, fit.direction),
     gap: fit.outletJoin?.gapMm ?? 0,
     set: null,
     ...(fit.outletJoin === null ? {} : { join: fit.outletJoin }),

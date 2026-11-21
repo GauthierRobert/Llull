@@ -10,7 +10,6 @@
 import type { Vec3 } from '@core/model/vectors';
 import { add3, dot3, len3, scale3, sub3 } from '@lib/vec3';
 import { fail, type DerivationFailure, type DerivationWarning } from './deriveTypes';
-import type { BranchFit } from './routeBranch';
 import type { Env, Slot } from './routeEnv';
 
 export interface LegShifts {
@@ -27,15 +26,8 @@ const ZERO: Vec3 = [0, 0, 0];
 /**
  * The offsets of the legs of the run in `env` and the axial start shift they cause.
  * @failure an offset the next leg cannot absorb (not parallel to it), or left on the last leg -> RTE_ECCENTRIC_OFFSET naming the reducers;
- *   a branch downstream of an eccentric reducer on the same leg -> RTE_BRANCH_ON_FITTING (the branch point is a port on the stored axis)
  */
-export function legShifts(
-  env: Env,
-  slots: readonly Slot[],
-  fits: readonly BranchFit[],
-  dirs: readonly Vec3[],
-  eps: number,
-): LegShifts | DerivationFailure {
+export function legShifts(env: Env, slots: readonly Slot[], dirs: readonly Vec3[], eps: number): LegShifts | DerivationFailure {
   const offset: Vec3[] = dirs.map(() => ZERO);
   const reducers: string[][] = dirs.map(() => []);
   for (const slot of slots) {
@@ -81,18 +73,6 @@ export function legShifts(
         detail: { leg, residualMm: residual, angleDeg, toleranceDeg: env.tolerance.valueDeg },
       });
     start[leg + 1] = along;
-  }
-  for (const fit of fits) {
-    const first = slots.find((slot) => slot.offset !== undefined && slot.leg === fit.point.leg);
-    if (first === undefined || (offset[fit.point.leg] as Vec3) === ZERO) continue;
-    if (fit.point.distance > (first.interval.start + first.interval.end) / 2)
-      return fail(
-        'RTE_BRANCH_ON_FITTING',
-        `branch ${fit.point.id} sits downstream of the eccentric reducer ${first.interval.id} on leg ${fit.point.leg}, where the axis is off the stored line: take branches off before the reducer or on another leg`,
-        [env.run.id, fit.point.id, first.interval.id],
-        ['branches'],
-        { leg: fit.point.leg, distance: fit.point.distance },
-      );
   }
   return { offset, start, warnings };
 }
