@@ -7,9 +7,10 @@ import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
 import { deriveRun } from '@aec/plant/piping/routeParts';
+import { execute } from '@core/commands/registry';
 import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
-import { addTie, cs150Line } from '../piping/rteFixtures';
+import { addTie, cs150Document, cs150Line } from '../piping/rteFixtures';
 
 const piping = (doc: CadDocument): PipingModel => doc.plant?.piping as PipingModel;
 
@@ -130,7 +131,127 @@ describe('tee downstream of an eccentric reducer (branch axis on the shifted leg
     expect(Number((record.find((line) => line.startsWith('BRANCH1-POINT')) ?? '').split(' ')[3])).toBeGreaterThan(54 + 84.15);
   });
 
+  it('add_branch downstream of the reducer is pure and reports both the shifted centre and the stored point', () => {
+    const params = { runId: base.runId, at: { leg: 0, distance: 3000 }, dn: 100, legs: [{ direction: '+Z', length: 500 }] };
+    expectPure(base.doc, () => execute(base.doc, 'add_branch', params));
+    const out = data<{ position: number[]; storedPosition: number[] }>(base.doc, 'add_branch', params);
+    expect(out.position[2]).toBeCloseTo(27, 9);
+    expect(out.position[0]).toBe(3000);
+    expect(out.storedPosition).toEqual([3000, 0, 0]);
+  });
+
   it('is pure', () => {
     expectPure(withTee.document, () => data(withTee.document, 'export_pcf', {}));
+  });
+});
+
+/** A DN150 header with a 6x4 eccentric reducer at 2000 and a riser; the branch tee is added at `distance` of leg 0. */
+function header(flat: 'top' | 'bottom', direction: string | number[] = '+X'): { doc: CadDocument; runId: string } {
+  const line = cs150Line(150, '3003');
+  const tie = addTie(line.doc, 'A', [0, 0, 0], [1, 0, 0], { dn: 150 });
+  const result = ok(tie.doc, 'route_pipe', {
+    lineId: line.lineId,
+    from: { portId: tie.id },
+    legs: [
+      { direction, length: 4000 },
+      { direction: '+Z', length: 1000 },
+    ],
+    inline: [{ type: 'reducerEccentric', tag: 'RE-1', dn2: 100, flat, at: { leg: 0, centreDistance: 2000 } }],
+  });
+  return { doc: result.document, runId: (result.data as { runId: string }).runId };
+}
+
+const tee = (runId: string): Record<string, unknown> => ({
+  runId,
+  at: { leg: 0, distance: 3000 },
+  dn: 100,
+  legs: [{ direction: '+Z', length: 500 }],
+});
+
+const branchRunOf = (doc: CadDocument, headerId: string): string => Object.keys(piping(doc).runs).find((id) => id !== headerId) as string;
+
+describe('flat on the bottom, history and re-derivation', () => {
+  it('a flat-bottom reducer puts the tee centre at z -27 and the branch pipe on the outlet at z 78 (hand: -27 + M 105)', () => {
+    const h = header('bottom');
+    const added = ok(h.doc, 'add_branch', tee(h.runId));
+    const derived = deriveRun(added.document, piping(added.document).runs[h.runId] as PipeRun);
+    const part = derived.ok ? derived.parts.find((candidate) => candidate.kind === 'tee') : undefined;
+    expect(part?.centre?.[2]).toBeCloseTo(-27, 9);
+    expect(part?.ports[2]?.position[2]).toBeCloseTo(78, 6);
+    const branch = deriveRun(added.document, piping(added.document).runs[branchRunOf(added.document, h.runId)] as PipeRun);
+    const pipe = branch.ok ? branch.parts.find((candidate) => candidate.kind === 'pipe') : undefined;
+    expect(pipe?.ports[0]?.position[2]).toBeCloseTo(78, 6);
+  });
+
+  it('insert_inline_component upstream of an existing branch re-derives it: the outlet moves to [3000, 0, 132] and the branch pipe follows', () => {
+    const line = cs150Line(150, '3004');
+    const tie = addTie(line.doc, 'A', [0, 0, 0], [1, 0, 0], { dn: 150 });
+    const routed = ok(tie.doc, 'route_pipe', {
+      lineId: line.lineId,
+      from: { portId: tie.id },
+      legs: [
+        { direction: '+X', length: 4000 },
+        { direction: '+Z', length: 1000 },
+      ],
+    });
+    const runId = (routed.data as { runId: string }).runId;
+    const withBranch = ok(routed.document, 'add_branch', tee(runId));
+    const inserted = ok(withBranch.document, 'insert_inline_component', {
+      runId,
+      type: 'reducerEccentric',
+      dn2: 100,
+      flat: 'top',
+      at: { leg: 0, centreDistance: 2000 },
+    });
+    const derived = deriveRun(inserted.document, piping(inserted.document).runs[runId] as PipeRun);
+    const part = derived.ok ? derived.parts.find((candidate) => candidate.kind === 'tee') : undefined;
+    expect(part?.ports[2]?.position).toEqual([3000, 0, 132]);
+    const branch = deriveRun(inserted.document, piping(inserted.document).runs[branchRunOf(inserted.document, runId)] as PipeRun);
+    const pipe = branch.ok ? branch.parts.find((candidate) => candidate.kind === 'pipe') : undefined;
+    expect(pipe?.ports[0]?.position[2]).toBeCloseTo(132, 6);
+  });
+
+  it('replay_history re-mints the shifted branch identically (plant slice and entities)', () => {
+    const h = header('top');
+    const added = ok(h.doc, 'add_branch', tee(h.runId));
+    const replayed = execute(added.document, 'replay_history', {}).document;
+    expect(replayed.plant).toEqual(added.document.plant);
+    expect(Object.keys(replayed.entities).sort()).toEqual(Object.keys(added.document.entities).sort());
+  });
+
+  it('the branch run counts its centreline from the shifted outlet: leg 0 is 500 - 27 = 473 mm (the shift along the branch is subtracted)', () => {
+    const h = header('top');
+    const added = ok(h.doc, 'add_branch', tee(h.runId));
+    const runId = branchRunOf(added.document, h.runId);
+    const takeoff = data<{ legs: Array<{ lengthMm: number }>; centrelineLengthMm: number }>(added.document, 'piping_takeoff', { runId });
+    expect(takeoff.legs[0]?.lengthMm).toBeCloseTo(500 - 27, 6);
+    expect(takeoff.centrelineLengthMm).toBeCloseTo(500 - 27, 6);
+  });
+});
+
+describe('a sloped header leg', () => {
+  it('a vertical branch off a 1 % sloped leg is taken up within the angle tolerance with a warning naming the residual', () => {
+    const h = header('top', [1, 0, 0.01]);
+    const added = ok(h.doc, 'add_branch', tee(h.runId));
+    const derived = deriveRun(added.document, piping(added.document).runs[h.runId] as PipeRun);
+    expect(derived.ok).toBe(true);
+    const warning = derived.ok
+      ? derived.warnings.find((item) => item.message.includes('sideways residual') && item.ids.length > 1)
+      : undefined;
+    expect(warning?.code).toBe('RTE_ECCENTRIC_OFFSET');
+  });
+});
+
+describe('export -> route import', () => {
+  it("llull's own PCF of a header with an eccentric reducer and a tee re-imports as a route and re-exports the same file", () => {
+    const h = header('top');
+    const added = ok(h.doc, 'add_branch', tee(h.runId));
+    const lineId = Object.keys(piping(added.document).lines)[0] as string;
+    const text = (data<{ files: PcfFile[] }>(added.document, 'export_pcf', { lineIds: [lineId] }).files[0] as PcfFile).content;
+    const imported = execute(cs150Document(), 'import_pcf', { text, as: 'route', spec: 'CS150' });
+    expect(imported.rejected, imported.summary).toBeUndefined();
+    const again = (data<{ files: PcfFile[] }>(imported.document, 'export_pcf', {}).files[0] as PcfFile).content;
+    const bare = (value: string): string => value.replace(/^ {4}UNIQUE-COMPONENT-IDENTIFIER .*\n/gm, '');
+    expect(bare(again)).toBe(bare(text));
   });
 });

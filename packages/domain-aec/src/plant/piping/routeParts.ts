@@ -115,8 +115,12 @@ function layoutRun(i: RunInputs): RunCtx | DerivationFailure {
   const endBlindId = end.blind === undefined ? null : mint('flange');
   const fits = layoutBranches(env);
   if (isFailure(fits)) return fits;
-  const shifts = legShifts(env, inlineSlots, dirs, eps);
-  if (isFailure(shifts)) return shifts;
+  const legShift = legShifts(env, inlineSlots, dirs, eps);
+  if (isFailure(legShift)) return legShift;
+  const shifts = {
+    ...legShift,
+    start: legShift.start.map((value, leg) => (leg === 0 && start.startAlongMm !== undefined ? value + start.startAlongMm : value)),
+  };
   const slotsByLeg = new Map<number, Slot[]>();
   for (const slot of [...inlineSlots, ...fits.filter((fit) => fit.kind === 'tee').map((fit) => teeSlot(env, fit))])
     slotsByLeg.set(slot.leg, [...(slotsByLeg.get(slot.leg) ?? []), slot]);
@@ -148,7 +152,22 @@ function layoutRun(i: RunInputs): RunCtx | DerivationFailure {
     joints,
     legs: [],
     inline: [],
-    warnings: [...shifts.warnings, ...i.chosen.warnings],
+    warnings: [
+      ...shifts.warnings,
+      ...fits.flatMap((fit) =>
+        fit.residualMm === undefined
+          ? []
+          : [
+              {
+                code: 'RTE_ECCENTRIC_OFFSET',
+                ids: [run.id, fit.point.id],
+                message: `branch ${fit.point.id}: the eccentric offset of the header is not exactly along the branch; the ${+fit.residualMm.toFixed(4)} mm sideways residual is dropped (within the angle tolerance)`,
+                detail: { branch: fit.point.id, residualMm: fit.residualMm },
+              },
+            ],
+      ),
+      ...i.chosen.warnings,
+    ],
     addJoint: (joint): void => {
       if (joint.parts.some((id) => id.startsWith('open:'))) return;
       joints.push({ id: `${run.id}/joint-${joints.length + 1}`, ...joint });

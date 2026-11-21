@@ -36,6 +36,8 @@ export interface BranchFit {
   readonly position: Vec3;
   /** Offset of the header axis at the branch from the stored axis: the sum of the eccentric reducers upstream on the leg (zero vector when none). */
   readonly shift: Vec3;
+  /** Sideways residual of the shift that the branch run does not take up (within the angle tolerance), mm; absent when none. */
+  readonly residualMm?: number;
   readonly direction: Vec3;
   /** Tee M, olet A (centre of the header to the outlet face), stub-in OD / 2: where the branch pipe starts along the branch. */
   readonly branchStart: number;
@@ -339,6 +341,7 @@ export function branchStartSetup(
     port,
     portId,
     fittingId: fit.partId,
+    ...(len3(fit.shift) > 0 ? { startAlongMm: dot3(fit.shift, fit.direction) } : {}),
     ...(fit.kind === 'stubIn' ? { weldless: true } : {}),
   };
 }

@@ -109,15 +109,9 @@ function elbowStep(w: Walk, component: NetworkComponent, exit: NetworkPoint): St
 function teeStep(s: PlanState, w: Walk, component: NetworkComponent): Step {
   const [a, b] = [component.ends[0]?.xyz, component.ends[1]?.xyz];
   const centre = component.centre ?? (a !== undefined && b !== undefined ? midpoint(a, b) : undefined);
-  if (isShifted(w.shift))
-    return refuse(
-      'ISO_ROUTE_UNSUPPORTED',
-      `tee ${component.id} lies downstream of an eccentric reducer on the same leg, where the axis is off the stored line: the RTE cannot branch there`,
-      [component.id],
-    );
   if (component.branch === undefined || centre === undefined)
     return refuse('ISO_ROUTE_UNSUPPORTED', `tee ${component.id} has no branch point`, [component.id]);
-  addBranch(s, w.seed.key, centre, component.branch);
+  addBranch(s, w.seed.key, sub3(centre, w.shift), component.branch);
   return 'advance';
 }
 

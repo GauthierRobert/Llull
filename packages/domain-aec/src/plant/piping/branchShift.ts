@@ -11,7 +11,7 @@ import { add3, dot3, len3, scale3, sub3 } from '@lib/vec3';
 import { fail, isFailure, type DerivationFailure } from './deriveTypes';
 import { eccentricOffset, flatPerpendicular } from './eccentric';
 import { unitVector } from './legs';
-import { runPoints } from './model';
+import { getPiping, runPoints } from './model';
 import type { Env } from './routeEnv';
 import { inlineInOrder, isReducer, startDn } from './runSizes';
 
@@ -19,6 +19,7 @@ interface Shiftable {
   readonly point: BranchPoint;
   readonly direction: Vec3;
   readonly shift: Vec3;
+  readonly residualMm?: number;
 }
 
 interface Offset {
@@ -48,7 +49,8 @@ function reducerOffsets(env: Env): Offset[] {
 
 /**
  * `fits` with `shift` = the sum of the offsets of the eccentric reducers upstream of each branch point on its leg.
- * @failure a shifted branch whose direction is not along the offset -> RTE_BRANCH_ON_FITTING naming the branch
+ * @invariant an offset within the branch tolerance of the branch direction (a vertical branch on a gently sloped leg) is taken up along the branch; the sideways residual is reported (`residualMm`)
+ * @failure a shifted branch whose direction is not along the offset (beyond the tolerance) -> RTE_BRANCH_ON_FITTING naming the branch
  */
 export function withBranchShifts<T extends Shiftable>(env: Env, fits: readonly T[]): T[] | DerivationFailure {
   const reducers = reducerOffsets(env);
@@ -59,7 +61,10 @@ export function withBranchShifts<T extends Shiftable>(env: Env, fits: readonly T
       .reduce((sum, reducer) => add3(sum, reducer.offset), [0, 0, 0] as Vec3);
     const size = len3(shift);
     const across = len3(sub3(shift, scale3(fit.direction, dot3(shift, fit.direction))));
-    if (size > 0 && across > Math.max(1e-3, 1e-6 * size))
+    const sideways = size > 0 && across > Math.max(1e-3, 1e-6 * size);
+    const angleDeg = size > 0 ? (Math.acos(Math.min(1, Math.abs(dot3(shift, fit.direction)) / size)) * 180) / Math.PI : 0;
+    const tolerance = getPiping(env.doc).runs[fit.point.branchRunId]?.angleToleranceDeg ?? env.tolerance.valueDeg;
+    if (sideways && angleDeg > tolerance)
       return fail(
         'RTE_BRANCH_ON_FITTING',
         `branch ${fit.point.id} sits downstream of an eccentric reducer on leg ${fit.point.leg} of run ${env.run.id}; the axis there is ${+size.toFixed(3)} mm off the stored line toward [${shift.map((v) => +(v / size).toFixed(4)).join(', ')}], which is not along the branch direction [${fit.direction.map((v) => +v.toFixed(4)).join(', ')}]: the branch run would have to move sideways with it. Turn the flat side along the branch, or take the branch off before the reducer`,
@@ -67,7 +72,7 @@ export function withBranchShifts<T extends Shiftable>(env: Env, fits: readonly T
         ['branches'],
         { leg: fit.point.leg, distance: fit.point.distance, shift },
       );
-    shifted.push(size > 0 ? { ...fit, shift } : fit);
+    shifted.push(size === 0 ? fit : { ...fit, shift, ...(sideways ? { residualMm: across } : {}) });
   }
   return shifted;
 }
