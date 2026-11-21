@@ -349,3 +349,17 @@ milestone is reviewed by `cad-reviewer` and gated by `npm run check:coverage`.
 ## 12. References
 
 [R1]–[R32] as in [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11; grades and extracts in [`validation/sources.md`](validation/sources.md).
+
+## 13. As built
+
+### 13.1 M0 installer (2026-11-21)
+
+- TR-ASC-01: `"llull": "file:.."` removed from `desktop/package.json` and `server/package.json` (no source imported it; the server
+  bundle needs only its own runtime dependencies: `@resvg/resvg-js`, `cors`, `express`, `express-rate-limit`, `zod`, and the dynamic
+  `manifold-3d` / `@mujoco/mujoco`). Both lockfiles no longer resolve any package outside their folder. `electron-builder.yml` excludes
+  `node_modules/**` from app.asar (main + preload are bundled). `desktop/tests/packaging.test.ts` pins all three. Checked by running
+  `desktop/scripts/stage-server.mjs`: `build/server/node_modules` holds no `llull` link and `npm ls --omit=dev` lists only the runtime set.
+- TR-ASC-02: `desktop/scripts/systemTar.mjs` picks `%SystemRoot%\System32\tar.exe` on Windows and `/usr/bin/tar` or `/bin/tar` elsewhere,
+  never `tar` from `PATH`; `prepare-python.mjs` uses it. Not tried on a Windows machine from this session.
+- Left: the CI packaging check of TR-ASC-01 that inspects a real `resources` folder needs an `npm run dist` run (electron-builder
+  download), not run here.
