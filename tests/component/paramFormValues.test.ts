@@ -27,7 +27,7 @@ describe('valuesFromParams', () => {
     const fields = fieldsFromSchema(getCommand('array_linear')!.paramsSchema);
     const params = { id: 'box-1.1', count: 3, offset: [2, 0.5, -1e-3] };
     const values = valuesFromParams(fields, params);
-    expect(values).toEqual({ id: 'box-1.1', count: '3', offset: '2, 0.5, -0.001' });
+    expect(values).toEqual({ id: 'box-1.1', count: '3', offset: '2, 0.5, -0.001', as: '' });
     const parsed = parseFormValues(fields, values);
     expect(parsed).toEqual({ ok: true, params });
   });
