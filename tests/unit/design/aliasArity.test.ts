@@ -91,6 +91,20 @@ describe('alias.entity', () => {
     expect(apply(`${boxes}move_entities m ids=[nope.entity] delta=[0,0,1]`).error?.code).toBe('DESIGN_UNKNOWN_ALIAS');
   });
 
+  it('all entities consumed is DESIGN_ALIAS_CONSUMED with the live heir, not DESIGN_NO_ENTITY', () => {
+    const r = apply(
+      `add_box a size=[1,1,1]\nadd_box b size=[1,1,1]\nduplicate_entities g ids=[a, b]\nboolean u op=union a=g[0] b=g[1]\nmove_entities m ids=[g.entity] delta=[0,0,1]`,
+    );
+    expect(r.error?.code).toBe('DESIGN_ALIAS_CONSUMED');
+    expect(r.error?.remediation).toBe('Use u instead.');
+  });
+
+  it('an unbound word on a list param is the literal id (wrapped in a list); the command then refuses it', () => {
+    const r = apply(`${boxes}move_entities m ids=foo delta=[0,0,1]`);
+    expect(r.error?.code).toBe('DESIGN_STEP_FAILED');
+    expect(r.summary).toContain('foo');
+  });
+
   it('is pure: the input document is unchanged', () => {
     const doc = createEmptyDocument();
     const before = JSON.stringify(doc);

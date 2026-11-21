@@ -422,7 +422,10 @@ class DesignRunner {
     if (template instanceof ExprRef) return this.evaluate(template.text, env, line);
     if (template instanceof NameRef) {
       const ref = this.reference(template.text, env, line);
-      if (ref === null) return this.interpolate(template.text, env, line);
+      if (ref === null) {
+        const literal = this.interpolate(template.text, env, line);
+        return template.list ? [literal] : literal;
+      }
       if (template.list) return ref.ids;
       if (!ref.group) return ref.ids[0] ?? template.text;
       if (template.many) return ref.ids;
@@ -476,7 +479,16 @@ class DesignRunner {
     const entities = this.aliases.get(name)?.entities ?? [];
     const live = entities.filter((id) => this.doc.entities[id] !== undefined && !this.consumed.has(id));
     if (live.length > 0) return live;
-    if (entities.length > 0) this.liveIds(name, line);
+    if (entities.length > 0) {
+      const consumer = this.consumed.get(entities[0] ?? '');
+      const heir = consumer?.by ? this.liveHeir(consumer.by) : null;
+      throw new DesignError(
+        'DESIGN_ALIAS_CONSUMED',
+        line,
+        `the entities of ${name} were consumed at line ${consumer?.line ?? '?'}`,
+        heir !== null ? `Use ${heir} instead.` : 'Bind the consuming line to an alias and use it.',
+      );
+    }
     throw new DesignError(
       'DESIGN_NO_ENTITY',
       line,

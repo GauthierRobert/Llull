@@ -127,7 +127,7 @@ OP        = "==" | "~=" | "<=" | ">=" | "<" | ">" ;
 | string \| string[] | a one-id alias: that id; a group alias: all its ids | — | — |
 | number | a parameter / loop variable | constants fold; otherwise evaluated per run | units: `6mm` `3.2m` `2in` → document unit |
 | array of numbers | — | per item | `alias.side` → the anchor point `[x, y, z]` |
-| array | an alias (or `alias[a..<b]`) expands to all its live ids, a single id stays a one-item list | per item | — |
+| array | an alias (or `alias[a..<b]`) expands to all its live ids, a single id stays a one-item list; a word that is no alias is a literal id, `[word]` (the command then refuses an unknown id) | per item | — |
 | object with `near` | — | — | `alias.side` → `{ near: point }` |
 | object | — | — | dotted keys (`hole.kind=simple`); free-form records accept any key; unions: JSON `{…}` |
 | union | branch chosen by the value's shape | | |
