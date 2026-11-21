@@ -98,3 +98,60 @@ describe('check_steel_members: stair landings', () => {
     expect(gain).toBeCloseTo(1.35 * ((0.8 * MASS * GRAVITY) / 1000) + 1.5 * 2.4, 2);
   });
 });
+
+describe('check_steel_members: stair landings, plan filter, plate treads, units', () => {
+  const build = (units: 'mm' | 'm', tread: Record<string, unknown>, beamX: number[]): CadDocument => {
+    const k = units === 'mm' ? 1 : 0.001;
+    let doc = apply(createEmptyDocument(), 'set_units', { units });
+    doc = apply(doc, 'add_level', { name: 'Grade', elevation: 0, height: 3000 * k });
+    const level = Object.keys(doc.building?.levels ?? {})[0] as string;
+    for (const x of beamX)
+      doc = apply(doc, 'add_steel_member', {
+        profile: 'IPE200',
+        role: 'beam',
+        start: [x * k, -600 * k, 1450 * k],
+        end: [x * k, 600 * k, 1450 * k],
+        levelId: level,
+      });
+    return apply(doc, 'add_steel_stair', {
+      start: [0, 0, 0],
+      angle: 0,
+      rise: 3000 * k,
+      riserMax: 180 * k,
+      going: 280 * k,
+      landings: [{ afterRiser: 9, length: 1000 * k }],
+      tread,
+      levelId: level,
+    });
+  };
+  const plate = { kind: 'checker_plate', thickness: 6 };
+
+  it('a checker-plate landing weighs 0.8 m2 x 6 mm x 7850 kg/m3, the same in a document in metres', () => {
+    const dead = (0.8 * (6 / 1000) * 7850 * GRAVITY) / 1000;
+    for (const units of ['mm', 'm'] as const) {
+      const thickness = units === 'mm' ? 6 : 0.006;
+      const floor = steel(build(units, { kind: 'checker_plate', thickness }, [2300, 3180]), { stairLandingLoad: landing }).loads.floors[0];
+      expect(floor?.deadKn, units).toBeCloseTo(dead, 6);
+      expect(floor?.imposedKn, units).toBeCloseTo(2.4, 6);
+      expect(floor?.supportingBeams, units).toBe(2);
+    }
+  });
+
+  it('a beam at the right height but 10 m away in plan carries nothing: the landing is reported as not carried', () => {
+    const far = steel(build('mm', plate, [10000, 10600]), { stairLandingLoad: landing });
+    expect(far.loads.floors[0]).toMatchObject({ deadKn: 0, imposedKn: 0, supportingBeams: 0 });
+    expect(far.warnings.join(';')).toContain('stair landing');
+  });
+
+  it('equipment standing at the landing level does not reduce the cited imposed load', () => {
+    const base = build('mm', plate, [2300, 3180]);
+    const doc = apply(base, 'add_equipment', {
+      name: 'Skid',
+      location: [2740, 0],
+      size: [500, 400, 300],
+      weight: 100,
+      levelId: Object.keys(base.building?.levels ?? {})[0],
+    });
+    expect(steel(doc, { stairLandingLoad: landing }).loads.floors[0]?.imposedKn).toBeCloseTo(2.4, 6);
+  });
+});

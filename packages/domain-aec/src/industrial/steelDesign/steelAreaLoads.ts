@@ -165,6 +165,20 @@ function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, params: 
   return surfaces;
 }
 
+/** Beams whose plan extent meets the polygon's bounding box grown by `margin` (mm): a beam far away in plan cannot carry the plate. */
+function nearInPlan(beams: ReadonlyArray<BeamLoads>, polygon: ReadonlyArray<Point2>, margin: number): BeamLoads[] {
+  const xs = polygon.map((point) => point[0]);
+  const ys = polygon.map((point) => point[1]);
+  const [x0, x1, y0, y1] = [minOf(xs) - margin, maxOf(xs) + margin, minOf(ys) - margin, maxOf(ys) + margin];
+  return beams.filter(
+    (beam) =>
+      Math.max(beam.a[0], beam.b[0]) >= x0 &&
+      Math.min(beam.a[0], beam.b[0]) <= x1 &&
+      Math.max(beam.a[1], beam.b[1]) >= y0 &&
+      Math.min(beam.a[1], beam.b[1]) <= y1,
+  );
+}
+
 /** Plates of the landings of steel stairs as surfaces (self weight of the tread type + the cited imposed load); a warning when no load is requested. */
 function landingSurfaces(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, params: AreaLoadParams, warnings: string[]): Surface[] {
   const { building, toMm, elevationMm, source } = units;
@@ -182,6 +196,7 @@ function landingSurfaces(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, par
     const thickness = toMm(treadThickness(source, stair.tread));
     layout.landings.forEach((plate, index) => {
       const top = elevationMm(stair.levelId) + toMm(plate.top);
+      const polygon = plate.corners.map((point) => toPoint2(point, toMm));
       surfaces.push({
         slabId: `${stair.id}:landing-${index + 1}`,
         kind: 'landing',
@@ -189,10 +204,10 @@ function landingSurfaces(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, par
         imposedKnM2: load.imposedKPa,
         mark: `${stair.mark} landing ${index + 1}`,
         levelId: stair.levelId,
-        polygon: plate.corners.map((point) => toPoint2(point, toMm)),
+        polygon,
         openings: [],
         top,
-        beams: beamsUnder(beams, top - thickness, top),
+        beams: nearInPlan(beamsUnder(beams, top - thickness, top), polygon, toMm(stairSizes(source, stair).stringerDepth)),
       });
     });
   }
@@ -237,7 +252,7 @@ function applyFloors(surfaces: ReadonlyArray<Surface>, footprints: ReadonlyArray
     let deadKn = 0;
     let imposedKn = 0;
     for (const centre of centres) {
-      const occupied = standing.some((footprint) => insideFootprint(centre, footprint));
+      const occupied = surface.kind !== 'landing' && standing.some((footprint) => insideFootprint(centre, footprint));
       const dead = surface.deadKnM2 * cellArea;
       const imposed = occupied ? 0 : surface.imposedKnM2 * cellArea;
       bear(centre, surface.beams, dead, imposed, true);
