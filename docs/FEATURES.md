@@ -34,7 +34,7 @@
 | [design](#design) | 6 |
 | [pmi](#pmi) | 20 |
 | [plm](#plm) | 40 |
-| [scan](#scan) | 23 |
+| [scan](#scan) | 24 |
 | [mesh](#mesh) | 25 |
 | [implicit](#implicit) | 22 |
 | [environment](#environment) | 6 |
@@ -1217,6 +1217,7 @@
 | `detach_point_cloud` | Detach a cloud from the document. |  |
 | `extract_pipes` | Read-only: extract the pipe in a region (one per call in this version): native cylinder fit, ends from the inliers' axial extent, and the DN snap of OD = 2 (r … | read-only |
 | `fit_primitive` | Read-only: fit a plane, cylinder or sphere to the cloud points of a region (native seeded RANSAC on PCA-oriented points, then Levenberg-Marquardt on the orthog… | read-only |
+| `fit_steel_member` | Read-only: identify a steel member in a region of the cloud against the llull catalogue (IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L; FL / RD only when named in `f… | read-only |
 | `mark_registration_supplied` | Record that a cloud arrived pre-registered (contractor data) without a llull registration: a record of method "supplied", status "unverified", so everything de… |  |
 | `measure_cloud` | Read-only point-to-point measure on a cloud: each end is a point or {nearest: point} snapped to the closest scan point within snapRadius. | read-only |
 | `nearest_cloud_point` | Read-only snap to a scan point: the cloud point nearest to `point` (document units) within maxDistance, with its source record index and the distance of the se… | read-only |

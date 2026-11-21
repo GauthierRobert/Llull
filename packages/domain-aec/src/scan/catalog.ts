@@ -7,6 +7,7 @@ import { attachPointCloud, detachPointCloud, updatePointCloud } from './referenc
 import { acceptRegistration, applyRegistration, markRegistrationSupplied } from './registrationCommands';
 import { computeRegistration } from './registrationQuery';
 import { extractPipes, fitPrimitive } from './fitCommands';
+import { fitSteelMember } from './steelFitCommand';
 import { sliceCloud } from './sliceCommand';
 import { tracePipeCentreline } from './traceCommand';
 import { acceptAsbuiltExtraction, commitAsbuiltExtraction } from './extractionCommands';
@@ -32,6 +33,7 @@ export const scanCommands = commandCatalog(
   fitPrimitive,
   extractPipes,
   tracePipeCentreline,
+  fitSteelMember,
   commitAsbuiltExtraction,
   acceptAsbuiltExtraction,
   cloudToModelDeviation,
