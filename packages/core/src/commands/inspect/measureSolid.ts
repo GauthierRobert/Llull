@@ -12,6 +12,9 @@ import { currentContext } from '../context';
 import { MASS_UNITS, type MassFailure, densityParam, measureTotal, missingEntityResult } from './massMeasure';
 import { analyze, volumeOnlyResult, weightedResult } from './massPropertiesReport';
 
+/** Kinds whose closed-form world box is provably tight at any rotation: sphere, cylinder (half-axis·|n| + r·sqrt(1-n²) per axis) and box (its 8 corners). */
+const CLOSED_FORM_TIGHT: ReadonlySet<Entity['kind']> = new Set(['box', 'cylinder', 'sphere']);
+
 /** World bounds of e and their source: the kernel's tight box of the placed exact shape (TR-ASC-15), else the analytic estimate. */
 function measuredBounds(doc: CadDocument, e: Entity, ctx: ExecutionContext | undefined): { bounds: Bounds; source: BoundsSource } {
   const kernel = (ctx ?? currentContext()).kernel;
@@ -22,14 +25,14 @@ function measuredBounds(doc: CadDocument, e: Entity, ctx: ExecutionContext | und
     const mass = shape === null ? null : (kernel?.massProperties?.(shape) ?? null);
     if (mass !== null) return { bounds: { min: mass.bounds.min, max: mass.bounds.max }, source: 'exact' };
   }
-  return { bounds: entityBoundsInDoc(doc, e), source: 'conservative' };
+  return { bounds: entityBoundsInDoc(doc, e), source: CLOSED_FORM_TIGHT.has(e.kind) ? 'exact' : 'conservative' };
 }
 
 interface MeasureBoundingBoxData {
   min: Vec3;
   max: Vec3;
   size: Vec3;
-  /** 'exact': every measured entity came from the kernel's tight box; 'conservative': at least one is an analytic / mesh / corner estimate (a superset). */
+  /** 'exact': every measured entity is the kernel's tight box or a tight closed form (box, cylinder, sphere); 'conservative': at least one is an analytic / mesh / corner estimate (a superset). */
   bounds: BoundsSource;
 }
 
@@ -48,7 +51,7 @@ export const measureBoundingBox = defineCommand({
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     "Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d], bounds:'exact'|'conservative' }. Does not modify the document. " +
     'Entity rotation and the sweep angle of a partly turned profile are applied (the AABB wraps the actual geometry). ' +
-    "Under the exact OCC kernel a kernel result, extrusion, revolution, sweep, loft, cone, torus, wedge or pyramid is measured on its exact shape as placed (the tight box, data.bounds 'exact'); otherwise (no kernel, box / cylinder / sphere closed forms, meshes, instances) the box wraps the rotated geometry and may exceed it: data.bounds 'conservative' (also when any entity of a combined box is).",
+    "Under the exact OCC kernel a kernel result, extrusion, revolution, sweep, loft, cone, torus, wedge or pyramid is measured on its exact shape as placed (the tight box, data.bounds 'exact'); a box, cylinder or sphere is always exact (its closed-form box is tight at any rotation); otherwise (no kernel, meshes, instances, 2D shapes, cone / torus / kernel kinds without a kernel) the box wraps the rotated geometry and may exceed it: data.bounds 'conservative' (also when any entity of a combined box is).",
   params: z.object({
     entityId: z.string().optional().describe('Id of the entity whose bounding box to compute. Takes precedence over useSelection.'),
     useSelection: z

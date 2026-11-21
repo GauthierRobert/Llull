@@ -59,7 +59,7 @@ No law needs to change. `capture_viewport` is a read-only command whose effect l
 | TR-ASC-13 | MUST   | `.lld` shared pure evaluator: value grammar with schema binding, ranges, comprehensions, `if`, `let`, built-ins, functions, `expand_design`; `af.entity` (§4.4, §5.5)                                                                                                                                                                                                                         | 16, 17, 18, 20, 21 | AF-05, AF-13        |
 | TR-ASC-14 | SHOULD | `.lld` modules with typed params, namespacing, auto layer + group, DAG imports, SHA-256 embedded sources (§3 `DesignSource`, §4.4 R6)                                                                                                                                                                                                                                                         | 19                 | AF-13, AF-41        |
 | TR-ASC-15 | MUST   | bounds of kernel-backed entities from `BRepBndLib::AddOptimal` on the transformed shape; `data.bounds = 'conservative'` otherwise (§4.5)                                                                                                                                                                                                                                                      | 22                 | AF-21               |
-| TR-ASC-16 | MUST   | ruled `loft_sections` through polygon sections built from exact segments (`BRepBuilderAPI_MakePolygon`), vertex pairing by index after seam alignment, `LOFT_VERTEX_COUNT` (§4.5)                                                                                                                                                                                                             | 23                 | AF-11               |
+| TR-ASC-16 | MUST   | ruled `loft_sections` through polygon sections built from exact segments (`BRepBuilderAPI_MakePolygon`), vertex pairing by index after seam alignment; unequal vertex counts resample as before with a `LOFT_VERTEX_COUNT` warning (replay, §4.5)                                                                                                                                             | 23                 | AF-11               |
 | TR-ASC-17 | MUST   | `capture_viewport` through injected `ctx.viewportCapture` (desktop: offscreen frame, temporary camera, `webContents.capturePage`); `render_view` routes over-budget scenes to it or to `ctx.raster`, else `RENDER_BUDGET_EXCEEDED` (§4.6)                                                                                                                                                     | 24, 25             | AF-22, AF-12        |
 
 ## 3. Data model
@@ -170,7 +170,8 @@ Every feature expands to the same flat command list before `execute` runs, in on
 - `loft_sections`: when every section is a polygon (rectangle, closed polyline) and `ruled: true`, or `coupling:
 'vertices'` is given, build each section as a closed polyline of exact line segments (`BRepBuilderAPI_MakePolygon`).
   No resampling, no Catmull-Rom. Corresponding vertices are paired by index after seam alignment (same vertex count
-  required, else `LOFT_VERTEX_COUNT`). `BRepOffsetAPI_ThruSections(ruled=true)` then yields planar or bilinear faces.
+  required; with unequal counts the loft is resampled as before M5 and the summary carries the warning
+  `LOFT_VERTEX_COUNT`, because a refusal would break replay of saved histories, L8). Planar or bilinear side faces.
 
 ### 4.6 Visibility (M6)
 
@@ -284,7 +285,7 @@ One pure evaluator shared by values, comprehensions, functions and modules:
 | `CHECK_PART_LIMIT`                                                                                                                                                             | check_assembly             | above 20,000 parts; narrow with ids, component or layer                            |
 | `DESIGN_ALIAS_ARITY` / `DESIGN_INDEX_RANGE` / `DESIGN_VALUE_SCHEMA` / `DESIGN_EXPR_TYPE` / `DESIGN_LIST_LIMIT` / `DESIGN_FN_RECURSION` / `DESIGN_FN_ARGS` / `DESIGN_NO_ENTITY` | design language            | see §4.4                                                                           |
 | `DESIGN_MODULE_NOT_FOUND` / `DESIGN_MODULE_CYCLE` / `DESIGN_MODULE_PATH` / `DESIGN_MODULE_PARAM` / `DESIGN_MODULE_HASH_CHANGED` (warn)                                         | design language            | see §4.4                                                                           |
-| `LOFT_VERTEX_COUNT`                                                                                                                                                            | loft_sections              | polygon sections need equal vertex counts for exact ruled lofts                    |
+| `LOFT_VERTEX_COUNT`                                                                                                                                                            | loft_sections              | warning: unequal polygon vertex counts, resampled (exact path needs equal counts)  |
 | `VIEWPORT_UNAVAILABLE`                                                                                                                                                         | capture_viewport           | no desktop app; use `--app` or `render_view renderer=native`                       |
 | `RENDER_BUDGET_EXCEEDED` (warn)                                                                                                                                                | render_view                | not everything drawn; `drawnShare` given                                           |
 
@@ -619,3 +620,26 @@ A prototype was built and measured; its code is not on the branch because it is 
   36: 75 vs 58) with equal volume, which none of the checks catch. Automatic routing must never change a result, so the path stays out.
 - **Reopen when** a fixture with expensive tools exists (section 8: disk + 36 lofted blades) and shows a saving, and the face-count check (topology
   equal to the general fuse on a sample) is part of the acceptance. M1a's single general fuse remains the path for `many`.
+
+### 13.11 As built (M5) exact bounds and ruled polygon loft (2026-11-21)
+
+- **Exact bounds.** New optional port `GeometryKernel.shapeBounds(shape)` (sidecar op, `BRepBndLib::AddOptimal` with `useTriangulation=false`,
+  `useShapeTolerance=false`, no mass integration). `kernelEntityBounds` (`geometry/kernelBounds.ts`) answers it for extrusion, revolution, sweep,
+  loft, wedge, pyramid, cone, torus and a mesh with a `brep`; `measure_bounding_box` reports `data.bounds: 'exact' | 'conservative'`.
+  Rule: `'exact'` for a kernel box and for box, cylinder and sphere, whose closed-form boxes are tight at any rotation (box from its 8 rotated
+  corners, cylinder `h/2 |n| + r sqrt(1 - n^2)` per axis, sphere `r`); `'conservative'` for meshes without B-rep, instances, 2D shapes and kernel kinds
+  measured without a kernel; a combined box is exact only when every entity is. The kernel wrapper memoizes boxes per recipe key (bounded LRU,
+  4096; a refusal is not kept), so whole-document queries and the `.lld` anchor path (`frameOf` runs `measure_bounding_box`; exact boxes are kept
+  there because flush placement of tilted parts needs the tight box, and the memo makes repeats free) do not round-trip twice.
+- **Polygon loft.** `loft_sections {ruled:true}` with every section a polygon (inline `section`, rectangle / closed-polyline sketch) of EQUAL vertex
+  count keeps the vertices (`LoftEntity.polygon: true`, `commands/solids/loftPolygon.ts`, counter-clockwise about the travel, cyclic seam alignment).
+  Native: sections are `BRepBuilderAPI_MakePolygon` wires; side faces are built face by face (planar when the four vertices are coplanar, else
+  bilinear), capped and sewn, because `BRepOffsetAPI_ThruSections(ruled)` gave B-spline sides on OCCT 7.9.2. Unequal counts: the old resampled ruled
+  loft is kept (replay, L8) and the summary warns `LOFT_VERTEX_COUNT`; golden plan `ruled_loft_vertex_count_mismatch_replay` pins it. Loading a loft
+  with `polygon: true` together with `faces`, `sections`, `closed: true` or `ruled !== true` is rejected (persistence guard, hostile-load suite).
+- **Tests.** `tests/unit/kernelBounds.test.ts`, `tests/unit/sweep/loftPolygon.test.ts`, `tests/unit/measure.test.ts`, the guard cases in the hostile-load suite,
+  `server/tests/nativeKernelFidelity.test.ts`, `server/tests/kernelLeavesSweeps.test.ts`, `solver/.../bounds_tests.rs`, `recipe/nodes_tests.rs`.
+- **Left.** (1) Sewn-solid validity check and sewing-tolerance clamp (native, pending). (2) Code export (`export_code`) rebuilds ThruSections
+  B-spline sides, so its face types differ from the native planar / bilinear ones. (3) `coupling: 'vertices'` is not on this path. (4) Only
+  `measure_bounding_box` uses exact bounds (and `frameOf` through it); the other bounds consumers (§4.5 says "every") keep `entityBoundsInDoc`; widen later.
+  (5) Whole-document cost at 2,450 parts is unmeasured (one `evaluate` + one `shapeBounds` per kernel-backed entity on a cold cache).

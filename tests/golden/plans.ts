@@ -197,6 +197,28 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
+  ruled_loft_vertex_count_mismatch_replay: [
+    {
+      command: 'loft_sections',
+      params: {
+        ruled: true,
+        sections: [
+          { center: [0, 0, 0], section: xy(-5, -3, 5, -3, 5, 3, -5, 3) },
+          { center: [0, 0, 10], section: xy(-2, -2, 2, -2, 0, 2) },
+        ],
+      },
+    },
+    {
+      command: 'loft_sections',
+      params: {
+        ruled: true,
+        sections: [
+          { center: [20, 0, 0], section: xy(-5, -3, 5, -3, 5, 3, -5, 3) },
+          { center: [20, 0, 10], section: xy(-2, -2, 2, -2, 2, 2, -2, 2) },
+        ],
+      },
+    },
+  ],
   bell_nozzle_and_plumbing: [
     { command: 'draw_spline', params: { points: xy(3, 0, 1.5, 3, 4, 7, 6, 10) }, as: 'wall' },
     { command: 'draw_polyline', params: { points: xy(6, 10, 5.6, 10) }, as: 'lip' },

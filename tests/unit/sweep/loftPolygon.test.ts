@@ -1,4 +1,4 @@
-/** ASC M5 (TR-ASC-16): a ruled loft through polygon sections keeps the vertices, pairs them by index after seam alignment and refuses unequal counts (LOFT_VERTEX_COUNT). */
+/** ASC M5 (TR-ASC-16): a ruled loft through polygon sections keeps the vertices, pairs them by index after seam alignment; unequal counts resample as before with a LOFT_VERTEX_COUNT warning (replay). */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument, type LoftEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -68,28 +68,81 @@ describe('loft_sections: exact ruled polygon loft', () => {
     expect(entityOf(result).polygon).toBe(true);
   });
 
-  it('refuses sections with different vertex counts with LOFT_VERTEX_COUNT and leaves the document unchanged', () => {
-    const doc = createEmptyDocument();
+  it('sections with different vertex counts are resampled as before (replay) and the summary warns LOFT_VERTEX_COUNT', () => {
+    const triangle = [
+      [-2, -2],
+      [2, -2],
+      [0, 2],
+    ];
+    const result = loftOf([
+      { section: rect(5, 3), center: [0, 0, 0] },
+      { section: triangle, center: [0, 0, 10] },
+    ]);
+    expect(result.affected, result.summary).toHaveLength(1);
+    expect(result.summary).toContain('warning LOFT_VERTEX_COUNT: section 1 has 3 vertices, section 0 has 4');
+    expect(result.summary).not.toContain('exact ruled polygon');
+    const loft = entityOf(result);
+    expect(loft.polygon).toBeUndefined();
+    expect(loft.ruled).toBe(true);
+    expect(loft.rings.every((ring) => ring.length === 24)).toBe(true);
+  });
+
+  it('an inline section given as a sketch id is a polygon placed at its center and rotation', () => {
+    const drawn = execute(createEmptyDocument(), 'draw_rectangle', { width: 8, height: 4 });
+    const doc = drawn.document;
+    const sketch = drawn.affected[0] as string;
     const result = loftOf(
       [
-        { section: rect(5, 3), center: [0, 0, 0] },
-        {
-          section: [
-            [-2, -2],
-            [2, -2],
-            [0, 2],
-          ],
-          center: [0, 0, 10],
-        },
+        { sectionId: sketch, center: [0, 0, 0] },
+        { section: rect(2, 1), center: [0, 0, 10], rotation: [0, 0, 0.5] },
       ],
       {},
       doc,
     );
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('LOFT_VERTEX_COUNT');
-    expect(result.summary).toContain('section 1 has 3 vertices, section 0 has 4');
-    expect(result.error).toMatchObject({ code: 'LOFT_VERTEX_COUNT', paths: ['params.sections.1'] });
+    expect(result.affected, result.summary).toHaveLength(1);
+    const loft = entityOf(result);
+    expect(loft.polygon).toBe(true);
+    expect(loft.rings.every((ring) => ring.length === 4)).toBe(true);
+  });
+
+  it('a sketch section with an arc is not a polygon: the general ruled loft resamples it', () => {
+    const circle = execute(createEmptyDocument(), 'draw_arc', { center: [0, 0], radius: 3 });
+    const result = execute(circle.document, 'loft_sections', {
+      ruled: true,
+      sections: [
+        { sectionId: circle.affected[0], center: [0, 0, 0] },
+        { section: rect(2, 1), center: [0, 0, 10] },
+      ],
+    });
+    expect(result.affected, result.summary).toHaveLength(1);
+    expect(entityOf(result).polygon).toBeUndefined();
+    expect(entityOf(result).rings[0]).toHaveLength(24);
+    const ids = execute(circle.document, 'loft_sections', { ruled: true, sectionIds: [circle.affected[0], 'missing'] });
+    expect(ids.affected).toEqual([]);
+  });
+
+  it('a sketch section that does not resolve, or that mixes section and sectionId, falls to the general failures', () => {
+    const missing = loftOf([
+      { sectionId: 'nope', center: [0, 0, 0] },
+      { section: rect(2, 1), center: [0, 0, 10] },
+    ]);
+    expect(missing.affected).toEqual([]);
+    const both = loftOf([
+      { sectionId: 'nope', section: rect(1, 1), center: [0, 0, 0] },
+      { section: rect(2, 1), center: [0, 0, 10] },
+    ]);
+    expect(both.affected).toEqual([]);
+    const degenerate = loftOf([
+      {
+        section: [
+          [0, 0],
+          [1, 0],
+        ],
+        center: [0, 0, 0],
+      },
+      { section: rect(2, 1), center: [0, 0, 10] },
+    ]);
+    expect(degenerate.affected).toEqual([]);
   });
 
   it('a smooth loft (ruled: false) still resamples polygons, and a round section keeps the general ruled path', () => {
@@ -159,5 +212,25 @@ describe('loft_sections: exact ruled polygon loft', () => {
     const loaded = execute(createEmptyDocument(), 'load_document', { json: flagged(false) });
     expect(loaded.document.entities[loft.id]).toBeUndefined();
     expect(loaded.summary).toContain('polygon must be true');
+  });
+
+  it.each([
+    ['ruled: false', { ruled: false }, 'needs ruled'],
+    ['closed: true', { closed: true }, 'excludes closed'],
+    ['sections', { sections: [] }, 'excludes faces and sections'],
+    ['faces', { faces: [] }, 'excludes faces and sections'],
+  ])('a persisted polygon loft with %s is rejected on load', (_label, patch, message) => {
+    const made = loftOf([
+      { section: rect(5, 3), center: [0, 0, 0] },
+      { section: rect(2, 1), center: [0, 0, 10] },
+    ]);
+    const loft = entityOf(made);
+    const json = serializeDocument({
+      ...made.document,
+      entities: { ...made.document.entities, [loft.id]: { ...loft, ...patch } as LoftEntity },
+    });
+    const loaded = execute(createEmptyDocument(), 'load_document', { json });
+    expect(loaded.document.entities[loft.id]).toBeUndefined();
+    expect(loaded.summary).toContain(message);
   });
 });

@@ -131,7 +131,7 @@ describe('measure commands (read-only)', () => {
       min: [-2, -3, -4],
       max: [2, 3, 4],
       size: [4, 6, 8],
-      bounds: 'conservative',
+      bounds: 'exact',
     });
     const pair = build(['add_box', { size: [2, 2, 2], position: [0, 0, 0] }], ['add_box', { size: [2, 2, 2], position: [10, 0, 0] }]).doc;
     const all = data(pair, 'measure_bounding_box', {}) as unknown as Record<string, number[]>;
