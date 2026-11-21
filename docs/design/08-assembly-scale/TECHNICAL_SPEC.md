@@ -447,3 +447,15 @@ Scope: §4.2, TR-ASC-06 data side (no renderer), §6 interop, decision D1. Code:
   exact STEP text, and `mapped_item` shape reuse, which is chosen by OCCT's XCAF writer, not by TS code.
 - **Left.** Renderer (InstancedMesh / BatchedMesh / `instanceId` picking, TR-ASC-06) for a later lane; `PatternInstanceSet` /
   `patternOf` connection members (M3); flipping the default to `instances` (D1) once every command accepts instances; pattern fuse.
+
+**Renderer (M2, as built).** `src/ui/viewport/3d/componentInstancePlan.ts` (pure) + `ComponentInstancedRenderer.tsx`, wired in `Entities.tsx`.
+A component with at least 8 eligible instances whose children are all plain 3D solids is drawn as one `InstancedMesh` per child solid
+(geometry from `solidTriangles(child)`, instance matrix = position / Euler XYZ / scale), so a 10,000-member pattern of a one-solid component is
+1 draw call (budget §8: ≤ 200). `instanceId` indexes the id-sorted instance ids: a click selects that instance entity, never the batch. Colours go
+through `instanceColor` (child or material colour, tint store, selection lerp, as the plant buckets); x-ray raises the batch opacity when any
+member is selected; section / clip planes are the scene-wide ones (click guarded by `isClippedAway`). Visibility, layers, explode offsets come from the same
+filtered entity list as the per-entity path. Instances that are animated, finished, ghosted, transitioning, mirrored (negative scale), under 8 in
+number, or of a component with 2D / nested / decaled children stay on the per-entity path. Reuses `useBatchCapacity`, `makeMaterialArgs`,
+`writeBucketColours`. Tests: `tests/component/ComponentInstancedRenderer.test.tsx` (1,000-member polar array = one InstancedMesh, matrices, pick, single-instance tint).
+Not built: `BatchedMesh` for unique parts (not used by the plant renderer either; no measurement justifies it), hover by `instanceId`, a
+BVH for picking 10,000 instances (default three raycast), LOD swap for far instances, a measured `renderer.info.render.calls` (no GPU here).
