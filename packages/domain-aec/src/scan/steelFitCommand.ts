@@ -16,6 +16,9 @@ import { unverifiedReasons } from './extraction';
 import { fromM, scanOf, toM, vecFromM } from './model';
 import { regionSpec, resolveRegion } from './region';
 import { cloudIdParam, regionParam, seedParam } from './schemas';
+import { sweepFrame } from '../shared/mesh';
+import { dot3, hypot3 } from '@lib/vec3';
+import { existingLevelId, getBuilding } from '../building/model';
 import { findProfile, profileOutline, STEEL_PROFILES } from '../steel/profiles';
 
 /** Section families searched by default (flat and round bars only when named). */
@@ -23,33 +26,31 @@ const DEFAULT_FAMILIES = ['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 
 /** Named defaults of the parameters (documented in the descriptions). */
 const DEFAULT_MAX_CANDIDATES = 5;
 const DEFAULT_SEED = 1;
+const MIN_HINT_NORM = 1e-9;
 const ALL_FAMILIES: string[] = [...new Set(STEEL_PROFILES.map((profile) => profile.family))];
 
 type Vec = readonly [number, number, number];
 const vec = (value: unknown): Vec | undefined =>
   Array.isArray(value) && value.length === 3 && value.every((n) => typeof n === 'number') ? (value as unknown as Vec) : undefined;
-const cross = (a: Vec, b: Vec): Vec => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a: Vec, b: Vec): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const unitOf = (a: Vec): Vec => {
-  const n = Math.hypot(a[0], a[1], a[2]);
-  return n > 0 ? [a[0] / n, a[1] / n, a[2] / n] : [0, 0, 0];
-};
 
-/** `add_steel_member` roll (radians) that turns the sweep frame's depth onto `depth` for the axis `axis` (shared/mesh.ts sweepFrame). */
-export function memberRoll(axis: Vec, depth: Vec): number {
-  const d = unitOf(axis);
-  const reference: Vec = Math.abs(d[2]) > 0.999 ? [1, 0, 0] : [0, 0, 1];
-  const along = dot(reference, d);
-  const up = unitOf([reference[0] - d[0] * along, reference[1] - d[1] * along, reference[2] - d[2] * along]);
-  return Math.atan2(dot(depth, cross(up, d)), dot(depth, up));
+/** `add_steel_member` roll (radians) that turns the sweep frame's depth (`sweepFrame` at roll 0: u = side, v = up) onto `depth` for the axis start -> end. */
+export function memberRoll(start: Vec, end: Vec, depth: Vec): number {
+  const frame = sweepFrame(start, end, 0);
+  return frame === null ? 0 : Math.atan2(dot3(depth, frame.u), dot3(depth, frame.v));
 }
+
+/** Unit direction (the native op takes any non-zero length; a unit vector keeps the job readable). */
+const unitHint = (hint: Vec): number[] => {
+  const n = hypot3(hint);
+  return hint.map((c) => c / n);
+};
 
 const mm = (metres: unknown): number => (typeof metres === 'number' ? metres * 1000 : Number.NaN);
 
 function paramProblem(
   families: readonly string[],
   positive: Readonly<Record<string, number | undefined>>,
-  axisHint: readonly number[] | undefined,
+  axisHint: Vec | undefined,
 ): { key: string; text: string } | undefined {
   const unknown = families.filter((family) => !ALL_FAMILIES.includes(family));
   if (unknown.length > 0 || families.length === 0)
@@ -58,8 +59,8 @@ function paramProblem(
       text: `families must be a non-empty list of ${ALL_FAMILIES.join(', ')} (got ${unknown.join(', ') || 'none'})`,
     };
   for (const [key, value] of Object.entries(positive)) if (value !== undefined && !(value > 0)) return { key, text: `${key} must be > 0` };
-  if (axisHint !== undefined && axisHint.every((component) => component === 0))
-    return { key: 'axisHint', text: 'axisHint must not be the zero vector' };
+  if (axisHint !== undefined && !(hypot3(axisHint) > MIN_HINT_NORM))
+    return { key: 'axisHint', text: 'axisHint must be a finite vector with a norm above 1e-9' };
   return undefined;
 }
 
@@ -102,21 +103,22 @@ function candidateOf(doc: CadDocument, candidate: Readonly<Record<string, unknow
 
 /**
  * @failure SCN_CLOUD_NOT_FOUND / SCN_ASSET_*; bad region -> SCN_CROP_*; unknown family / non-positive parameter -> SCN_PARAM_INVALID; < 30 points ->
- *   SCN_FIT_TOO_FEW_POINTS; section thinner than 1 cm -> SCN_FIT_NO_MODEL; no outline within the extent gate -> SCN_STEEL_NO_MATCH;
+ *   SCN_FIT_TOO_FEW_POINTS; section thinner than 1 cm -> SCN_FIT_NO_MODEL; no hint and a stub region (axial extent < 3 x the
+ *   section) -> SCN_STEEL_AXIS_AMBIGUOUS; no outline within the extent gate -> SCN_STEEL_NO_CANDIDATE; unknown levelId -> SCN_PARAM_INVALID;
  *   no binary -> NATIVE_TOOL_MISSING
  */
 export const fitSteelMember = defineCommand({
   name: 'fit_steel_member',
   description:
     'Read-only: identify a steel member in a region of the cloud against the llull catalogue (IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L; FL / RD ' +
-    'only when named in `families`). Native: the axis is the largest-variance direction of the region points (or axisHint, needed for a member ' +
-    'shorter than its section), the points are projected onto the section plane, and every catalogue outline is scored by the RMS distance ' +
+    'only when named in `families`). Native: the axis is the largest-variance direction of the region points (or axisHint: REQUIRED for a region shorter than about 3 x the larger ' +
+    'section dimension, else SCN_STEEL_AXIS_AMBIGUOUS), the points are projected onto the section plane, and every catalogue outline is scored by the RMS distance ' +
     'of the section points to the outline over a roll search with the section seen from either end. Put the region around ONE member. data: ' +
     'candidates[] best first (profile, family, scoreMm, measured hMm / bMm of the rotated extents, hDeltaMm / bDeltaMm against the catalogue, ' +
     "axis, depthDirection, widthDirection), `member` = the best candidate's axis (start, end, direction), measured section (hMm, bMm; tw / tf " +
     'null: not resolvable from a scan below 10 sigma, reason given) and `addSteelMember` = { profile, start, end, roll } ready for add_steel_member ' +
-    '(z relative to the level), plus warnings: SCN_STEEL_NO_MATCH when the best score exceeds the inlier band (non-catalogue or built-up ' +
-    'section: model manually). The result is a proposal; creating the member stays a separate add_steel_member call.',
+    '(start / end z relative to `levelId`, whose elevation is subtracted; default the active level), plus warnings: SCN_STEEL_NO_MATCH when the best score exceeds ' +
+    'the inlier band (non-catalogue or built-up section: model manually) and SCN_STEEL_LOW_COVERAGE (occluded / one-sided: h, b, centre are of the visible part). The result is a proposal; creating the member stays a separate add_steel_member call.',
   annotations: { readOnly: true },
   params: z.object({
     cloudId: cloudIdParam,
@@ -131,23 +133,43 @@ export const fitSteelMember = defineCommand({
       .length(3)
       .optional()
       .describe(
-        '[x, y, z] direction of the member axis (document frame, any length): needed when the region is shorter than the section is deep.',
+        '[x, y, z] direction of the member axis (document frame, any length): required when the region is shorter than about 3 x the larger section dimension.',
       ),
     noiseSigma: z.number().optional().describe('Scanner noise sigma in document units, when known: the no-match band is 3 sigma.'),
     distanceThreshold: z
       .number()
       .optional()
       .describe('Explicit no-match band for the best score, document units (default 3 x sigma, else 2.5 x median spacing).'),
+    levelId: z
+      .string()
+      .optional()
+      .describe(
+        'Level id add_steel_member will be called on (default: the active level, else the first): its elevation is subtracted from start / end z.',
+      ),
     seed: seedParam,
   }),
   run: (doc, params, ctx): CommandResult => {
     const command = 'fit_steel_member';
-    const { cloudId, region, axisHint, noiseSigma, distanceThreshold } = params;
+    const { cloudId, region, noiseSigma, distanceThreshold } = params;
+    const axisHint = vec(params.axisHint);
     const families = params.families ?? DEFAULT_FAMILIES;
     const maxCandidates = params.maxCandidates ?? DEFAULT_MAX_CANDIDATES;
     const seed = params.seed ?? DEFAULT_SEED;
     const problem = paramProblem(families, { noiseSigma, distanceThreshold }, axisHint);
     if (problem !== undefined) return refuseScan(doc, command, 'SCN_PARAM_INVALID', problem.text, [cloudId], [problem.key]);
+    const building = getBuilding(doc);
+    const levelId = existingLevelId(building, params.levelId);
+    if (params.levelId !== undefined && levelId === undefined)
+      return refuseScan(
+        doc,
+        command,
+        'SCN_PARAM_INVALID',
+        `unknown level '${params.levelId}' (levels: ${building.levelOrder.join(', ') || 'none'})`,
+        [cloudId],
+        ['levelId'],
+      );
+    const level = levelId === undefined ? undefined : building.levels[levelId];
+    const elevation = level === undefined ? 0 : level.elevation;
     const access = cloudAccess(doc, command, cloudId, ctx);
     if (!isAccess(access)) return access;
     const resolved = resolveRegion(doc, region);
@@ -157,7 +179,7 @@ export const fitSteelMember = defineCommand({
       loopXy: profileOutline(profile).outer.map(([x, y]) => [x / 1000, y / 1000]),
     }));
     const native: Record<string, unknown> = { region: resolved.region, outlines, maxCandidates, seed };
-    if (axisHint !== undefined) native['axisHint'] = axisHint;
+    if (axisHint !== undefined) native['axisHint'] = unitHint(axisHint);
     if (noiseSigma !== undefined) native['noiseSigma'] = toM(doc, noiseSigma);
     if (distanceThreshold !== undefined) native['distanceThreshold'] = toM(doc, distanceThreshold);
     const ran = runOp(doc, command, access.port, 'steel', [access.cloud], native);
@@ -175,9 +197,23 @@ export const fitSteelMember = defineCommand({
     const warnings = (Array.isArray(result['warnings']) ? result['warnings'] : [])
       .filter(isRecord)
       .flatMap((w) => (typeof w['code'] === 'string' ? [{ code: w['code'], message: String(w['message'] ?? '') }] : []));
-    const reasons = unverifiedReasons(scanOf(doc), access.cloud, []);
+    const reasons = unverifiedReasons(
+      scanOf(doc),
+      access.cloud,
+      warnings.map((w) => w.code),
+    );
     const [startDoc, endDoc] = [vecFromM(doc, start), vecFromM(doc, end)];
     const length = fromM(doc, Number(result['length']));
+    const relative = (point: Vec): Vec => [point[0], point[1], point[2] - elevation];
+    const nativeThreshold = result['threshold'];
+    const threshold = isRecord(nativeThreshold)
+      ? {
+          ...nativeThreshold,
+          value: fromM(doc, Number(nativeThreshold['value'])),
+          spacing: fromM(doc, Number(nativeThreshold['spacing'])),
+          unit: doc.units,
+        }
+      : null;
     const provenance = {
       method: 'pca axis + chamfer section match',
       algorithmVersion: `${ran.provenance.binary}/steel-1`,
@@ -206,10 +242,16 @@ export const fitSteelMember = defineCommand({
           tfMm: null,
           twTfReason: 'web and flange thickness are below 10 sigma of a scan in general; read them from the catalogue candidate',
         },
-        addSteelMember: { profile: best?.profile, start: startDoc, end: endDoc, roll: memberRoll(axis, depth) },
+        addSteelMember: {
+          profile: best?.profile,
+          start: relative(startDoc),
+          end: relative(endDoc),
+          roll: memberRoll(startDoc, endDoc, depth),
+          ...(levelId === undefined ? {} : { levelId }),
+        },
         rms: fromM(doc, Number(result['rms'])),
         pointsInRegion: result['pointsInRegion'],
-        threshold: isRecord(result['threshold']) ? result['threshold'] : null,
+        threshold,
         warnings,
         unverified: reasons.length > 0,
         unverifiedReasons: reasons,

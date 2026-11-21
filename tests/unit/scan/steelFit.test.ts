@@ -9,6 +9,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { CloudOp, CloudOpResult } from '@core/model/pointCloud';
 import type { ExecutionContext } from '@core/commands/types';
 import { memberRoll } from '@aec/scan/steelFitCommand';
+import { sweepFrame } from '@aec/shared/mesh';
 import { expectPure } from '../../helpers/expectNoOp';
 import { fixturePort, KEY_A, opOk } from './fixturePort';
 
@@ -112,7 +113,14 @@ describe('fit_steel_member', () => {
   it('refuses bad parameters by name without calling the port', () => {
     const { ctx, ops } = context(() => opOk(answer()));
     const { doc, cloudId } = attached(ctx);
-    for (const extra of [{ families: ['XYZ'] }, { families: [] }, { noiseSigma: 0 }, { distanceThreshold: -1 }, { axisHint: [0, 0, 0] }]) {
+    for (const extra of [
+      { families: ['XYZ'] },
+      { families: [] },
+      { noiseSigma: 0 },
+      { distanceThreshold: -1 },
+      { axisHint: [0, 0, 0] },
+      { axisHint: [1e-12, 0, 0] },
+    ]) {
       const result = fit(doc, cloudId, ctx, extra);
       expect(result.summary).toContain('SCN_PARAM_INVALID');
       expect(result.affected).toEqual([]);
@@ -129,17 +137,71 @@ describe('fit_steel_member', () => {
   });
 
   it('turns a native refusal into its coded no-op', () => {
-    const { ctx } = context(() => ({ ok: false, code: 'SCN_STEEL_NO_MATCH', message: 'no outline within the gate' }));
+    const { ctx } = context(() => ({ ok: false, code: 'SCN_STEEL_NO_CANDIDATE', message: 'no outline within the gate' }));
     const { doc, cloudId } = attached(ctx);
     const result = fit(doc, cloudId, ctx);
-    expect(result.summary).toContain('SCN_STEEL_NO_MATCH');
+    expect(result.summary).toContain('SCN_STEEL_NO_CANDIDATE');
     expect(result.document).toBe(doc);
   });
 
   it('derives the add_steel_member roll from the depth direction (sweep frame: up, then side = up x axis)', () => {
-    expect(memberRoll([1, 0, 0], [0, 0, 1])).toBeCloseTo(0, 9);
-    expect(memberRoll([1, 0, 0], [0, 1, 0])).toBeCloseTo(Math.PI / 2, 9);
-    expect(memberRoll([0, 0, 1], [1, 0, 0])).toBeCloseTo(0, 9);
-    expect(memberRoll([0, 0, 2], [0, 1, 0])).toBeCloseTo(-Math.PI / 2, 9);
+    expect(memberRoll([0, 0, 0], [1, 0, 0], [0, 0, 1])).toBeCloseTo(0, 9);
+    expect(memberRoll([0, 0, 0], [1, 0, 0], [0, 1, 0])).toBeCloseTo(Math.PI / 2, 9);
+    expect(memberRoll([0, 0, 0], [0, 0, 1], [1, 0, 0])).toBeCloseTo(0, 9);
+    expect(memberRoll([0, 0, 0], [0, 0, 2], [0, 1, 0])).toBeCloseTo(-Math.PI / 2, 9);
+    expect(memberRoll([1, 1, 1], [1, 1, 1], [0, 0, 1])).toBe(0);
+  });
+
+  it('subtracts the level elevation: add_steel_member on the proposal reproduces the fitted frame and position', () => {
+    const tilted = {
+      ...answer(),
+      candidates: [{ ...(answer()['candidates'] as Record<string, unknown>[])[0], depthDirection: [0, 0.6, 0.8] }],
+    };
+    const { ctx } = context(() => opOk({ ...tilted, start: [0, 0, 7.2], end: [2, 0, 7.2] }));
+    const attachedDoc = attached(ctx);
+    const { cloudId } = attachedDoc;
+    let { doc } = attachedDoc;
+    doc = execute(doc, 'add_level', { name: 'L1', elevation: 0 }).document;
+    doc = execute(doc, 'add_level', { name: 'L2', elevation: 3600 }).document;
+    const levels = Object.values(doc.building?.levels ?? {});
+    const second = levels.find((level) => level.elevation === 3600);
+    expect(second).toBeDefined();
+    for (const levelId of [undefined, second?.id]) {
+      const fitted = fit(doc, cloudId, ctx, levelId === undefined ? {} : { levelId });
+      const proposal = (
+        fitted.data as { addSteelMember: { profile: string; start: number[]; end: number[]; roll: number; levelId?: string } }
+      ).addSteelMember;
+      expect(proposal.levelId).toBe(second?.id);
+      expect(proposal.start).toEqual([0, 0, 3600]);
+      const built = execute(fitted.document, 'add_steel_member', proposal, ctx);
+      const element = Object.values(built.document.building?.elements ?? {}).find((e) => e.category === 'member');
+      if (element === undefined || element.category !== 'member') throw new Error('no member created');
+      const world = [element.start[0], element.start[1], element.start[2] + (second?.elevation ?? 0)];
+      expect(world).toEqual([0, 0, 7200]);
+      const frame = sweepFrame(world as [number, number, number], [2000, 0, 7200], element.roll);
+      expect(frame?.v[1]).toBeCloseTo(0.6, 9);
+      expect(frame?.v[2]).toBeCloseTo(0.8, 9);
+    }
+  });
+
+  it('refuses an unknown level and a non-finite axis hint, converts the threshold to document units', () => {
+    const { ctx } = context(() => opOk(answer()));
+    const { doc, cloudId } = attached(ctx);
+    expect(fit(doc, cloudId, ctx, { levelId: 'level-9' }).summary).toContain('SCN_PARAM_INVALID');
+    expect(fit(doc, cloudId, ctx, { axisHint: [1e-12, 0, 0] }).summary).toContain('SCN_PARAM_INVALID');
+    const ok = fit(doc, cloudId, ctx);
+    expect((ok.data as { threshold: { value: number; spacing: number } }).threshold).toMatchObject({ value: 1.5, spacing: 10 });
+  });
+
+  it('flags a low-coverage fit as unverified and turns the new native refusals into coded no-ops', () => {
+    const low = context(() => opOk(answer([{ code: 'SCN_STEEL_LOW_COVERAGE', message: 'one-sided' }])));
+    const { doc, cloudId } = attached(low.ctx);
+    expect((fit(doc, cloudId, low.ctx).data as { unverified: boolean }).unverified).toBe(true);
+    for (const code of ['SCN_STEEL_AXIS_AMBIGUOUS', 'SCN_STEEL_NO_CANDIDATE']) {
+      const refused = context(() => ({ ok: false, code, message: 'x' }));
+      const result = fit(doc, cloudId, refused.ctx);
+      expect(result.summary).toContain(code);
+      expect(result.affected).toEqual([]);
+    }
   });
 });

@@ -177,16 +177,86 @@ fn best_roll(coarse: &[[f64; 2]], full: &[[f64; 2]], outline: &Outline) -> Optio
     Some((objective(theta), theta))
 }
 
-/// Largest-variance direction of the points, sign fixed so its largest component is positive.
-pub fn principal_axis(points: &[Vec3]) -> Vec3 {
-    let (_, vectors) = jacobi_eigen(scatter(points, &mean(points)));
+/// Largest-variance direction of the points (sign fixed so its largest component is positive) and the ratio of the two largest eigenvalues.
+pub fn principal_axis(points: &[Vec3]) -> (Vec3, f64) {
+    let (values, vectors) = jacobi_eigen(scatter(points, &mean(points)));
     let axis = column(&vectors, 2);
     let largest = (0..3).max_by(|&i, &j| axis[i].abs().total_cmp(&axis[j].abs())).unwrap_or(0);
-    if axis[largest] < 0.0 {
-        scale(&axis, -1.0)
-    } else {
-        axis
+    let axis = if axis[largest] < 0.0 { scale(&axis, -1.0) } else { axis };
+    (axis, values[2] / values[1].max(1e-300))
+}
+
+/// Caps of a job (a hostile one must not cost minutes of CPU): refused as NATIVE_JOB_INPUT naming the field.
+pub const MAX_OUTLINES: usize = 512;
+pub const MAX_LOOP_VERTICES: usize = 256;
+pub const MAX_NAME_CHARS: usize = 64;
+pub const MAX_CANDIDATES: usize = 100;
+/// Smallest axisHint norm (a direction, any length above this).
+const MIN_HINT_NORM: f64 = 1e-9;
+/// The axis of the PCA is ambiguous when the two largest variances are within this ratio.
+pub const AXIS_EIGEN_RATIO: f64 = 2.0;
+/// ... or when the axial extent is less than this multiple of the larger in-plane extent (a stub: the long direction may lie across the section).
+pub const AXIS_EXTENT_RATIO: f64 = 3.0;
+/// Fraction of the best outline's perimeter that must have section points within the band (else SCN_STEEL_LOW_COVERAGE).
+pub const MIN_COVERAGE: f64 = 0.8;
+
+fn validate(outlines: &[Outline], axis_hint: &Option<Vec3>, max_candidates: usize) -> CloudResult<()> {
+    if outlines.is_empty() || outlines.len() > MAX_OUTLINES {
+        return Err(CloudError::input(format!("params.outlines needs 1 to {MAX_OUTLINES} outlines, got {}", outlines.len())));
     }
+    if max_candidates == 0 || max_candidates > MAX_CANDIDATES {
+        return Err(CloudError::input(format!("params.maxCandidates must be 1 to {MAX_CANDIDATES}")));
+    }
+    for outline in outlines {
+        let n = outline.loop_xy.len();
+        if outline.name.chars().count() > MAX_NAME_CHARS {
+            return Err(CloudError::input(format!("params.outlines[].name is longer than {MAX_NAME_CHARS} characters")));
+        }
+        if !(3..=MAX_LOOP_VERTICES).contains(&n) {
+            return Err(CloudError::input(format!(
+                "params.outlines[].loopXy of '{}' needs 3 to {MAX_LOOP_VERTICES} vertices, got {n}",
+                outline.name
+            )));
+        }
+        if outline.loop_xy.iter().any(|p| !p[0].is_finite() || !p[1].is_finite()) {
+            return Err(CloudError::input(format!("params.outlines[].loopXy of '{}' holds a non-finite coordinate", outline.name)));
+        }
+        let size = size_of(outline);
+        if size[0] <= 0.0 || size[1] <= 0.0 || size[0].is_nan() || size[1].is_nan() {
+            return Err(CloudError::input(format!("params.outlines[].loopXy of '{}' has a zero bounding box", outline.name)));
+        }
+    }
+    if let Some(hint) = axis_hint {
+        if !hint.iter().all(|c| c.is_finite()) || crate::linalg::norm(hint) <= MIN_HINT_NORM {
+            return Err(CloudError::input("params.axisHint must be a finite vector with a norm above 1e-9"));
+        }
+    }
+    Ok(())
+}
+
+/// Share of the outline's perimeter (sampled every ~2 mm) with a section point within `band`, for the best candidate's roll.
+fn coverage(section: &[[f64; 2]], best: &Candidate, outline: &Outline, band: f64) -> f64 {
+    let sign = if best.flipped { -1.0 } else { 1.0 };
+    let oriented: Vec<[f64; 2]> = section.iter().map(|p| [p[0], sign * p[1]]).collect();
+    let turned = subsample(&rotated(&oriented, best.roll_deg.to_radians()), MAX_SECTION_POINTS);
+    let (low, high) = extents(&turned);
+    let centre = [(low[0] + high[0]) / 2.0, (low[1] + high[1]) / 2.0];
+    let n = outline.loop_xy.len();
+    let (mut covered, mut total) = (0usize, 0usize);
+    for i in 0..n {
+        let (a, b) = (outline.loop_xy[i], outline.loop_xy[(i + 1) % n]);
+        let length = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+        let steps = ((length / 0.002).ceil() as usize).max(1);
+        for k in 0..steps {
+            let t = (k as f64 + 0.5) / steps as f64;
+            let q = [a[0] + t * (b[0] - a[0]) + centre[0], a[1] + t * (b[1] - a[1]) + centre[1]];
+            total += 1;
+            if turned.iter().any(|p| (p[0] - q[0]).hypot(p[1] - q[1]) <= band) {
+                covered += 1;
+            }
+        }
+    }
+    covered as f64 / total.max(1) as f64
 }
 
 /// Best roll and viewing direction of one outline over the section points: the candidate (without its ranking).
@@ -224,7 +294,8 @@ fn place(section: &[[f64; 2]], frame_uv: (&Vec3, &Vec3), axis: &Vec3, centroid: 
 }
 
 /// @failure < 30 points -> SCN_FIT_TOO_FEW_POINTS; no / degenerate outlines or a zero axisHint -> NATIVE_JOB_INPUT; a section thinner than 1 cm
-///   -> SCN_FIT_NO_MODEL; no outline within the extent gate -> SCN_STEEL_NO_MATCH
+///   -> SCN_FIT_NO_MODEL; no hint and an ambiguous axis -> SCN_STEEL_AXIS_AMBIGUOUS;
+///   no outline within the extent gate -> SCN_STEEL_NO_CANDIDATE
 pub fn fit(
     points: &[Vec3],
     outlines: &[Outline],
@@ -235,11 +306,9 @@ pub fn fit(
     if points.len() < MIN_POINTS {
         return Err(too_few(points.len(), MIN_POINTS, "steel member"));
     }
-    if outlines.is_empty() || outlines.iter().any(|o| o.loop_xy.len() < 3) {
-        return Err(CloudError::input("params.outlines needs closed loops of at least 3 points"));
-    }
-    let axis = match axis_hint {
-        Some(hint) => unit(&hint).ok_or_else(|| CloudError::input("params.axisHint must not be zero"))?,
+    validate(outlines, &axis_hint, max_candidates)?;
+    let (axis, eigen_ratio) = match axis_hint {
+        Some(hint) => (unit(&hint).ok_or_else(|| CloudError::input("params.axisHint must not be zero"))?, f64::INFINITY),
         None => principal_axis(points),
     };
     let threshold = settings.threshold(&KdTree::build(points));
@@ -256,13 +325,24 @@ pub fn fit(
     axial.sort_by(f64::total_cmp);
     let (t_low, t_high) = (percentile(&axial, 0.005), percentile(&axial, 0.995));
     let (low, high) = extents(&section);
+    let in_plane = (high[0] - low[0]).max(high[1] - low[1]);
+    if axis_hint.is_none() && (eigen_ratio < AXIS_EIGEN_RATIO || t_high - t_low < AXIS_EXTENT_RATIO * in_plane) {
+        return Err(CloudError::new(
+            "SCN_STEEL_AXIS_AMBIGUOUS",
+            format!(
+                "the region is {:.0} mm long and {:.0} mm across (variance ratio {eigen_ratio:.2}); the principal axis may lie across the section: give axisHint",
+                (t_high - t_low) * 1000.0,
+                in_plane * 1000.0
+            ),
+        ));
+    }
     if (high[0] - low[0]) < MIN_EXTENT && (high[1] - low[1]) < MIN_EXTENT {
         return Err(CloudError::new("SCN_FIT_NO_MODEL", "the section of the region is thinner than 1 cm in both directions; not a member"));
     }
     let mut candidates: Vec<Candidate> = outlines.iter().filter_map(|o| place(&section, (&u, &v), &axis, &centroid, o)).collect();
     if candidates.is_empty() {
         return Err(CloudError::new(
-            "SCN_STEEL_NO_MATCH",
+            "SCN_STEEL_NO_CANDIDATE",
             format!(
                 "no catalogue outline has extents within {} % of the section ({:.1} x {:.1} mm)",
                 EXTENT_GATE * 100.0,
@@ -285,6 +365,19 @@ pub fn fit(
                 threshold.value * 1000.0
             ),
         });
+    }
+    if let Some(outline) = outlines.iter().find(|o| o.name == best.profile) {
+        let share = coverage(&section, best, outline, threshold.value);
+        if share < MIN_COVERAGE {
+            warnings.push(FitWarning {
+                code: "SCN_STEEL_LOW_COVERAGE",
+                message: format!(
+                    "only {:.0} % of the best outline's perimeter has scan points within {:.1} mm: an occluded or one-sided member; h, b and the centre are of the visible part",
+                    share * 100.0,
+                    threshold.value * 1000.0
+                ),
+            });
+        }
     }
     let (from, to) = if best.flipped { (t_high, t_low) } else { (t_low, t_high) };
     Ok(SteelFit {

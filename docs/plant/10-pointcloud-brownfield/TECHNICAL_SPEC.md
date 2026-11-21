@@ -915,15 +915,19 @@ timestamps, so the same document and assets give the same archive bytes (tested)
 
 `fit_steel_member` (read-only, toolset `scan`; `scan/steelFitCommand.ts`) runs the native op `steel` (`llull-cloud/src/fit/steel.rs`). The catalogue stays in
 TypeScript: the command sends the outer outline of every profile of `families` (default IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L; FL / RD only when named) in
-metres, and Rust does the numerics. Axis: the largest-variance direction of the region (sign fixed), or `axisHint` (needed for a member shorter than its section
-is deep; no face-plane refinement of the axis is built: PCA only). Section points are projected onto the plane through the centroid (stride subsample to 1 500
+metres, and Rust does the numerics. Axis: the largest-variance direction of the region (sign fixed), or `axisHint` (a finite vector, norm > 1e-9). No face-plane
+refinement of the axis is built: PCA only, so WITHOUT a hint the fit refuses `SCN_STEEL_AXIS_AMBIGUOUS` when the two largest variances are within 2x or the axial extent
+is under 3 x the larger in-plane extent (a stub: IPE 300 at 0.4 h, 1.3 h, HEA 300 at 1.1 h in `tests/steel.rs`). Section points are projected onto the plane through the centroid (stride subsample to 1 500
 points) and every outline is scored by RMS(min distance point to outline) with the outline centred on the 0.5 % / 99.5 % percentile box of the rotated points,
 over a roll search (coarse 5° on 300 points, golden section ±5° on all) for BOTH viewing directions (the unequal angle is chiral: the second direction reverses
 the axis, so every candidate carries `axisDirection`, `depthDirection`, `widthDirection` with width x depth = axis). A roll is tried only when the rotated extents are
 within 30 % of the outline's. h and b are the rotated extents of the best orientation. The command derives the `add_steel_member` roll from the depth direction with
-the sweep-frame convention (`shared/mesh.ts`) and returns `addSteelMember = { profile, start, end, roll }`. `tw` / `tf` are `null` with a reason (not resolvable
+the sweep-frame convention (`shared/mesh.ts`) and returns `addSteelMember = { profile, start, end, roll, levelId? }`: `add_steel_member` reads z relative to its level, so the command takes `levelId` (default the active level,
+else the first; unknown: `SCN_PARAM_INVALID`) and subtracts that level's elevation (`axis` / `member` stay absolute; the test creates the member on a level at 3.6 m and compares position and frame). `tw` / `tf` are `null` with a reason (not resolvable
 from a scan below 10 sigma; STL-A does not gate them). Refusals: < 30 points `SCN_FIT_TOO_FEW_POINTS`, section under 1 cm `SCN_FIT_NO_MODEL`, no outline within the
-extent gate `SCN_STEEL_NO_MATCH`; a best score above the inlier band is a warning with the same code (built-up section). Not built: the commit of a steel extraction
+extent gate `SCN_STEEL_NO_CANDIDATE`; warnings: `SCN_STEEL_NO_MATCH` (best score above the inlier band: built-up section) and `SCN_STEEL_LOW_COVERAGE` (under 80 % of the best
+outline's perimeter has scan points within the band: occluded / one-sided, h, b and centre are of the visible part, the fit is unverified; no translation refinement per roll is
+built). Job caps (`NATIVE_JOB_INPUT` naming the field): 512 outlines, 3 to 256 finite vertices per loop with a non-zero box, names of 64 characters, `maxCandidates` 1 to 100. Not built: the commit of a steel extraction
 (`commit_asbuilt_extraction` takes pipes only; FR-SCN-15 "optionally create `add_steel_member`" is one `add_steel_member` call on the returned proposal), the
 `$fromStep` binding of plan SC-SCN-05. VC-SCN-23 on the pack file STL-A: IPE 300 first, h / b within 3 mm, axis within 0.26° (asserted), centre within 3 mm.
 

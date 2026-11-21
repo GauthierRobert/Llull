@@ -1,6 +1,8 @@
 //! VC-SCN-23 (STL-A: IPE 300 ranked first, h and b within 3 mm) on synthetic members in arbitrary orientation, the chirality of an unequal
 //! angle, the axis hint, the warning of a non-catalogue section and the failure codes.
 
+mod common;
+
 use llull_cloud::fit::steel::{fit, Outline};
 use llull_cloud::fit::FitSettings;
 use llull_cloud::kdtree::Rng;
@@ -165,7 +167,7 @@ fn failures_are_named() {
     assert_eq!(fit(&wire, &catalogue(), None, 5, &settings()).unwrap_err().code, "SCN_FIT_NO_MODEL");
     let bar = vec![[-0.01, -0.01], [0.01, -0.01], [0.01, 0.01], [-0.01, 0.01]];
     let thin = member(&mut rng, &bar, 600, 2.0, 0.0001, &aligned());
-    assert_eq!(fit(&thin, &catalogue(), None, 5, &settings()).unwrap_err().code, "SCN_STEEL_NO_MATCH");
+    assert_eq!(fit(&thin, &catalogue(), None, 5, &settings()).unwrap_err().code, "SCN_STEEL_NO_CANDIDATE");
 }
 
 #[test]
@@ -189,4 +191,89 @@ fn vc_scn_23_on_the_pack_file_stl_a() {
     assert!(dot(&found.axis_direction, &[0.0, 1.0, 0.0]).abs() > 0.99999, "axis {:?}", found.axis_direction);
     let off = sub(&best.centre, &[5.0, best.centre[1], 4.0]);
     assert!(norm(&off) < 0.003, "centre {:?}", best.centre);
+}
+
+#[test]
+fn a_short_member_without_a_hint_is_an_ambiguous_axis() {
+    let ipe = i_loop(0.3, 0.15, 0.0071, 0.0107);
+    let hea = i_loop(0.29, 0.3, 0.0085, 0.014);
+    for (name, shape, length) in [("IPE300 0.4h", &ipe, 0.12), ("IPE300 1.3h", &ipe, 0.39), ("HEA300 1.1h", &hea, 0.32)] {
+        let mut rng = Rng::new(21);
+        let points = member(&mut rng, shape, 5000, length, 0.0004, &aligned());
+        let error = fit(&points, &catalogue(), None, 3, &settings()).unwrap_err();
+        assert_eq!(error.code, "SCN_STEEL_AXIS_AMBIGUOUS", "{name}: {}", error.message);
+        assert!(error.message.contains("axisHint"));
+        let found = fit(&points, &catalogue(), Some([0.0, 0.0, 1.0]), 3, &settings()).unwrap();
+        assert_eq!(found.candidates[0].profile, if name.starts_with("IPE") { "IPE300" } else { "HEA300" }, "{name}");
+    }
+}
+
+#[test]
+fn an_occluded_member_warns_low_coverage() {
+    let mut rng = Rng::new(9);
+    let all = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 9000, 3.0, 0.0005, &aligned());
+    let seen: Vec<V> = all.into_iter().filter(|p| p[1] > -0.07).collect();
+    let found = fit(&seen, &catalogue(), None, 3, &settings()).unwrap();
+    assert!(found.warnings.iter().any(|w| w.code == "SCN_STEEL_LOW_COVERAGE"), "{:?}", found.warnings);
+}
+
+#[test]
+fn hostile_outlines_and_hints_are_refused_naming_the_field() {
+    let mut rng = Rng::new(2);
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 800, 2.0, 0.0004, &aligned());
+    let big_loop: Vec<[f64; 2]> = (0..20_000).map(|i| [(i as f64).sin(), (i as f64).cos()]).collect();
+    let refused =
+        |outlines: &[Outline], hint: Option<V>, candidates: usize| fit(&points, outlines, hint, candidates, &settings()).unwrap_err();
+    let error = refused(&[outline("huge", big_loop)], None, 5);
+    assert_eq!(error.code, "NATIVE_JOB_INPUT");
+    assert!(error.message.contains("loopXy"));
+    let many: Vec<Outline> = (0..513).map(|i| outline(&format!("o{i}"), l_loop(0.1, 0.1, 0.01))).collect();
+    assert!(refused(&many, None, 5).message.contains("outlines"));
+    assert!(refused(&catalogue(), None, 101).message.contains("maxCandidates"));
+    assert!(refused(&catalogue(), None, 0).message.contains("maxCandidates"));
+    assert!(refused(&[outline(&"n".repeat(65), l_loop(0.1, 0.1, 0.01))], None, 5).message.contains("name"));
+    assert!(refused(&[outline("nan", vec![[0.0, 0.0], [f64::NAN, 1.0], [1.0, 0.0]])], None, 5).message.contains("non-finite"));
+    assert!(refused(&[outline("flat", vec![[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])], None, 5).message.contains("bounding box"));
+    for hint in [[0.0; 3], [1e-12, 0.0, 0.0], [f64::INFINITY, 0.0, 0.0], [f64::NAN, 0.0, 1.0]] {
+        assert!(refused(&catalogue(), Some(hint), 5).message.contains("axisHint"), "{hint:?}");
+    }
+}
+
+#[test]
+fn the_steel_op_job_runs_over_an_imported_asset_and_refuses_bad_params() {
+    use llull_cloud::asset;
+    use llull_cloud::read::{read, ImportOptions};
+    let dir = common::temp_dir("steel-op");
+    let cloud = read(&common::data("synthetic/stl-a.csv"), &ImportOptions::default()).unwrap();
+    let key = "a".repeat(64);
+    let built = asset::build(&cloud, &key, &"b".repeat(64), "stl-a.csv", &ImportOptions::default()).unwrap();
+    let asset_dir = dir.join(&key);
+    asset::write(&built, &asset_dir).unwrap();
+    let identity = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+    let run = |name: &str, params: serde_json::Value| {
+        let folder = dir.join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        let job = serde_json::json!({ "version": 1, "kind": "steel", "clouds": [{ "assetKey": key, "dir": asset_dir, "toDocument": identity }], "params": params });
+        std::fs::write(folder.join("job.json"), job.to_string()).unwrap();
+        llull_cloud::job::run("op", &folder, &mut Vec::new())
+            .map(|_| serde_json::from_slice::<serde_json::Value>(&std::fs::read(folder.join("result.json")).unwrap()).unwrap())
+    };
+    let outlines = serde_json::to_value(
+        [("IPE300", i_loop(0.3, 0.15, 0.0071, 0.0107)), ("IPE270", i_loop(0.27, 0.135, 0.0066, 0.0102))]
+            .iter()
+            .map(|(name, l)| serde_json::json!({ "name": name, "loopXy": l }))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let ok = run("ok", serde_json::json!({ "outlines": outlines, "axisHint": [0.0, 3.0, 0.0], "maxCandidates": 1, "noiseSigma": 0.001, "region": { "kind": "all" } })).unwrap();
+    assert_eq!(ok["candidates"].as_array().unwrap().len(), 1);
+    assert_eq!(ok["candidates"][0]["profile"], "IPE300");
+    assert_eq!(ok["deterministic"], true);
+    assert_eq!(run("missing", serde_json::json!({ "axisHint": [0.0, 1.0, 0.0] })).unwrap_err().code, "NATIVE_JOB_INPUT");
+    let unknown = serde_json::json!([{ "name": "x", "loopXy": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]], "extra": 1 }]);
+    assert_eq!(run("unknown", serde_json::json!({ "outlines": unknown })).unwrap_err().code, "NATIVE_JOB_INPUT");
+    let snake = serde_json::json!([{ "name": "x", "loop_xy": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]] }]);
+    assert_eq!(run("snake", serde_json::json!({ "outlines": snake })).unwrap_err().code, "NATIVE_JOB_INPUT");
+    assert_eq!(run("hint", serde_json::json!({ "outlines": outlines, "axisHint": [0.0, 0.0, 0.0] })).unwrap_err().code, "NATIVE_JOB_INPUT");
+    let _ = std::fs::remove_dir_all(&dir);
 }
