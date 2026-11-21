@@ -36,11 +36,15 @@ describe('bindCommand', () => {
   });
 
   it('enum members, string names, quoted text, booleans, dotted object keys', () => {
-    expect(bind('boolean c op=union a=base b=boss').params).toEqual({ op: 'union', a: new NameRef('base'), b: new NameRef('boss') });
+    expect(bind('boolean c op=union a=base b=boss').params).toEqual({
+      op: 'union',
+      a: new NameRef('base', false, 'boolean.a'),
+      b: new NameRef('boss', true, 'boolean.b'),
+    });
     expect(bind('add_box b size=[1,1,1] color="#ffffff"').params['color']).toBe('#ffffff');
     const hole = bind('add_hole h target=body face=base.top points=[[0,0]] hole.kind=simple hole.diameter=8mm extent.kind=through_all');
     expect(hole.params).toMatchObject({
-      target: new NameRef('body'),
+      target: new NameRef('body', false, 'add_hole.target'),
       face: new AnchorRef('base', 'top'),
       hole: { kind: 'simple', diameter: 8 },
       extent: { kind: 'through_all' },

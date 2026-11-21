@@ -18,6 +18,7 @@ import { AnchorRef, bindCommand, EXPRESSION_HELP, ExprRef, NameRef, type BoundCo
 import { exactFacePoint, frameOf, placementDelta, sidePoint, type Frame } from './anchors';
 import { runCheck, type CheckResult, type CheckScope } from './checks';
 import { convertUnits } from './units';
+import { splitAliasRef, selectIds } from './aliasRef';
 
 type CommandStatement = Extract<Statement, { kind: 'command' }>;
 type CheckStatement = Extract<Statement, { kind: 'check' }>;
@@ -53,6 +54,8 @@ interface AliasRecord {
   readonly ids: readonly string[];
   /** Its entities (anchors, bbox / volume checks). */
   readonly geometry: readonly string[];
+  /** Entities its line created (`alias.entity` / `alias.entities`): for an entity alias its ids. */
+  readonly entities: readonly string[];
   readonly line: number;
   /** World box captured when its entities are consumed (live entities are measured when anchored on). */
   frame: Frame | null;
@@ -124,7 +127,7 @@ class DesignRunner {
   }
 
   bind(name: string, ids: readonly string[], geometry: readonly string[]): void {
-    this.aliases.set(name, { ids, geometry, line: 0, frame: null });
+    this.aliases.set(name, { ids, geometry, entities: geometry, line: 0, frame: null });
   }
 
   /** Queue the checks of `statements` (loops expanded) without executing commands. */
@@ -365,7 +368,7 @@ class DesignRunner {
         `${command} reports no id to bind "${alias}" to`,
         'Drop the alias ("_") and refer to what it made by its name, e.g. materialName="steel".',
       );
-    this.aliases.set(alias, { ids, geometry, line, frame: null });
+    this.aliases.set(alias, { ids, geometry, entities: records.length > 0 ? [...created] : ids, line, frame: null });
     for (const id of geometry) this.aliasOf.set(id, alias);
   }
 
@@ -418,8 +421,17 @@ class DesignRunner {
   private resolve(template: Template, env: Env, line: number): unknown {
     if (template instanceof ExprRef) return this.evaluate(template.text, env, line);
     if (template instanceof NameRef) {
-      const ids = this.namedIds(template.text, env, line);
-      return ids === null ? this.interpolate(template.text, env, line) : (ids[0] ?? template.text);
+      const ref = this.reference(template.text, env, line);
+      if (ref === null) return this.interpolate(template.text, env, line);
+      if (template.list) return ref.ids;
+      if (!ref.group) return ref.ids[0] ?? template.text;
+      if (template.many) return ref.ids;
+      throw new DesignError(
+        'DESIGN_ALIAS_ARITY',
+        line,
+        `${template.param || 'this param'} expects one id, got group '${template.text}' (${ref.ids.length} ids)`,
+        `Pick one: ${template.text}[0], ${template.text}[-1] or ${template.text}[i]; a list param takes the whole group.`,
+      );
     }
     if (template instanceof AnchorRef) {
       const point = this.anchor(template, env, line).point;
@@ -427,30 +439,50 @@ class DesignRunner {
     }
     if (Array.isArray(template))
       return template.flatMap((item) => {
-        const ids = item instanceof NameRef ? this.namedIds(item.text, env, line) : null;
-        return ids ?? [this.resolve(item, env, line)];
+        const ref = item instanceof NameRef ? this.reference(item.text, env, line) : null;
+        return ref?.ids ?? [this.resolve(item, env, line)];
       });
     if (template !== null && typeof template === 'object')
       return Object.fromEntries(Object.entries(template).map(([key, value]) => [key, this.resolve(value, env, line)]));
     return template;
   }
 
-  /** Live ids of the alias a word names (`sketch`, `post{i}`, `sketch[1]` = its second id), or null when it names no alias. */
-  private namedIds(text: string, env: Env, line: number): string[] | null {
-    const indexed = /^(.*)\[(\d+)\]$/.exec(text);
-    const name = this.interpolate(indexed?.[1] ?? text, env, line);
-    if (!this.aliases.has(name)) return null;
-    const ids = this.liveIds(name, line);
-    if (indexed?.[2] === undefined) return ids;
-    const id = ids[Number(indexed[2])];
-    if (id === undefined)
-      throw new DesignError(
-        'DESIGN_UNKNOWN_ALIAS',
-        line,
-        `${name} has ${ids.length} id(s), no [${indexed[2]}]`,
-        `Index from 0 to ${ids.length - 1}.`,
-      );
-    return [id];
+  /**
+   * What an alias reference word names: `sketch` (its live ids, group when it has several), `sketch[1]` / `sketch[-1]` (one id),
+   * `sketch[a..<b]` (a group), `af.entity` (its first created entity), `af.entities` (all). Null when the word names no alias and
+   * has no member / selector (then it is literal text).
+   */
+  private reference(text: string, env: Env, line: number): { ids: string[]; group: boolean } | null {
+    const parts = splitAliasRef(text);
+    if (parts === null) return null;
+    const name = this.interpolate(parts.name, env, line);
+    if (!this.aliases.has(name)) {
+      if (parts.member === null && parts.selector === null) return null;
+      return { ids: this.liveIds(name, line), group: false };
+    }
+    const record = this.aliases.get(name);
+    const all = parts.member === null ? this.liveIds(name, line) : this.liveEntities(name, line);
+    const ids = parts.member === 'entity' ? all.slice(0, 1) : all;
+    const group = parts.member === 'entities' || (parts.member === null && (record?.ids.length ?? 0) !== 1);
+    if (parts.selector !== null) {
+      const label = `${name}${parts.member === null ? '' : `.${parts.member}`}`;
+      return selectIds(ids, label, parts.selector, (e) => this.evaluate(e, env, line), line);
+    }
+    return { ids, group };
+  }
+
+  /** Live entities its line created (DESIGN_NO_ENTITY when the alias made none, DESIGN_ALIAS_CONSUMED when all are gone). */
+  private liveEntities(name: string, line: number): string[] {
+    const entities = this.aliases.get(name)?.entities ?? [];
+    const live = entities.filter((id) => this.doc.entities[id] !== undefined && !this.consumed.has(id));
+    if (live.length > 0) return live;
+    if (entities.length > 0) this.liveIds(name, line);
+    throw new DesignError(
+      'DESIGN_NO_ENTITY',
+      line,
+      `${name} has no entity`,
+      `${name} names records only; use the command that creates the entity, or refer to ${name} itself.`,
+    );
   }
 
   private evaluate(text: string, env: Env, line: number): number {
