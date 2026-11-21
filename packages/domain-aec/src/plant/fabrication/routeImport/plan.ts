@@ -49,15 +49,25 @@ function pickStart(s: PlanState): NetworkPoint | RouteRefusal {
   return startEnd;
 }
 
-/** An olet whose centre is on this run's centreline branches off it. */
-function branchOlets(s: PlanState, seed: Seed, line: readonly Vec3[], olets: readonly OletCandidate[], pending: Set<number>): void {
+/** An olet whose centre, less an offset carried along the run (an eccentric reducer upstream), is on this run's centreline branches off it at that stored point. */
+function branchOlets(
+  s: PlanState,
+  seed: Seed,
+  line: readonly Vec3[],
+  shifts: readonly Vec3[],
+  olets: readonly OletCandidate[],
+  pending: Set<number>,
+): void {
   for (const { component, i } of olets) {
     if (!pending.has(i) || component.branch === undefined) continue;
     const centre = component.centre ?? component.branch.xyz;
-    if (!line.some((p, k) => k > 0 && onSegment(centre, line[k - 1] as Vec3, p))) continue;
+    const stored = shifts
+      .map((shift) => sub3(centre, shift))
+      .find((point) => line.some((p, k) => k > 0 && onSegment(point, line[k - 1] as Vec3, p)));
+    if (stored === undefined) continue;
     pending.delete(i);
     take(s, i);
-    addBranch(s, seed.key, centre, component.branch);
+    addBranch(s, seed.key, stored, component.branch);
   }
 }
 
@@ -84,6 +94,7 @@ function walkSeed(
     key: seed.startKey,
     end: seed.start,
     shift: ZERO,
+    shifts: [ZERO],
     cap: undefined,
     startCap: undefined,
   };
@@ -111,7 +122,7 @@ function walkSeed(
     ...(seed.parent === undefined ? {} : { parent: seed.parent }),
     consumed: w.consumed,
   });
-  branchOlets(s, seed, line, olets, pending);
+  branchOlets(s, seed, line, w.shifts, olets, pending);
   return undefined;
 }
 

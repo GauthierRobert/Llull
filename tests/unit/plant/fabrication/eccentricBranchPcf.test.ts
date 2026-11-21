@@ -254,4 +254,36 @@ describe('export -> route import', () => {
     const bare = (value: string): string => value.replace(/^ {4}UNIQUE-COMPONENT-IDENTIFIER .*\n/gm, '');
     expect(bare(again)).toBe(bare(text));
   });
+
+  it('a weldolet downstream of the reducer re-imports as a route and re-exports the same file (olet matched on the shifted axis)', () => {
+    const line = cs150Line(150, '3005');
+    const tie = addTie(line.doc, 'A', [0, 0, 0], [1, 0, 0], { dn: 150 });
+    const routedHeader = ok(tie.doc, 'route_pipe', {
+      lineId: line.lineId,
+      from: { portId: tie.id },
+      legs: [
+        { direction: '+X', length: 5000 },
+        { direction: '+Z', length: 1000 },
+      ],
+      inline: [
+        { type: 'reducerEccentric', tag: 'RE-1', dn2: 100, flat: 'top', at: { leg: 0, centreDistance: 1500 } },
+        { type: 'reducerEccentric', tag: 'RE-2', dn2: 150, flat: 'bottom', at: { leg: 0, centreDistance: 2500 } },
+      ],
+    });
+    const added = ok(routedHeader.document, 'add_branch', {
+      runId: (routedHeader.data as { runId: string }).runId,
+      at: { leg: 0, distance: 4000 },
+      dn: 50,
+      legs: [{ direction: '+Z', length: 500 }],
+    });
+    const lineId = Object.keys(piping(added.document).lines)[0] as string;
+    const text = (data<{ files: PcfFile[] }>(added.document, 'export_pcf', { lineIds: [lineId] }).files[0] as PcfFile).content;
+    expect(records(text, 'OLET')).toHaveLength(1);
+    const imported = execute(cs150Document(), 'import_pcf', { text, as: 'route', spec: 'CS150' });
+    expect(imported.rejected, imported.summary).toBeUndefined();
+    const again = (data<{ files: PcfFile[] }>(imported.document, 'export_pcf', {}).files[0] as PcfFile).content;
+    expect(records(again, 'OLET')[0]?.find((line) => line.startsWith('CENTRE-POINT'))).toBe('CENTRE-POINT 4000.0 0.0 54.0');
+    const bare = (value: string): string => value.replace(/^ {4}UNIQUE-COMPONENT-IDENTIFIER .*\n/gm, '');
+    expect(bare(again)).toBe(bare(text));
+  });
 });

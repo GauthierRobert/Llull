@@ -33,6 +33,8 @@ export interface Walk {
   end: Vec3;
   /** Offset of the actual axis from the stored one (an eccentric reducer upstream on this leg). */
   shift: Vec3;
+  /** Every offset the walk carried along the run (the olets are placed after the walk and match on any of them). */
+  readonly shifts: Vec3[];
   cap: PlannedCap | undefined;
   /** The closure at the start of the main run (its walk begins on the pipe side of it). */
   startCap: (PlannedCap & { readonly tip: Vec3 }) | undefined;

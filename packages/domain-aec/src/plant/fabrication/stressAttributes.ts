@@ -1,7 +1,7 @@
 /** PST-FU2: the stress model's COMPONENT-ATTRIBUTE1..10 (07 PST, CAESAR II import map of 05 `pcf_keywords.json`, grade B) written into the PCF components by `export_pcf`. */
 
 import type { CadDocument } from '@core/model/types';
-import { pcfAttributeValues, SLOTS } from '../stress/commands/pcfAttributeSlots';
+import { pcfAttributeValues } from '../stress/commands/pcfAttributeSlots';
 import { findModel } from '../stress/model/store';
 import type { StressModel } from '../stress/model/schema';
 import type { NetworkComponent, PcfComponentType } from './model';
@@ -32,10 +32,7 @@ export function stressAttributesOf(doc: CadDocument, modelId: string): StressAtt
   if (model === undefined) return { ok: false, reason: `no stress model "${modelId}"` };
   if (model.conditions === undefined) return { ok: false, reason: `stress model ${modelId} has no operating conditions` };
   const { slots } = pcfAttributeValues(model.conditions);
-  const entries = SLOTS.flatMap((_, index) => {
-    const value = slots[index];
-    return value === null || value === undefined ? [] : [[`COMPONENT-ATTRIBUTE${index + 1}`, value] as const];
-  });
+  const entries = slots.flatMap((value, index) => (value === null ? [] : [[`COMPONENT-ATTRIBUTE${index + 1}`, value] as const]));
   return { ok: true, model, attributes: Object.fromEntries(entries) };
 }
 
@@ -48,7 +45,7 @@ export interface Applied {
 }
 
 /** The run / pipe a component belongs to: the part of its id before the first `/` (`run-6.1/pipe-2`, `pipe-3/elbow-1`). */
-const ownerOf = (component: NetworkComponent): string => component.id.split('/')[0] ?? '';
+const ownerOf = (component: NetworkComponent): string => component.id.split('/')[0] as string;
 
 /**
  * `components` with the attributes appended to the pipe-borne components of the model scope (an attribute a component already holds is kept);

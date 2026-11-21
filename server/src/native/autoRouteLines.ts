@@ -163,6 +163,7 @@ export async function runAutoRouteLines(
       ...(solutions.has(line['lineId'] as string) ? { solution: solutions.get(line['lineId'] as string) } : {}),
     })),
     common,
+    ...(Array.isArray(params['branches']) ? { branches: params['branches'] } : {}),
     order: 'given',
     sequence: best.planned.map((entry) => entry.line['lineId']),
     // Always all-or-nothing over the planned lines: a document that changed during the plan is refused as a whole.
