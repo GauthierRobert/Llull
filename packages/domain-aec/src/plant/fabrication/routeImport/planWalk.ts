@@ -140,6 +140,7 @@ function eccentricReducerStep(s: PlanState, w: Walk, component: NetworkComponent
   const centre = sub3(midpoint(entry.xyz, exit.xyz), add3(w.shift, [step.offset[0] / 2, step.offset[1] / 2, step.offset[2] / 2]));
   w.inline.push({ type: 'reducer', componentId: component.id, centre, dn2: exit.boreMm, flat: step.flat });
   w.shift = add3(w.shift, step.offset);
+  w.shifts.push(w.shift);
   return 'advance';
 }
 

@@ -14,6 +14,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { RadialStairElement } from '@aec/building/types';
 import { defaultClassOfElement } from '@aec/plant/display/defaultMaterialClass';
 import { radialStairErrors } from '@aec/plant/structures/radial/radialValidate';
+import { radialQuantities } from '@aec/plant/structures/radial/radialMeasure';
 import { winderWedge } from '@aec/plant/structures/radial/radialLayout';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
@@ -208,6 +209,17 @@ describe('radial stairs: sector area, move, schedule, clash, material class, ris
     const f = scene();
     const info = ok(f.doc, 'add_spiral_stair', { ...SPIRAL, levelId: f.grade }).data as { treadAreaM2: number };
     expect(info.treadAreaM2).toBeCloseTo((16 * 0.5 * (Math.PI / 8) * (900 ** 2 - 84.15 ** 2)) / 1e6, 4);
+  });
+
+  it('a stair whose section profile is not in the catalogue (a loaded file) has no section mass: the tread mass alone is the steel mass', () => {
+    const f = scene();
+    const doc = apply(f.doc, 'add_spiral_stair', { ...SPIRAL, levelId: f.grade });
+    const known = radialQuantities(doc, stairOf(doc));
+    const unknown = radialQuantities(doc, { ...stairOf(doc), profile: 'NOPE' });
+    expect(known.sectionKg).toBeGreaterThan(0);
+    expect(unknown.sectionKg).toBe(0);
+    expect(unknown.sectionM).toBeCloseTo(known.sectionM, 9);
+    expect(unknown.steelKg).toBeCloseTo(known.treadKg, 9);
   });
 
   it('move_building_element shifts plates, runs, start and the evaluated meshes by the delta', () => {
