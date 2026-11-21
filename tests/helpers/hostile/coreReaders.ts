@@ -70,6 +70,7 @@ function linearModelDocument(tamper: (form: Record<string, unknown>) => void): s
 import { firaBytes } from '../../unit/wrap/fixtures';
 import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
 import { variableTrueTypeWithMetrics } from '../../unit/wrap/variableTrueType';
+import { kernedDeviceFont } from '../../unit/wrap/kernedFont';
 import { aliasedStoreFont, gvarTupleFanFont, manyRangesFont, operatorFanFont, sharedSubrsFont } from '../../unit/wrap/hostileFonts';
 import { run as plmRun } from '../../unit/plm/scenarioRunner';
 import { inWork } from '../../unit/plm/fixtures';
@@ -534,6 +535,28 @@ export const CORE_READERS: readonly HostileReader[] = [
       return named.ok ? validateGlyphs(named.font) : named;
     },
     accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'core: text_outline (GPOS pair kerning + GDEF 1.3 variation store at an instance)',
+    covers: ['core/src/lib/font/gpos.ts:gdefKerningDelta', 'text_outline'],
+    input: 'bytes',
+    build: () => kernedDeviceFont(),
+    extra: [
+      { name: 'the kerning device offset is 0xFFFF', input: () => kernedDeviceFont('deviceOffset') },
+      { name: 'the kerning device row is past the data subtable', input: () => kernedDeviceFont('innerRow') },
+      { name: 'the kerning device outer index is past the store', input: () => kernedDeviceFont('outerIndex') },
+    ],
+    skipLinear: 'a binary font container: its size is not a record count',
+    read: (input) => {
+      const imported = execute(createEmptyDocument(), 'import_font', { base64: toBase64(asBytes(input)), variation: { wght: 900 } });
+      const font = imported.affected[0];
+      if (font === undefined) return imported;
+      const text = execute(imported.document, 'add_text', { content: 'AB', position: [0, 0, 0], height: 7, font });
+      const id = text.affected[0];
+      return id === undefined ? text : execute(text.document, 'text_outline', { id });
+    },
+    accepts: (result) =>
+      (result as { rejected?: boolean; data?: unknown }).rejected === undefined && (result as { data?: unknown }).data !== undefined,
   },
   {
     name: 'core: parseFont (CFF with seac, an arithmetic operator and a charset)',
