@@ -144,12 +144,12 @@ describe('coerceValue branches', () => {
     expect(coerceValue(3, { anyOf: [{ type: 'string' }, { type: 'number' }] }, 'p', 1)).toBe(3);
     expect(codeOf(() => coerceValue(1.5, { type: 'integer' }, 'p', 1))).toBe('DESIGN_VALUE_SCHEMA');
     expect(codeOf(() => coerceValue('z', { enum: ['a', 'b'] }, 'p', 1))).toBe('DESIGN_VALUE_SCHEMA');
-    expect(codeOf(() => coerceValue({ q: 1 }, { type: 'object', properties: { k: { type: 'number' } } }, 'p', 1))).toBe(
+    expect(codeOf(() => coerceValue({ q: 1 }, { type: 'object', properties: { k: { type: 'number', description: 'k' } } }, 'p', 1))).toBe(
       'DESIGN_VALUE_SCHEMA',
     );
-    expect(codeOf(() => coerceValue({}, { type: 'object', properties: { k: { type: 'number' } }, required: ['k'] }, 'p', 1))).toBe(
-      'DESIGN_VALUE_SCHEMA',
-    );
+    expect(
+      codeOf(() => coerceValue({}, { type: 'object', properties: { k: { type: 'number', description: 'k' } }, required: ['k'] }, 'p', 1)),
+    ).toBe('DESIGN_VALUE_SCHEMA');
     expect(codeOf(() => coerceValue(1, { type: 'array' }, 'p', 1))).toBe('DESIGN_VALUE_SCHEMA');
     expect(codeOf(() => coerceValue(1, { type: 'object' }, 'p', 1))).toBe('DESIGN_VALUE_SCHEMA');
   });

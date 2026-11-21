@@ -166,3 +166,35 @@ describe('refusals (unchanged document, stable code, path)', () => {
     expectPure(doc, () => execute(doc, 'pipe_sif', elbow));
   });
 });
+
+describe('pipe_sif flangedEnds (PST-FU2, PSI b311.py note 3)', () => {
+  const base = { component: 'bend', odMm: 168.275, wallMm: 7.112, bendRadiusMm: 228.6, rule: 'B31.3-2018' } as const;
+  const h0 = 0.250379;
+  const empty = createEmptyDocument();
+
+  it('one flanged end: h = h0^(7/6), both: h0^(4/3); k, ii, io follow with the corrected h (hand numbers)', () => {
+    const plain = data<Sif>(empty, 'pipe_sif', base);
+    expectRel(plain.h as number, h0, 1e-5);
+    expect(plain.grade).toBe('A');
+    const one = data<Sif>(empty, 'pipe_sif', { ...base, flangedEnds: 1 });
+    expectRel(one.h as number, 0.198776, 1e-4, 'h one end');
+    expectRel(one.k, 1.65 / 0.198776, 1e-4, 'k');
+    expectRel(one.ii, 0.9 / 0.340598, 2e-4, 'ii');
+    expect(one.grade).toBe('B');
+    expect(one.ruleRows.map((row) => row.id)).toContain('SIF-BEND-FLANGED');
+    const both = data<Sif>(empty, 'pipe_sif', { ...base, flangedEnds: 2 });
+    expectRel(both.h as number, h0 ** (4 / 3), 1e-5, 'h both');
+    expect(both.ii).toBeGreaterThan(one.ii);
+    expect(data<Sif>(empty, 'pipe_sif', { ...base, flangedEnds: 0 }).h).toBe(plain.h);
+  });
+
+  it('refuses flangedEnds on a component that is not a bend', () => {
+    expectRefusal(
+      empty,
+      'pipe_sif',
+      { component: 'welding_tee', odMm: 168.275, wallMm: 7.112, rule: 'B31.3-2018', flangedEnds: 1 },
+      'PST_PARAM_INVALID',
+      'flangedEnds',
+    );
+  });
+});

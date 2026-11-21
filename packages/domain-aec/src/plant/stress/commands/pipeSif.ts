@@ -25,7 +25,7 @@ export const pipeSif = defineCommand({
   description:
     'Stress intensification factors (ii in-plane, io out-of-plane) and flexibility factor k of one pipe component, by closed form from the code appendix D, e.g. a 6 inch ' +
     'Sch 40 long radius elbow (OD 168.3, wall 7.11, R1 228.6 mm) gives h 0.2502, k 6.594, ii 2.267, io 1.889. Components: elbow / bend (needs bendRadiusMm), welding_tee, ' +
-    'unreinforced_tee, reinforced_tee (needs padMm), weldolet, butt_weld; sweepolet and reducer have no factor in a read source and need rule "user". ' +
+    'unreinforced_tee, reinforced_tee (needs padMm), weldolet, butt_weld; sweepolet and reducer have no factor in a read source and need rule "user". The B31J factors of reducers, olets, flanges, Y / lateral branches are not built (tables not public): give them with rule "user". flangedEnds (0 / 1 / 2) applies the flange stiffening correction to a bend. ' +
     'The rule is "B31.3-<edition>" (2016 to 2024) or "B31.1-<edition>" (2016 to 2022) or "user"; there is no default edition. Editions 2020 and later require ASME B31J ' +
     '(tables not public): the appendix D value is still returned with a non-hideable PST_SIF_EDITION warning, or give the B31J values with rule "user" and userSif. ' +
     'For tees and olets odMm and wallMm are those of the matching RUN pipe (not the branch). Bends are grade A, tees and olets grade B (named in the result); B31.1 returns one SIF for both planes. All lengths are mm. ' +
@@ -38,6 +38,12 @@ export const pipeSif = defineCommand({
       .number()
       .positive()
       .describe('Centreline bend radius R1 in mm (elbow / bend). Long radius is 1.5 x nominal size, short radius 1.0 x.')
+      .optional(),
+    flangedEnds: z
+      .union([z.literal(0), z.literal(1), z.literal(2)])
+      .describe(
+        'Elbow / bend only: number of flanged ends (0, 1 or 2). The stiffening correction multiplies h by h^(1/6) (one) or h^(1/3) (both), grade B (PSI b311.py); default 0. Refused on other components.',
+      )
       .optional(),
     padMm: z.number().positive().describe('Thickness tr of the reinforcing pad or saddle in mm (reinforced_tee only).').optional(),
     rule: z
@@ -56,7 +62,10 @@ export const pipeSif = defineCommand({
       wallMm: params.wallMm,
       ...(params.bendRadiusMm === undefined ? {} : { bendRadiusMm: params.bendRadiusMm }),
       ...(params.padMm === undefined ? {} : { padMm: params.padMm }),
+      ...(params.flangedEnds === undefined ? {} : { flangedEnds: params.flangedEnds }),
     };
+    if (params.flangedEnds !== undefined && params.component !== 'elbow' && params.component !== 'bend')
+      return fail(`flangedEnds applies to elbow / bend only, not ${params.component}`, 'flangedEnds');
     if (params.rule === 'user') {
       if (params.userSif === undefined) return fail('rule "user" needs userSif { ii, io, k, source }', 'userSif');
       const { ii, io, k, source } = params.userSif;

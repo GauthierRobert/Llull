@@ -145,6 +145,13 @@ export const RULE_ROWS: Readonly<Record<string, RuleRow>> = {
     sources: ['S5 (whatispiping.com)', 'S6 (projectmaterials.com)', 'S3 (psi/codes/b311.py)'],
     grade: 'A',
   },
+  'SIF-BEND-FLANGED': {
+    id: 'SIF-BEND-FLANGED',
+    clause: 'B31.1 App. D note 3 (flanged ends of a bend); B31.3 up to 2018 App. D',
+    formula: 'h = h0 c, c = h0^(1/6) (one flanged end) or h0^(1/3) (both), h0 = T R1 / r2^2; then as SIF-BEND with the corrected h',
+    sources: ['S3 (psi/codes/b311.py h(), sha256 edac26f8...)'],
+    grade: 'B',
+  },
   'SIF-TEE-UNREINFORCED': {
     id: 'SIF-TEE-UNREINFORCED',
     clause: 'B31.3 up to 2018 App. D (unreinforced fabricated tee)',
