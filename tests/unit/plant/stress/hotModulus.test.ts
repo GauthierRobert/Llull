@@ -6,25 +6,12 @@ import type { CadDocument } from '@core/model/types';
 import { apply, expectRefusal } from '../../../helpers/commandAssertions';
 import { analyzed, anchorAt, baseDoc, cases, conditioned, DN100, withModel, withPipe } from './m3Fixtures';
 import { expectRel } from './stressFixtures';
+import { E_ROWS, withEModulus } from './nozzleFixtures';
 
 const STATED_E = 200000;
 const E_AT_100C = 195000;
 
-const rows = [
-  { tempC: 20, ShMPa: 138, EGPa: 200, meanCtePerK: 1.2e-5 },
-  { tempC: 100, ShMPa: 138, EGPa: 195, meanCtePerK: 1.2e-5 },
-  { tempC: 200, ShMPa: 138, EGPa: 190, meanCtePerK: 1.2e-5 },
-];
-
-const withMaterial = (doc: CadDocument): CadDocument =>
-  apply(doc, 'import_pipe_material_data', {
-    materialId: 'FIX',
-    designation: 'fixture steel',
-    rows,
-    referenceTempC: 20,
-    source: { citation: 'test fixture', locator: 'none' },
-    licence: 'test fixture values',
-  });
+const withMaterial = (doc: CadDocument): CadDocument => withEModulus(doc);
 
 function cantilever(tempC: number): { doc: CadDocument; id: string } {
   const pipe = withPipe(
@@ -100,5 +87,66 @@ describe('set_hot_modulus', () => {
     const model = missing.plant?.stress?.models[id];
     if (model !== undefined) model.hotModulus = { materialId: 'GONE' };
     expectRefusal(missing, 'analyze_pipe_stress', { modelId: id }, 'PST_MATERIAL_NOT_FOUND');
+  });
+});
+
+describe('hot modulus: ranges, staleness', () => {
+  /** An L-shaped pipe between two anchors: its thermal reactions and S_E are proportional to E. */
+  function frame(hot: boolean): { doc: CadDocument; id: string } {
+    const pipe = withPipe(
+      withMaterial(baseDoc()),
+      [
+        [0, 0, 0],
+        [3000, 0, 0],
+        [3000, 3000, 0],
+      ],
+      DN100.odMm,
+    );
+    const model = withModel(pipe.doc, [pipe.id]);
+    let doc = conditioned(model.doc, model.id, { temperatures: [{ name: 'T1', tempC: 200 }] });
+    doc = anchorAt(anchorAt(doc, model.id, pipe.id, 0), model.id, pipe.id, 6000);
+    doc = cases(doc, model.id, [
+      { name: 'SUS', type: 'SUS', basic: ['W'] },
+      { name: 'OPE', type: 'OPE', basic: ['W', 'T1'] },
+      {
+        name: 'EXP',
+        type: 'EXP',
+        combine: [
+          { case: 'OPE', factor: 1 },
+          { case: 'SUS', factor: -1 },
+        ],
+      },
+    ]);
+    return { doc: hot ? apply(doc, 'set_hot_modulus', { modelId: model.id, materialId: 'FIX' }) : doc, id: model.id };
+  }
+  const maxStress = (doc: CadDocument, id: string, name: string): number =>
+    Math.max(
+      ...(analyzed(doc, id, { include: ['stresses'] }).details?.stresses ?? [])
+        .filter((row) => row.case === name)
+        .map((row) => row.stressMPa),
+    );
+  const opeReactionX = (doc: CadDocument, id: string): number =>
+    Math.abs(
+      (analyzed(doc, id, { include: ['reactions'] }).details?.reactions ?? []).find((row) => row.case === 'OPE')?.forceN[0] as number,
+    );
+
+  it('S_E is computed with the stated E (B31.3 E_a) with or without the hot modulus; OPE reactions keep the hot E', () => {
+    const cold = frame(false);
+    const hot = frame(true);
+    expectRel(maxStress(hot.doc, hot.id, 'EXP'), maxStress(cold.doc, cold.id, 'EXP'), 1e-9, 'S_E');
+    const ratio = opeReactionX(hot.doc, hot.id) / opeReactionX(cold.doc, cold.id);
+    expect(ratio).toBeLessThan(0.99);
+    expect(ratio).toBeGreaterThan(0.9);
+  });
+
+  it('re-importing the E rows after recording makes the results stale', () => {
+    const { doc, id } = frame(true);
+    const recorded = apply(doc, 'record_pipe_stress_results', { modelId: id });
+    expect(execute(recorded, 'analyze_pipe_stress', { modelId: id }).data).toMatchObject({ recorded: { stale: false } });
+    const changed = withEModulus(
+      recorded,
+      E_ROWS.map((row) => ({ ...row, EGPa: row.EGPa * 0.9 })),
+    );
+    expect(execute(changed, 'analyze_pipe_stress', { modelId: id }).data).toMatchObject({ recorded: { stale: true } });
   });
 });

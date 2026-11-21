@@ -98,6 +98,7 @@ describe('toolset pipestress', () => {
       'check_nozzle_loads',
       'check_pipe_stress',
       'create_stress_model',
+      'delete_nozzle_load_limit',
       'delete_sif_override',
       'delete_spring_hanger',
       'delete_stress_component',

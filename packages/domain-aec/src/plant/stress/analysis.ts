@@ -95,6 +95,14 @@ export function inputHashOf(doc: CadDocument, model: StressModel, built: BuiltMo
       components: built?.sources.components ?? null,
       branches: built?.sources.branches ?? null,
       material,
+      ...(model.hotModulus === undefined
+        ? {}
+        : {
+            hotMaterial:
+              doc.materials !== undefined && Object.hasOwn(doc.materials, model.hotModulus.materialId)
+                ? doc.materials[model.hotModulus.materialId]
+                : null,
+          }),
     }),
   );
 }

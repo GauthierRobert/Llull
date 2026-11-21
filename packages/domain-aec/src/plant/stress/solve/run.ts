@@ -4,7 +4,7 @@ import { pipeProperties } from '@lib/frame3d/section';
 import type { FrameElement, FrameLoadCase, FrameModel } from '@lib/frame3d/types';
 import type { CadDocument } from '@core/model/types';
 import type { BuiltModel } from '../model/build';
-import type { OperatingConditions, StressModel } from '../model/schema';
+import type { LoadCaseDef, OperatingConditions, StressModel } from '../model/schema';
 import { loadCaseProblems } from './cases';
 import { hotModulusOf } from './hotModulus';
 import { solveWithContacts, type ContactOutcome, type GroundSpring } from './nonlinear';
@@ -149,21 +149,13 @@ export function solveModel(
       ids: [],
     });
   const states = new Map<string, CaseState>();
-  for (const loadCase of model.loadCases) {
-    if (loadCase.type === 'EXP' || loadCase.combine !== undefined) continue;
-    const hot = hotModulusOf(doc, model, conditions, loadCase);
-    if (hot !== null && !hot.ok)
-      return { ok: false, code: hot.code, message: `case ${loadCase.name}: ${hot.message}`, ids: [], paths: [hot.path] };
-    const caseFrame = hot === null ? frame : { nodes: frame.nodes, elements: frameElements(built, conditions, hot.modulusMPa) };
-    if (hot !== null)
-      warnings.push({
-        code: 'PST_HOT_MODULUS',
-        message: `case ${loadCase.name}: E = ${hot.modulusMPa.toFixed(0)} MPa at ${hot.tempC} degC instead of the stated ${conditions.material.youngsModulusMPa} MPa${hot.unverified.length > 0 ? ` (unverified: ${hot.unverified.join(', ')})` : ''}`,
-        ids: [],
-      });
-    const loads = caseLoads(doc, built, conditions, loadCase.name, loadCase.basic ?? [], model, hot === null ? undefined : hot.modulusMPa);
+  // displacement ranges (EXP) are computed with the stated modulus (B31.3 319.3.2 / 319.4: E_a); an OPE case solved with E(T) keeps its hot state for displacements, loads and nozzle loads
+  const ranges = new Map<string, CaseState>();
+  const solveCase = (loadCase: LoadCaseDef, modulusMPa: number | undefined, quiet: boolean): CaseState | SolveFailure => {
+    const caseFrame = modulusMPa === undefined ? frame : { nodes: frame.nodes, elements: frameElements(built, conditions, modulusMPa) };
+    const loads = caseLoads(doc, built, conditions, loadCase.name, loadCase.basic ?? [], model, modulusMPa);
     if ('ok' in loads) return { ok: false, code: loads.code, message: loads.message, ids: [], paths: [loads.path] };
-    if (loads.unverified.length > 0)
+    if (loads.unverified.length > 0 && !quiet)
       warnings.push({
         code: 'PST_MATERIAL_UNVERIFIED',
         message: `case ${loadCase.name}: ${[...new Set(loads.unverified)].join('; ')}`,
@@ -183,7 +175,7 @@ export function solveModel(
         paths: solved.dofs.map((dof) => DOF_NAMES[dof.dof] as string),
       };
     }
-    states.set(loadCase.name, {
+    return {
       name: loadCase.name,
       type: loadCase.type,
       displacements: solved.result.displacements,
@@ -196,11 +188,35 @@ export function solveModel(
       residual: solved.result.residual,
       iterations: solved.iterations,
       contacts: solved.contacts,
-    });
+    };
+  };
+  for (const loadCase of model.loadCases) {
+    if (loadCase.type === 'EXP' || loadCase.combine !== undefined) continue;
+    const hot = hotModulusOf(doc, model, conditions, loadCase);
+    if (hot !== null && !hot.ok)
+      return { ok: false, code: hot.code, message: `case ${loadCase.name}: ${hot.message}`, ids: [], paths: [hot.path] };
+    if (hot !== null)
+      warnings.push({
+        code: 'PST_HOT_MODULUS',
+        message: `case ${loadCase.name}: E = ${hot.modulusMPa.toFixed(0)} MPa at ${hot.tempC} degC instead of the stated ${conditions.material.youngsModulusMPa} MPa for its displacements and loads; displacement ranges (EXP) use the stated E${hot.unverified.length > 0 ? ` (unverified: ${hot.unverified.join(', ')})` : ''}`,
+        ids: [],
+      });
+    const state = solveCase(loadCase, hot === null ? undefined : hot.modulusMPa, false);
+    if ('ok' in state) return state;
+    states.set(loadCase.name, state);
+    if (hot !== null) {
+      const range = solveCase(loadCase, undefined, true);
+      if ('ok' in range) return range;
+      ranges.set(loadCase.name, range);
+    }
   }
   for (const loadCase of model.loadCases) {
     if (loadCase.combine === undefined) continue;
-    const terms = loadCase.combine.map((term) => ({ state: states.get(term.case) as CaseState, factor: term.factor }));
+    const expansion = loadCase.type === 'EXP';
+    const terms = loadCase.combine.map((term) => ({
+      state: ((expansion ? ranges.get(term.case) : undefined) ?? states.get(term.case)) as CaseState,
+      factor: term.factor,
+    }));
     const method = loadCase.method ?? 'algebraic';
     const mix = (pick: (state: CaseState) => Float64Array): Float64Array => {
       const out = new Float64Array(pick(terms[0]?.state as CaseState).length);
@@ -211,7 +227,6 @@ export function solveModel(
         });
       return method === 'srss' ? out.map(Math.sqrt) : out;
     };
-    const expansion = loadCase.type === 'EXP';
     states.set(loadCase.name, {
       name: loadCase.name,
       type: expansion ? 'EXP' : 'OCC',

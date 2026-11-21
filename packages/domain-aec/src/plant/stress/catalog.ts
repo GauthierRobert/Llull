@@ -15,7 +15,7 @@ import { approvePipeStress, recordPipeStressResults } from './commands/record';
 import { addStressRestraint, deleteStressRestraint } from './commands/restraints';
 import { nozzleLoadCheck } from './commands/nozzleLoadCheck';
 import { setHotModulus } from './commands/hotModulus';
-import { checkNozzleLoads, setNozzleLoadLimit } from './commands/nozzleLimits';
+import { checkNozzleLoads, deleteNozzleLoadLimit, setNozzleLoadLimit } from './commands/nozzleLimits';
 import { deleteSpringHanger, importSpringTable, selectSpringHangers } from './commands/springs';
 import { springVariability } from './commands/springVariability';
 import { thermalGrowth } from './commands/thermalGrowth';
@@ -28,6 +28,7 @@ export const pipeStressCommands = commandCatalog(
   springVariability,
   nozzleLoadCheck,
   setNozzleLoadLimit,
+  deleteNozzleLoadLimit,
   setHotModulus,
   checkNozzleLoads,
   importSpringTable,

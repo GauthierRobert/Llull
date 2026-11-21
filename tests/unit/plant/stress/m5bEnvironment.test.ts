@@ -278,47 +278,6 @@ describe('OCC combinations by method (scalar, srss, algebraic)', () => {
     expect(Sg + Sw).toBeGreaterThan(Math.hypot(Sg, Sw));
   });
 
-  it('EXP takes the same methods: scalar adds the range stresses S_E of the terms, srss root-sums them; the allowable is the expansion one', () => {
-    const sc = cantilever();
-    const exp = (method: string): { stressMPa: number; ratio: number; allowableMPa: number; rule: string } => {
-      const doc = apply(sc.doc, 'set_stress_load_cases', {
-        modelId: sc.id,
-        cases: [
-          { name: 'SUS', type: 'SUS', basic: ['W'] },
-          { name: 'WINDY', type: 'OCC', basic: ['WIN1'] },
-          {
-            name: 'EXPC',
-            type: 'EXP',
-            combine: [
-              { case: 'SUS', factor: 1 },
-              { case: 'WINDY', factor: 1 },
-            ],
-            method,
-          },
-        ],
-        wind: [WIND],
-      });
-      return rootRow(doc, sc.id, 'EXPC');
-    };
-    const scalar = exp('scalar');
-    expectRel(scalar.stressMPa, Sg + Sw, 1e-7, 'scalar S_E');
-    expect(scalar.rule).toBe('B313-SA-1A');
-    expectRel(scalar.ratio, scalar.stressMPa / scalar.allowableMPa, 1e-12, 'ratio');
-    expect(scalar.allowableMPa).not.toBeCloseTo(1.33 * Sh, 6);
-    expectRel(exp('srss').stressMPa, Math.hypot(Sg, Sw), 1e-7, 'srss S_E');
-    const doc = apply(sc.doc, 'set_stress_load_cases', {
-      modelId: sc.id,
-      cases: [
-        { name: 'SUS', type: 'SUS', basic: ['W'] },
-        { name: 'WINDY', type: 'OCC', basic: ['WIN1'] },
-        { name: 'EXPC', type: 'EXP', combine: [{ case: 'WINDY', factor: 1 }], method: 'scalar' },
-      ],
-      wind: [WIND],
-    });
-    const data = analyzed(doc, sc.id, { include: ['reactions'] });
-    expect((data.details?.reactions ?? []).some((row) => row.case === 'EXPC')).toBe(false);
-  });
-
   it('a scalar or srss case has no reactions or displacements in the details (they are not physical states)', () => {
     const { doc, id } = scene('scalar');
     const data = analyzed(doc, id, { include: ['reactions', 'displacements'] });

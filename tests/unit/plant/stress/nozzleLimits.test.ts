@@ -5,61 +5,11 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { nozzleFrame, toFrame } from '../../../../packages/domain-aec/src/plant/stress/code/nozzleFrame';
 import { apply, expectRefusal } from '../../../helpers/commandAssertions';
-import { anchorAt, baseDoc, cases, conditioned, DN100, withModel, withPipe } from './m3Fixtures';
+import { scene, type Row, type Scene } from './nozzleFixtures';
 import { expectRel } from './stressFixtures';
+import { cases as setCases } from './m3Fixtures';
 
 const LBF = 4.4482216152605;
-
-interface Scene {
-  doc: CadDocument;
-  id: string;
-  restraintId: string;
-}
-
-interface Row {
-  case: string;
-  ratio: number;
-  forceNozzleFrameN: [number, number, number];
-  momentNozzleFrameNm: [number, number, number];
-}
-
-/** Pump P-101 with a +Z nozzle N2 at (0, 300, 1000); the pipe rises 3000 mm from the nozzle, turns +X for 3000 mm; anchor at the nozzle. */
-function scene(record = true): Scene {
-  let doc = apply(baseDoc(), 'add_equipment', {
-    name: 'Centrifugal pump',
-    mark: 'P-101',
-    location: [0, -300],
-    size: [1200, 600, 800],
-    weight: 650,
-  });
-  doc = apply(doc, 'add_nozzle', {
-    equipment: 'P-101',
-    mark: 'N2',
-    dn: 100,
-    rating: 'CL150',
-    facing: 'RF',
-    location: { on: 'free', position: [0, 300, 1000], direction: [0, 0, 1] },
-    projection: 300,
-  });
-  const pipe = withPipe(
-    doc,
-    [
-      [0, 300, 1000],
-      [0, 300, 4000],
-      [3000, 300, 4000],
-    ],
-    DN100.odMm,
-  );
-  const model = withModel(pipe.doc, [pipe.id]);
-  let d = conditioned(model.doc, model.id, { temperatures: [{ name: 'T1', tempC: 60 }] });
-  d = anchorAt(d, model.id, pipe.id, 0);
-  d = cases(d, model.id, [
-    { name: 'SUS', type: 'SUS', basic: ['W'] },
-    { name: 'OPE', type: 'OPE', basic: ['W', 'T1'] },
-  ]);
-  const restraintId = d.plant?.stress?.models[model.id]?.restraints[0]?.id as string;
-  return { doc: record ? apply(d, 'record_pipe_stress_results', { modelId: model.id }) : d, id: model.id, restraintId };
-}
 
 const USER = (limit: number): Record<string, unknown> => ({
   standard: 'user',
@@ -196,5 +146,86 @@ describe('check_nozzle_loads', () => {
     const before = JSON.stringify(doc);
     execute(doc, 'check_nozzle_loads', { modelId: s.id });
     expect(JSON.stringify(doc)).toBe(before);
+  });
+});
+
+describe('nozzle limit lifecycle and guards', () => {
+  it('delete_nozzle_load_limit by portId or limitId; a vanished port blocks the check until the limit is deleted', () => {
+    const s = scene();
+    const limited = setLimit(s);
+    const limitId = limited.plant?.stress?.models[s.id]?.nozzleLimits?.[0]?.id as string;
+    const gone = structuredClone(limited);
+    const model = gone.plant?.stress?.models[s.id];
+    if (model?.nozzleLimits?.[0] !== undefined) model.nozzleLimits[0].portId = 'P-101:ZZ';
+    expectRefusal(gone, 'check_nozzle_loads', { modelId: s.id }, 'PST_NOZZLE_PORT_NOT_FOUND');
+    const deleted = execute(gone, 'delete_nozzle_load_limit', { modelId: s.id, limitId });
+    expect(deleted.rejected).toBeUndefined();
+    expect(deleted.affected).toEqual([s.id, limitId]);
+    expectRefusal(deleted.document, 'check_nozzle_loads', { modelId: s.id }, 'PST_NOZZLE_NO_LIMITS');
+    const byPort = apply(limited, 'delete_nozzle_load_limit', { modelId: s.id, portId: 'P-101:N2' });
+    expect(byPort.plant?.stress?.models[s.id]?.nozzleLimits).toEqual([]);
+    expect(byPort.plant?.stress?.models[s.id]?.recorded).toBeDefined();
+  });
+
+  it('delete refuses unknown model, none or both selectors, unknown limit', () => {
+    const s = scene();
+    const limited = setLimit(s);
+    expectRefusal(limited, 'delete_nozzle_load_limit', { modelId: 'nope', limitId: 'x' }, 'PST_MODEL_NOT_FOUND');
+    expectRefusal(limited, 'delete_nozzle_load_limit', { modelId: s.id }, 'PST_PARAM_INVALID');
+    expectRefusal(limited, 'delete_nozzle_load_limit', { modelId: s.id, limitId: 'a', portId: 'b' }, 'PST_PARAM_INVALID');
+    expectRefusal(limited, 'delete_nozzle_load_limit', { modelId: s.id, portId: 'P-101:N9' }, 'PST_PARAM_INVALID');
+    expectRefusal(limited, 'delete_nozzle_load_limit', { modelId: s.id, limitId: 'nope' }, 'PST_PARAM_INVALID');
+  });
+
+  it('refuses a holder away from the port (PST_NOZZLE_NOT_AT_PORT) and accepts the anchor at the flange', () => {
+    const s = scene();
+    const pipeId = s.doc.plant?.stress?.models[s.id]?.scope.ids[0] as string;
+    const far = apply(s.doc, 'add_stress_restraint', { modelId: s.id, at: { pipeId, atMm: 6000 }, kind: 'anchor' });
+    const farId = far.plant?.stress?.models[s.id]?.restraints[1]?.id as string;
+    expectRefusal(
+      far,
+      'set_nozzle_load_limit',
+      { modelId: s.id, portId: 'P-101:N2', holderId: farId, ...USER(1) },
+      'PST_NOZZLE_NOT_AT_PORT',
+    );
+    expect(
+      execute(far, 'set_nozzle_load_limit', { modelId: s.id, portId: 'P-101:N2', holderId: s.restraintId, ...USER(1) }).rejected,
+    ).toBeUndefined();
+  });
+
+  it('a zero frameX is rejected by the schema; a frameX along the axis is refused at set time', () => {
+    const s = scene();
+    const base = { modelId: s.id, portId: 'P-101:N2', holderId: s.restraintId, ...USER(1) };
+    expect(execute(s.doc, 'set_nozzle_load_limit', { ...base, frameX: [0, 0, 0] }).rejected).toBe(true);
+    expectRefusal(s.doc, 'set_nozzle_load_limit', { ...base, frameX: [0, 0, 5] }, 'PST_PARAM_INVALID', 'frameX');
+  });
+
+  it('a case filter that excludes every reaction of the holder is PST_PARAM_INVALID on cases, not a missing node', () => {
+    const s = scene(false);
+    const withCombo = setCases(s.doc, s.id, [
+      { name: 'SUS', type: 'SUS', basic: ['W'] },
+      { name: 'OPE', type: 'OPE', basic: ['W', 'T1'] },
+      { name: 'T1ONLY', type: 'OPE', basic: ['T1'] },
+      { name: 'EXPS', type: 'EXP', combine: [{ case: 'T1ONLY', factor: 1 }], method: 'scalar' },
+    ]);
+    const recorded = apply(withCombo, 'record_pipe_stress_results', { modelId: s.id });
+    const doc = apply(recorded, 'set_nozzle_load_limit', { modelId: s.id, portId: 'P-101:N2', holderId: s.restraintId, ...USER(1e9) });
+    expectRefusal(doc, 'check_nozzle_loads', { modelId: s.id, cases: ['EXPS'] }, 'PST_PARAM_INVALID', 'cases');
+  });
+
+  it('reports a limitsHash that changes with the limits', () => {
+    const s = scene();
+    const hash = (doc: CadDocument): string =>
+      (execute(doc, 'check_nozzle_loads', { modelId: s.id }).data as { limitsHash: string }).limitsHash;
+    expect(hash(setLimit(s))).toMatch(/^[0-9a-f]{64}$/);
+    expect(hash(setLimit(s, USER(2e9)))).not.toBe(hash(setLimit(s)));
+  });
+
+  it('with the hot modulus the nozzle loads still come from the recorded (hot) OPE reactions', () => {
+    const s = scene(true, true);
+    const doc = setLimit(s);
+    const result = execute(doc, 'check_nozzle_loads', { modelId: s.id });
+    expect(result.rejected).toBeUndefined();
+    expect(rowsOf(result).map((row) => row.case)).toEqual(['SUS', 'OPE']);
   });
 });
