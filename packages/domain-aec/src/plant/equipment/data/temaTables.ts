@@ -37,9 +37,6 @@ export const TEMA_LETTERS: Readonly<Record<TemaPart, Readonly<Record<string, str
   },
 };
 
-/** Valid TEMA letters that llull does not model yet (`EQP_TEMA_UNSUPPORTED`). */
-export const TEMA_UNSUPPORTED: Readonly<Record<TemaPart, readonly string[]>> = { front: ['D'], shell: ['K', 'X'], rear: [] };
-
 /** Rear heads with a tubesheet at each end of the shell (bundle not removable). */
 export const TEMA_FIXED_REARS: readonly string[] = ['L', 'M', 'N'];
 

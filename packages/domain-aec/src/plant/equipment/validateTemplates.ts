@@ -70,6 +70,20 @@ function exchangerDesignErrors(design: unknown, at: string): string[] {
   return errors;
 }
 
+/** The kettle record: present exactly for the shell letter K, every dimension > 0, the cylinders and the cone fit in the shell. */
+function kettleErrors(template: Record<string, unknown>, at: string): string[] {
+  const { tema, kettle } = template;
+  const isKettle = isRecord(tema) && tema['shell'] === 'K';
+  if (kettle === undefined) return isKettle ? [`${at}.kettle is required for the shell letter K`] : [];
+  if (!isKettle) return [`${at}.kettle is only for the shell letter K`];
+  if (!isRecord(kettle)) return [`${at}.kettle must be an object`];
+  return positive(
+    kettle,
+    ['enlargedInsideDiameter', 'enlargedLength', 'transitionLength', 'enlargedThickness', 'weirHeight'],
+    `${at}.kettle`,
+  );
+}
+
 export function exchangerErrors(template: Record<string, unknown>, at: string): string[] {
   const errors = positive(template, ['shellInsideDiameter', 'shellThickness', 'tubesheetThickness'], at);
   if (typeof template['temaType'] !== 'string') errors.push(`${at}.temaType must be a string`);
@@ -112,11 +126,21 @@ export function exchangerErrors(template: Record<string, unknown>, at: string): 
     const channel = template[name];
     if (channel === undefined && !required) continue;
     if (!isRecord(channel)) errors.push(`${at}.${name} must be an object${required ? '' : ' or absent'}`);
-    else appendAll(errors, positive(channel, ['length', 'thickness'], `${at}.${name}`));
+    else {
+      appendAll(errors, positive(channel, ['length', 'thickness'], `${at}.${name}`));
+      if (channel['coverThickness'] !== undefined && !isPositiveNumber(channel['coverThickness']))
+        errors.push(`${at}.${name}.coverThickness must be a number > 0`);
+    }
   }
+  const orientation = template['orientation'];
+  if (orientation !== 'horizontal' && orientation !== 'vertical') errors.push(`${at}.orientation must be horizontal or vertical`);
   const support = template['support'];
-  if (isRecord(support) && support['type'] !== 'saddles' && support['type'] !== 'none')
-    errors.push(`${at}.support.type must be saddles or none`);
+  const allowed = orientation === 'vertical' ? ['skirt', 'legs', 'none'] : ['saddles', 'none'];
+  if (isRecord(support) && !allowed.includes(support['type'] as string))
+    errors.push(
+      `${at}.support.type must be ${allowed.slice(0, -1).join(', ')} or ${allowed[allowed.length - 1]} for a ${String(orientation)} exchanger`,
+    );
+  appendAll(errors, kettleErrors(template, at));
   return [...errors, ...supportErrors(support, at)];
 }
 

@@ -121,6 +121,20 @@ export interface TubeBundle {
 export interface ExchangerChannel {
   readonly length: number;
   readonly thickness: number;
+  /** Flat cover thickness when it differs from the channel wall (front head D: required). */
+  readonly coverThickness?: number;
+}
+
+/** TEMA K kettle: the shell is the restricted diameter at the tubesheet, a cone, then the enlarged cylinder over the bundle; all dimensions are caller inputs. */
+export interface ExchangerKettle {
+  readonly enlargedInsideDiameter: number;
+  /** Length of the enlarged cylinder, measured to the rear end of the shell. */
+  readonly enlargedLength: number;
+  /** Axial length of the cone from the restricted to the enlarged diameter. */
+  readonly transitionLength: number;
+  readonly enlargedThickness: number;
+  /** Overflow weir height above the lowest inside point of the enlarged shell (internal: data only, no geometry). */
+  readonly weirHeight: number;
 }
 
 /** Design data of one side of an exchanger (same fields and rules as the vessel design, no operating liquid level). */
@@ -129,10 +143,15 @@ export interface ExchangerSideDesign extends Omit<VesselDesignData, 'operatingLi
   readonly specificGravity?: number | undefined;
 }
 
-/** Horizontal shell-and-tube exchanger (TEMA fronts A B C N, shells E F G H J, rears L M N P S T U W). Axis along local X. */
+/**
+ * Shell-and-tube exchanger (TEMA fronts A B C D N, shells E F G H J K X, rears L M N P S T U W). Horizontal: axis along local X. Vertical: axis along +Z,
+ * front head at the bottom (axial coordinate x of the frame = height above the bottom tangent line + offset).
+ */
 export interface ExchangerTemplate {
   readonly kind: 'exchanger';
-  readonly orientation: 'horizontal';
+  readonly orientation: 'horizontal' | 'vertical';
+  /** TEMA K only. */
+  readonly kettle?: ExchangerKettle;
   readonly temaType: string;
   readonly tema: TemaDesignation;
   readonly shellInsideDiameter: number;

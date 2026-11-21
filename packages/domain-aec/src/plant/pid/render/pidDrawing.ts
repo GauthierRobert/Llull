@@ -1,6 +1,6 @@
 /**
  * A P&ID sheet as drawing primitives (plant 04 PID §2: the 2D view and SVG are presentation over the same model). One glyph per item, its id the
- * item id; symbols come from the built-in library and are drawn at their default size, never stored.
+ * item id; symbols come from the built-in library (or the project symbol of their class, `define_pid_symbol`) and are drawn at their default size.
  */
 
 import type { DrawingPrimitive } from '@core/model/drawing';
@@ -129,7 +129,7 @@ function itemGlyph(pid: PidModel, item: PidItem, convention: PidConvention): Pid
       };
     }
     case 'instrument': {
-      const symbol = instrumentSymbol(item.location, item.display);
+      const symbol = withProjectSymbol(pid, instrumentSymbol(item.location, item.display), convention);
       const letters = `${item.category}${item.functions}`;
       return {
         ...base,
@@ -157,7 +157,7 @@ function itemGlyph(pid: PidModel, item: PidItem, convention: PidConvention): Pid
         ...base,
         layer: LAYERS.instrument,
         primitives: [
-          ...placeSymbol(actuatorSymbol(item.actuator), { at, angleDeg: 0, layer: LAYERS.instrument }),
+          ...placeSymbol(withProjectSymbol(pid, actuatorSymbol(item.actuator), convention), { at, angleDeg: 0, layer: LAYERS.instrument }),
           ...(item.failAction === undefined ? [] : [label([at[0] + 7, at[1] + 8], 2, item.failAction)]),
         ],
       };
@@ -168,7 +168,11 @@ function itemGlyph(pid: PidModel, item: PidItem, convention: PidConvention): Pid
         ...base,
         layer: LAYERS.pipe,
         primitives: [
-          ...placeSymbol(connectorSymbol(item.direction), { at: item.at, angleDeg: item.rotationDeg, layer: LAYERS.pipe }),
+          ...placeSymbol(withProjectSymbol(pid, connectorSymbol(item.direction), convention), {
+            at: item.at,
+            angleDeg: item.rotationDeg,
+            layer: LAYERS.pipe,
+          }),
           label([item.at[0], item.at[1] - 8], 2, target === undefined ? item.pairKey : `${item.pairKey} > ${target}`),
         ],
       };

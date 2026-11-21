@@ -21,3 +21,11 @@ export function aroundXAxis(x: number, axisZ: number, orientationDeg: number, st
   const centre = point(x, 0, axisZ);
   return { base: offsetAlong(centre, direction, start), face: offsetAlong(centre, direction, projection), direction };
 }
+
+/** Shell-style placement around the vertical axis (x = y = 0) at height `z`: angle north_cw (0 = +Y, 90 = +X), `start` = base radius. */
+export function aroundZAxis(z: number, orientationDeg: number, start: number, projection: number): NozzlePlacement {
+  const angle = rad(orientationDeg);
+  const direction = point(Math.sin(angle), Math.cos(angle), 0);
+  const centre = point(0, 0, z);
+  return { base: offsetAlong(centre, direction, start), face: offsetAlong(centre, direction, projection), direction };
+}

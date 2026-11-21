@@ -1069,7 +1069,7 @@
 | `check_pid` | Check the P&ID of the document (doc.plant.pid) for schematic faults, read-only. | read-only |
 | `check_pid_3d` | Compare the P&ID (doc.plant.pid) with the 3D plant model, read-only. | read-only |
 | `create_pid_sheet` | Create a P&ID sheet (doc.plant.pid) to draw on: the first step of any P&ID. |  |
-| `define_pid_symbol` | Define the project's own symbol for a P&ID library class (equipment such as Tank / CentrifugalPump, or an inline piping component such as BallValve): the graph… |  |
+| `define_pid_symbol` | Define the project's own symbol for a P&ID library class (equipment such as Tank / CentrifugalPump, an inline piping component such as BallValve, an instrument… |  |
 | `delete_pid_item` | Delete a P&ID item (equipment, nozzle, line, inline component, instrument, signal, actuating system, off-page connector, loop) by tag or id, with what depends … |  |
 | `export_dexpi` | Export the P&ID of the document (doc.plant.pid) as DEXPI XML, read-only, deterministic (the same document gives the same bytes): version 1.3 = Proteus XML (roo… | read-only |
 | `export_pid_svg` | Draw a P&ID sheet (doc.plant.pid) as SVG, read-only and deterministic: paper frame and title block (sheet number, title, revision, status, convention), then on… | read-only |

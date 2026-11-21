@@ -280,7 +280,7 @@ describe('load validation of stored symbols', () => {
     [
       'a key that is not a library class',
       (state: Record<string, unknown>) => ((state['symbols'] as Record<string, unknown>)['Nope'] = symbol(state)),
-      /key must be an equipment or piping class/,
+      /key must be a class of the library/,
     ],
     ['a class that differs from the key', (state: Record<string, unknown>) => (symbol(state)['class'] = 'Pump'), /class equals its key/],
     ['an empty name', (state: Record<string, unknown>) => (symbol(state)['name'] = ''), /name must be 1 to 64/],

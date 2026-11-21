@@ -54,7 +54,7 @@ describe('VC-EQP-16: the error table of the specification', () => {
     const refusals: Array<[string, CadDocument, string, object, string]> = [
       ['EQP_TEMA_INVALID', mmDocument(), 'add_heat_exchanger', { ...bemParams, temaType: 'BXZ' }, 'temaType.2'],
       ['EQP_TEMA_INVALID', mmDocument(), 'add_heat_exchanger', { ...bemParams, temaType: 'BE' }, 'temaType'],
-      ['EQP_TEMA_UNSUPPORTED', mmDocument(), 'add_heat_exchanger', { ...bemParams, temaType: 'AKT' }, 'temaType.1'],
+      ['EQP_EXCHANGER_UNSUPPORTED', mmDocument(), 'add_heat_exchanger', { ...bemParams, temaType: 'BKM' }, 'temaType.2'],
       ['EQP_PARAM_INVALID', mmDocument(), 'add_heat_exchanger', { ...bem, temaType: 'AES', rearChannel: { length: 300 } }, 'rearChannel'],
       [
         'EQP_SUPPORT_INVALID',

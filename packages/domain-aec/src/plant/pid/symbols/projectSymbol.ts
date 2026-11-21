@@ -8,9 +8,16 @@ import { isRecord } from '@lib/isRecord';
 import type { Vec2 } from '@core/model/vectors';
 import { halfExtents } from '../authoring/classes';
 import { KNOWN_EQUIPMENT_CLASSES, KNOWN_PIPING_CLASSES } from '../dexpi/proteusClasses';
-import type { PidConvention, PidModel } from '../model';
-import { INLINE_HALF, INLINE_HALF_HEIGHT } from './piping';
-import type { PidSymbol, Shape, ShapeStyle } from './shapes';
+import {
+  PID_ACTUATORS,
+  PID_INSTRUMENT_DISPLAYS,
+  PID_INSTRUMENT_LOCATIONS,
+  type PidConvention,
+  type PidItem,
+  type PidModel,
+} from '../model';
+import { INLINE_HALF, INLINE_HALF_HEIGHT, actuatorSymbol, connectorSymbol, instrumentSymbol } from './piping';
+import type { PidSymbol, Shape, ShapeStyle, SymbolFamily } from './shapes';
 
 /** Limits of an untrusted definition (sheet millimetres, symbol frame). */
 export const SYMBOL_LIMITS = { shapes: 64, points: 200, text: 24, coordinate: 1000, textHeight: 100, name: 64 } as const;
@@ -25,13 +32,50 @@ const isPoint = (value: unknown): value is Vec2 =>
   Math.abs(value[0]) <= SYMBOL_LIMITS.coordinate &&
   Math.abs(value[1]) <= SYMBOL_LIMITS.coordinate;
 
+/** The built-in instrument bubbles (location x display), actuators and off-page connectors by library class (`Instrument:field:discrete`, `Actuator:motor`, `FlowInPipeOffPageConnector`). */
+const FIXED_SYMBOLS: ReadonlyMap<string, PidSymbol> = new Map(
+  [
+    ...PID_INSTRUMENT_LOCATIONS.flatMap((location) => PID_INSTRUMENT_DISPLAYS.map((display) => instrumentSymbol(location, display))),
+    ...PID_ACTUATORS.map((kind) => actuatorSymbol(kind)),
+    connectorSymbol('in'),
+    connectorSymbol('out'),
+  ].map((symbol): [string, PidSymbol] => [symbol.class, symbol]),
+);
+
 /** Families whose graphics a project may replace, and the class set that names them. */
-export const symbolFamilyOf = (cls: string): 'equipment' | 'piping' | null =>
-  KNOWN_EQUIPMENT_CLASSES.has(cls) ? 'equipment' : KNOWN_PIPING_CLASSES.has(cls) ? 'piping' : null;
+export const symbolFamilyOf = (cls: string): Exclude<SymbolFamily, 'annotation'> | null =>
+  KNOWN_EQUIPMENT_CLASSES.has(cls)
+    ? 'equipment'
+    : KNOWN_PIPING_CLASSES.has(cls)
+      ? 'piping'
+      : ((FIXED_SYMBOLS.get(cls)?.family as Exclude<SymbolFamily, 'annotation'> | undefined) ?? null);
+
+/**
+ * Where a project symbol is anchored: `centre` = its bounding box is centred on the origin; `base` (actuators) = the middle of the bottom edge is the origin, because
+ * the stem foot of an actuator is placed on the valve.
+ */
+export const symbolAnchor = (cls: string): 'centre' | 'base' => (symbolFamilyOf(cls) === 'actuator' ? 'base' : 'centre');
 
 /** Half extents the graphics of `cls` are fitted into. */
-export const targetBox = (cls: string): readonly [number, number] =>
-  symbolFamilyOf(cls) === 'piping' ? [INLINE_HALF, INLINE_HALF_HEIGHT] : halfExtents(cls);
+export const targetBox = (cls: string): readonly [number, number] => {
+  const fixed = FIXED_SYMBOLS.get(cls);
+  if (fixed !== undefined) return [fixed.halfWidth, fixed.halfHeight];
+  return symbolFamilyOf(cls) === 'piping' ? [INLINE_HALF, INLINE_HALF_HEIGHT] : halfExtents(cls);
+};
+
+/** The library class whose project symbol draws `item`: the DEXPI class, or the variant name of an instrument bubble, actuator or connector. */
+export function symbolClassOf(item: PidItem): string {
+  switch (item.kind) {
+    case 'instrument':
+      return `Instrument:${item.location}:${item.display}`;
+    case 'actuating':
+      return `Actuator:${item.actuator}`;
+    case 'opc':
+      return connectorSymbol(item.direction).class;
+    default:
+      return item.dexpiClass;
+  }
+}
 
 /** Why one raw shape is not acceptable (null when it is); the vocabulary is `Shape` of `shapes.ts`. */
 function shapeProblem(raw: unknown): string | null {
@@ -114,18 +158,27 @@ function extent(shapes: readonly Shape[]): { min: Vec2; max: Vec2 } {
 }
 
 /**
- * The shapes of a VALID raw definition centred on the middle of their bounding box and scaled uniformly to fit the half extents `target`.
+ * The shapes of a VALID raw definition centred on the middle of their bounding box (`anchor` base: on the middle of their bottom edge, filling the box
+ * height 0..2 x target[1]) and scaled uniformly to fit the half extents `target`.
  * @failure zero extent (a point, or a line of no length) -> the reason string
  */
-export function normalise(raw: readonly Record<string, unknown>[], target: readonly [number, number]): Shape[] | string {
+export function normalise(
+  raw: readonly Record<string, unknown>[],
+  target: readonly [number, number],
+  anchor: 'centre' | 'base' = 'centre',
+): Shape[] | string {
   const shapes = raw.map(cleaned);
   const { min, max } = extent(shapes);
   const halfW = (max[0] - min[0]) / 2;
   const halfH = (max[1] - min[1]) / 2;
   if (!(halfW > 1e-9 || halfH > 1e-9)) return 'the graphics have no extent (a point or a degenerate line)';
-  const scale = Math.min(halfW > 1e-9 ? target[0] / halfW : Infinity, halfH > 1e-9 ? target[1] / halfH : Infinity);
+  const heightFit = anchor === 'base' ? 2 * target[1] : target[1];
+  const scale = Math.min(
+    halfW > 1e-9 ? target[0] / halfW : Infinity,
+    halfH > 1e-9 ? heightFit / (anchor === 'base' ? 2 * halfH : halfH) : Infinity,
+  );
   const cx = (min[0] + max[0]) / 2;
-  const cy = (min[1] + max[1]) / 2;
+  const cy = anchor === 'base' ? min[1] : (min[1] + max[1]) / 2;
   const move = (p: Vec2): Vec2 => [(p[0] - cx) * scale, (p[1] - cy) * scale];
   return shapes.map((shape): Shape => {
     if (shape.t === 'line') return { ...shape, pts: shape.pts.map(move) };
@@ -135,9 +188,14 @@ export function normalise(raw: readonly Record<string, unknown>[], target: reado
 }
 
 /** Whether stored shapes lie inside `target` (a loaded file's definition must already be fitted). */
-export function fitsBox(shapes: readonly Shape[], target: readonly [number, number]): boolean {
+export function fitsBox(shapes: readonly Shape[], target: readonly [number, number], anchor: 'centre' | 'base' = 'centre'): boolean {
   const { min, max } = extent(shapes);
-  return [min[0], max[0]].every((x) => Math.abs(x) <= target[0] + 1e-6) && [min[1], max[1]].every((y) => Math.abs(y) <= target[1] + 1e-6);
+  const lowest = anchor === 'base' ? 0 : -target[1];
+  const highest = anchor === 'base' ? 2 * target[1] : target[1];
+  return (
+    [min[0], max[0]].every((x) => Math.abs(x) <= target[0] + 1e-6) &&
+    [min[1], max[1]].every((y) => y >= lowest - 1e-6 && y <= highest + 1e-6)
+  );
 }
 
 /** `symbol` with the project graphics of its class when the project defines them for `convention`, else `symbol` itself. */

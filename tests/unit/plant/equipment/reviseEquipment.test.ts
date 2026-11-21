@@ -122,7 +122,7 @@ describe('update_equipment_parameters: exchangers', () => {
       'EQP_NOZZLE_OFF_BODY',
       'nozzles.S2.location.station',
     ],
-    ['a TEMA letter that is not modelled', { temaType: 'BKM' }, 'EQP_TEMA_UNSUPPORTED', 'exchanger.temaType.1'],
+    ['a kettle with a fixed-tubesheet rear', { temaType: 'BKM' }, 'EQP_EXCHANGER_UNSUPPORTED', 'exchanger.temaType.2'],
     ['a flange face inside the new wall', { shellInsideDiameter: 1300 }, 'EQP_NOZZLE_PROJECTION_TOO_SHORT', 'nozzles.S1.projection'],
     ['a wall and a BWG gauge together', { tubes: { bwg: 14, wallThickness: 2 } }, 'EQP_PARAM_INVALID', 'exchanger.tubes.bwg'],
     ['a thickness below the allowance', { corrosionAllowance: 9 }, 'EQP_PARAM_INVALID', 'exchanger.shellThickness'],
