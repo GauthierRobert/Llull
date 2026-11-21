@@ -118,6 +118,7 @@ export function renderDocument(
     polygonBudget: raster ? Math.max(budget, RASTER_BUDGET) : budget,
     simplifiedEntityIds: fitted.simplifiedEntityIds,
     skippedEntityIds: fitted.skippedEntityIds,
+    ...(fitted.simplifiedEntityIds.length + fitted.skippedEntityIds.length > 0 ? { polygonTotal: fitted.totalPolygons } : {}),
     cutEntityIds,
     svg: perspective
       ? svg
