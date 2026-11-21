@@ -1,3 +1,4 @@
+import type { EquipmentElement } from '@aec/building/types';
 /**
  * Plant 08 DAT J4: `check_plant_data` compares the nozzle a routed line names with the line's spec class and with the P-T rating at the line design
  * temperature. Oracles are the bundled ASME B16.5 group 1.1 table values (CL150 19.6 bar at 38 degC, 13.8 bar at 200 degC; CL300 51.1 bar at 38 degC).
@@ -21,7 +22,9 @@ const ratingCodes = (doc: CadDocument): string[] =>
     .map((finding) => finding.code);
 
 function nozzleName(doc: CadDocument, mark: string): string {
-  const element = Object.values(doc.building?.elements ?? {}).find((item) => item.category === 'equipment' && item.mark === mark);
+  const element = Object.values(doc.building?.elements ?? {}).find(
+    (item): item is EquipmentElement => item.category === 'equipment' && item.mark === mark,
+  );
   const nozzle = element?.plant?.nozzles[0];
   if (nozzle === undefined) throw new Error(`no nozzle on ${mark}`);
   return `${mark}:${nozzle.mark}`;
