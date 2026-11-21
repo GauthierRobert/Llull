@@ -367,12 +367,37 @@ fn the_face_planes_pull_a_tilted_hint_back_onto_the_axis() {
 }
 
 #[test]
-fn a_hint_far_off_the_axis_is_not_refined() {
+fn a_hint_far_off_the_axis_is_never_bent_past_the_limit() {
     let mut rng = Rng::new(26);
-    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 8000, 3.0, 0.0005, &aligned());
-    if let Ok(found) = fit(&points, &thick_catalogue(), Some(tilted([0.0, 0.0, 1.0], 12.0)), 3, &settings()) {
-        assert!(!found.axis_refinement.applied && found.axis_refinement.reason.is_some());
+    let truth = [0.0, 0.0, 1.0];
+    let points = member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 8000, 0.45, 0.0005, &aligned());
+    for degrees in [2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 12.0] {
+        let hint = tilted(truth, degrees);
+        let found = fit(&points, &thick_catalogue(), Some(hint), 3, &settings()).unwrap();
+        let refinement = &found.axis_refinement;
+        let moved = dot(&found.axis_direction, &hint).abs().clamp(-1.0, 1.0).acos().to_degrees();
+        assert!(moved <= 5.0 + 1e-6, "{degrees} deg hint moved {moved}");
+        if degrees <= 5.0 {
+            assert!(refinement.applied, "{degrees}: {:?}", refinement.reason);
+            assert!(dot(&found.axis_direction, &truth).abs().acos().to_degrees() < 0.3);
+        }
+        if degrees == 6.0 || degrees == 8.0 {
+            // The faces pull further than the limit from the hint: the principal axis (here the hint) is kept and the refusal says so.
+            assert!(!refinement.applied && moved < 1e-9, "{degrees}: applied {} moved {moved}", refinement.applied);
+            assert!(refinement.reason.as_deref().unwrap_or("").contains("over the 5 deg limit"), "{:?}", refinement.reason);
+        }
+        if !refinement.applied {
+            assert!(moved < 1e-9 && refinement.reason.is_some());
+        }
     }
+    let far = fit(
+        &member(&mut rng, &i_loop(0.3, 0.15, 0.0071, 0.0107), 8000, 3.0, 0.0005, &aligned()),
+        &thick_catalogue(),
+        Some(tilted(truth, 12.0)),
+        3,
+        &settings(),
+    );
+    assert_eq!(far.unwrap_err().code, "SCN_STEEL_NO_CANDIDATE");
 }
 
 #[test]

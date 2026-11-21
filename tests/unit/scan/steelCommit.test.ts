@@ -10,7 +10,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { CloudOp, CloudOpResult } from '@core/model/pointCloud';
 import type { ExecutionContext } from '@core/commands/types';
 import { isRecord } from '@lib/isRecord';
-import { normaliseDesignation } from '@aec/steel/profiles';
+import { normaliseDesignation, STEEL_PROFILES } from '@aec/steel/profiles';
+import { extractionHash, type PendingExtraction } from '@aec/scan/extraction';
 import { expectPure } from '../../helpers/expectNoOp';
 import { fixturePort, KEY_A, opOk } from './fixturePort';
 
@@ -168,8 +169,92 @@ describe('commit_asbuilt_extraction for a steel member (SC-SCN-05)', () => {
     const fitRecord = extraction['fit'] as Record<string, unknown>;
     const tampered = { ...extraction, fit: { ...fitRecord, profile: 'HEB300' } };
     expect(execute(doc, 'commit_asbuilt_extraction', { extraction: tampered }, ctx).summary).toContain('SCN_EXTRACTION_TAMPERED');
-    const bare = { ...extraction, fit: { profile: 'IPE300' }, extractionHash: 'x' };
-    expect(execute(doc, 'commit_asbuilt_extraction', { extraction: bare }, ctx).summary).toContain('SCN_EXTRACTION_TAMPERED');
+  });
+
+  /** The extraction with its fit replaced and the hash recomputed, so the commit gets past the tamper check. */
+  const rehashed = (extraction: Record<string, unknown>, fitReplacement: Record<string, unknown>): Record<string, unknown> => {
+    const full: Record<string, unknown> = { ...extraction, fit: fitReplacement };
+    const { extractionHash: _old, ...content } = full;
+    return { ...content, extractionHash: extractionHash(content as unknown as Omit<PendingExtraction, 'extractionHash'>) };
+  };
+
+  it('refuses a steel fit without its axis, and passes on the add_steel_member refusals (twin, bad level, zero length) with the document unchanged', () => {
+    const ctx = context(() => opOk(answer()));
+    const { doc, cloudId } = setup(ctx);
+    const extraction = fromStep(fit(doc, cloudId, ctx).data, 'extractions.0.extraction') as Record<string, unknown>;
+    const good = extraction['fit'] as Record<string, unknown>;
+    const bare = rehashed(extraction, { profile: 'IPE300' });
+    const bareResult = execute(doc, 'commit_asbuilt_extraction', { extraction: bare }, ctx);
+    expect(bareResult.summary).toContain('SCN_PARAM_INVALID');
+    expect(bareResult.document).toBe(doc);
+    const twin = execute(
+      doc,
+      'add_steel_member',
+      { profile: 'IPE300', start: [5, 1, 4], end: [5, 3, 4], roll: good['roll'] },
+      ctx,
+    ).document;
+    const twinResult = execute(twin, 'commit_asbuilt_extraction', { extraction }, ctx);
+    expect(twinResult.summary).toContain('already exists');
+    expect(twinResult.affected).toEqual([]);
+    expect(twinResult.document).toBe(twin);
+    const badLevel = execute(doc, 'commit_asbuilt_extraction', { extraction, levelId: 'level-9' }, ctx);
+    expect(badLevel.affected).toEqual([]);
+    expect(badLevel.document).toBe(doc);
+    const degenerate = rehashed(extraction, { ...good, start: [5, 1, 4], end: [5, 1, 4] });
+    const degenerateResult = execute(doc, 'commit_asbuilt_extraction', { extraction: degenerate }, ctx);
+    expect(degenerateResult.affected).toEqual([]);
+    expect(degenerateResult.document).toBe(doc);
+  });
+
+  it('writes the extraction record before the member and add_steel_member refuses an asBuilt that names no extraction', () => {
+    const ctx = context(() => opOk(answer()));
+    const { doc } = setup(ctx);
+    const forged = execute(
+      doc,
+      'add_steel_member',
+      { profile: 'IPE300', start: [0, 0, 0], end: [1, 0, 0], asBuilt: { extractionId: 'ext-9.9', unverified: false } },
+      ctx,
+    );
+    expect(forged.affected).toEqual([]);
+    expect(forged.summary).toContain("asBuilt.extractionId 'ext-9.9'");
+    expect(forged.document).toBe(doc);
+  });
+
+  it('keeps the catalogue names unique under the designation rule', () => {
+    const keys = STEEL_PROFILES.map((profile) => normaliseDesignation(profile.name));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('refuses a native answer without a positive finite threshold and drops malformed tw / tf and axisRefinement', () => {
+    const withoutThreshold = context(() => opOk({ ...answer(), threshold: undefined }));
+    const first = setup(withoutThreshold);
+    expect(fit(first.doc, first.cloudId, withoutThreshold).summary).toContain('NATIVE_PROTOCOL');
+    const nanThreshold = context(() => opOk({ ...answer(), threshold: { value: 'x', spacing: 0.01 } }));
+    const second = setup(nanThreshold);
+    expect(fit(second.doc, second.cloudId, nanThreshold).summary).toContain('NATIVE_PROTOCOL');
+    const malformed = context(() =>
+      opOk({
+        ...answer(),
+        thickness: { tw: { value: -1, residual: 0.0004, samples: 3 }, tf: { value: 0.0107, residual: 0.0005, samples: 1.5 }, reason: null },
+        axisRefinement: { applied: 'yes', deltaDeg: 1 },
+      }),
+    );
+    const third = setup(malformed);
+    const data = fit(third.doc, third.cloudId, malformed).data as {
+      measured: Record<string, unknown>;
+      axisRefinement: unknown;
+      warnings: unknown[];
+    };
+    expect(data.measured['twMm']).toBeNull();
+    expect(data.measured['tfMm']).toBeNull();
+    expect(String(data.measured['twTfReason'])).toContain('malformed');
+    expect(data.axisRefinement).toBeNull();
+    expect(data.warnings).toEqual([]);
+    const partial = context(() =>
+      opOk({ ...answer(), axisRefinement: { applied: false, deltaDeg: 0, faces: 0, facePoints: 0, residual: 0, reason: 'x' } }),
+    );
+    const fourth = setup(partial);
+    expect((fit(fourth.doc, fourth.cloudId, partial).data as { axisRefinement: { reason: string } }).axisRefinement.reason).toBe('x');
   });
 
   it('flags the member unverified from the fit quality, keeps the human gate, replays without the port and is pure', () => {

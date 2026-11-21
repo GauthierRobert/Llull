@@ -364,48 +364,58 @@ fn refine_loop(
     outlines: &[Outline],
     max_candidates: usize,
     band: f64,
-    mut view: SectionView,
-    mut candidates: Vec<Candidate>,
+    view: SectionView,
+    candidates: Vec<Candidate>,
 ) -> (SectionView, Vec<Candidate>, AxisRefinement) {
     let first_axis = view.axis;
+    let first_score = candidates[0].score;
     let mut result = AxisRefinement::not_applied("no face-plane evidence");
+    let mut refined: Option<(SectionView, Vec<Candidate>)> = None;
     for pass in 0..REFINE_PASSES {
-        let Some(outline) = outlines.iter().find(|o| o.name == candidates[0].profile) else { break };
-        let wide = REFINE_WIDE_BAND * candidates[0].h.min(candidates[0].b);
-        let band_now = band.max(wide);
-        let probe = refine_axis(points, &placed(&view.section, &candidates[0]), outline, &view.axis, band_now);
-        match probe {
-            Ok((refined, info)) => {
-                let next = SectionView::new(points, centroid, refined);
-                let mut again = next.rank(centroid, outlines);
-                again.truncate(max_candidates.max(1));
-                if !again.first().is_some_and(|c| c.profile == candidates[0].profile && c.score <= candidates[0].score * 1.02 + 1e-9) {
-                    if pass == 0 {
-                        result =
-                            AxisRefinement::not_applied("the refined axis did not improve the best score; the principal axis was kept");
-                    }
-                    break;
-                }
-                view = next;
-                candidates = again;
-                let total = dot(&view.axis, &first_axis).clamp(-1.0, 1.0).acos().to_degrees();
-                result = AxisRefinement { delta_deg: total, ..info };
-                if total > MAX_TOTAL_REFINE_DEG {
-                    break;
-                }
-                if info.delta_deg < REFINE_CONVERGED_DEG {
-                    break;
-                }
-            }
+        let (now_view, now_candidates) = match &refined {
+            Some((v, c)) => (v, c),
+            None => (&view, &candidates),
+        };
+        let Some(outline) = outlines.iter().find(|o| o.name == now_candidates[0].profile) else { break };
+        let wide = REFINE_WIDE_BAND * now_candidates[0].h.min(now_candidates[0].b);
+        let probe = refine_axis(points, &placed(&now_view.section, &now_candidates[0]), outline, &now_view.axis, band.max(wide));
+        let (axis, info) = match probe {
+            Ok(found) => found,
             Err(reason) => {
                 if pass == 0 {
                     result = AxisRefinement::not_applied(&reason);
                 }
                 break;
             }
+        };
+        let next = SectionView::new(points, centroid, axis);
+        let mut again = next.rank(centroid, outlines);
+        again.truncate(max_candidates.max(1));
+        if !again.first().is_some_and(|c| c.profile == candidates[0].profile && c.score <= first_score * 1.02 + 1e-9) {
+            if pass == 0 {
+                result = AxisRefinement::not_applied("the refined axis did not improve the best score; the principal axis was kept");
+            }
+            break;
+        }
+        let total = dot(&next.axis, &first_axis).clamp(-1.0, 1.0).acos().to_degrees();
+        if total > MAX_TOTAL_REFINE_DEG {
+            refined = None;
+            result = AxisRefinement::not_applied(&format!(
+                "the face planes move the axis by {total:.1} deg in total, over the {MAX_TOTAL_REFINE_DEG} deg limit: kept the principal axis"
+            ));
+            break;
+        }
+        result = AxisRefinement { delta_deg: total, ..info };
+        let converged = dot(&next.axis, &now_view.axis).clamp(-1.0, 1.0).acos().to_degrees() < REFINE_CONVERGED_DEG;
+        refined = Some((next, again));
+        if converged {
+            break;
         }
     }
-    (view, candidates, result)
+    match refined {
+        Some((v, c)) => (v, c, result),
+        None => (view, candidates, result),
+    }
 }
 
 /// @failure < 30 points -> SCN_FIT_TOO_FEW_POINTS; no / degenerate outlines or a zero axisHint -> NATIVE_JOB_INPUT; a section thinner than 1 cm
