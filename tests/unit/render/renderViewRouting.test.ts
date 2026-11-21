@@ -7,6 +7,9 @@ import type { RasterPort } from '@core/model/raster';
 import type { ViewportCapturePort, ViewportCaptureRequest } from '@core/model/viewportCapture';
 import { rasterScenePixels } from '@core/commands/render/raster';
 import { encodePng } from '@lib/png';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import { createResolveMemo } from '@core/commands/resolveMemo';
+import { NATIVE_ROUTE_BUDGET, routeOverBudget } from '@core/commands/render/renderViewRouting';
 import { expectPure } from '../../helpers/expectNoOp';
 
 /** Above the 400000-polygon raster budget of the reference renderer. */
@@ -42,7 +45,7 @@ beforeAll(() => {
   big = bigMeshDoc();
 }, 60_000);
 
-function viewport(outcome: 'ok' | 'pending' | 'unavailable'): {
+function viewport(outcome: 'ok' | 'pending' | 'unavailable' | 'stale'): {
   port: ViewportCapturePort;
   requests: ViewportCaptureRequest[];
   docs: CadDocument[];
@@ -57,6 +60,7 @@ function viewport(outcome: 'ok' | 'pending' | 'unavailable'): {
         requests.push(request);
         docs.push(doc);
         if (outcome === 'pending') return { ok: false, code: 'VIEWPORT_PENDING', message: 'drawing' };
+        if (outcome === 'stale') return { ok: false, code: 'VIEWPORT_STALE', message: 'not the live document' };
         if (outcome === 'unavailable') return { ok: false, code: 'VIEWPORT_UNAVAILABLE', message: 'no app' };
         return { ok: true, png: encodePng(request.width, request.height, new Uint8Array(request.width * request.height * 4)), ...request };
       },
@@ -109,6 +113,9 @@ describe('render_view over budget (M6b)', { timeout: 120_000 }, () => {
     expect(data).toMatchObject({ routedTo: 'viewport', renderer: 'viewport', deterministic: false, drawnShare: 1, width: 96, height: 64 });
     expect(data['svgSha256']).toBeUndefined();
     expect(data['simplifiedEntityIds']).toEqual([]);
+    expect(data['polygonCount']).toBeUndefined();
+    expect(data['polygonTotal']).toBeUndefined();
+    expect(data['referencePolygonTotal']).toBe(TRIANGLES);
     expect(data.svg).toMatch(/^<svg[^>]*>.*href="data:image\/png;base64,/);
     expect(result.summary).toMatch(/desktop viewport/);
     expect(result.summary).toMatch(/perspective/);
@@ -122,12 +129,12 @@ describe('render_view over budget (M6b)', { timeout: 120_000 }, () => {
 
   it('a viewport refusal falls through to the native raster and says why', () => {
     const { port, calls } = raster();
-    const result = run(big, {}, { viewportCapture: viewport('unavailable').port, raster: port });
+    const result = run(big, {}, { viewportCapture: viewport('stale').port, raster: port });
     const data = result.data as Data;
     expect(calls.length).toBeGreaterThan(0);
     expect(data).toMatchObject({ routedTo: 'raster', drawnShare: 1, renderer: 'native', deterministic: false });
     expect(data['svgSha256']).toBeUndefined();
-    expect(result.summary).toContain('VIEWPORT_UNAVAILABLE');
+    expect(result.summary).toContain('VIEWPORT_STALE');
     expect(result.summary).toMatch(/native raster/);
   });
 
@@ -153,7 +160,91 @@ describe('render_view over budget (M6b)', { timeout: 120_000 }, () => {
     expect(requests).toEqual([]);
   });
 
+  it('no app is not a failure: VIEWPORT_UNAVAILABLE is left out of the summary of the fallback', () => {
+    const result = run(big, {}, { viewportCapture: viewport('unavailable').port });
+    expect(result.summary).toContain('RENDER_BUDGET_EXCEEDED');
+    expect(result.summary).not.toContain('VIEWPORT_UNAVAILABLE');
+  });
+
   it('is pure', () => {
     expectPure(big, () => run(big, {}, { viewportCapture: viewport('ok').port }));
+  });
+});
+
+/** The router alone, on a stub reference result: the cases that would cost a multi-million polygon render. */
+describe('routeOverBudget (stubbed reference result)', { timeout: 120_000 }, () => {
+  const stub = (polygonTotal: number): CommandResult => ({
+    document: small,
+    summary: 'Rendered.',
+    affected: [],
+    data: {
+      simplifiedEntityIds: ['a'],
+      skippedEntityIds: [],
+      polygonCount: 400_000,
+      polygonTotal,
+      polygonBudget: 400_000,
+      width: 96,
+      height: 64,
+      svg: '<svg/>',
+    },
+  });
+  const ctxOf = (raster: RasterPort): ExecutionContext => ({ ...defaultContext(), raster });
+  const failing = (code: string): CommandResult => ({
+    document: small,
+    summary: 'x',
+    affected: [],
+    error: { code, ids: [], paths: [], remediation: '' },
+  });
+
+  it('never asks the native raster for a scene above its limit, and says so', () => {
+    const renderCalls: unknown[] = [];
+    const port: RasterPort = { render: (scene) => void renderCalls.push(scene) as never };
+    let rendered = 0;
+    const result = routeOverBudget(small, {}, ctxOf(port), stub(NATIVE_ROUTE_BUDGET + 1), () => {
+      rendered += 1;
+      return stub(1);
+    });
+    expect(renderCalls).toEqual([]);
+    expect(rendered).toBe(0);
+    expect(result.summary).toContain('RENDER_BUDGET_EXCEEDED');
+    expect(result.summary).toContain(`limit of ${NATIVE_ROUTE_BUDGET}`);
+    expect((result.data as Data)['routedTo']).toBeUndefined();
+  });
+
+  it('a native render that is still over budget, or that fails, is not returned: the warning names why', () => {
+    const port = raster().port;
+    const still = routeOverBudget(small, {}, ctxOf(port), stub(500_000), () => stub(500_000));
+    expect(still.summary).toContain('still over its budget');
+    expect((still.data as Data)['routedTo']).toBeUndefined();
+    const failed = routeOverBudget(small, {}, ctxOf(port), stub(500_000), () => failing('NATIVE_JOB_FAILED'));
+    expect(failed.summary).toContain('NATIVE_JOB_FAILED');
+    expect((failed.data as Data)['warnings']).toEqual([expect.objectContaining({ code: 'RENDER_BUDGET_EXCEEDED' })]);
+  });
+
+  it('projection, fovDeg, title, labels and dimensions make a request non-plain: warning only, no port asked', () => {
+    const { port, requests } = viewport('ok');
+    const ctx = { ...defaultContext(), viewportCapture: port, raster: raster().port };
+    for (const extra of [
+      { projection: 'perspective' },
+      { fovDeg: 30 },
+      { title: 'T' },
+      { showLabels: true },
+      { showDimensions: true },
+      { renderer: 'reference' },
+    ]) {
+      const result = routeOverBudget(small, extra as never, ctx, stub(500_000), () => stub(1));
+      expect(result.summary).toContain('RENDER_BUDGET_EXCEEDED');
+      expect((result.data as Data)['routedTo']).toBeUndefined();
+    }
+    expect(requests).toEqual([]);
+  });
+
+  it('the reference render is memoized for the pending run and the re-run of a resolve', () => {
+    const memo = createResolveMemo();
+    const ctx = { ...defaultContext(), resolveMemo: memo };
+    const first = execute(small, 'render_view', PARAMS, ctx);
+    const second = execute(small, 'render_view', PARAMS, ctx);
+    expect(memo.size).toBeGreaterThan(0);
+    expect(second.data).toEqual(first.data);
   });
 });

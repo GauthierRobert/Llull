@@ -90,4 +90,20 @@ describe('render_view over budget through the deferred run (M6b)', () => {
     expect(result.summary).toContain('VIEWPORT_CAPTURE_FAILED');
     expect((result.data as { drawnShare: number }).drawnShare).toBeLessThan(1);
   }, 120_000);
+
+  it('inside a plan after a mutating step the viewport answers VIEWPORT_STALE: render_view falls through to the warning and the renderer is never asked', async () => {
+    const events = fakeRenderer(() => undefined);
+    setLiveDoc(overBudgetDoc());
+    const result = await applyCommandAsync('build_project', {
+      actions: [
+        { command: 'add_box', params: { size: [1, 1, 1] } },
+        { command: 'render_view', params: { width: 96, height: 64 } },
+      ],
+      onError: 'continue',
+    });
+    const text = JSON.stringify(result);
+    expect(text).toContain('VIEWPORT_STALE');
+    expect(text).toContain('RENDER_BUDGET_EXCEEDED');
+    expect(events).toEqual([]);
+  }, 120_000);
 });

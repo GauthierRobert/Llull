@@ -29,6 +29,17 @@ export interface RenderViewData {
   skippedEntityIds: string[];
   /** Filled polygons before the budget; present only when the budget reduced the picture (`drawnShare` = polygonCount / polygonTotal). */
   polygonTotal?: number;
+  /** Reference renderer only (`renderer: 'reference'`, the default): digest of `svg` and the renderer version. Absent on a routed picture. */
+  svgSha256?: string;
+  rendererVersion?: string;
+  /** Which renderer drew the picture; `deterministic` is false for the native raster and the desktop viewport (a picture, not a reference). */
+  renderer?: 'reference' | 'native' | 'viewport';
+  deterministic?: boolean;
+  engine?: string;
+  /** Over the polygon budget (ASC M6b): where a plain request was drawn instead of the reference raster, the share of polygons drawn, the warning when nothing better was possible. */
+  routedTo?: 'viewport' | 'raster';
+  drawnShare?: number;
+  warnings?: { code: string; message: string }[];
   /** Entities clipped by `cut` (empty without a cut). */
   cutEntityIds: string[];
   /** What the `overlay` kinds drew (04 DIR FR-DIR-40): entity ids and the counts of segments and dots in the SVG; absent without `overlay`. */
@@ -128,3 +139,9 @@ export interface Polygon3D extends PreDepthPolygon {
   /** Camera-space depth of centroid (for painter's sort). */
   depth: number;
 }
+
+/** `data` of a render_view picture drawn by the desktop viewport (over budget, ASC M6b): the reference's polygon figures are renamed so they do not contradict `drawnShare` 1. */
+export type ViewportPictureData = Omit<
+  RenderViewData,
+  'polygonCount' | 'polygonBudget' | 'polygonTotal' | 'svgSha256' | 'rendererVersion'
+> & { referencePolygonCount: number; referencePolygonBudget: number; referencePolygonTotal?: number };
