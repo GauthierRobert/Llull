@@ -20,11 +20,7 @@ import { isClippedAway } from './review/activeClipPlanes';
 const DUMMY = new THREE.Object3D();
 
 /** Instance matrices (scale, then rotate about the component origin, then translate: `instanceToWorld`) into the mesh, then refresh bounds. */
-function writeComponentMatrices(
-  mesh: THREE.InstancedMesh,
-  ids: readonly EntityId[],
-  entities: Readonly<Record<EntityId, Entity>>,
-): void {
+function writeComponentMatrices(mesh: THREE.InstancedMesh, ids: readonly EntityId[], entities: Readonly<Record<EntityId, Entity>>): void {
   ids.forEach((id, index) => {
     const instance = entities[id];
     if (instance === undefined) return;
