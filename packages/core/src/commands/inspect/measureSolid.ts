@@ -1,9 +1,11 @@
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { entityBoundsInDoc, kernelEntityBounds, mergeBounds } from '../../geometry/bounds';
+import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
+import { kernelEntityBounds } from '../../geometry/kernelBounds';
+import type { BoundsSource } from '../../geometry/kernelBounds';
 import { recipeOf } from '../../geometry/shapeRecipe';
-import type { Bounds, BoundsSource } from '../../geometry/bounds';
+import type { Bounds } from '../../geometry/bounds';
 import { formatLength } from '../../model/units';
 import { commandError, noop, report } from '../noop';
 import { currentContext } from '../context';

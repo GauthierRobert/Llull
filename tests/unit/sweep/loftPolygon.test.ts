@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument, type LoftEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import type { CommandResult } from '@core/commands/types';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { loftTriangles } from '@core/geometry/loft';
 import { expectPure } from '../../helpers/expectNoOp';
@@ -16,7 +17,7 @@ const rect = (hx: number, hy: number, first = 0): number[][] => {
   return corners.map((_, i) => corners[(i + first) % 4] as number[]);
 };
 
-const loftOf = (sections: unknown[], extra: Record<string, unknown> = {}, doc: CadDocument = createEmptyDocument()) =>
+const loftOf = (sections: unknown[], extra: Record<string, unknown> = {}, doc: CadDocument = createEmptyDocument()): CommandResult =>
   execute(doc, 'loft_sections', { sections, ruled: true, ...extra });
 
 const entityOf = (result: ReturnType<typeof loftOf>): LoftEntity => result.document.entities[result.affected[0] as string] as LoftEntity;

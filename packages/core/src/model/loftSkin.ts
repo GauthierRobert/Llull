@@ -10,4 +10,6 @@ export interface LoftSkin {
   closed?: boolean;
   /** Planar caps the kernel closes the skin with: 2 (default), 1 when one end is a point, 0 for a closed loft. */
   caps?: 0 | 1 | 2;
+  /** Ruled polygon loft (ASC M5): `rings` are the section vertices (paired by index, not resampled); the kernel builds straight-edge sections. */
+  polygon?: true;
 }

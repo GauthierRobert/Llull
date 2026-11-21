@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
-import { kernelEntityBounds } from '@core/geometry/bounds';
+import { kernelEntityBounds } from '@core/geometry/kernelBounds';
 import type { CadDocument, Entity, Vec3 } from '@core/model/types';
 import { expectPure } from '../helpers/expectNoOp';
 import { build } from '../helpers/addEntity';
