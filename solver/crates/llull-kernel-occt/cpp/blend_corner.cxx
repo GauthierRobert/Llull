@@ -1334,13 +1334,6 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
                   " but is not rounded: the two rounded edges of a vertex with a sharp edge need a constant radius in this build (edge " + std::to_string(other) + " varies)";
             return nullptr;
           }
-        // Measured on the cylinder block (r 0.3 to 2, ball 1 to 3.5, 10 cases; 1 builds): the star over a hole whose crease vertex lies on the curved sharp edge misses the blend ends by 3e-6 to 5e-5 at 64 poles
-        // (the limit is 0.2e-6 x the diagonal). The straight top edge fails the same way in 9 of 10 (13.39.5): the cause is not found.
-        if (BRepAdaptor_Curve(TopoDS::Edge(unique_edges(edge + 1))).GetType() != GeomAbs_Line) {
-          why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
-                " but is not rounded: an edge left sharp at a setback corner must be a straight line (the star over it missed the blend ends by 3e-6 to 5e-5 in 9 of 10 cases measured on the cylinder block, limit 0.2e-6 x the diagonal)";
-          return nullptr;
-        }
         const auto given = std::find_if(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; });
         if (given != corner.setbacks.end() && !(given->second > 0)) {
           why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " at " + where(corner.at) +
