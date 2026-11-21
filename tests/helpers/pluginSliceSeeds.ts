@@ -169,7 +169,19 @@ function buildingWithEquipment(): CadDocument {
   const withNozzles = (doc: CadDocument, tag: string, nozzles: readonly object[]): CadDocument =>
     nozzles.reduce<CadDocument>((next, nozzle) => run(next, 'add_nozzle', { equipment: tag, ...nozzle }), doc);
   let doc = run(buildingWithPlatforms(), 'add_vessel', { ...separatorParams, location: [0, 20000] });
-  doc = withNozzles(doc, 'V-101', separatorNozzles);
+  doc = withNozzles(doc, 'V-101', [
+    ...separatorNozzles,
+    {
+      mark: 'P1',
+      service: 'padded drain',
+      dn: 100,
+      rating: 'CL150',
+      facing: 'RF',
+      location: { on: 'shell', elevation: 800, orientationDeg: 90 },
+      projection: 1000,
+      pad: { outsideDiameter: 300, thickness: 12 },
+    },
+  ]);
   doc = run(doc, 'add_heat_exchanger', { ...bemParams, location: [15000, 20000] });
   doc = withNozzles(doc, 'E-301', bemNozzles);
   doc = run(doc, 'add_storage_tank', { ...tankParams, location: [60000, 30000] });

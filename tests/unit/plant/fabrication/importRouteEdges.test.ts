@@ -93,6 +93,29 @@ describe('files written by other tools', () => {
     expect(execute(base, 'import_pcf', { text: HEADER + body, valveTypes: { '2': 'valveBall' } }).rejected).toBe(true);
   });
 
+  it('valveTypes keys are the COMPONENT-IDENTIFIER the file wrote (V-101 at record 2), not the record position; a duplicated identifier is refused by name', () => {
+    const named = (identifier: string, a: string, b: string): string =>
+      `VALVE\n    COMPONENT-IDENTIFIER ${identifier}\n    END-POINT ${a} 100 BW\n    END-POINT ${b} 100 BW\n`;
+    const body = (second: string): string =>
+      pipe(1, '0.0 0.0 0.0', '1000.0 0.0 0.0') +
+      named('V-101', '1000.0 0.0 0.0', '1300.0 0.0 0.0') +
+      pipe(3, '1300.0 0.0 0.0', '2500.0 0.0 0.0') +
+      named(second, '2500.0 0.0 0.0', '2800.0 0.0 0.0') +
+      pipe(5, '2800.0 0.0 0.0', '3800.0 0.0 0.0');
+    const ok1 = route(body('V-102'), { valveType: 'valveGate', valveTypes: { 'V-101': 'valveGate', 'V-102': 'valveGate' } });
+    expect(ok1.rejected, ok1.summary).toBeUndefined();
+    // the position-based id still works, and the bare position does not name a valve any more
+    expect(route(body('V-102'), { valveTypes: { 'pcf:E-1:2': 'valveGate' } }).rejected).toBeUndefined();
+    const byPosition = route(body('V-102'), { valveTypes: { '2': 'valveGate' } });
+    expect(byPosition.error?.code).toBe('ISO_PARAM_INVALID');
+    const onlySecond = route(body('V-102'), { valveType: 'valveGate', valveTypes: { 'V-102': 'valveGlobe' } });
+    expect(onlySecond.error?.code).toBe('RTE_SPEC_NO_COMPONENT');
+    const duplicate = route(body('V-101'), { valveTypes: { 'V-101': 'valveGate' } });
+    expect(duplicate.error?.code).toBe('ISO_PARAM_INVALID');
+    expect(duplicate.summary).toContain('V-101');
+    expect(duplicate.summary).toContain('more than one valve');
+  });
+
   it('a field-fit weld (SKEY WF) and a shop weld (SKEY WW): the first is stored as a field-fit weld, the second is derived', () => {
     const body =
       pipe(1, '0.0 0.0 0.0', '1000.0 0.0 0.0') +

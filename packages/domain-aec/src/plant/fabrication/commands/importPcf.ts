@@ -76,7 +76,7 @@ export const importPcf = defineCommand({
       .record(z.string(), z.enum(VALVE_TYPES))
       .optional()
       .describe(
-        'as route: catalogue type of individual valves, keyed by the COMPONENT-IDENTIFIER of the VALVE record in the file (e.g. { "V-101": "valveBall", "V-102": "valveCheck" }) or by the full component id the route data reports ("pcf:<line>:<identifier>"); every other valve takes valveType. A key that is not a VALVE of the file is refused (ISO_PARAM_INVALID).',
+        'as route: catalogue type of individual valves, keyed by the COMPONENT-IDENTIFIER of the VALVE record in the file (e.g. { "V-101": "valveBall", "V-102": "valveCheck" }) or by the component id the route data reports (route.runs[].inline[].componentId: the UNIQUE-COMPONENT-IDENTIFIER, else "pcf:<line>:<position of the record>"); an identifier the file gives to two valves is refused; every other valve takes valveType. A key that is not a VALVE of the file is refused (ISO_PARAM_INVALID).',
       ),
   }),
   run: (doc, params, ctx): CommandResult => {

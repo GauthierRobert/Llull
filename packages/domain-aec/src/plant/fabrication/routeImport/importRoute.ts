@@ -69,24 +69,27 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
       [],
       ['spec'],
     );
-  // A key is the id the route data reports (`pcf:<line>:<identifier>`) or the bare COMPONENT-IDENTIFIER of the VALVE record.
-  const valveIds = new Map<string, string>();
-  for (const component of file.components)
-    if (component.type === 'VALVE') {
-      valveIds.set(component.id, component.id);
-      valveIds.set(component.id.slice(component.id.lastIndexOf(':') + 1), component.id);
-    }
-  const unknown = Object.keys(args.valveTypes).filter((id) => !valveIds.has(id));
-  if (unknown.length > 0)
+  // A key is the COMPONENT-IDENTIFIER of a VALVE record as the file wrote it, or the component id the route data reports (UNIQUE-COMPONENT-IDENTIFIER, or
+  // `pcf:<line>:<position>` of a record without one). An identifier the file gives to two valves is ambiguous and refused by name.
+  const valves = file.components.filter((component) => component.type === 'VALVE');
+  const resolveKey = (key: string): string[] => {
+    const byId = valves.filter((valve) => valve.id === key);
+    return byId.length > 0 ? byId.map((valve) => valve.id) : valves.filter((valve) => valve.identifier === key).map((valve) => valve.id);
+  };
+  const unknown = Object.keys(args.valveTypes).filter((key) => resolveKey(key).length === 0);
+  const ambiguous = Object.keys(args.valveTypes).filter((key) => resolveKey(key).length > 1);
+  if (unknown.length > 0 || ambiguous.length > 0)
     return refuseIso(
       doc,
       'import_pcf',
       'ISO_PARAM_INVALID',
-      `valveTypes names ${unknown.join(', ')}, which ${unknown.length === 1 ? 'is' : 'are'} not VALVE record(s) of the file`,
-      unknown,
+      unknown.length > 0
+        ? `valveTypes names ${unknown.join(', ')}, which ${unknown.length === 1 ? 'is' : 'are'} not VALVE record(s) of the file (by COMPONENT-IDENTIFIER or component id)`
+        : `valveTypes names ${ambiguous.join(', ')}, a COMPONENT-IDENTIFIER the file gives to more than one valve: use the component id from the route data`,
+      [...unknown, ...ambiguous],
       ['valveTypes'],
     );
-  const valveTypes = Object.fromEntries(Object.entries(args.valveTypes).map(([key, type]) => [valveIds.get(key) as string, type]));
+  const valveTypes = Object.fromEntries(Object.entries(args.valveTypes).map(([key, type]) => [resolveKey(key)[0] as string, type]));
   const plan = planRoute(file.components, { eccentricFlat: args.eccentricFlat });
   if (!plan.ok) return refuseIso(doc, 'import_pcf', plan.code, `as route: ${plan.message}`, plan.ids, ['as']);
   if (args.supports && plan.supports.length > 0 && Object.keys(getBuilding(doc).levels).length === 0)

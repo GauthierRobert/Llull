@@ -4,11 +4,11 @@
  * deducted (named in the method). Flanges that are placeholders or unverified make the caller report it.
  */
 
-import type { NozzleRecord, TankTemplate } from '../plantData';
-import type { ExchangerGeometry } from './exchangerFrame';
+import type { EquipmentTemplate, NozzleRecord, TankTemplate } from '../plantData';
+import { resolveExchanger, type ExchangerGeometry } from './exchangerFrame';
 import { thicknessAt } from './tankFrame';
 import type { MassPart } from './vesselMass';
-import { headSurfaceHeight, type VesselGeometry } from './vesselFrame';
+import { headSurfaceHeight, resolveVessel, type VesselGeometry } from './vesselFrame';
 import { powInt } from '@lib/powInt';
 
 const annulus = (outer: number, inner: number): number => Math.PI * (outer * outer - inner * inner);
@@ -72,3 +72,18 @@ export const tankWallOf =
     nozzle.location.on === 'shell' && 'elevation' in nozzle.location
       ? template.diameter / 2 + thicknessAt(template, nozzle.location.elevation)
       : 0;
+
+/** Distance from the projection origin to the outside of the wall at the nozzle on any template (0 for a free nozzle, a pump or a block, or a template that does not resolve). */
+export function outsideWallOf(template: EquipmentTemplate, nozzle: NozzleRecord): number {
+  if (template.kind === 'vessel') {
+    const geometry = resolveVessel(template);
+    return 'error' in geometry ? 0 : vesselWall(geometry, nozzle);
+  }
+  if (template.kind === 'exchanger') return exchangerWallOf(resolveExchanger(template))(nozzle);
+  if (template.kind === 'tank') return tankWallOf(template)(nozzle);
+  return 0;
+}
+
+/** Length of the neck between the outside of the wall and the flange: the room a reinforcing pad has. */
+export const neckLengthOf = (template: EquipmentTemplate, nozzle: NozzleRecord): number =>
+  nozzle.projection - outsideWallOf(template, nozzle) - nozzle.flange.thickness;

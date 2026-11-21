@@ -87,3 +87,13 @@ export function addBranch(s: PlanState, parent: string, centre: Vec3, outlet: Ne
   s.branches += 1;
   s.seeds.push({ key: `branch-${s.branches}`, start: centre, startKey: nodeKey(outlet.xyz), dn: outlet.boreMm, parent });
 }
+
+/** The refusal of an INSTRUMENT with a tapping point (BRANCH1-POINT), or undefined: the RTE cannot branch off an instrument body. */
+export function tappingRefusal(component: NetworkComponent): RouteRefusal | undefined {
+  if (component.type !== 'INSTRUMENT' || component.branch === undefined) return undefined;
+  return refuse(
+    'ISO_ROUTE_UNSUPPORTED',
+    `instrument ${component.id} has a tapping point (BRANCH1-POINT): the RTE cannot branch off an instrument body, so the take-off line cannot be rebuilt (route mode takes an instrument with two end points only)`,
+    [component.id],
+  );
+}

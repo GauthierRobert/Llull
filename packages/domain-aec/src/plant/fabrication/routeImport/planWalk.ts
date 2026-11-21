@@ -7,7 +7,20 @@ import type { NetworkComponent, NetworkPoint } from '../model';
 import { bodyOf } from './inlineBody';
 import { eccentricStep, isShifted, storedCorner, ZERO } from './eccentric';
 import { flangeStep } from './planFlange';
-import { addBranch, arrive, comp, free, midpoint, otherEnd, refuse, take, type PlanState, type Step, type Walk } from './planState';
+import {
+  addBranch,
+  arrive,
+  comp,
+  free,
+  midpoint,
+  otherEnd,
+  refuse,
+  take,
+  tappingRefusal,
+  type PlanState,
+  type Step,
+  type Walk,
+} from './planState';
 import type { RouteRefusal } from './planTypes';
 
 /** The axis-parallel corner of an elbow whose centre is not given (the L through the first axis the end points differ on). */
@@ -149,12 +162,8 @@ function bodyStep(w: Walk, component: NetworkComponent, entry: NetworkPoint | un
       `instrument ${component.id} has ${[...new Set(component.ends.map((bodyEnd) => bodyEnd.endType))].join(' / ')} ends: route mode takes an instrument with butt-weld ends, or flanged between flange sets (socket-weld and threaded instruments are not rebuilt)`,
       [component.id],
     );
-  if (component.type === 'INSTRUMENT' && component.branch !== undefined)
-    return refuse(
-      'ISO_ROUTE_UNSUPPORTED',
-      `instrument ${component.id} has a tapping point (BRANCH1-POINT): the RTE cannot branch off an instrument body, so the take-off line cannot be rebuilt (route mode takes an instrument with two end points only)`,
-      [component.id],
-    );
+  const tapped = tappingRefusal(component);
+  if (tapped !== undefined) return tapped;
   if (entry === undefined)
     return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no first end point`, [component.id]);
   w.inline.push(bodyOf(component, entry.xyz, exit.xyz, w.shift, false));

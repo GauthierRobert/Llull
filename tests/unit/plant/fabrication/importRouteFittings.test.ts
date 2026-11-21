@@ -443,6 +443,40 @@ describe('an instrument with a tapping point', () => {
   });
 });
 
+describe('a reducer inside a branch run that ends in a cap', () => {
+  const extras = extrasDocument();
+  const created = ok(extras, 'create_pipeline', { service: 'P', sequence: '3005', spec: 'CS150', dn: 150 });
+  const lineId = created.affected[0] as string;
+  const header = ok(created.document, 'route_pipe', { lineId, from: { point: [0, 0, 0] }, legs: [{ direction: '+X', length: 6000 }] });
+  const branch = ok(header.document, 'add_branch', {
+    runId: header.affected[0],
+    at: { point: [3000, 0, 0] },
+    dn: 150,
+    legs: [{ direction: '+Y', length: 3000 }],
+  });
+  const reduced = ok(branch.document, 'insert_inline_component', {
+    runId: branch.affected[0],
+    type: 'reducerConcentric',
+    dn2: 100,
+    at: { leg: 0, centreDistance: 1500 },
+  });
+  const capped = ok(reduced.document, 'set_run_end_cap', { runId: branch.affected[0], end: 'end' });
+  const original = exported(capped.document, lineId);
+
+  it('the cap is placed after the reducer: export, import as route, export is a fixed point and the branch ends capped at the DN100 size', () => {
+    expect(original).toContain('CAP\n');
+    const result = route(original, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const info = routeData(result);
+    expect(info.route.runs.map((run) => [run.inline.map((item) => item.type), run.capped])).toEqual([
+      [[], false],
+      [['reducer'], true],
+    ]);
+    expect(info.route.comparison.pipeLengthDeltaMm).toBe(0);
+    expect(bare(exported(result.document, info.lineId))).toBe(bare(original));
+  });
+});
+
 /** DN100 line: pipe 0..1000, then `middle`, then pipe to 3000 (hand-written, butt weld ends). */
 const hand100 = (middle: string, pipeAfterFrom: string): string =>
   HEADER +

@@ -77,10 +77,12 @@ describe('nozzle pad: add_nozzle / update_nozzle', () => {
     const entity = padded.entities[`${element?.id}:nozzle-N200`] as RevolutionEntity;
     const radii = entity.profile.map((point) => point[0]);
     expect(Math.max(...radii.slice(0, 4))).toBe(200);
-    expect(entity.profile.some((point) => point[0] === 200 && point[1] === 10)).toBe(true);
+    // the shell is 12 mm thick and the axis starts at mid-wall: the ring stands on the OUTSIDE wall (6 mm up the axis), 10 mm thick, never buried
+    const ring = entity.profile.filter((point) => point[0] === 200);
+    expect(ring.map((point) => point[1])).toEqual([6, 16]);
     const plainElement = Object.values((plain.building as BuildingModel).elements).find((item) => item.category === 'equipment');
     expect((plain.entities[`${plainElement?.id}:nozzle-N200`] as RevolutionEntity).profile).toHaveLength(6);
-    expect(entity.profile).toHaveLength(8);
+    expect(entity.profile).toHaveLength(10);
   });
 
   it('adds the flat pad annulus to the nozzle mass (pi (200^2 - 109.55^2) x 10 mm3 at 7850 kg/m3)', () => {
@@ -111,6 +113,25 @@ describe('nozzle pad: add_nozzle / update_nozzle', () => {
     expect(nozzleKg(removed)).toBeCloseTo(nozzleKg(plain), 9);
     expectRefusal(added, 'update_nozzle', { equipment: 'V-1', mark: 'N200', pad: PAD, removePad: true }, 'EQP_PARAM_INVALID', 'removePad');
     expectPure(added, () => execute(added, 'update_nozzle', { equipment: 'V-1', mark: 'N200', removePad: true }));
+  });
+
+  it('thickness is checked against the neck ABOVE THE WALL: 300 mm on projection 800 (the wall is 512 from the axis) is refused, 200 is accepted', () => {
+    expectRefusal(vessel(), 'add_nozzle', nozzle({ pad: { outsideDiameter: 400, thickness: 300 } }), 'EQP_PARAM_INVALID', 'pad.thickness');
+    expect(execute(vessel(), 'add_nozzle', nozzle({ pad: { outsideDiameter: 400, thickness: 200 } })).rejected).toBeUndefined();
+    const refused = expectRefusal(
+      plain,
+      'update_nozzle',
+      { equipment: 'V-1', mark: 'N200', pad: { outsideDiameter: 400, thickness: 300 } },
+      'EQP_PARAM_INVALID',
+      'pad.thickness',
+    );
+    expect(refused.summary).toContain('neck above the wall');
+  });
+
+  it('removePad changes nothing when false, or on a nozzle without a pad: refused, not a silent change', () => {
+    expectRefusal(plain, 'update_nozzle', { equipment: 'V-1', mark: 'N200', removePad: true }, 'EQP_PARAM_INVALID', 'removePad');
+    expectRefusal(padded, 'update_nozzle', { equipment: 'V-1', mark: 'N200', removePad: false }, 'EQP_PARAM_INVALID', 'removePad');
+    expect(execute(padded, 'update_nozzle', { equipment: 'V-1', mark: 'N200', removePad: false, service: 'x' }).rejected).toBeUndefined();
   });
 
   it.each([
@@ -160,6 +181,9 @@ describe('nozzle pad: load validation', () => {
     expect(corrupt(PAD)).toEqual([]);
     expect(corrupt({ outsideDiameter: 0, thickness: 10 }).join(';')).toContain('pad needs outsideDiameter and thickness > 0');
     expect(corrupt('big').join(';')).toContain('pad needs outsideDiameter and thickness > 0');
+    expect(corrupt({ outsideDiameter: 400, thickness: 300 }).join(';')).toContain(
+      'pad.thickness must be shorter than the neck above the wall',
+    );
     expect(corrupt({ outsideDiameter: 200, thickness: 10 }).join(';')).toContain('pad.outsideDiameter must exceed neckOutsideDiameter');
   });
 });

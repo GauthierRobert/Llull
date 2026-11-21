@@ -268,12 +268,13 @@ function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionC
     if (branched.rejected === true) return branched;
     const branchRun = branched.affected[0] as string;
     runIds[planned.key] = branchRun;
-    const closed = closeEnd(planned, branchRun);
-    if (closed !== undefined) return closed;
+    // The inline components first, then the closure: the spec cap length is read on the run as it ends (a reducer changes the size the cap is chosen at).
     for (const item of inlineParams) {
       const placed = run('insert_inline_component', { runId: branchRun, ...item });
       if (placed.rejected === true) return placed;
     }
+    const closed = closeEnd(planned, branchRun);
+    if (closed !== undefined) return closed;
   }
 
   const weldIds: string[] = [];
