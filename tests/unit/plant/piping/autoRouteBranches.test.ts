@@ -14,15 +14,32 @@ import { addTie, cs150Line } from './rteFixtures';
 const piping = (doc: CadDocument): PipingModel => doc.plant?.piping as PipingModel;
 
 function scene(): { doc: CadDocument; header: string; branch: string; headerLine: Record<string, unknown>; tieC: string } {
+  const s = sceneWith(1);
+  return { doc: s.doc, header: s.header, branch: s.branches[0] as string, headerLine: s.headerLine, tieC: s.tieC };
+}
+
+/** The header scene with `count` DN100 branch lines (3001, 3002 ...). */
+function sceneWith(count: number): {
+  doc: CadDocument;
+  header: string;
+  branches: string[];
+  headerLine: Record<string, unknown>;
+  tieC: string;
+} {
   const line = cs150Line(150, '2001');
   const a = addTie(line.doc, 'TP-1', [0, 0, 3000], [1, 0, 0], { dn: 150 });
   const b = addTie(a.doc, 'TP-2', [10000, 0, 3000], [-1, 0, 0], { dn: 150 });
   const c = addTie(b.doc, 'TP-3', [4000, 2000, 3000], [0, -1, 0], { dn: 100 });
-  const doc = apply(c.doc, 'create_pipeline', { service: 'P', sequence: '3001', spec: 'CS150', dn: 100 });
+  let doc = c.doc;
+  const branches: string[] = [];
+  for (let k = 0; k < count; k++) {
+    doc = apply(doc, 'create_pipeline', { service: 'P', sequence: String(3001 + k), spec: 'CS150', dn: 100 });
+    branches.push(piping(doc).lineOrder.at(-1) as string);
+  }
   return {
     doc,
     header: line.lineId,
-    branch: piping(doc).lineOrder.at(-1) as string,
+    branches,
     headerLine: { lineId: line.lineId, from: { portId: a.id }, to: { portId: b.id } },
     tieC: c.id,
   };
@@ -98,10 +115,12 @@ describe('auto_route_lines with branches', () => {
     expect(Object.keys(piping(result.document).runs)).toHaveLength(2);
   });
 
-  it('refuses a partial request where no branch placed, and invalid requests (header not in lines, branch line also routed, twice)', () => {
+  it('partial keeps the routed header when every branch fails; invalid requests (header not in lines, branch line also routed, twice)', () => {
     const s = scene();
     const bad = { lineId: s.branch, headerLineId: s.header, at: { leg: 7, distance: 100 }, to: { portId: s.tieC } };
-    expectRefusal(s.doc, 'auto_route_lines', { partial: true, lines: [s.headerLine], branches: [bad] }, 'RTE_AUTOROUTE_BRANCH_UNREACHABLE');
+    const kept = ok(s.doc, 'auto_route_lines', { partial: true, lines: [s.headerLine], branches: [bad] });
+    expect((kept.data as BranchesData).branches[0]?.status).toBe('failed');
+    expect(kept.affected).toHaveLength(1);
     const good = { ...bad, at: { nearTo: [4000, 2000, 3000] } };
     expectRefusal(
       s.doc,
@@ -134,5 +153,131 @@ describe('auto_route_lines with branches', () => {
     expect((result.data as BranchesData).branches[0]).toMatchObject({ status: 'skipped', code: 'RTE_AUTOROUTE_BRANCH_UNREACHABLE' });
     expect(result.affected).toHaveLength(1);
     expectRefusal(doc, 'auto_route_lines', { lines: [broken], branches }, 'RTE_AUTOROUTE_LINES_FAILED');
+  });
+
+  it('under no partial a header left out of sequence refuses upfront (branches.0.headerLineId), and a skipped branch is never a silent success', () => {
+    const s = scene();
+    const doc = apply(s.doc, 'create_pipeline', { service: 'P', sequence: '3009', spec: 'CS150', dn: 100 });
+    const free = piping(doc).lineOrder.at(-1) as string;
+    const freeLine = {
+      lineId: free,
+      from: { point: [0, 5000, 0], direction: [1, 0, 0] },
+      to: { point: [3000, 5000, 0], direction: [-1, 0, 0] },
+    };
+    const branches = [{ lineId: s.branch, headerLineId: s.header, at: { nearTo: [4000, 2000, 3000] }, to: { portId: s.tieC } }];
+    expectRefusal(
+      doc,
+      'auto_route_lines',
+      { order: 'given', sequence: [free], lines: [s.headerLine, freeLine], branches },
+      'RTE_AUTOROUTE_LINES_INVALID',
+      'branches.0.headerLineId',
+    );
+    const skippedOnly = execute(doc, 'auto_route_lines', {
+      partial: true,
+      lines: [{ ...s.headerLine, to: { portId: 'nope' } }, freeLine],
+      branches,
+    });
+    expect(skippedOnly.rejected).toBeUndefined();
+    expectRefusal(
+      doc,
+      'auto_route_lines',
+      { lines: [{ ...s.headerLine, to: { portId: 'nope' } }, freeLine], branches },
+      'RTE_AUTOROUTE_LINES_FAILED',
+    );
+  });
+
+  it('two branches on one header both place (ids follow the branch order); a third on the first tee is refused as on a fitting', () => {
+    const s = sceneWith(3);
+    const [one, two, three] = s.branches as [string, string, string];
+    const b1 = { lineId: one, headerLineId: s.header, at: { nearTo: [4000, 2000, 3000] }, to: { portId: s.tieC } };
+    const b2 = {
+      lineId: two,
+      headerLineId: s.header,
+      at: { nearTo: [7000, 500, 3000] },
+      legs: [{ direction: '+Y', length: 800 }],
+      dn: 100,
+    };
+    const result = ok(s.doc, 'auto_route_lines', { lines: [s.headerLine], branches: [b1, b2] });
+    expect((result.data as BranchesData).branches.map((branch) => branch.status)).toEqual(['routed', 'routed']);
+    expect(piping(result.document).runs[result.affected[0] as string]?.branches).toHaveLength(2);
+    const swapped = ok(s.doc, 'auto_route_lines', { lines: [s.headerLine], branches: [b2, b1] });
+    expect((swapped.data as BranchesData).branches.map((branch) => branch.lineId)).toEqual([two, one]);
+    expect(swapped.affected).toHaveLength(result.affected.length);
+    const colliding = { lineId: three, headerLineId: s.header, at: { point: [4000, 0, 3000] }, legs: [{ direction: '-Y', length: 800 }] };
+    const refused = expectRefusal(
+      s.doc,
+      'auto_route_lines',
+      { lines: [s.headerLine], branches: [b1, colliding] },
+      'RTE_AUTOROUTE_BRANCH_UNREACHABLE',
+      'branches.1',
+    );
+    expect(refused.summary).toContain('RTE_BRANCH_ON_FITTING');
+  });
+
+  it('passes dn, via and angleToleranceDeg through to add_branch; distance 0 is refused by the schema', () => {
+    const s = scene();
+    const base = { lineId: s.branch, headerLineId: s.header };
+    const viaBranch = ok(s.doc, 'auto_route_lines', {
+      lines: [s.headerLine],
+      branches: [
+        {
+          ...base,
+          at: { point: [4000, 0, 3000] },
+          dn: 50,
+          via: [[4000, 1500, 3000]],
+          to: { point: [4000, 1500, 3000] },
+          angleToleranceDeg: 5,
+        },
+      ],
+    });
+    const branchRun = piping(viaBranch.document).runs[viaBranch.affected[1] as string];
+    expect(branchRun).toMatchObject({ dn: 50, angleToleranceDeg: 5 });
+    expect((viaBranch.data as BranchesData).branches[0]?.status).toBe('routed');
+    expectRefusal(
+      s.doc,
+      'auto_route_lines',
+      { lines: [s.headerLine], branches: [{ ...base, at: { leg: 0, distance: 0 }, to: { portId: s.tieC } }] },
+      'CMD_INVALID_PARAMS',
+    );
+  });
+
+  it('nearTo works on a multi-leg header: a target on the second leg picks leg 1; off the corner or beyond the end it is clamped to the straight pipe and the refusal says so', () => {
+    const line = cs150Line(150, '2001');
+    const a = addTie(line.doc, 'TP-1', [0, 0, 3000], [1, 0, 0], { dn: 150 });
+    const b = addTie(a.doc, 'TP-2', [6000, 4000, 3000], [0, 1, 0], { dn: 150 });
+    let doc = apply(b.doc, 'create_pipeline', { service: 'P', sequence: '3001', spec: 'CS150', dn: 100 });
+    const branch = piping(doc).lineOrder.at(-1) as string;
+    doc = apply(doc, 'create_pipeline', { service: 'P', sequence: '3002', spec: 'CS150', dn: 100 });
+    const other = piping(doc).lineOrder.at(-1) as string;
+    const header = { lineId: line.lineId, from: { portId: a.id }, to: { portId: b.id } };
+    const onSecond = ok(doc, 'auto_route_lines', {
+      lines: [header],
+      branches: [
+        { lineId: branch, headerLineId: line.lineId, at: { nearTo: [8000, 2000, 3000] }, legs: [{ direction: '+X', length: 500 }] },
+      ],
+    });
+    expect(piping(onSecond.document).runs[onSecond.affected[0] as string]?.branches?.[0]).toMatchObject({ leg: 1 });
+    const corner = expectRefusal(
+      doc,
+      'auto_route_lines',
+      {
+        lines: [header],
+        branches: [
+          { lineId: branch, headerLineId: line.lineId, at: { nearTo: [6600, -300, 3000] }, legs: [{ direction: '+Y', length: 500 }] },
+        ],
+      },
+      'RTE_AUTOROUTE_BRANCH_UNREACHABLE',
+    );
+    expect(corner.summary).toContain('clamped');
+    const beyond = expectRefusal(
+      doc,
+      'auto_route_lines',
+      {
+        lines: [header],
+        branches: [{ lineId: other, headerLineId: line.lineId, at: { nearTo: [-900, 0, 3000] }, legs: [{ direction: '+Y', length: 500 }] }],
+      },
+      'RTE_AUTOROUTE_BRANCH_UNREACHABLE',
+    );
+    expect(beyond.summary).toContain('clamped');
   });
 });
