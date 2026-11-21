@@ -13,7 +13,7 @@ import { rackReports } from './steelRackReport';
 
 const ASSUMPTIONS: ReadonlyArray<string> = [
   'Loads: EN 1990 ULS 1.35 G + 1.5 Q; SLS G + Q. G = self weight (catalogue kg/m), floor dead load, equipment operating weight, pipes (steel wall + contents) and cable trays; Q = imposed floor load. No imposed-load reduction factors.',
-  'Floor slabs (role floor): the slab area (openings removed) is rastered; each cell bears on the nearest beam in plan whose top of steel lies at the slab underside (-60 / +20 mm) — the 45° tributary rule (triangles on the short sides, trapezoids on the long sides of a rectangular bay), ties split. Imposed load is not applied under equipment footprints. Grating panels (add_grating, add_access_platform) are surfaces of their own: dead load = the catalogue kg/m² of the type (not floorDeadLoad), imposed = the panel imposedLoadKPa when set, else imposedLoad; they bear on the beams at their underside (-bar depth, -60 / +20 mm) and are listed in data.loads.floors[] with kind "grating".',
+  'Floor slabs (role floor): the slab area (openings removed) is rastered; each cell bears on the nearest beam in plan whose top of steel lies at the slab underside (-60 / +20 mm) — the 45° tributary rule (triangles on the short sides, trapezoids on the long sides of a rectangular bay), ties split. Imposed load is not applied under equipment footprints. Grating panels (add_grating, add_access_platform) are surfaces of their own: dead load = the catalogue kg/m² of the type (not floorDeadLoad), imposed = the panel imposedLoadKPa when set, else imposedLoad; they bear on the beams at their underside (-bar depth, -60 / +20 mm) and are listed in data.loads.floors[] with kind "grating". Steel-stair landings (stairLandingLoad { imposedKPa, source }, source required) are surfaces too (kind "landing", id <stair id>:landing-<n>): dead load = the tread type kg/m², imposed = the cited value, bearing on the beams at their underside; the stringers and treads of the flights are not carried to the beams.',
   'Equipment: its footprint is rastered; the weight (kg × 9.80665) goes to the beams nearest each cell, proportional to footprint area per bay, through the floor slab under it, else directly onto beams whose top of steel is at its base. Equipment on grade is reported and not carried.',
   'Pipes and cable trays: a run rests on a beam where it crosses the beam in plan with its underside within 10 mm of the beam top of steel; each support takes the weight per metre over half the span to the neighbouring supports (end supports also the overhang to the run end). Pipe wall = standard wall (ASME B36.10M) of the outside diameter.',
   'Pipes with supports (add_pipe_support): only their supports carry them. Each support that bears on steel takes the weight per metre over half the span to its neighbours (the full overhang to a free end; half the span to an end carried by equipment or a header, whose nozzle takes the rest) as a point load on its member: on a floor beam at the support (a shoe, guide or anchor restrains the top flange like a resting pipe; a hanger does not), or axially on a column (a bracket off the column is noted: eccentricity not checked). Unattached supports carry nothing and are warned. A pipe with no support and both ends carried by equipment or headers within the table span (check_pipe_supports) rests on its nozzles: no warning.',
@@ -23,6 +23,14 @@ const ASSUMPTIONS: ReadonlyArray<string> = [
   'Moment frames: columns and beams in one vertical plane x = const or y = const joined by rigid beam joints (startJoint / endJoint rigid, on a column) are solved as a 2D frame (direct stiffness, pinned beam ends released, column bases pinned or fixed by baseFixity / base plate fixity; a column belongs to one frame plane). Loads: the beam loads above, the reactions of pinned beams on the frame columns and the column weight. Notional horizontal forces φ × the factored vertical load at each beam level act in both directions (EN 1993-1-1 §5.3.2) with 1.35 G + 1.5 Q; the storey drift under G + Q + the same forces is limited to h / swayRatio. αcr = h / (200 δ) from the drift under V / 200 (Horne); αcr < 3 fails and all moments are amplified by 1 / (1 - 1 / αcr) when αcr < 10 (conservative). Beams: N + M interaction (§6.3.3) with LTB over the span (sagging, unless restrained) and over the hogging length at rigid ends, section N + M with the shear reduction (§6.2.8), shear, deflection relative to the chord (cantilever: 2L). Columns: §6.3.3 with Lcr = storey piece on the axis the frame plane bends (the roll decides: 0 puts the depth along X), section N + M, shear. A frame is the lateral system of its direction for the storeys below its highest beam.',
   'Sections: area / inertia from the outline without root radii (about 4-5 % conservative), shear area h·tw, class 4 and angle / channel / cold-formed sections are reported as not analysed. γM0 = γM1 = 1.0; fy from the member grade (thickness ≤ 40 mm). Members with roof, wind or crane roles (rafter, purlin, rail, crane) are not analysed here.',
 ];
+
+/** The refusal text of a bad `stairLandingLoad` (blank source, negative or non-finite load), or null. */
+function landingLoadProblem(landing: { readonly imposedKPa: number; readonly source: string } | undefined): string | null {
+  if (landing === undefined) return null;
+  if (landing.source.trim() === '')
+    return 'check_steel_members failed: stairLandingLoad.source is blank: cite the live-load source (code clause or load schedule) of the landings.';
+  return isNonNegativeNumber(landing.imposedKPa) ? null : 'check_steel_members failed: stairLandingLoad.imposedKPa must be a number >= 0.';
+}
 
 /**
  * @affects none; data = { ok, members: MemberRow[], totals, loads, storeys, frames, warnings, csv }
@@ -70,6 +78,15 @@ export const checkSteelMembers = defineCommand({
       .number()
       .optional()
       .describe('Density of the pipe contents, kg/m³: 1000 = water-filled (default, operating / hydrotest), 0 = empty pipes.'),
+    stairLandingLoad: z
+      .object({
+        imposedKPa: z.number().describe('Imposed (live) load on the landings, kN/m², >= 0.'),
+        source: z.string().describe('Where the value comes from (code clause, project load schedule): required, refused when blank.'),
+      })
+      .optional()
+      .describe(
+        'Loads the landings of steel stairs (add_steel_stair): their self weight (the tread type kg/m²) and this imposed load bear on the beams at the landing underside. The repo carries no live-load row for stairs, so the value and its source must be cited here; without it landings are not loaded (a warning names them).',
+      ),
     cableTrayWeight: z.number().optional().describe('Weight of a cable tray including its cables, kg per metre of run. Default 75.'),
     notionalFactor: z
       .number()
@@ -109,12 +126,16 @@ export const checkSteelMembers = defineCommand({
     if (!(isFiniteNumber(notionalFactor) && notionalFactor >= 0 && notionalFactor <= 0.1))
       return noop(doc, 'check_steel_members failed: notionalFactor must be a number in [0, 0.1].');
     if (!isPositiveNumber(deflectionRatio)) return noop(doc, 'check_steel_members failed: deflectionRatio must be a number > 0.');
+    const landing = params.stairLandingLoad;
+    const landingProblem = landingLoadProblem(landing);
+    if (landingProblem !== null) return noop(doc, landingProblem);
     const unknownLevel = unknownLevelFailure(doc, 'check_steel_members', params.levelId);
     if (unknownLevel) return unknownLevel;
     if (!isPositiveNumber(swayRatio)) return noop(doc, 'check_steel_members failed: swayRatio must be a number > 0.');
     const analysis = analyseSteelStructure(doc, {
       floorDeadLoad,
       imposedLoad,
+      stairLandingLoad: landing,
       pipeContentDensity,
       cableTrayWeight,
       notionalFactor,

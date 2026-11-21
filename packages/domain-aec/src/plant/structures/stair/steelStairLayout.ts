@@ -67,6 +67,10 @@ export interface StairLayout {
   readonly riserFrames: ReadonlyArray<StairFrame>;
   /** Stringer centre-lines: two per flight (left, right of the climb direction). */
   readonly stringers: ReadonlyArray<StairRun>;
+  /** Knuckle runs at turning landings: the stringer of each side follows the landing (horizontal, at the height the flight stringer ends) to the next flight. */
+  readonly knuckles: ReadonlyArray<StairRun>;
+  /** Flight (index in `flights`) that each knuckle run leaves, same order as `knuckles`. */
+  readonly knuckleFlights: ReadonlyArray<number>;
   readonly treads: ReadonlyArray<StairPlate>;
   /** Riser each tread tops, same order as `treads`. */
   readonly treadRisers: ReadonlyArray<number>;
@@ -131,6 +135,28 @@ function landingAcross(turn: SteelStairTurn | undefined, width: number, sizes: S
   return turnSign(turn) === 1 ? [-width / 2, axes + width / 2] : [-axes - width / 2, width / 2];
 }
 
+/** Plan points (frame of the flight before the turn) of the stringer of one side through a turning landing, from the flight end to the next flight start. */
+function knucklePoints(
+  stair: LayoutInput,
+  sizes: StairSizes,
+  path: Pick<StairLayout, 'stations' | 'frames'>,
+  flight: number,
+  landing: SteelStairLanding & { readonly turn: SteelStairTurn },
+  side: 1 | -1,
+): Vec2[] {
+  const frame = path.frames[flight] as StairFrame;
+  const next = path.frames[flight + 1] as StairFrame;
+  const at = path.stations[landing.afterRiser - 1] as number;
+  const beyond = at + landing.length;
+  const offset = side * stringerOffset(stair.width, sizes);
+  const sign = turnSign(landing.turn);
+  const start = framePoint(frame, at, offset);
+  const end = framePoint(next, beyond, offset);
+  if (!isHalf(landing.turn)) return [start, framePoint(frame, beyond - stair.width / 2 - sign * offset, offset), end];
+  if (side === sign) return [start, end];
+  return [start, framePoint(frame, beyond, offset), framePoint(frame, beyond, sign * halfTurnAxes(stair.width, sizes) - offset), end];
+}
+
 type Path = Pick<StairLayout, 'stations' | 'flights' | 'frames' | 'riserFrames' | 'run' | 'end'>;
 
 /** Stations, flights and frames of a stair: what every consumer of the plan needs, without the plates. */
@@ -181,6 +207,23 @@ export function layoutSteelStair(stair: LayoutInput, sizes: StairSizes): StairLa
     ),
   );
 
+  const knuckles: StairRun[] = [];
+  const knuckleFlights: number[] = [];
+  flights.forEach((flight, index) => {
+    const landing = stair.landings.find((candidate) => candidate.afterRiser === flight.lastRiser);
+    if (landing?.turn === undefined) return;
+    const z = sz + flight.lastRiser * h - drop;
+    for (const side of [1, -1] as const) {
+      const points = knucklePoints(stair, sizes, path, index, { ...landing, turn: landing.turn }, side);
+      for (let i = 1; i < points.length; i++) {
+        const [a, b] = [points[i - 1] as Vec2, points[i] as Vec2];
+        if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-9) continue;
+        knuckles.push({ from: [a[0], a[1], z], to: [b[0], b[1], z] });
+        knuckleFlights.push(index);
+      }
+    }
+  });
+
   const half = stair.width / 2;
   const plate = (riser: number, depth: number, across: readonly [number, number] = [-half, half]): StairPlate => {
     const [from, to] = [station(riser), station(riser) + depth];
@@ -215,7 +258,7 @@ export function layoutSteelStair(stair: LayoutInput, sizes: StairSizes): StairLa
     from = end + length;
   });
   regions.push({ frame: frames[frames.length - 1] as StairFrame, from, to: path.run, across: [-half, half] });
-  return { ...path, stringers, treads, treadRisers, landings, regions };
+  return { ...path, stringers, knuckles, knuckleFlights, treads, treadRisers, landings, regions };
 }
 
 /**

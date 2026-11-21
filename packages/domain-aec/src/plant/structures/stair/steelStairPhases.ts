@@ -128,6 +128,37 @@ export const landingOf = (
   ...(landing.turn === undefined ? {} : { turn: landing.turn }),
 });
 
+/** The landings `landingEvery` generates: ceil(rise / landingEvery) equal flights with `length` landings between them, turned per `landingTurn`; or the refusal. */
+export function everyLandings(
+  rise: number,
+  riserCount: number,
+  landingEvery: number,
+  length: number,
+  landingTurn: StairParams['landingTurn'],
+  fail: Fail,
+): Phase<SteelStairLanding[]> {
+  const flights = Math.ceil(rise / landingEvery - 1e-9);
+  const perFlight = Math.ceil(riserCount / flights);
+  const count = flights - 1;
+  if (Array.isArray(landingTurn) && landingTurn.length !== count)
+    return stop(
+      fail(
+        'STA_INVALID_GEOMETRY',
+        `landingTurn lists ${landingTurn.length} turn(s) but landingEvery gives ${flights} flight(s), ${count} landing(s)`,
+        ['landingTurn', 'landingEvery'],
+      ),
+    );
+  if (typeof landingTurn === 'string' && count === 0)
+    return stop(
+      fail('STA_INVALID_GEOMETRY', `landingTurn ${landingTurn} but landingEvery gives 1 flight, no landing to turn`, ['landingTurn']),
+    );
+  const cuts = Array.from({ length: count }, (_, index): SteelStairLanding => {
+    const turn = Array.isArray(landingTurn) ? landingTurn[index] : landingTurn;
+    return { afterRiser: (index + 1) * perFlight, length, ...(turn === undefined || turn === 'straight' ? {} : { turn }) };
+  });
+  return proceed(cuts);
+}
+
 /** The clear width and the landings (explicit, or splitting the rise into equal flights); named defaults go on `defaulted`; bad landings are refused. */
 export function landingsOf(
   doc: Parameters<typeof fromMm>[0],
@@ -146,11 +177,17 @@ export function landingsOf(
   const landingLength = params.landingLength ?? Math.max(width, mm(oshaLanding));
 
   let cuts: SteelStairLanding[] = [];
+  if (params.landingTurn !== undefined && params.landingEvery === undefined)
+    return stop(
+      fail('STA_INVALID_GEOMETRY', 'landingTurn turns the landings of landingEvery: give landingEvery, or put turn on each landings[]', [
+        'landingTurn',
+      ]),
+    );
   if (params.landings !== undefined) cuts = params.landings.map((landing) => landingOf(landing, landingLength));
   else if (params.landingEvery !== undefined) {
-    const flights = Math.ceil(riseValue / params.landingEvery - 1e-9);
-    const perFlight = Math.ceil(riserCount / flights);
-    for (let flight = 1; flight < flights; flight++) cuts.push({ afterRiser: flight * perFlight, length: landingLength });
+    const every = everyLandings(riseValue, riserCount, params.landingEvery, landingLength, params.landingTurn, fail);
+    if (!every.ok) return every;
+    cuts = every.value;
   }
   if (cuts.some((landing) => landing.length === landingLength) && cuts.length > 0 && params.landingLength === undefined)
     defaulted.push(`landing length ${round(toMm(doc, landingLength), 1)} mm (max of width and the OSHA landing row)`);

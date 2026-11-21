@@ -104,6 +104,10 @@ export function stairFlightBoxes(doc: CadDocument, stair: SteelStairElement, lev
     const box = runBox(world(part.from), world(part.to), (profile.tw * factor) / 2, (profile.h * factor) / 2);
     if (box !== null) found.push({ flight: Math.floor(index / 2), box });
   });
+  layout.knuckles.forEach((part, index) => {
+    const box = runBox(world(part.from), world(part.to), (profile.tw * factor) / 2, (profile.h * factor) / 2);
+    if (box !== null) found.push({ flight: layout.knuckleFlights[index] as number, box });
+  });
   const thickness = treadThickness(doc, stair.tread);
   const plates: Array<[number, (typeof layout.treads)[number]]> = [
     ...layout.treads.map((plate, index): [number, typeof plate] => [flightOf(layout.treadRisers[index] as number), plate]),
