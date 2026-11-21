@@ -9,7 +9,8 @@ import { defineCommand, vec3, z } from '../schema';
 import { UNIT_SCALE, expandInstance } from '../../geometry/instanceExpansion';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
-import { referenceLossSuffix, referenceSuffix, replaceEntities, withoutEntities } from '../entity/entityOps';
+import { referenceLossSuffix, referenceSuffix, withoutEntities } from '../entity/entityOps';
+import { relocateEntities } from '../entity/relocateEntity';
 import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 import { currentContext } from '../context';
@@ -115,10 +116,10 @@ export const createComponent = defineCommand({
       );
     const instanceId = nextId('instance');
     const instance = instanceEntity(instanceId, compId, ORIGIN, ORIGIN);
-    const replaced = replaceEntities(doc, entityIds, instance);
+    const { document: replaced, dissolvedGroups } = relocateEntities(doc, entityIds, instance);
     return changed(
       { ...replaced, components: { ...doc.components, [compId]: component } },
-      `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
+      `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}${dissolvedGroups.length > 0 ? ` Group(s) [${dissolvedGroups.join(', ')}] had all members inside the component and were dissolved.` : ''}`,
       [instanceId],
     );
   },

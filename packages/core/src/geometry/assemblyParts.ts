@@ -39,7 +39,7 @@ function unionOf(recipes: readonly ShapeRecipe[]): ShapeRecipe | null {
 }
 
 /** The 3D solids of an instance, nested instances expanded; null when the nesting is too deep or a component is missing. */
-function instanceSolids(doc: CadDocument, instance: InstanceEntity, depth: number): Entity[] | null {
+export function instanceSolids(doc: CadDocument, instance: InstanceEntity, depth: number): Entity[] | null {
   const component = doc.components[instance.componentId];
   if (component === undefined || depth > MAX_NESTING) return null;
   const solids: Entity[] = [];

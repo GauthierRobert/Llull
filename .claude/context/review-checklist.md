@@ -35,6 +35,7 @@ below catch most of it mechanically, so run them first. `cad-reviewer` checks th
   step-scoped (`nextId` / `ctx.ids`), never time-based.
 - Undo restores exactly; `clear_document` leaves no slice state behind.
 - Deleting something others reference either cascades (derived runs, supports, welds, branches) or is refused by name: no orphans.
+- Relocating an entity is not deleting it: moving one into a component (or any container) must carry its group membership, selection, animation targets, material class and import provenance to its stand-in (`relocateEntities`), and name any dissolved group in the summary. Test: grouped + selected + animated + classed source survives.
 - An edit of an upstream slice re-derives downstream geometry (`reconcile`), and a second reconcile is a no-op.
 - Derived entities equal what a load re-derives.
 

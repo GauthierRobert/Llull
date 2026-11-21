@@ -10,7 +10,8 @@ import { nextId } from '../../lib/id';
 import { applyMat3, eulerFromMat, matFromEulerXYZ, mulMat3, type Mat3 } from '../../lib/axisRotation';
 import { add3, ORIGIN } from '../../lib/vec3';
 import { instanceEntity } from '../assembly/assemblies';
-import { referenceLossSuffix, replaceEntities } from '../entity/entityOps';
+import { referenceLossSuffix } from '../entity/entityOps';
+import { relocateEntities } from '../entity/relocateEntity';
 
 /** Rigid placement x' = turn · x + shift (world frame). */
 export interface PatternPlacement {
@@ -65,7 +66,7 @@ export function arrayAsInstances(
       color: source.color,
       ...(source.name === undefined ? {} : { name: source.name }),
     };
-    working = { ...replaceEntities(doc, [source.id], base), components: { ...doc.components, [componentId]: component } };
+    working = { ...relocateEntities(doc, [source.id], base).document, components: { ...doc.components, [componentId]: component } };
     created.push(base.id);
   }
   const rotation = matFromEulerXYZ(base.rotation);
