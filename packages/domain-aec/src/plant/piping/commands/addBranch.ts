@@ -69,7 +69,7 @@ export const addBranch = defineCommand({
     'tolerance): give legs [{ direction, length }] (a leg may be sloped: planLength + slope as in route_pipe, e.g. a drain falling away from the header) and optionally via, and/or `to` (a free port of size dn, or an open point; with `to` and no legs the ' +
     'branch runs straight to it). The branch is a new run of the same line (or of lineId) at size dn; its first piece is cut after the fitting. Returns the ' +
     'branch run id (affected[0]) and the branch point id (affected[1]); data = { branchRunId, branchId, headerRunId, fitting (tee, reducingTee, weldolet ' +
-    '..., stubIn), fittingCode (T, RT, W, S, TH, SI, SIR), partId, headerDn, branchDn, leg, distance, position, direction, branchStartMm, ' +
+    '..., stubIn), fittingCode (T, RT, W, S, TH, SI, SIR), partId, headerDn, branchDn, leg, distance, position (the branch centre on the header axis, shifted when the point lies downstream of an eccentric reducer), storedPosition (the same point on the stored run line), direction, branchStartMm, ' +
     'branchStartSource, runCentreToEndMm, reviewRequired, pipePieces (header and branch cuts), legs, warnings, unverified }. A stub-in reports ' +
     'RTE_STUB_IN_REVIEW in check_piping (reinforcement is checked outside llull). Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_RUN, RTE_UNKNOWN_LINE, ' +
     'RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, RTE_SIZE_MISMATCH, RTE_BRANCH_NO_TABLE_ROW, RTE_BRANCH_ON_FITTING (also an olet or stub-in whose footprint overlaps another one on the same header leg), RTE_NO_FITTING_FOR_ANGLE (not ' +
@@ -203,7 +203,8 @@ export const addBranch = defineCommand({
         branchDn: params.dn,
         leg: where.leg,
         distance: where.distance,
-        position,
+        position: fit.position,
+        storedPosition: position,
         direction,
         branchStartMm: fit.branchStartMm,
         branchStartSource: fit.branchStartSource,

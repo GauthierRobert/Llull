@@ -73,6 +73,29 @@ export const pipingPlansV1: Record<string, GoldenAction[]> = {
     { command: 'check_piping', params: { lineIds: ['$line'] } },
     { command: 'piping_takeoff', params: { runId: '$run' } },
   ],
+  // ISO-M6e: the riser of SC-RTE-12 with a DN100 tee on the leg downstream of the reducer: the tee and the branch pipe sit on the shifted axis (z 27); PCF of the line.
+  piping_eccentric_branch: [
+    ...IMPORTS,
+    tie('EB', [0, 0, 0], [1, 0, 0], 150, 'eb'),
+    { command: 'create_pipeline', params: { service: 'P', sequence: '5013', spec: 'CS150', dn: 150 }, as: 'line' },
+    {
+      command: 'route_pipe',
+      params: {
+        lineId: '$line',
+        from: { portId: '$eb' },
+        legs: [
+          { direction: '+X', length: 4000 },
+          { direction: '+Z', length: 1000 },
+        ],
+        inline: [{ type: 'reducerEccentric', tag: 'RE-1', dn2: 100, flat: 'top', at: { leg: 0, centreDistance: 2000 } }],
+      },
+      as: 'run',
+    },
+    { command: 'add_branch', params: { runId: '$run', at: { leg: 0, distance: 3000 }, dn: 100, legs: [{ direction: '+Z', length: 500 }] } },
+    { command: 'check_piping', params: { lineIds: ['$line'] } },
+    { command: 'piping_takeoff', params: { lineId: '$line' } },
+    { command: 'export_pcf', params: { lineIds: ['$line'] } },
+  ],
   // SC-RTE-13: a 60 degree turn as a trimmed 90 elbow (the spec allows it), then the same turn as a 500 mm pipe bend on a second line.
   piping_trimmed_and_bend: [
     ...IMPORTS,

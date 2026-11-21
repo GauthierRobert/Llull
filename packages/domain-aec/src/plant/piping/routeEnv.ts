@@ -48,6 +48,8 @@ export interface EndSetup {
   readonly blind?: { readonly row: CatalogueRow; readonly thickness: number };
   /** Branch start on a stub-in: the first piece is not butt welded to the part (the set-on branch weld is the one weld). */
   readonly weldless?: boolean;
+  /** Branch start downstream of an eccentric reducer: how far along the first leg the branch axis start lies from the stored start (header offset . branch direction), mm. */
+  readonly startAlongMm?: number;
 }
 
 export const partOf = (

@@ -152,20 +152,27 @@ describe('eccentric reducers in route mode', () => {
     expect(result.document).toBe(base);
   });
 
-  it('a tee downstream of the reducer on the same leg is refused with the tee named', () => {
-    const text =
-      HEADER +
-      record('PIPE', 1, ['0.0 0.0 0.0 150 BW', '1930.0 0.0 0.0 150 BW']) +
-      record('REDUCER-ECCENTRIC', 2, ['1930.0 0.0 0.0 150 BW', '2070.0 0.0 27.0 100 BW']) +
-      record(
-        'TEE',
-        3,
-        ['2070.0 0.0 27.0 100 BW', '2500.0 0.0 27.0 100 BW'],
-        '    CENTRE-POINT 2285.0 0.0 27.0\n    BRANCH1-POINT 2285.0 200.0 27.0 100 BW\n',
-      );
-    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
-    expect(result.error?.ids).toEqual(['pcf:E-1:3']);
-    expect(result.summary).toContain('eccentric reducer');
+  const teeFile = (branch: string): string =>
+    HEADER +
+    record('PIPE', 1, ['0.0 0.0 0.0 150 BW', '1930.0 0.0 0.0 150 BW']) +
+    record('REDUCER-ECCENTRIC', 2, ['1930.0 0.0 0.0 150 BW', '2070.0 0.0 27.0 100 BW']) +
+    record(
+      'TEE',
+      3,
+      ['2070.0 0.0 27.0 100 BW', '2500.0 0.0 27.0 100 BW'],
+      `    CENTRE-POINT 2285.0 0.0 27.0\n    BRANCH1-POINT ${branch} 100 BW\n`,
+    ) +
+    record('PIPE', 4, ['2500.0 0.0 27.0 100 BW', '3848.0 0.0 27.0 100 BW']) +
+    record('ELBOW', 5, ['3848.0 0.0 27.0 100 BW', '4000.0 0.0 179.0 100 BW'], '    CENTRE-POINT 4000.0 0.0 27.0\n    SKEY ELBW\n') +
+    record('PIPE', 6, ['4000.0 0.0 179.0 100 BW', '4000.0 0.0 1000.0 100 BW']);
+
+  it('a tee downstream of the reducer is rebuilt on the stored axis (branch along the offset); a branch across the offset is refused', () => {
+    const result = route(teeFile('2285.0 0.0 200.0') + record('PIPE', 7, ['2285.0 0.0 200.0 100 BW', '2285.0 0.0 1000.0 100 BW']));
+    expect(result.rejected).toBeUndefined();
+    expect(routeData(result).route.runs).toHaveLength(2);
+    const across = route(teeFile('2285.0 200.0 27.0') + record('PIPE', 7, ['2285.0 200.0 27.0 100 BW', '2285.0 1000.0 27.0 100 BW']));
+    expect(across.rejected).toBe(true);
+    expect(across.summary).toContain('RTE_BRANCH_ON_FITTING');
   });
 
   it('is pure: the document passed in is not changed', () => {

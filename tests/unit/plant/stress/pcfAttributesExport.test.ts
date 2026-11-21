@@ -10,7 +10,13 @@ import { baseDoc, conditioned, DN100, withModel, withPipe } from './m3Fixtures';
 
 interface Exported {
   files: { name: string; content: string; componentCount: number }[];
-  stressAttributes: { modelId: string; attributes: Record<string, string>; covered: string[]; notCovered: string[] } | null;
+  stressAttributes: {
+    modelId: string;
+    attributes: Record<string, string>;
+    covered: string[];
+    partial: { line: string; runIds: string[] }[];
+    notCovered: string[];
+  } | null;
 }
 
 const CONDITIONS = {
@@ -120,5 +126,85 @@ describe('export_pcf stressModelId on a routed line (run-scoped model)', () => {
     const content = result.files[0]?.content ?? '';
     expect(content).toContain('COMPONENT-ATTRIBUTE2 260');
     expect(content).toContain('PIPE\n    COMPONENT-IDENTIFIER 1');
+  });
+});
+
+/** A routed header (run 1) with an eccentric reducer, an elbow, a tee at 3000 and the branch run (run 2) on a second pipe. */
+function routedWithBranch(): { doc: ReturnType<typeof baseDoc>; headerId: string; branchId: string } {
+  const line = cs150Line(150, '3001');
+  const tie = addTie(line.doc, 'A', [0, 0, 0], [1, 0, 0], { dn: 150 });
+  const route = execute(tie.doc, 'route_pipe', {
+    lineId: line.lineId,
+    from: { portId: tie.id },
+    legs: [
+      { direction: '+X', length: 4000 },
+      { direction: '+Z', length: 1000 },
+    ],
+    inline: [{ type: 'reducerEccentric', tag: 'RE-1', dn2: 100, flat: 'top', at: { leg: 0, centreDistance: 2000 } }],
+  });
+  if (route.rejected === true) throw new Error(route.summary);
+  const headerId = (route.data as { runId: string }).runId;
+  const branch = execute(route.document, 'add_branch', {
+    runId: headerId,
+    at: { leg: 0, distance: 3000 },
+    dn: 100,
+    legs: [{ direction: '+Z', length: 500 }],
+  });
+  if (branch.rejected === true) throw new Error(branch.summary);
+  const branchId = (branch.data as { branchRunId: string }).branchRunId;
+  return { doc: branch.document, headerId, branchId };
+}
+
+const records = (content: string, type: string): string[] =>
+  content.split(/\n(?=[A-Z])/).filter((record) => record.startsWith(`${type}\n`));
+
+describe('export_pcf stressModelId per component (routed header + branch)', () => {
+  const scene2 = routedWithBranch();
+  const model = withModel(scene2.doc, [scene2.headerId]);
+  const doc = conditioned(model.doc, model.id, CONDITIONS);
+  const out = data<Exported>(doc, 'export_pcf', { stressModelId: model.id });
+  const text = out.files[0]?.content ?? '';
+
+  it('writes the attributes only on the components of the in-scope run; the branch run keeps none and the line is partial', () => {
+    expect(out.stressAttributes?.covered).toEqual([]);
+    expect(out.stressAttributes?.notCovered).toEqual([]);
+    expect(out.stressAttributes?.partial).toEqual([{ line: expect.any(String), runIds: [scene2.headerId] }]);
+    for (const type of ['TEE', 'ELBOW', 'REDUCER-ECCENTRIC', 'PIPE']) {
+      const withIds = records(text, type).filter((record) => record.includes('UNIQUE-COMPONENT-IDENTIFIER'));
+      expect(withIds.length).toBeGreaterThan(0);
+      for (const record of withIds) {
+        const owner = /UNIQUE-COMPONENT-IDENTIFIER (\S+?)\//.exec(record)?.[1];
+        expect(record.includes('COMPONENT-ATTRIBUTE2 260'), `${type} of ${owner}`).toBe(owner === scene2.headerId);
+      }
+    }
+  });
+
+  it('a routed PCF with attributes round-trips byte for byte through route import', () => {
+    const onlyHeader = out.files[0]?.content ?? '';
+    const imported = apply(createEmptyDocument(), 'import_pcf', { text: onlyHeader });
+    const again = data<Exported>(imported, 'export_pcf', {});
+    expect(again.files[0]?.content).toBe(onlyHeader);
+  });
+});
+
+describe('export_pcf stressModelId edge cases', () => {
+  it('an imported line is unchanged and listed in notCovered', () => {
+    const s = scene();
+    const text = fileOf(data<Exported>(s.doc, 'export_pcf', { stressModelId: s.modelId, lineIds: ['L-1'] }), 'L-1.pcf').replace(
+      'PIPELINE-REFERENCE L-1',
+      'PIPELINE-REFERENCE L-9',
+    );
+    const imported = apply(s.doc, 'import_pcf', { text });
+    const result = data<Exported>(imported, 'export_pcf', { stressModelId: s.modelId, lineIds: ['L-9'] });
+    expect(result.stressAttributes?.notCovered).toEqual(['L-9']);
+    expect(result.files[0]?.content).toBe(text);
+  });
+
+  it('an attribute a component already holds is kept, not overwritten', () => {
+    const text =
+      'ISOGEN-FILES ISOGEN.FLS\nUNITS-BORE MM\nUNITS-CO-ORDS MM\nPIPELINE-REFERENCE X-1\nPIPE\n    COMPONENT-IDENTIFIER 1\n    END-POINT 0.0 0.0 0.0 100 BW\n    END-POINT 1000.0 0.0 0.0 100 BW\n    COMPONENT-ATTRIBUTE2 77\n';
+    const imported = apply(createEmptyDocument(), 'import_pcf', { text });
+    const out = data<Exported>(imported, 'export_pcf', {});
+    expect(out.files[0]?.content).toContain('COMPONENT-ATTRIBUTE2 77');
   });
 });

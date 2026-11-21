@@ -4,8 +4,6 @@ import type { CadDocument } from '@core/model/types';
 import { pcfAttributeValues, SLOTS } from '../stress/commands/pcfAttributeSlots';
 import { findModel } from '../stress/model/store';
 import type { StressModel } from '../stress/model/schema';
-import { getPiping } from '../piping/model';
-import { legacyLines } from './legacyNetwork';
 import type { NetworkComponent, PcfComponentType } from './model';
 
 /** Components that carry the attributes: the pipe-borne ones; SUPPORT, WELD, BOLT and GASKET stay as they are. */
@@ -41,22 +39,39 @@ export function stressAttributesOf(doc: CadDocument, modelId: string): StressAtt
   return { ok: true, model, attributes: Object.fromEntries(entries) };
 }
 
-/** Does the model cover the exported line? `id`: a routed line id or a legacy pipe line key. */
-export function modelCoversLine(doc: CadDocument, model: StressModel, kind: 'route' | 'legacy', id: string): boolean {
-  const scope = new Set(model.scope.ids);
-  if (kind === 'route') {
-    const piping = getPiping(doc);
-    return model.scope.kind === 'runs' && piping.runOrder.some((runId) => piping.runs[runId]?.lineId === id && scope.has(runId));
-  }
-  return model.scope.kind === 'pipes' && (legacyLines(doc).get(id) ?? []).some((pipe) => scope.has(pipe.id));
+export interface Applied {
+  readonly components: NetworkComponent[];
+  /** Scope ids (run ids / pipe ids) whose components got the attributes. */
+  readonly applied: string[];
+  /** Pipe-borne components of the line that belong to something outside the model scope (they are left as they are). */
+  readonly skipped: number;
 }
 
-/** `components` with the attributes appended to the pipe-borne ones (an attribute a component already holds is kept). */
+/** The run / pipe a component belongs to: the part of its id before the first `/` (`run-6.1/pipe-2`, `pipe-3/elbow-1`). */
+const ownerOf = (component: NetworkComponent): string => component.id.split('/')[0] ?? '';
+
+/**
+ * `components` with the attributes appended to the pipe-borne components of the model scope (an attribute a component already holds is kept);
+ * `kind` is the kind of line (routed lines are covered by run-scoped models, legacy lines by pipe-scoped ones).
+ */
 export function withStressAttributes(
   components: readonly NetworkComponent[],
   attributes: Readonly<Record<string, string>>,
-): NetworkComponent[] {
-  return components.map((component) =>
-    CARRIERS.has(component.type) ? { ...component, extra: { ...attributes, ...component.extra } } : component,
-  );
+  model: StressModel,
+  kind: 'route' | 'legacy',
+): Applied {
+  const scope = new Set(model.scope.kind === (kind === 'route' ? 'runs' : 'pipes') ? model.scope.ids : []);
+  const applied = new Set<string>();
+  let skipped = 0;
+  const out = components.map((component) => {
+    if (!CARRIERS.has(component.type)) return component;
+    const owner = ownerOf(component);
+    if (!scope.has(owner)) {
+      skipped += 1;
+      return component;
+    }
+    applied.add(owner);
+    return { ...component, extra: { ...attributes, ...component.extra } };
+  });
+  return { components: out, applied: [...applied].sort(), skipped };
 }
