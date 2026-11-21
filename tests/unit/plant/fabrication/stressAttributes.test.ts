@@ -67,6 +67,9 @@ describe('stressAttributesOf', () => {
     expect(stressAttributesOf(s.bare.doc, s.bare.id)).toMatchObject({ ok: false });
     const found = stressAttributesOf(s.doc, s.id);
     expect(found.ok).toBe(true);
-    expect(found.ok && Object.keys(found.attributes).length).toBeGreaterThan(0);
+    const attributes = found.ok ? found.attributes : {};
+    expect(attributes).toMatchObject({ 'COMPONENT-ATTRIBUTE7': expect.any(String), 'COMPONENT-ATTRIBUTE9': expect.any(String) });
+    expect(attributes).not.toHaveProperty('COMPONENT-ATTRIBUTE3');
+    expect(attributes).not.toHaveProperty('COMPONENT-ATTRIBUTE8');
   });
 });

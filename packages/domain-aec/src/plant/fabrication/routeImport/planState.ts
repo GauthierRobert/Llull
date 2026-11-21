@@ -1,7 +1,6 @@
 /** The state of one route-plan walk (visited components, welds, gaskets, branch seeds) and the lookups over the component network. */
 
 import type { Vec3 } from '@core/model/vectors';
-import { distance3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
 import type { NetworkComponent, NetworkPoint } from '../model';
 import type { PlannedInline } from './inlineBody';
@@ -33,8 +32,10 @@ export interface Walk {
   end: Vec3;
   /** Offset of the actual axis from the stored one (an eccentric reducer upstream on this leg). */
   shift: Vec3;
-  /** Every offset the walk carried along the run (the olets are placed after the walk and match on any of them). */
-  readonly shifts: Vec3[];
+  /** Per point of `points` (parallel; entry 0 unused): the offsets in force on the segment that ends there, the one it started with and one per eccentric reducer on it. */
+  readonly shifts: Vec3[][];
+  /** The offsets of the leg being walked (becomes `shifts[k]` when the leg's end point is pushed). */
+  legShifts: Vec3[];
   cap: PlannedCap | undefined;
   /** The closure at the start of the main run (its walk begins on the pipe side of it). */
   startCap: (PlannedCap & { readonly tip: Vec3 }) | undefined;
@@ -50,8 +51,6 @@ export const refuse = (code: RouteRefusal['code'], message: string, ids: readonl
   ids,
 });
 export const midpoint = (a: Vec3, b: Vec3): Vec3 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-export const dedupe = (points: readonly Vec3[]): Vec3[] =>
-  points.filter((point, k) => k === 0 || distance3(point, points[k - 1] as Vec3) > 1e-6);
 
 export function createState(components: readonly NetworkComponent[], options: PlanOptions): PlanState {
   const index = new Map<string, number[]>();
