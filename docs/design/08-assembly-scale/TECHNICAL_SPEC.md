@@ -479,7 +479,9 @@ Scope: §4.3, §5.3 steps 1-5 and 7 (TS side), TR-ASC-07, 08, 10, 11 and the TS 
   (`FPR_BUDGET_EXCEEDED`). Context parts outside the scope are built while the document is under the cap.
 - **Broad phase (TR-ASC-07).** Sort-and-sweep below 200 parts; from 200 a BVH from the injected `ctx.spatialIndex` (`SpatialIndexPort`, the TS
   build by default) queried with each part box grown by `clearance + epsTouch`; then a separating-axis test on OBBs computed from the display
-  mesh (PCA by fixed Jacobi sweeps, extents by projection, so the box always encloses; 15 axes with the margin). The OBB is built from the mesh in
+  mesh (PCA by fixed Jacobi sweeps, extents by projection; 15 axes). Boxes and OBBs come from the display mesh, so a curved solid sticks out of them by the
+  chord error: every box, OBB and mesh-distance test grows by `margin + chordBound(a) + chordBound(b)` (`chordBound.ts`, `max(0.1, 1e-3 x diagonal)`); a 32-gon
+  elliptic prism pair whose tessellations are 0.046 apart while the exact solids overlap by 0.05 survives (test). The OBB is built from the mesh in
   TS, not from the kernel (`Bnd_OBB` stays a native option); instance masters are not reused for OBBs yet.
 - **Mesh narrow phase (TR-ASC-08).** One `ctx.geometryQueries.placedDistanceBatch` over all candidates (the existing batch port, which a native
   `check_pairs` replaces): a pair whose meshes are further apart than `clearance + epsTouch` plus both display chord bounds
@@ -494,13 +496,14 @@ Scope: §4.3, §5.3 steps 1-5 and 7 (TS side), TR-ASC-07, 08, 10, 11 and the TS 
   pattern the pairs (i, j) fall in the classes of j - i (folded mod N for a ring), i.e. master vs copy d = 1..N/2; each class is classified once
   and reported for every concrete pair, with the witness points mapped through the instance frames (`data.symmetry`: `patterns`,
   `pairsSkipped`, `pairsEvaluated`, `cacheHits`, `expanded: true`). Scaled instances are not reduced. `off` evaluates every pair.
-  Limitation: `penetrationEstimateMm` is the estimate along world axes of the class representative, so it can differ for a rotated copy;
-  volumes and distances are invariant. P vs an outside part Q gets no reduction beyond the pair cache.
-- **Pair cache (TR-ASC-10).** `PairCache` (`createPairCache`, LRU, default 200,000 entries ~ 64 MB) handed in by the host through
-  `ExecutionContext.pairCache`; else a `resolveMemo` of the context (`pairCacheOnMemo`, owner = the kernel); else only the run's own map. Key =
-  tolerances + kernel name + narrow-phase mode + the pair key above (world recipe hashes for plain parts). Content only, never time; `cache: false`
-  skips it. Measured on this machine (Manifold, no native kernel): see "Budgets". The server must create and pass the cache to persist it
-  across calls (not done: `server/` is another lane).
+  `penetrationEstimateMm` reads world axes and is not rotation-invariant, so it is recomputed (one `intersect` + analyze) for every reused hard pair of
+  an instance class (`data.symmetry.depthsRecomputed`); auto then equals off on rotated rows (test). Distances, volumes and the class are shared.
+  P vs an outside part Q gets no reduction beyond the pair cache.
+- **Pair cache (TR-ASC-10).** `PairCache` (`createPairCache`, LRU, default 200,000 entries ~ 64 MB) in `ExecutionContext.pairCache`:
+  `defaultContext()` keeps one per installed kernel (WeakMap, like the replay cache), so the server and the CLI process persist it across runs; else a
+  `resolveMemo` of the context holds ONE cache under a single tag (`pairCacheOnMemo`, owner = the kernel; it never evicts the mesh memo entries); else
+  only the run's own map. Key = tolerances + kernel name and `info()` + narrow-phase mode + the pair key above (world recipe hashes for plain parts). Content only, never time; `cache: false`
+  skips it. Measured on this machine (Manifold, no native kernel): see "Budgets".
 - **Connection groups (TR-ASC-11, D2).** `doc.prototype.connections` (`conn-<step>.<k>`, `ConnectionGroup` with members `ids | patternOf |
   layerId | groupId`, optional `detect`), commands `add_connection_group` (`CONN_REASON_EMPTY`, `CONN_MEMBERS_EMPTY`, `CONN_UNKNOWN_MEMBER`),
   `delete_connection_group`, `set_fastener` (toolset review). `declaredBy` is `'agent' | 'user'` as in §3 (the older intents use `'human'`).
@@ -512,14 +515,14 @@ Scope: §4.3, §5.3 steps 1-5 and 7 (TS side), TR-ASC-07, 08, 10, 11 and the TS 
   lists id, name, kind, live members, links, stale ids.
 - **Fastener tag.** `fastener: true` on an entity (`EntityTags`, in `model/prototype.ts`, extended by `BaseEntity`). A hard / contained pair
   with exactly one fastener and no intent is `FPR_FASTENER_THREAD` (info) and still a strong link; the rest of the pair data is unchanged.
-- **Load validation.** `prototypeProblems` checks `connections` (key = id, kind, non-empty reason, `declaredBy`, exactly one member selector,
-  `detect` ranges); entity `fastener` must be `true`. Members are not checked for existence (stale is a check item, not a load error).
+- **Load validation.** `prototypeProblems` checks `connections` (key = id, kind, non-empty name and reason, `declaredBy`, exactly one member selector,
+  `detect` ranges); entity `fastener` must be `true` and only on 3D solids / instances. Members are not checked for existence (stale is a check item, not a load error).
 - **Budgets (§8), measured here with Manifold on boxes (about 10 mm, 9.5 mm pitch, neighbours overlap), not asserted:** 175 parts, 1,527 pairs
   1.0 s; 2,450 parts, 27,155 pairs 10.2 s cold; the same with a warm cache after one part moved 1.0 s (27,144 hits); a 2,000-copy polar
   instance ring (25,384 pairs) 1.1 s with symmetry (9 evaluated) against 10.9 s with `symmetry: 'off'`. The reference machine and the native kernel will differ.
 - **Left.** Native batch `check_pairs` (thread pool, D7) and `BRepExtrema_ShapeProximity`; OBBs from the kernel / reused from instance masters;
-  the host (`server/`) creating the pair cache; FR-ASC-13 incremental re-check beyond the cache; a Connections panel (UI lane); symmetry for P vs
-  an outside part Q; exact `penetration` for mapped pairs.
+  FR-ASC-13 incremental re-check beyond the cache; a Connections panel (UI lane); symmetry for P vs
+  an outside part Q; a cheaper rotation-invariant penetration depth than the per-pair recompute.
 
 ### 13.7 As built (M6a) `capture_viewport` (2026-11-21)
 

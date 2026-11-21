@@ -56,7 +56,12 @@ export interface PairPhaseOutput {
       readonly meshCulled: number;
       readonly classified: number;
     };
-    readonly symmetry: { readonly pairsSkipped: number; readonly cacheHits: number; readonly pairsEvaluated: number };
+    readonly symmetry: {
+      readonly pairsSkipped: number;
+      readonly cacheHits: number;
+      readonly pairsEvaluated: number;
+      readonly depthsRecomputed: number;
+    };
   };
 }
 
@@ -74,7 +79,7 @@ const empty = (input: PairPhaseInput, exactKernel: boolean, candidates: number, 
   data: {
     pairsChecked: 0,
     narrowPhase: { mode: input.narrowPhase, exactKernel, candidates, meshCulled: 0, classified: 0 },
-    symmetry: { pairsSkipped: 0, cacheHits: 0, pairsEvaluated: 0 },
+    symmetry: { pairsSkipped: 0, cacheHits: 0, pairsEvaluated: 0, depthsRecomputed: 0 },
   },
 });
 
@@ -159,7 +164,12 @@ export function runPairPhase(input: PairPhaseInput): PairPhaseOutput {
         meshCulled: clear.filter(Boolean).length,
         classified,
       },
-      symmetry: { pairsSkipped: stats.reused, cacheHits: stats.cacheHits, pairsEvaluated: stats.evaluated },
+      symmetry: {
+        pairsSkipped: stats.reused,
+        cacheHits: stats.cacheHits,
+        pairsEvaluated: stats.evaluated,
+        depthsRecomputed: stats.depthsRecomputed,
+      },
     },
   };
 }

@@ -40,16 +40,7 @@ export function createPairCache(capacity: number = DEFAULT_CAPACITY): PairCache 
   };
 }
 
-/** A `PairCache` over a resolve memo (entries live as long as the memo, keyed on `owner`, normally the kernel). */
+/** The one `PairCache` a resolve memo keeps for `owner` (normally the kernel): a single memo entry, so a 20k-part check evicts nothing else. */
 export function pairCacheOnMemo(memo: OnceMemo, owner: object): PairCache {
-  return {
-    getOrCompute(key, compute) {
-      let ran = false;
-      const entry = memo.once(owner, `pair:${key}`, () => {
-        ran = true;
-        return compute();
-      });
-      return { entry, hit: !ran };
-    },
-  };
+  return memo.once(owner, 'pairCache', () => createPairCache());
 }

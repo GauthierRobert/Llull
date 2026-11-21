@@ -7,18 +7,18 @@
  */
 
 import type { AssemblyPart } from './partTypes';
+import { chordBound } from './chordBound';
 import { type GeometryQueryEngine } from '../geometryQueries';
-
-/** Display-mesh chord error bound (see `assemblyParts`): max(0.1, 1e-3 x bounding-box diagonal) document units. */
-function chordBound(part: AssemblyPart): number {
-  const diagonal = Math.hypot(part.max[0] - part.min[0], part.max[1] - part.min[1], part.max[2] - part.min[2]);
-  return Math.max(0.1, 1e-3 * diagonal);
-}
 
 /** One part's box lies inside the other's (grown by `slack`): containment gives no surface contact, so the mesh distance cannot clear it. */
 function nested(a: AssemblyPart, b: AssemblyPart, slack: number): boolean {
   const inside = (inner: AssemblyPart, outer: AssemblyPart): boolean =>
-    [0, 1, 2].every((k) => (inner.min[k] ?? 0) >= (outer.min[k] ?? 0) - slack && (inner.max[k] ?? 0) <= (outer.max[k] ?? 0) + slack);
+    inner.min[0] >= outer.min[0] - slack &&
+    inner.min[1] >= outer.min[1] - slack &&
+    inner.min[2] >= outer.min[2] - slack &&
+    inner.max[0] <= outer.max[0] + slack &&
+    inner.max[1] <= outer.max[1] + slack &&
+    inner.max[2] <= outer.max[2] + slack;
   return inside(a, b) || inside(b, a);
 }
 
@@ -44,7 +44,12 @@ export function meshClearPairs(
         meshIndex.set(index, meshes.length);
         meshes.push(part.mesh as NonNullable<AssemblyPart['mesh']>);
       }
-    queries.push({ pair, a: meshIndex.get(i) ?? 0, b: meshIndex.get(j) ?? 0, maxDistance: threshold + chordBound(a) + chordBound(b) });
+    queries.push({
+      pair,
+      a: meshIndex.get(i) as number,
+      b: meshIndex.get(j) as number,
+      maxDistance: threshold + chordBound(a) + chordBound(b),
+    });
   });
   const clear = pairs.map(() => false);
   if (queries.length === 0) return clear;

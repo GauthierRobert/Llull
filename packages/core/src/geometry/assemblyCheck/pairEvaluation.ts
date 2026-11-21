@@ -3,7 +3,8 @@
  * Unit-scale instances of one component are keyed by (local recipe, local recipe, relative placement), oriented so (a, b) and (b, a) share a key:
  * for N rigid copies of a pattern every pair (i, j) then maps to the class of j - i (mod N, folded), i.e. master vs copy d = 1..N/2, and the
  * result is reported for every concrete pair (witness points are mapped back through the instance frames). Other parts are keyed by recipe hashes.
- * @invariant a reused result equals a recompute up to the key quantization (translation 1e-6, rotation 1e-9 document units)
+ * @invariant a reused result equals a recompute up to the key quantization (translation 1e-6, rotation 1e-9 document units); the penetration depth
+ *   (an estimate along world axes, not rotation-invariant) is recomputed for every reused hard pair of an instance class, so auto equals off
  * @invariant `symmetry: false` keys every pair by its world recipes, so equal placements never share (audit mode)
  */
 
@@ -12,13 +13,15 @@ import { hashText } from '../../lib/hash';
 import { canonicalJson } from '../../lib/canonicalJson';
 import { recipeKey } from '../shapeRecipe';
 import type { AssemblyPart, CheckTolerances } from './partTypes';
-import { type PairClass, classifyPair } from './pairClassify';
+import { type PairClass, classifyPair, overlapOf } from './pairClassify';
 import type { PairCache, PairEntry } from './pairCache';
 import { frameApply, frameInvert, relativeKey, type RigidFrame } from './rigidFrame';
 
 interface PairStats {
   /** Pairs the kernel classified in this run. */
   evaluated: number;
+  /** Reused hard pairs whose penetration depth was recomputed for their own placement. */
+  depthsRecomputed: number;
   /** Pairs served by an earlier pair of the same run (symmetry reduction). */
   reused: number;
   /** Pairs served by the persistent cache. */
@@ -48,10 +51,10 @@ const mapPoints = (pair: PairClass, map: (point: PairClass['pointA']) => PairCla
 
 export function createPairEvaluator(input: EvaluatorInput): PairEvaluator {
   const { kernel, tolerances, symmetry, cache } = input;
-  const scope = hashText(canonicalJson({ tolerances, kernel: kernel.name ?? null, salt: input.salt }));
+  const scope = hashText(canonicalJson({ tolerances, kernel: kernel.name ?? null, info: kernel.info?.() ?? null, salt: input.salt }));
   const run = new Map<string, PairEntry>();
   const hashes = new Map<string, string>();
-  const stats: PairStats = { evaluated: 0, reused: 0, cacheHits: 0 };
+  const stats: PairStats = { evaluated: 0, depthsRecomputed: 0, reused: 0, cacheHits: 0 };
   const hashOf = (part: AssemblyPart): string => {
     let known = hashes.get(part.id);
     if (known === undefined) {
@@ -75,7 +78,9 @@ export function createPairEvaluator(input: EvaluatorInput): PairEvaluator {
       const [first, second] = swapped ? [b, a] : [a, b];
       const [volumeFirst, volumeSecond] = swapped ? [volumeB, volumeA] : [volumeA, volumeB];
       const frame = framed ? (first.frame ?? null) : null;
+      let computedHere = false;
       const compute = (): PairEntry => {
+        computedHere = true;
         stats.evaluated++;
         const pair = classifyPair(kernel, first, second, volumeFirst, volumeSecond, tolerances);
         return {
@@ -92,7 +97,12 @@ export function createPairEvaluator(input: EvaluatorInput): PairEvaluator {
       }
       const { pair } = entry;
       if (pair === null || pair === undefined) return pair;
-      return mapPoints(pair, frame === null ? (p) => p : (p) => frameApply(frame, p), swapped);
+      const mapped = mapPoints(pair, frame === null ? (p) => p : (p) => frameApply(frame, p), swapped);
+      if (computedHere || !framed || mapped.kind !== 'hard') return mapped;
+      // the depth estimate reads world axes, so it is not shared between rotated copies: recompute it for this placement
+      const overlap = overlapOf(kernel, a, b);
+      stats.depthsRecomputed++;
+      return overlap === null ? mapped : { ...mapped, penetration: overlap.depth };
     },
   };
 }

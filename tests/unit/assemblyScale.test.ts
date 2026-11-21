@@ -32,6 +32,7 @@ type Data = CheckResult & {
 const withKernel = (k: GeometryKernel, extra: Partial<ExecutionContext> = {}): ExecutionContext => ({
   ...defaultContext(),
   kernel: k,
+  pairCache: null,
   ...extra,
 });
 
@@ -132,6 +133,50 @@ describe('broad phase (BVH + OBB, TR-ASC-07)', () => {
   });
 });
 
+/** A closed n-gon elliptic prism (semi-axes `rx`, `ry`, z 0..5), vertices at `phase`, turned by `turn` about z, then moved by `shift`. */
+function prism(id: string, rx: number, ry: number, sides: number, phase: number, turn: number, shift: [number, number]): AssemblyPart {
+  const positions: number[] = [];
+  for (const z of [0, 5])
+    for (let k = 0; k < sides; k++) {
+      const angle = phase + (2 * Math.PI * k) / sides;
+      const [x, y] = [rx * Math.cos(angle), ry * Math.sin(angle)];
+      positions.push(x * Math.cos(turn) - y * Math.sin(turn) + shift[0], x * Math.sin(turn) + y * Math.cos(turn) + shift[1], z);
+    }
+  const xs = positions.filter((_, i) => i % 3 === 0);
+  const ys = positions.filter((_, i) => i % 3 === 1);
+  const indices: number[] = [];
+  for (let k = 1; k + 1 < sides; k++) indices.push(0, k + 1, k, sides, sides + k, sides + k + 1);
+  for (let k = 0; k < sides; k++) {
+    const next = (k + 1) % sides;
+    indices.push(k, next, sides + next, k, sides + next, sides + k);
+  }
+  return {
+    id,
+    min: [Math.min(...xs), Math.min(...ys), 0],
+    max: [Math.max(...xs), Math.max(...ys), 5],
+    mesh: { positions, indices },
+  } as unknown as AssemblyPart;
+}
+
+describe('broad phase keeps curved solids whose tessellations are apart (chord error)', () => {
+  const sagitta = 10 * (1 - Math.cos(Math.PI / 32));
+  it.each([
+    ['axis aligned, exact overlap 0.05 under a 0.046 mesh gap', 0, 19.95],
+    ['tangent, exact gap 0', 0, 20],
+    ['rotated 30 degrees, overlapping', Math.PI / 6, 19.95],
+    ['rotated 70 degrees, tangent', (70 * Math.PI) / 180, 20],
+  ])('%s', (_label, turn, distance) => {
+    const direction: [number, number] = [Math.cos(turn) * distance, Math.sin(turn) * distance];
+    const a = prism('a', 10, 15, 32, Math.PI / 32, turn, [0, 0]);
+    const b = prism('b', 10, 15, 32, Math.PI / 32, turn, direction);
+    expect(obbsSeparated(obbOfMesh(a.mesh) as never, obbOfMesh(b.mesh) as never, 0.001)).toBe(true);
+    expect(sagitta).toBeGreaterThan(0.02);
+    expect(broadPhasePairs([a, b], 0.001)).toEqual([[0, 1]]);
+    const many = [a, b, ...Array.from({ length: 205 }, (_, k) => partOf(`f${k}`, [1000 + k * 50, 0, 0], [1010 + k * 50, 10, 10]))];
+    expect(broadPhasePairs(many, 0.001, tsSpatialIndex)).toEqual([[0, 1]]);
+  });
+});
+
 describe('mesh narrow phase (TR-ASC-08)', () => {
   it('clears far pairs, keeps close pairs, nested boxes and parts without a mesh', () => {
     const near = [partOf('a', [0, 0, 0], [10, 10, 10]), partOf('b', [10.1, 0, 0], [20, 10, 10])];
@@ -140,6 +185,8 @@ describe('mesh narrow phase (TR-ASC-08)', () => {
     expect(meshClearPairs(far, [[0, 1]], 0.001, meshBvhEngine)).toEqual([true]);
     const nested = [partOf('outer', [0, 0, 0], [100, 100, 100]), partOf('inner', [40, 40, 40], [60, 60, 60])];
     expect(meshClearPairs(nested, [[0, 1]], 0.001, meshBvhEngine)).toEqual([false]);
+    const slackNested = [partOf('outer', [0, 0, 0], [100, 100, 100]), partOf('inner', [40, 40, 40], [100.05, 60, 60])];
+    expect(meshClearPairs(slackNested, [[0, 1]], 0.001, meshBvhEngine)).toEqual([false]);
     const bare = [partOf('a', [0, 0, 0], [10, 10, 10]), { ...partOf('b', [500, 0, 0], [510, 10, 10]), mesh: null } as AssemblyPart];
     expect(meshClearPairs(bare, [[0, 1]], 0.001, meshBvhEngine)).toEqual([false]);
     expect(meshClearPairs(far, [], 0.001, meshBvhEngine)).toEqual([]);
@@ -210,8 +257,7 @@ describe('symmetry reduction and pair cache (TR-ASC-09 / 10)', () => {
   const close = (a: CheckItem, b: CheckItem): void => {
     expect(a.code).toBe(b.code);
     expect(a.ids).toEqual(b.ids);
-    for (const [key, value] of Object.entries(a.values))
-      if (key !== 'penetrationEstimateMm') expect(b.values[key] ?? NaN).toBeCloseTo(value, 6);
+    for (const [key, value] of Object.entries(a.values)) expect(b.values[key] ?? NaN).toBeCloseTo(value, 6);
   };
 
   it('a 12-fold ring evaluates one class and reports every concrete pair, equal to the audit run', () => {
@@ -221,7 +267,14 @@ describe('symmetry reduction and pair cache (TR-ASC-09 / 10)', () => {
     const autoCalls = spy.distances();
     const audit = counting(kernel);
     const off = s.check({ symmetry: 'off' }, withKernel(audit.kernel));
-    expect(auto.symmetry).toMatchObject({ mode: 'auto', patterns: 1, expanded: true, pairsEvaluated: 1, pairsSkipped: 11 });
+    expect(auto.symmetry).toMatchObject({
+      mode: 'auto',
+      patterns: 1,
+      expanded: true,
+      pairsEvaluated: 1,
+      pairsSkipped: 11,
+      depthsRecomputed: 11,
+    });
     expect(autoCalls).toBe(1);
     expect(off.symmetry).toMatchObject({ mode: 'off', patterns: 0, pairsSkipped: 0 });
     expect(audit.distances()).toBe(12);
@@ -243,6 +296,32 @@ describe('symmetry reduction and pair cache (TR-ASC-09 / 10)', () => {
     for (const id of made.affected) entities[id] = { ...entities[id], scale: [1, 1, 1.0001] } as never;
     const data = execute({ ...made.document, entities }, 'check_assembly', {}, withKernel(kernel)).data as Data;
     expect(data.symmetry.pairsSkipped).toBe(0);
+  });
+
+  it('rotated instance rows (rotation only, rotation + translation) equal the audit run, penetration depth included', () => {
+    const build = (place: (k: number) => { position: [number, number, number]; rotation: [number, number, number] }): CadDocument => {
+      const s = scene();
+      const [seed] = s.run('add_box', { size: [14, 6, 6], position: [0, 0, 0] });
+      const made = execute(s.doc(), 'array_linear', { id: seed, count: 5, offset: [1, 0, 0], as: 'instances' }, withKernel(kernel));
+      const entities = { ...made.document.entities };
+      made.affected.forEach((id, k) => {
+        entities[id] = { ...entities[id], ...place(k) } as never;
+      });
+      return { ...made.document, entities };
+    };
+    const rows = [
+      build((k) => ({ position: [0, 0, 0], rotation: [0, 0, k * 0.3] })),
+      build((k) => ({ position: [k * 2, k, 0], rotation: [0.2 * k, 0, k * 0.4] })),
+    ];
+    for (const doc of rows) {
+      const run = (symmetry: string): Data => execute(doc, 'check_assembly', { symmetry }, withKernel(kernel)).data as Data;
+      const [auto, off] = [run('auto'), run('off')];
+      const hard = (data: Data): CheckItem[] => data.items.filter((item) => item.code === 'FPR_PAIR_HARD');
+      expect(hard(off).length).toBeGreaterThan(0);
+      expect(hard(auto).map((item) => item.ids)).toEqual(hard(off).map((item) => item.ids));
+      hard(auto).forEach((item, i) => close(item, hard(off)[i] as CheckItem));
+      expect(auto.items.map((item) => item.code)).toEqual(off.items.map((item) => item.code));
+    }
   });
 
   it('a host pair cache serves the second run: no kernel call, same items; cache false and a resolveMemo behave', () => {
@@ -410,6 +489,20 @@ describe('connection groups (TR-ASC-11, D2)', () => {
     expect(wrongAngle.data.connections[0]?.links).toBe(1);
     const tight = build({ toleranceMm: 1e-9, faceAngleDeg: 20, cylindrical: 'include' });
     expect(tight.data.connections[0]?.links).toBeLessThanOrEqual(2);
+  });
+
+  it('detect with no touching member pair links nothing', () => {
+    const s = scene();
+    const [a] = s.run('add_box', box([0, 0, 0]));
+    const [b] = s.run('add_box', box([100, 0, 0]));
+    s.run('add_connection_group', {
+      name: 'g',
+      kind: 'bolted',
+      members: { ids: [a, b] },
+      detect: { toleranceMm: 0.1, faceAngleDeg: 5, cylindrical: 'include' },
+      reason: 'r',
+    });
+    expect(s.check().connections[0]).toMatchObject({ members: 2, links: 0 });
   });
 
   it('a stale member is FPR_CONN_STALE (warn) and ignored', () => {

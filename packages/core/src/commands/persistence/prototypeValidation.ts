@@ -33,7 +33,10 @@ function membersProblem(at: string, members: unknown): string | null {
   const [key] = present;
   if (present.length !== 1 || key === undefined) return `${at}: members must hold exactly one of ${MEMBER_KEYS.join(', ')}`;
   const value = members[key];
-  if (key === 'ids') return isStringArray(value) && value.length > 0 ? null : `${at}: members.ids must be a non-empty array of strings`;
+  if (key === 'ids')
+    return isStringArray(value) && value.length > 0 && value.every((id) => id.length > 0)
+      ? null
+      : `${at}: members.ids must be a non-empty array of non-empty strings`;
   return typeof value === 'string' && value.length > 0 ? null : `${at}: members.${key} must be a non-empty string`;
 }
 
@@ -52,7 +55,7 @@ function detectProblem(at: string, detect: unknown): string | null {
 function connectionProblem(id: string, group: unknown): string | null {
   const at = `prototype.connections['${id}']`;
   if (!isRecord(group) || group['id'] !== id) return `${at} must be an object whose id is '${id}'`;
-  if (typeof group['name'] !== 'string') return `${at}: name must be a string`;
+  if (typeof group['name'] !== 'string' || group['name'].trim().length === 0) return `${at}: name must be a non-empty string`;
   if (typeof group['kind'] !== 'string' || !CONNECTION_KIND_LIST.includes(group['kind']))
     return `${at}: kind must be one of ${CONNECTION_KIND_LIST.join(', ')}`;
   if (typeof group['reason'] !== 'string' || group['reason'].trim().length === 0) return `${at}: reason must be non-empty`;

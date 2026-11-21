@@ -29,7 +29,10 @@ describe('prototype.connections load validation', () => {
   it('reports each malformed field', () => {
     expect(prototypeProblems({ intents: {}, grounded: [], connections: [] })[0]).toMatch(/keyed by connection id/);
     expect(slice({ id: 'other' })[0]).toMatch(/whose id is/);
-    expect(slice({ name: 3 })[0]).toMatch(/name must be a string/);
+    expect(slice({ name: 3 })[0]).toMatch(/name must be a non-empty string/);
+    expect(slice({ name: '  ' })[0]).toMatch(/name must be a non-empty string/);
+    expect(slice({ members: { ids: ['a', ''] } })[0]).toMatch(/non-empty strings/);
+    expect(slice({ members: { layerId: '' } })[0]).toMatch(/layerId must be a non-empty string/);
     expect(slice({ kind: 'glued' })[0]).toMatch(/kind must be one of/);
     expect(slice({ reason: '  ' })[0]).toMatch(/reason must be non-empty/);
     expect(slice({ declaredBy: 'robot' })[0]).toMatch(/declaredBy/);
@@ -63,6 +66,15 @@ describe('connection groups and the fastener tag survive save / load', () => {
     const text = JSON.parse(serializeDocument(doc)) as { document: { entities: Record<string, Record<string, unknown>> } };
     (text.document.entities[ids[0] as string] as Record<string, unknown>)['fastener'] = false;
     expect(() => deserializeDocument(JSON.stringify(text))).toThrow(/fastener/);
+    const flat = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [5, 5],
+      ],
+    });
+    const hostile = JSON.parse(serializeDocument(flat.document)) as { document: { entities: Record<string, Record<string, unknown>> } };
+    (hostile.document.entities[flat.affected[0] as string] as Record<string, unknown>)['fastener'] = true;
+    expect(() => deserializeDocument(JSON.stringify(hostile))).toThrow(/fastener applies to 3D solids and instances only/);
   });
 
   it('connections are part of the checked prototype (they change the check hash)', () => {

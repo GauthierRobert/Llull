@@ -1,6 +1,7 @@
 /**
  * Oriented bounding boxes of display meshes and their separating-axis test (broad phase step 2, TR-ASC-07).
- * @invariant the box encloses every vertex (extents are projected, not fitted), so a separation proves the parts are further apart than the margin
+ * @invariant the box encloses every MESH vertex (extents are projected, not fitted); a curved solid sticks out of its tessellation by the chord bound,
+ *   so callers pass `margin` grown by it (`broadPhase`)
  * @invariant deterministic: fixed Jacobi sweeps, no random
  */
 
@@ -14,6 +15,8 @@ export interface Obb {
   readonly half: Vec3;
 }
 
+const num = (values: ArrayLike<number>, index: number): number => values[index] as number;
+const at = (m: number[][], i: number, j: number): number => num(m[i] as number[], j);
 const JACOBI_SWEEPS = 16;
 const SEPARATION_EPS = 1e-9;
 
@@ -25,7 +28,6 @@ function eigenAxes(cov: number[][]): [Vec3, Vec3, Vec3] {
     [0, 1, 0],
     [0, 0, 1],
   ];
-  const at = (m: number[][], i: number, j: number): number => m[i]?.[j] ?? 0;
   for (let sweep = 0; sweep < JACOBI_SWEEPS; sweep++) {
     for (const [p, q] of [
       [0, 1],
@@ -63,44 +65,44 @@ export function obbOfMesh(mesh: MeshData | null): Obb | null {
   const count = mesh === null ? 0 : Math.floor(mesh.positions.length / 3);
   if (mesh === null || count === 0) return null;
   const mean = [0, 0, 0];
-  for (let i = 0; i < count; i++) for (let k = 0; k < 3; k++) mean[k] = (mean[k] ?? 0) + (mesh.positions[i * 3 + k] ?? 0) / count;
+  for (let i = 0; i < count; i++) for (let k = 0; k < 3; k++) mean[k] = num(mean, k) + num(mesh.positions, i * 3 + k) / count;
   const cov = [
     [0, 0, 0],
     [0, 0, 0],
     [0, 0, 0],
   ];
   for (let i = 0; i < count; i++) {
-    const d = [0, 1, 2].map((k) => (mesh.positions[i * 3 + k] ?? 0) - (mean[k] ?? 0));
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) (cov[r] as number[])[c] = (cov[r]?.[c] ?? 0) + (d[r] ?? 0) * (d[c] ?? 0);
+    const d = [0, 1, 2].map((k) => num(mesh.positions, i * 3 + k) - num(mean, k));
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) (cov[r] as number[])[c] = at(cov, r, c) + num(d, r) * num(d, c);
   }
   const axes = eigenAxes(cov);
   const low = [Infinity, Infinity, Infinity];
   const high = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < count; i++) {
-    const point: Vec3 = [mesh.positions[i * 3] ?? 0, mesh.positions[i * 3 + 1] ?? 0, mesh.positions[i * 3 + 2] ?? 0];
+    const point: Vec3 = [num(mesh.positions, i * 3), num(mesh.positions, i * 3 + 1), num(mesh.positions, i * 3 + 2)];
     axes.forEach((axis, k) => {
       const projected = dot3(point, axis);
-      low[k] = Math.min(low[k] ?? Infinity, projected);
-      high[k] = Math.max(high[k] ?? -Infinity, projected);
+      low[k] = Math.min(num(low, k), projected);
+      high[k] = Math.max(num(high, k), projected);
     });
   }
-  const mid = [0, 1, 2].map((k) => ((low[k] ?? 0) + (high[k] ?? 0)) / 2);
+  const mid = [0, 1, 2].map((k) => (num(low, k) + num(high, k)) / 2);
   const center: Vec3 = [0, 1, 2].reduce<Vec3>(
     (acc, k) => [
-      acc[0] + (mid[k] ?? 0) * (axes[k]?.[0] ?? 0),
-      acc[1] + (mid[k] ?? 0) * (axes[k]?.[1] ?? 0),
-      acc[2] + (mid[k] ?? 0) * (axes[k]?.[2] ?? 0),
+      acc[0] + num(mid, k) * (axes[k] as Vec3)[0],
+      acc[1] + num(mid, k) * (axes[k] as Vec3)[1],
+      acc[2] + num(mid, k) * (axes[k] as Vec3)[2],
     ],
     [0, 0, 0],
   );
-  return { center, axes, half: [0, 1, 2].map((k) => ((high[k] ?? 0) - (low[k] ?? 0)) / 2) as unknown as Vec3 };
+  return { center, axes, half: [0, 1, 2].map((k) => (num(high, k) - num(low, k)) / 2) as unknown as Vec3 };
 }
 
 /** True when some axis separates the boxes by more than `margin` (then the parts are further apart than `margin`). */
 export function obbsSeparated(a: Obb, b: Obb, margin: number): boolean {
   const delta: Vec3 = [b.center[0] - a.center[0], b.center[1] - a.center[1], b.center[2] - a.center[2]];
   const radius = (box: Obb, axis: Vec3): number =>
-    box.axes.reduce((sum, boxAxis, k) => sum + Math.abs(dot3(boxAxis, axis)) * (box.half[k] ?? 0), 0);
+    box.axes.reduce((sum, boxAxis, k) => sum + Math.abs(dot3(boxAxis, axis)) * box.half[k as 0 | 1 | 2], 0);
   const separates = (axis: Vec3): boolean => {
     const length = len3(axis);
     if (length < 1e-9) return false;

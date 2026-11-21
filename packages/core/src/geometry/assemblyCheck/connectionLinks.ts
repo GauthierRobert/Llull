@@ -51,8 +51,8 @@ function facetsNear(mesh: MeshData, point: Vec3, toleranceUnits: number): { cont
   const facets: Facet[] = [];
   for (let t = 0; t + 2 < mesh.indices.length; t += 3) {
     const corner = (k: number): Vec3 => {
-      const v = (mesh.indices[t + k] ?? 0) * 3;
-      return [mesh.positions[v] ?? 0, mesh.positions[v + 1] ?? 0, mesh.positions[v + 2] ?? 0];
+      const v = (mesh.indices[t + k] as number) * 3;
+      return [mesh.positions[v] as number, mesh.positions[v + 1] as number, mesh.positions[v + 2] as number];
     };
     const [a, b, c] = [corner(0), corner(1), corner(2)];
     const normal = cross3(sub3(b, a), sub3(c, a));

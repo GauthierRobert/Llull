@@ -222,6 +222,8 @@ function baseOptionalProblem(v: Record<string, unknown>): string | null {
   if (v['materialId'] !== undefined && typeof v['materialId'] !== 'string') return 'materialId must be a string';
   if (v['patternSourceId'] !== undefined && typeof v['patternSourceId'] !== 'string') return 'patternSourceId must be a string';
   if (v['fastener'] !== undefined && v['fastener'] !== true) return 'fastener must be true when present';
+  if (v['fastener'] === true && v['kind'] !== 'instance' && !(SOLID_KINDS as readonly string[]).includes(String(v['kind'])))
+    return 'fastener applies to 3D solids and instances only';
   const tags = v['tags'];
   if (tags !== undefined && !(Array.isArray(tags) && tags.every((t) => typeof t === 'string'))) return 'tags must be an array of strings';
   return null;

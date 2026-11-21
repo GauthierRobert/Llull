@@ -27,13 +27,7 @@ export function frameOfInstance(instance: InstanceEntity): RigidFrame | null {
   if (scale[0] !== 1 || scale[1] !== 1 || scale[2] !== 1) return null;
   const toWorld = instanceToWorld(UNIT, instance.rotation, instance.position);
   const origin = toWorld(ORIGIN);
-  const [ex, ey, ez] = [toWorld([1, 0, 0]), toWorld([0, 1, 0]), toWorld([0, 0, 1])];
-  const column = (axis: 0 | 1 | 2): readonly [number, number, number] => [
-    [ex, ey, ez][axis]?.[0] ?? 0,
-    [ex, ey, ez][axis]?.[1] ?? 0,
-    [ex, ey, ez][axis]?.[2] ?? 0,
-  ];
-  const [cx, cy, cz] = [column(0), column(1), column(2)];
+  const [cx, cy, cz] = [toWorld([1, 0, 0]), toWorld([0, 1, 0]), toWorld([0, 0, 1])];
   const rotation: Mat3 = [
     cx[0] - origin[0],
     cy[0] - origin[0],
@@ -52,9 +46,9 @@ export function frameOfInstance(instance: InstanceEntity): RigidFrame | null {
 export function frameApply(frame: RigidFrame, point: Vec3): Vec3 {
   const [r, t] = [frame.rotation, frame.translation];
   return [
-    (r[0] ?? 0) * point[0] + (r[1] ?? 0) * point[1] + (r[2] ?? 0) * point[2] + t[0],
-    (r[3] ?? 0) * point[0] + (r[4] ?? 0) * point[1] + (r[5] ?? 0) * point[2] + t[1],
-    (r[6] ?? 0) * point[0] + (r[7] ?? 0) * point[1] + (r[8] ?? 0) * point[2] + t[2],
+    r[0] * point[0] + r[1] * point[1] + r[2] * point[2] + t[0],
+    r[3] * point[0] + r[4] * point[1] + r[5] * point[2] + t[1],
+    r[6] * point[0] + r[7] * point[1] + r[8] * point[2] + t[2],
   ];
 }
 
@@ -62,13 +56,10 @@ export function frameApply(frame: RigidFrame, point: Vec3): Vec3 {
 export function frameInvert(frame: RigidFrame, point: Vec3): Vec3 {
   const [r, t] = [frame.rotation, frame.translation];
   const d: Vec3 = [point[0] - t[0], point[1] - t[1], point[2] - t[2]];
-  return [
-    (r[0] ?? 0) * d[0] + (r[3] ?? 0) * d[1] + (r[6] ?? 0) * d[2],
-    (r[1] ?? 0) * d[0] + (r[4] ?? 0) * d[1] + (r[7] ?? 0) * d[2],
-    (r[2] ?? 0) * d[0] + (r[5] ?? 0) * d[1] + (r[8] ?? 0) * d[2],
-  ];
+  return [r[0] * d[0] + r[3] * d[1] + r[6] * d[2], r[1] * d[0] + r[4] * d[1] + r[7] * d[2], r[2] * d[0] + r[5] * d[1] + r[8] * d[2]];
 }
 
+const at = (matrix: Mat3, index: number): number => matrix[index] as number;
 const quantize = (value: number, step: number): number => Math.round(value * step) / step || 0;
 
 /** Quantized placement of `b` in the frame of `a` (`a^-1 b`), as a key fragment. */
@@ -78,10 +69,7 @@ export function relativeKey(a: RigidFrame, b: RigidFrame): string {
   for (let row = 0; row < 3; row++)
     for (let col = 0; col < 3; col++)
       linear.push(
-        quantize(
-          (ra[row] ?? 0) * (rb[col] ?? 0) + (ra[3 + row] ?? 0) * (rb[3 + col] ?? 0) + (ra[6 + row] ?? 0) * (rb[6 + col] ?? 0),
-          ROTATION_STEP,
-        ),
+        quantize(at(ra, row) * at(rb, col) + at(ra, 3 + row) * at(rb, 3 + col) + at(ra, 6 + row) * at(rb, 6 + col), ROTATION_STEP),
       );
   const shift = frameInvert(a, b.translation);
   return `${linear.join(',')};${shift.map((v) => quantize(v, TRANSLATION_STEP)).join(',')}`;
