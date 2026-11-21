@@ -16,6 +16,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { systemTar } from './systemTar.mjs';
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(desktop, '..');
@@ -61,7 +62,7 @@ async function fetchPython() {
   const archive = path.join(buildDir, 'python.tar.gz');
   writeFileSync(archive, bytes);
   // The archive's top-level directory is `python/`.
-  execFileSync('tar', ['-xzf', archive, '-C', buildDir], { stdio: 'inherit' });
+  execFileSync(systemTar(), ['-xzf', archive, '-C', buildDir], { stdio: 'inherit' });
   rmSync(archive);
 }
 

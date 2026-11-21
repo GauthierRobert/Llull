@@ -32,6 +32,7 @@ import { lowerFeature, needsReach, throughReach } from './featureLowering';
 import { floorEdgeIndices } from './featureFillet';
 import { errorMessage } from '../lib/errorMessage';
 import { sha256Hex } from '../lib/sha256';
+import { LruCache } from '../lib/lruCache';
 
 /** `FaceQueryPort` over native shapes: every method takes the native shape where the port takes a handle. */
 export type FaceQueryOps<S> = {
@@ -91,6 +92,8 @@ export interface KernelOps<S> {
   analyze?(shape: S): ShapeAnalysis | null;
   /** Optional exact mass properties at unit density; a kernel without it leaves `GeometryKernel.massProperties` undefined. */
   massProperties?(shape: S): ExactMassProperties | null;
+  /** Optional tight box of the shape as placed; a kernel without it leaves `GeometryKernel.shapeBounds` undefined. */
+  shapeBounds?(shape: S): { readonly min: Vec3; readonly max: Vec3 } | null;
   /** Optional minimum distance (searched up to `maxDistance`); a kernel without it leaves `GeometryKernel.distance` undefined. */
   distance?(a: S, b: S, maxDistance: number): ShapeDistance | null;
   /** Optional face-level queries (01 §5.9); a kernel without it leaves `GeometryKernel.faceQuery` undefined. */
@@ -288,6 +291,8 @@ function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S
   };
 }
 
+const BOUNDS_CAPACITY = 4096;
+
 /**
  * Wrap native ops as a recipe-evaluating `GeometryKernel` with an LRU of `capacity` native shapes. Failed recipes (null) are cached too, so
  * a refused fillet is not retried on every replay.
@@ -386,6 +391,9 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     }),
   );
   const massOps = ops.massProperties?.bind(ops);
+  const boundsOps = ops.shapeBounds?.bind(ops);
+  /** Tight boxes by shape key (a box answers one native round trip; a null is not kept: a refusal may be transient). */
+  const boundsKept = new LruCache<{ readonly min: Vec3; readonly max: Vec3 }>(BOUNDS_CAPACITY);
   const loadBlobOps = ops.loadBlob?.bind(ops);
   const loadedBlobs = new Set<string>();
   const importOps = ops.importShapes?.bind(ops);
@@ -403,6 +411,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               ...(analyzeOps === undefined ? [] : ['analyze']),
               ...(distanceOps === undefined ? [] : ['distance']),
               ...(massOps === undefined ? [] : ['massProperties']),
+              ...(boundsOps === undefined ? [] : ['shapeBounds']),
               ...(importOps === undefined ? [] : ['importShapes']),
               ...(assemblyOps === undefined ? [] : ['exportStepAssembly']),
               ...(faceQuery === undefined ? [] : ['faceQuery']),
@@ -474,6 +483,20 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
             call(() => {
               const shape = nativeOf(handle);
               return shape === null ? null : massOps(shape);
+            }),
+        }),
+    ...(boundsOps === undefined
+      ? {}
+      : {
+          shapeBounds: (handle: ShapeHandle): { readonly min: Vec3; readonly max: Vec3 } | null =>
+            call(() => {
+              const { key } = bodyOf(handle);
+              const kept = boundsKept.get(key);
+              if (kept !== undefined) return kept;
+              const shape = nativeOf(handle);
+              const box = shape === null ? null : boundsOps(shape);
+              if (box !== null) boundsKept.set(key, box);
+              return box;
             }),
         }),
     ...(distanceOps === undefined

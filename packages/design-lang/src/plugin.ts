@@ -4,11 +4,11 @@
 
 import type { CadPlugin } from '@core/plugins/plugin';
 import { commandCatalog } from '@core/commands/schema';
-import { applyDesign, checkDesign, designSource, exportDesign } from './commands';
+import { applyDesign, checkDesign, designSource, expandDesign, exportDesign } from './commands';
 import { describeDesignSyntax } from './syntax';
 
 export const designPlugin: CadPlugin = {
   name: 'design',
   toolset: 'design',
-  commands: commandCatalog(applyDesign, designSource, checkDesign, exportDesign, describeDesignSyntax),
+  commands: commandCatalog(applyDesign, designSource, checkDesign, exportDesign, expandDesign, describeDesignSyntax),
 };

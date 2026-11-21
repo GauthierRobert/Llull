@@ -84,6 +84,8 @@ mod edge_fold_tests;
 #[cfg(test)]
 mod features_tests;
 #[cfg(test)]
+mod many_tests;
+#[cfg(test)]
 mod mesh_tests;
 #[cfg(test)]
 mod naming_tests;
@@ -136,6 +138,7 @@ mod ffi {
 
         type Shape;
         type StepWriter;
+        type ToolList;
 
         fn init_runtime();
         fn occt_version() -> String;
@@ -153,10 +156,19 @@ mod ffi {
         fn scaled(shape: &Shape, factor: f64) -> Result<UniquePtr<Shape>>;
         fn gtransformed(shape: &Shape, matrix: &[f64], translation: &[f64]) -> Result<UniquePtr<Shape>>;
         fn boolean_op(a: &Shape, b: &Shape, operation: i32, unify: bool) -> Result<UniquePtr<Shape>>;
+        fn new_tool_list() -> UniquePtr<ToolList>;
+        fn tool_list_push(list: Pin<&mut ToolList>, shape: &Shape);
+        fn boolean_many(a: &Shape, tools: &ToolList, operation: i32, unify: bool) -> Result<UniquePtr<Shape>>;
+        fn tool_list_note(list: &ToolList) -> String;
+        fn set_deadline_ms(milliseconds: f64);
+        fn clear_deadline();
+        fn request_cancel(id: i64);
+        fn set_request_id(id: i64);
         fn prefixed(shape: &Shape, prefix: &str) -> Result<UniquePtr<Shape>>;
 
         fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<MeshOut>;
         fn bounding_diagonal(shape: &Shape) -> Result<f64>;
+        fn shape_bounds(shape: &Shape) -> Result<Vec<f64>>;
         fn mass_properties(shape: &Shape) -> Result<MassOut>;
         fn analyze(shape: &Shape) -> Result<AnalysisOut>;
 
@@ -300,6 +312,51 @@ pub fn boolean(op: BooleanOp, a: &Shape, b: &Shape, unify: bool) -> Built {
     built(ffi::boolean_op(inner(a)?, inner(b)?, code, unify))
 }
 
+/// How a multi-tool boolean ended: one General Fuse / Cut result, or why it was refused (the host runs the balanced tree: KRN_FUSE_FALLBACK).
+pub enum ManyOutcome {
+    Built(Box<Shape>),
+    Fallback(Box<str>),
+}
+
+/// `a op (tools...)` in ONE General Fuse (`Union`) or Cut (`Subtract`), then (when `unify`) face merging; see `cpp/boolean_many.cxx`.
+/// A deadline or cancel is an `Err` starting `KRN_TIMEOUT`.
+pub fn boolean_many(op: BooleanOp, a: &Shape, tools: &[&Shape], unify: bool) -> OcctResult<ManyOutcome> {
+    let code = match op {
+        BooleanOp::Union => 0,
+        BooleanOp::Subtract => 1,
+        BooleanOp::Intersect => return Err("boolean_many: intersect takes one tool".to_string()),
+    };
+    let mut list = ffi::new_tool_list();
+    for tool in tools {
+        ffi::tool_list_push(list.pin_mut(), inner(tool)?);
+    }
+    let made = ffi::boolean_many(inner(a)?, &list, code, unify);
+    match built(made)? {
+        Some(shape) => Ok(ManyOutcome::Built(Box::new(shape))),
+        None => Ok(ManyOutcome::Fallback(ffi::tool_list_note(&list).into_boxed_str())),
+    }
+}
+
+/// The running request stops with `KRN_TIMEOUT` once `milliseconds` have passed (0: no deadline).
+pub fn set_deadline_ms(milliseconds: f64) {
+    ffi::set_deadline_ms(milliseconds);
+}
+
+/// Ends the deadline / request id / pending cancel of a finished request.
+pub fn clear_deadline() {
+    ffi::clear_deadline();
+}
+
+/// Names the request the calling thread runs (a positive wire id; anything else: none), so `request_cancel(id)` can stop it.
+pub fn set_request_id(id: i64) {
+    ffi::set_request_id(id);
+}
+
+/// Asks the operation of request `id` to stop at its next progress poll (callable from any thread); another id, or none running: nothing.
+pub fn request_cancel(id: i64) {
+    ffi::request_cancel(id);
+}
+
 /// The same shape with every persistent face name prefixed `<prefix>:` (SC-N1: a leaf names its faces after its entity id).
 pub fn prefixed(shape: &Shape, prefix: &str) -> Built {
     built(ffi::prefixed(inner(shape)?, prefix))
@@ -317,6 +374,12 @@ pub fn bounding_diagonal(shape: &Shape) -> OcctResult<f64> {
     let diagonal = occt(ffi::bounding_diagonal(inner(shape)?))?;
     shape.1.diagonal.set(Some(diagonal));
     Ok(diagonal)
+}
+
+/// Tight box `[min xyz, max xyz]` (AddOptimal of the shape as placed; no mass integration); `None` for an empty or unbounded shape.
+pub fn shape_bounds(shape: &Shape) -> OcctResult<Option<[f64; 6]>> {
+    let values = occt(ffi::shape_bounds(inner(shape)?))?;
+    Ok(<[f64; 6]>::try_from(values).ok())
 }
 
 pub fn mass_properties(shape: &Shape) -> OcctResult<MassOut> {

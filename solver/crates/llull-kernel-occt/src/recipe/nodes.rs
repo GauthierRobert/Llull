@@ -59,12 +59,20 @@ pub(super) fn revolution(face: Shape, axis: [f64; 3], angle: f64, entity: &Value
     place_entity(shape_of(features::revolution_of_face(&face, axis, angle))?, entity, [0.0; 3])
 }
 
-/// Loft (`loftedSolid`): ThruSections through the ring curves (`native.chains`), placed. With the capability `bsplineSections` the host also
+/// Loft (`loftedSolid`): ThruSections through the ring curves (`native.chains`), placed. A ruled polygon loft also carries `native.polygons` (xyz per vertex). With the capability `bsplineSections` the host also
 /// sends each exact section as ONE B-spline (`native.bsplines`): those are tried first, and a refusal or malformed data falls back to the chains.
 /// An advanced loft (end conditions, alignment, coupling, closed, guides) is a `sheetSolid` node, not a leaf (`sheet_node.rs`).
 pub(super) fn loft(entity: &Value) -> Evaluated {
     let native = entity.get("native");
     let ruled = native.and_then(|inner| inner.get("ruled")).and_then(Value::as_bool).unwrap_or(false);
+    // ASC M5: a ruled polygon loft keeps its vertices (MakePolygon sections, vertex k paired with vertex k); a refusal falls back to the straight-edge chains below.
+    if ruled {
+        if let Some(polygons) = chains(native.and_then(|inner| inner.get("polygons"))) {
+            if let Ok(Some(shape)) = features::skinned_polygon_solid(&polygons, ruled) {
+                return place_entity(Some(Rc::new(shape)), entity, [0.0; 3]);
+            }
+        }
+    }
     if let Some(curves) = chains(native.and_then(|inner| inner.get("bsplines"))) {
         if let Ok(Some(shape)) = features::skinned_solid_bsplines(&curves, ruled) {
             return place_entity(Some(Rc::new(shape)), entity, [0.0; 3]);

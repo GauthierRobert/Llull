@@ -16,14 +16,19 @@ import { canonicalJson } from '../../lib/canonicalJson';
 import { roundDeep } from '../../lib/significant';
 import { recipeKey } from '../../geometry/shapeRecipe';
 import type { AssemblyPart, CheckTolerances } from '../../geometry/assemblyCheck/partTypes';
-import { kernelUnsupportedItem, makeItem, validateParts } from '../../geometry/assemblyCheck/partValidity';
-import { candidatePairs, classifyPair, pairItem } from '../../geometry/assemblyCheck/pairClassify';
+import { makeItem, validateParts } from '../../geometry/assemblyCheck/partValidity';
+import { type NarrowPhaseMode, runPairPhase } from '../../geometry/assemblyCheck/pairPhase';
+import { type PairCache, pairCacheOnMemo } from '../../geometry/assemblyCheck/pairCache';
+import { withFrames } from '../../geometry/assemblyCheck/partFrames';
+import { connectionLinks } from '../../geometry/assemblyCheck/connectionLinks';
+import type { SpatialIndexPort } from '../../geometry/spatialIndex';
+import type { ResolveMemo } from '../resolveMemo';
 import { connectivityItems } from '../../geometry/assemblyCheck/connectivity';
 import { type GeometryQueryEngine, meshBvhEngine, resolveGeometryQueries } from '../../geometry/geometryQueries';
 import { measureThickness } from '../../geometry/assemblyCheck/thickness';
 import { realiseJoint } from '../../geometry/assemblyCheck/jointRealisation';
 import { type PartScope, candidateIds, collectParts, scopedIds } from '../../geometry/assemblyParts';
-import { assemblyLinks, intentOf } from '../../geometry/assemblyGraph';
+import { assemblyLinks } from '../../geometry/assemblyGraph';
 import { powInt } from '../../lib/powInt';
 import { maxOf, minOf } from '../../lib/arrayExtrema';
 import { appendAll } from '../../lib/appendAll';
@@ -36,11 +41,13 @@ export interface AssemblyCheckParams extends PartScope {
   readonly thickness?: 'off' | 'ray' | undefined;
   readonly raysPerPart?: number | undefined;
   readonly includeJoints?: boolean | undefined;
+  readonly symmetry?: 'auto' | 'off' | undefined;
+  readonly cache?: boolean | undefined;
+  readonly narrowPhase?: NarrowPhaseMode | undefined;
 }
 
 /** Budgets (TECHNICAL_SPEC 8). */
-export const MAX_PARTS = 500;
-export const MAX_PAIRS = 20_000;
+export const MAX_PARTS = 20_000;
 export const MAX_RAYS_TOTAL = meshBvhEngine.limits.maxThicknessRays;
 export const DEFAULT_RAYS = 2000;
 const CONTAINMENT_RATIO = 0.99;
@@ -52,6 +59,8 @@ export interface BudgetRefusal {
   readonly refused: true;
   readonly limit: string;
   readonly remediation: string;
+  /** Stable code of the refusal (`CHECK_PART_LIMIT`, `FPR_BUDGET_EXCEEDED`). */
+  readonly code?: string;
 }
 
 export type AssemblyCheckOutcome =
@@ -180,15 +189,28 @@ function staleReferenceItem(doc: CadDocument): CheckItem[] {
       ];
 }
 
-const refusal = (limit: string, remediation: string): BudgetRefusal => ({ refused: true, limit, remediation });
+const refusal = (limit: string, remediation: string, code?: string): BudgetRefusal => ({
+  refused: true,
+  limit,
+  remediation,
+  ...(code === undefined ? {} : { code }),
+});
+
+/** Host ports `check_assembly` reads from the execution context. */
+export interface AssemblyCheckPorts {
+  readonly geometryQueries?: GeometryQueryEngine | null | undefined;
+  readonly spatialIndex?: SpatialIndexPort | null | undefined;
+  readonly pairCache?: PairCache | null | undefined;
+  readonly resolveMemo?: ResolveMemo | null | undefined;
+}
 
 export function runAssemblyCheck(
   doc: CadDocument,
   kernel: GeometryKernel,
   params: AssemblyCheckParams,
-  geometryQueries?: GeometryQueryEngine | null,
+  ports: AssemblyCheckPorts = {},
 ): AssemblyCheckOutcome {
-  const engine = resolveGeometryQueries(geometryQueries);
+  const engine = resolveGeometryQueries(ports.geometryQueries);
   const mmPerUnit = MM_PER_UNIT[doc.units];
   const tolerances: CheckTolerances = {
     epsTouch: params.touchToleranceMm === undefined ? DEFAULT_TOUCH_UNITS : params.touchToleranceMm / mmPerUnit,
@@ -201,7 +223,7 @@ export function runAssemblyCheck(
   const selected = scopedIds(doc, params);
   const subjectIds = selected === null ? allIds : allIds.filter((id) => selected.has(id));
   const narrow = 'Narrow the request with ids, body or component.';
-  if (subjectIds.length > MAX_PARTS) return refusal(`${subjectIds.length} parts, limit ${MAX_PARTS}`, narrow);
+  if (subjectIds.length > MAX_PARTS) return refusal(`${subjectIds.length} parts, limit ${MAX_PARTS}`, narrow, 'CHECK_PART_LIMIT');
   const threshold = thresholdOf(params);
   const rays = params.raysPerPart ?? DEFAULT_RAYS;
   const thicknessOn = (params.thickness ?? (threshold === null ? 'off' : 'ray')) === 'ray';
@@ -244,47 +266,44 @@ export function runAssemblyCheck(
     );
   const validity = validateParts(kernel, collected.parts, tolerances);
   appendAll(items, validity.items);
-  const parts = withExactBounds(collected.parts, validity.analyses);
+  const exact = withExactBounds(collected.parts, validity.analyses);
+  const symmetryOn = (params.symmetry ?? 'auto') === 'auto';
+  const framed = symmetryOn ? withFrames(doc, kernel, exact) : { parts: exact, patterns: 0 };
+  const { parts } = framed;
+  const partsById = new Map(parts.map((part) => [part.id, part]));
 
   const links = assemblyLinks(doc, new Set(allIds));
   const strongLinks = [...links.strongLinks];
-  const touchLinks: Array<readonly [string, string]> = [];
-  const candidates = candidatePairs(parts, tolerances.clearance + tolerances.epsTouch).filter(([i, j]) => {
-    const [a, b] = [parts[i], parts[j]];
-    if (a === undefined || b === undefined || (!subjects.has(a.id) && !subjects.has(b.id))) return false;
-    if (validity.excluded.has(a.id) || validity.excluded.has(b.id)) return false;
-    return params.body !== undefined || links.bodyOf.get(a.id) === undefined || links.bodyOf.get(a.id) !== links.bodyOf.get(b.id);
+  const connections = connectionLinks(doc, partsById, mmPerUnit, engine, ports.spatialIndex);
+  appendAll(strongLinks, connections.links);
+  const cache: PairCache | null =
+    params.cache === false
+      ? null
+      : (ports.pairCache ??
+        (ports.resolveMemo === null || ports.resolveMemo === undefined ? null : pairCacheOnMemo(ports.resolveMemo, kernel)));
+  const phase = runPairPhase({
+    doc,
+    kernel,
+    parts,
+    subjects,
+    excluded: validity.excluded,
+    sameBody: (a, b) => params.body === undefined && links.bodyOf.get(a) !== undefined && links.bodyOf.get(a) === links.bodyOf.get(b),
+    analyses: validity.analyses,
+    tolerances,
+    symmetry: symmetryOn,
+    cache,
+    narrowPhase: params.narrowPhase ?? 'auto',
+    engine,
+    spatialIndex: ports.spatialIndex,
   });
-  if (candidates.length > MAX_PAIRS) return refusal(`${candidates.length} candidate pairs, limit ${MAX_PAIRS}`, narrow);
-  let pairsNotRun = false;
-  for (const [i, j] of candidates) {
-    const [a, b] = [parts[i] as AssemblyPart, parts[j] as AssemblyPart];
-    const [analysisA, analysisB] = [validity.analyses.get(a.id), validity.analyses.get(b.id)];
-    const pair =
-      analysisA === undefined || analysisB === undefined
-        ? null
-        : classifyPair(kernel, a, b, analysisA.volume, analysisB.volume, tolerances);
-    if (pair === null) {
-      pairsNotRun = true;
-      continue;
-    }
-    if (pair === undefined) continue;
-    const intent = intentOf(doc, a.id, b.id);
-    items.push(
-      pairItem(
-        pair,
-        [a.id, b.id],
-        tolerances,
-        intent === undefined ? undefined : { id: intent.id, kind: intent.kind, reason: intent.reason, declaredBy: intent.declaredBy },
-      ),
-    );
-    if (pair.kind === 'touch') touchLinks.push([a.id, b.id]);
-    else if (pair.kind !== 'clearance') strongLinks.push([a.id, b.id]);
-  }
-  if (pairsNotRun) items.push(kernelUnsupportedItem(subjectIds, 'pair classification (distance / analyze)'));
+  if (phase.refusal !== null) return refusal(phase.refusal, narrow);
+  appendAll(items, phase.items);
+  appendAll(strongLinks, phase.strongLinks);
+  const touchLinks = phase.touchLinks;
 
   appendAll(items, connectivityItems({ parts: allIds, strongLinks, touchLinks, grounded: links.grounded }));
   const reported = items.filter((entry) => entry.ids.length === 0 || entry.ids.some((id) => subjects.has(id)));
+  appendAll(reported, connections.items);
   if (thicknessOn)
     appendAll(
       reported,
@@ -337,7 +356,10 @@ export function runAssemblyCheck(
       .filter((part) => subjects.has(part.id))
       .map((part) => ({ id: part.id, volumeMm3: (validity.analyses.get(part.id)?.volume ?? 0) * powInt(mmPerUnit, 3) })),
     skipped2D,
-    pairsChecked: candidates.length,
+    pairsChecked: phase.data.pairsChecked,
+    narrowPhase: phase.data.narrowPhase,
+    symmetry: { mode: params.symmetry ?? 'auto', patterns: framed.patterns, expanded: true, ...phase.data.symmetry },
+    connections: connections.summaries,
     ...(thicknessOn ? { geometryQueries: engine.provenance } : {}),
   };
   return { refused: false, result: roundDeep(result), extras: roundDeep(extras) };

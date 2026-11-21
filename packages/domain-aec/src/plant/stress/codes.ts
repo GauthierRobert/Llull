@@ -42,6 +42,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PST_NOZZLE_OVERLOAD:
     'Reduce the nozzle load: add flexibility, move supports or anchors, or use a limit that applies (confirm the rule with the equipment vendor).',
   PST_NOZZLE_LIMIT_MISSING: 'Pass the limit table (api610 table + orientation) or userLimits for the standard.',
+  PST_NOZZLE_PORT_NOT_FOUND: 'Name a port "<tag>:<mark>" of an equipment of the document (equipment_ports lists them).',
+  PST_NOZZLE_NODE_NOT_FOUND:
+    'holderId must be a pipe support or a restraint of the model that holds the pipe at the nozzle (an anchor at the nozzle flange); record again after adding it.',
+  PST_NOZZLE_NOT_AT_PORT:
+    'Anchor the pipe at the nozzle flange (add_stress_restraint anchor at the port position) and name that restraint as holderId.',
+  PST_NOZZLE_NO_LIMITS: 'set_nozzle_load_limit for each nozzle first.',
   PST_HUMAN_GATE: 'A qualified reviewer signs in the desktop app; an agent cannot approve stress results.',
 };
 
@@ -74,6 +80,8 @@ const FINDING_REMEDIATION: Readonly<Record<string, string>> = {
   PST_SPRING_CONSTANT_EFFORT:
     'No variable spring of the table fits: size a constant-effort hanger from the vendor for the stated load and travel.',
   PST_SPRING_LOAD_DEVIATION: 'Re-run select_spring_hangers (the stiffer system changed the travel) or check the spring table values.',
+  PST_HOT_MODULUS:
+    'OPE displacements, reactions and nozzle loads use E at the case temperature; displacement ranges (EXP) are still solved with the stated E (B31.3 319.3.2 / 319.4). Confirm the setting with a qualified engineer or clear it with set_hot_modulus.',
   PST_SHARP_CORNERS: 'Give elbowRadiusFactor 1.5 (long radius) for bends with SIFs.',
   PST_RESTRAINT_OVERRIDDEN: 'Two restraints act on the same degree of freedom; the later one is used.',
   PST_INSTALL_TEMP_DEFAULTED: 'Set installTempC explicitly.',

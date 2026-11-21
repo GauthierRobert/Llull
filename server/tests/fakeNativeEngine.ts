@@ -80,7 +80,7 @@ export function createFakeEngine(durationMs: number, stages = 4, heartbeatMs = 5
       if (scope.deferring) return deferMeshOp('quad_remesh');
       const key = `fake:${op.targetQuads}:${input.mesh.positions.join(',')}`;
       const held = scope.lookup(key);
-      if (held !== undefined) return held;
+      if (held !== undefined && !('frame' in held)) return held;
       if (scope.cancelled) return { code: 'MESH_CANCELLED', message: 'cancelled' };
       scope.request({
         key,

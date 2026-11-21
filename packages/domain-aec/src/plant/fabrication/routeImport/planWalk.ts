@@ -7,7 +7,20 @@ import type { NetworkComponent, NetworkPoint } from '../model';
 import { bodyOf } from './inlineBody';
 import { eccentricStep, isShifted, storedCorner, ZERO } from './eccentric';
 import { flangeStep } from './planFlange';
-import { addBranch, arrive, comp, free, midpoint, otherEnd, refuse, take, type PlanState, type Step, type Walk } from './planState';
+import {
+  addBranch,
+  arrive,
+  comp,
+  free,
+  midpoint,
+  otherEnd,
+  refuse,
+  take,
+  tappingRefusal,
+  type PlanState,
+  type Step,
+  type Walk,
+} from './planState';
 import type { RouteRefusal } from './planTypes';
 
 /** The axis-parallel corner of an elbow whose centre is not given (the L through the first axis the end points differ on). */
@@ -35,6 +48,49 @@ export function startFlangeSet(s: PlanState, w: Walk, startEnd: NetworkPoint): R
   take(s, flange);
   w.consumed.push(comp(s, flange).id);
   w.startPort = { position: startEnd.xyz, direction: normalize3(sub3(joint.xyz, startEnd.xyz)), dn: startEnd.boreMm };
+  w.key = nodeKey(joint.xyz);
+  w.end = joint.xyz;
+  return undefined;
+}
+
+/**
+ * The main run starts at a closed end (the line has another closed end, so the walk could not start at an open one): a CAP, or a blind flange with its gasket and
+ * the flange behind it, is read from the free first end `startEnd` (the closure's closed end) and the walk begins on the pipe side of it.
+ */
+export function startClosure(s: PlanState, w: Walk, startEnd: NetworkPoint, closure: number): RouteRefusal | undefined {
+  const component = comp(s, closure);
+  const mouthPoint = otherEnd(component, w.key);
+  if (mouthPoint === undefined)
+    return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no second end point`, [component.id]);
+  take(s, closure);
+  w.consumed.push(component.id);
+  if (component.type === 'CAP') {
+    w.startCap = { kind: 'cap', mouth: mouthPoint.xyz, tip: startEnd.xyz };
+    w.key = nodeKey(mouthPoint.xyz);
+    w.end = mouthPoint.xyz;
+    return undefined;
+  }
+  const matingKey = nodeKey(mouthPoint.xyz);
+  const gasket = free(s, matingKey).find((i) => comp(s, i).type === 'GASKET');
+  const faceKey = gasket === undefined ? matingKey : nodeKey(otherEnd(comp(s, gasket), matingKey)?.xyz ?? mouthPoint.xyz);
+  const flange = free(s, faceKey, ...(gasket === undefined ? [] : [gasket])).find(
+    (i) => comp(s, i).type === 'FLANGE' && comp(s, i).ends.some((e) => e.endType === 'FL' && nodeKey(e.xyz) === faceKey),
+  );
+  const joint = flange === undefined ? undefined : otherEnd(comp(s, flange), faceKey);
+  if (flange === undefined || joint === undefined)
+    return refuse(
+      'ISO_ROUTE_UNSUPPORTED',
+      `blind flange ${component.id} has no flange behind it (the closed start needs flange, [gasket], blind)`,
+      [component.id],
+    );
+  if (gasket === undefined) s.gasketless.push(comp(s, flange).id, component.id);
+  else {
+    take(s, gasket);
+    s.rebuilt.push(comp(s, gasket).id);
+  }
+  take(s, flange);
+  w.consumed.push(comp(s, flange).id);
+  w.startCap = { kind: 'blindFlange', mouth: mouthPoint.xyz, tip: startEnd.xyz };
   w.key = nodeKey(joint.xyz);
   w.end = joint.xyz;
   return undefined;
@@ -106,6 +162,8 @@ function bodyStep(w: Walk, component: NetworkComponent, entry: NetworkPoint | un
       `instrument ${component.id} has ${[...new Set(component.ends.map((bodyEnd) => bodyEnd.endType))].join(' / ')} ends: route mode takes an instrument with butt-weld ends, or flanged between flange sets (socket-weld and threaded instruments are not rebuilt)`,
       [component.id],
     );
+  const tapped = tappingRefusal(component);
+  if (tapped !== undefined) return tapped;
   if (entry === undefined)
     return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no first end point`, [component.id]);
   w.inline.push(bodyOf(component, entry.xyz, exit.xyz, w.shift, false));

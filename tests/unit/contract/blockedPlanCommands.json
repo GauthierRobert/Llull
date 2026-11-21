@@ -1,18 +1,8 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
-      "export_caesar_neutral"
-    ],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
-      "fit_steel_member"
-    ],
-    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": [
-      "export_pdf"
-    ],
-    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-print-1to50.json": [
-      "load_plot_style",
-      "print_sheet"
-    ]
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": ["export_caesar_neutral"],
+    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": ["export_pdf"],
+    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-print-1to50.json": ["load_plot_style", "print_sheet"]
   }
 }

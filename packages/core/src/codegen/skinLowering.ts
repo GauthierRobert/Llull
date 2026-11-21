@@ -187,9 +187,11 @@ function sweepBuild(entity: SweepEntity): SweptBuild | Refusal {
   return helixBuild(entity) ?? facesBuild(entity);
 }
 
-/** Sections of a basic loft: its exact curves (a B-spline each, closed by a straight edge when its ends differ) or the Catmull-Rom curves of its rings. */
+/** Sections of a basic loft: its exact curves (a B-spline each, closed by a straight edge when its ends differ) or the Catmull-Rom curves of its rings (a polygon loft: its straight edges). */
 function loftSections(entity: LoftEntity): LoftSection[] {
   if (entity.sections !== undefined) return entity.sections.map((curve) => ({ kind: 'bspline', curve, closing: hasClosingEdge(curve) }));
+  if (entity.polygon === true)
+    return entity.rings.map((ring) => ({ kind: 'chain', segments: ring.map((p, k) => [p, ring[(k + 1) % ring.length] as Vec3]) }));
   return entity.rings.map((ring) => ({ kind: 'chain', segments: ringCurves(ring).map((segment) => [...segment.points]) }));
 }
 
@@ -197,6 +199,13 @@ function sizeOf(faces: readonly NurbsSurfaceData[]): number {
   const poles = faces.flatMap((face) => face.poles.flat());
   const extent = [0, 1, 2].map((axis) => maxOf(poles.map((p) => p[axis] as number)) - minOf(poles.map((p) => p[axis] as number)));
   return hypotOf(extent);
+}
+
+/** The section vertices of a ruled polygon loft whose sections share one vertex count (>= 3): the native kernel's polygon path. */
+function polygonRings(entity: LoftEntity): readonly (readonly Vec3[])[] | null {
+  if (entity.polygon !== true || !entity.ruled || entity.sections !== undefined || entity.rings.length < 2) return null;
+  const count = entity.rings[0]?.length ?? 0;
+  return count >= 3 && entity.rings.every((ring) => ring.length === count) ? entity.rings : null;
 }
 
 function loftBuild(entity: LoftEntity): SweptBuild | Refusal {
@@ -210,7 +219,8 @@ function loftBuild(entity: LoftEntity): SweptBuild | Refusal {
     return { kind: 'faces', faces, cap: (entity.caps ?? 2) > 0, tolerance: Math.max(1e-7, 1e-6 * sizeOf(faces)) };
   }
   if (entity.closed === true) return refusal('is closed but carries no exact faces');
-  return { kind: 'loft', sections: loftSections(entity), ruled: entity.ruled };
+  const polygons = polygonRings(entity);
+  return { kind: 'loft', sections: loftSections(entity), ruled: entity.ruled, ...(polygons === null ? {} : { polygons }) };
 }
 
 const fallbackCache = new WeakMap<object, readonly number[]>();

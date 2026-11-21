@@ -34,6 +34,8 @@ export interface Walk {
   /** Offset of the actual axis from the stored one (an eccentric reducer upstream on this leg). */
   shift: Vec3;
   cap: PlannedCap | undefined;
+  /** The closure at the start of the main run (its walk begins on the pipe side of it). */
+  startCap: (PlannedCap & { readonly tip: Vec3 }) | undefined;
 }
 
 /** What one component did to the walk: refused, or moved on past its exit (`advance`), or already moved `end` / `key` itself (`again`). */
@@ -84,4 +86,14 @@ export function arrive(s: PlanState, key: string): void {
 export function addBranch(s: PlanState, parent: string, centre: Vec3, outlet: NetworkPoint): void {
   s.branches += 1;
   s.seeds.push({ key: `branch-${s.branches}`, start: centre, startKey: nodeKey(outlet.xyz), dn: outlet.boreMm, parent });
+}
+
+/** The refusal of an INSTRUMENT with a tapping point (BRANCH1-POINT), or undefined: the RTE cannot branch off an instrument body. */
+export function tappingRefusal(component: NetworkComponent): RouteRefusal | undefined {
+  if (component.type !== 'INSTRUMENT' || component.branch === undefined) return undefined;
+  return refuse(
+    'ISO_ROUTE_UNSUPPORTED',
+    `instrument ${component.id} has a tapping point (BRANCH1-POINT): the RTE cannot branch off an instrument body, so the take-off line cannot be rebuilt (route mode takes an instrument with two end points only)`,
+    [component.id],
+  );
 }

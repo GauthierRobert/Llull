@@ -103,7 +103,7 @@ export const selectSpringHangers = defineCommand({
     'the operating case is solved with every hanger carrying its P_hot as an upward force to get the vertical travel d (up positive); the smallest table size whose load range holds P_hot and whose travel holds |d| is chosen with cold load P_cold = P_hot + k d and variability V = |k d| / P_hot within maxVariability ' +
     '(default 0.25, grade B; use 0.15 near rotating equipment). When no variable size fits and constantEffortFallback is true (default) a constant-effort hanger of load P_hot is stored instead and listed in the warnings; with false the refusal is PST_SPRING_NO_SIZE (no size covers load and travel) or PST_SPRING_VARIABILITY. ' +
     'The selection replaces the rigid rest of a hanger support at that place: afterwards the analysis treats it as a linear spring (rate k) with preload P_cold, and the result reports the operating load of each spring against P_hot (residualPct; above 1 percent the warning PST_SPRING_LOAD_DEVIATION). ' +
-    'Loads N, rates N/mm, travel mm. Returns data { modelId, operatingCase, springs[{ id, kind, size, series, rateNPerMm, hotLoadN, coldLoadN, travelUpMm, variability, operatingLoadN, residualPct }], warnings, defaulted }.',
+    'Loads N, rates N/mm, travel mm. With the model setting hotModulus (set_hot_modulus) the travel solve uses E at the operating temperature of the OPE case (data.hotModulusMPa, else null). Returns data { modelId, operatingCase, hotModulusMPa, springs[{ id, kind, size, series, rateNPerMm, hotLoadN, coldLoadN, travelUpMm, variability, operatingLoadN, residualPct }], warnings, defaulted }.',
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),
     hangers: z.array(at).min(1).max(200).describe('The hanger points to design, each {supportId} or {pipeId, atMm}.'),
@@ -238,7 +238,16 @@ export const selectSpringHangers = defineCommand({
         `select_spring_hangers: ${springs.map((spring) => `${spring.id} ${spring.kind === 'variable' ? `${spring.series}/${spring.size} k ${spring.rateNPerMm} N/mm, cold ${spring.coldLoadN.toFixed(0)} N, V ${spring.variability.toFixed(3)}` : 'constant-effort'} (hot ${spring.hotLoadN.toFixed(0)} N, d ${spring.travelUpMm.toFixed(2)} mm, operating error ${spring.residualPct.toFixed(2)} %)`).join('; ')}${warnings.length > 0 ? `; warnings ${[...new Set(warnings.map((warning) => warning.code))].join(', ')}` : ''}${defaulted.length > 0 ? `; defaulted ${defaulted.join(', ')}` : ''}.`,
         [model.id, ...selections.map((spring) => spring.id)],
       ),
-      data: { modelId: model.id, operatingCase: design.operatingCase, springs, warnings, defaulted, reviewRequired: true, grade: 'B' },
+      data: {
+        modelId: model.id,
+        operatingCase: design.operatingCase,
+        hotModulusMPa: design.hotModulusMPa ?? null,
+        springs,
+        warnings,
+        defaulted,
+        reviewRequired: true,
+        grade: 'B',
+      },
     };
   },
 });

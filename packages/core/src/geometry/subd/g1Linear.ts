@@ -8,6 +8,7 @@
 
 import type { Vec3 } from '../../model/types';
 import { maxOf } from '../../lib/arrayExtrema';
+import { factorRows } from './g1Factored';
 
 /** A condition: coefficient x unknown pairs over the local unknowns of a group. */
 export type SparseRow = ReadonlyArray<readonly [number, number]>;
@@ -35,6 +36,8 @@ export const DENSE_MAX_UNKNOWNS = 900;
 /** Multiply-adds of the dense path (Gram-Schmidt twice: 2 rows^2 x unknowns) and of the sparse path (nonzeros x iterations x 2 products x 3 axes); `maxWork` is an approximate bound (it counts the products over the nonzeros, not the vector bookkeeping). */
 const DENSE_MAX_WORK = 2.5e9;
 const SPARSE_MAX_WORK = 1.5e9;
+/** Multiply-adds of the direct projector (envelope factorisation + its projections, `g1Factored.ts`) after the feasibility iterations; a `maxWork` argument replaces it. */
+const DIRECT_MAX_WORK = 5e9;
 /** Iterations of the projected conjugate gradient of the objective, and its ridge (relative to a sample weight of 1). */
 const OBJECTIVE_ITERATIONS = 80;
 const RIDGE = 1e-8;
@@ -225,11 +228,12 @@ export function solveSparse(
   b: readonly Vec3[],
   start: Vec3[],
   samples: readonly Sample[] = [],
-  maxWork = SPARSE_MAX_WORK,
+  maxWork?: number,
+  projector: 'direct' | 'iterative' = 'direct',
 ): Solution {
   const n = start.length;
   const nonzeros = rows.reduce((sum, row) => sum + row.length, 0);
-  const iterations = Math.min(6 * n, Math.floor(maxWork / Math.max(1, 12 * nonzeros)));
+  const iterations = Math.min(6 * n, Math.floor((maxWork ?? SPARSE_MAX_WORK) / Math.max(1, 12 * nonzeros)));
   let feasibilityIterations = 0;
   const columns: Float64Array[] = [];
   let capped = false;
@@ -273,19 +277,43 @@ export function solveSparse(
   };
   if (capped || samples.length === 0) return solution;
   const sampleNonzeros = samples.reduce((sum, sample) => sum + sample.terms.length, 0);
-  // work left after the feasibility iterations (12 nonzeros each), per axis: PROJECTIONS projections (each `inner` CGLS iterations of 4 nonzeros, plus 2 products over the rows and 4 over the samples)
-  // and the repair (REPAIR_ROUNDS rounds of 4 x inner iterations of 4 nonzeros); maxWork is approximate (the counts are of multiply-adds by nonzeros, not of the vector bookkeeping)
-  const left = maxWork - feasibilityIterations * 12 * nonzeros;
+  // work left after the feasibility iterations (12 nonzeros each)
+  const used = feasibilityIterations * 12 * nonzeros;
+  const left = (maxWork ?? SPARSE_MAX_WORK) - used;
+  // direct: the envelope factor of A A^T (`g1Factored.ts`) when it fits what is left; the same projected conjugate gradient then costs two sweeps per projection
+  const direct =
+    projector === 'direct'
+      ? factorRows(
+          rows,
+          n,
+          (maxWork ?? DIRECT_MAX_WORK) - used - 3 * PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros),
+          PROJECTIONS,
+          REPAIR_ROUNDS,
+        )
+      : null;
+  // iterative: per axis PROJECTIONS projections (each `inner` CGLS iterations of 4 nonzeros, plus 2 products over the rows and 4 over the samples) and the repair (REPAIR_ROUNDS rounds of
+  // 4 x `inner` iterations of 4 nonzeros); maxWork is approximate (the counts are of multiply-adds by nonzeros, not of the vector bookkeeping)
   const perAxis = left / 3 - PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros);
   const inner = Math.min(MAX_INNER_ITERATIONS, Math.floor(perAxis / Math.max(1, (PROJECTIONS * 4 + REPAIR_ROUNDS * 4 * 4) * nonzeros)));
-  if (inner < MIN_INNER_ITERATIONS) return solution;
-  const improved = columns.map((column, axis) => limitObjective(rows, samples, column, axis, inner));
-  const repaired = improved.map((column, axis) => repair(rows, b, column, axis, inner));
+  if (direct === null && inner < MIN_INNER_ITERATIONS) return solution;
+  const improved = columns.map((column, axis) =>
+    limitObjective(samples, column, axis, direct?.project ?? ((v) => cglsProject(rows, v, inner))),
+  );
+  const repaired = improved.map((column, axis) =>
+    repair(rows, b, column, axis, direct?.pseudoInverse ?? ((r) => cglsPseudoInverse(rows, n, r, 4 * inner))),
+  );
   const residual = violation(rows, b, repaired);
+  const reported = direct === null ? inner : 0;
   // acceptance gate: a projection too rough to keep the conditions (the repair could not bring x back onto A x = b) keeps the nearest-to-start solution
   return residual < solution.residual * 1e3 + 1e-12
-    ? { x: asPoints(repaired, n), residual, status: 'ok', objective: 'limit', projectionIterations: inner }
-    : { ...solution, projectionIterations: inner };
+    ? {
+        x: asPoints(repaired, n),
+        residual,
+        status: 'ok',
+        objective: 'limit',
+        ...(direct === null ? { projectionIterations: reported } : {}),
+      }
+    : { ...solution, ...(direct === null ? { projectionIterations: reported } : {}) };
 }
 
 /** The product A^+ A v by CGLS on the rows from zero (the part of v in the row space of A), `iterations` at most. */
@@ -320,20 +348,21 @@ function rowSpacePart(rows: readonly SparseRow[], v: Float64Array, iterations: n
   return z;
 }
 
+/** The iterative projector: v - A^+ A v with A^+ A v by CGLS on the rows, `inner` iterations at most. */
+function cglsProject(rows: readonly SparseRow[], v: Float64Array, inner: number): Float64Array {
+  const part = rowSpacePart(rows, v, inner);
+  return v.map((value, k) => value - (part[k] as number));
+}
+
 /** x moved inside the null space of the rows (v -> v - A^+ A v) towards the samples of the limit surface: projected conjugate gradient with a small ridge. */
 function limitObjective(
-  rows: readonly SparseRow[],
   samples: readonly Sample[],
   start: Float64Array,
   axis: number,
-  inner: number,
+  project: (v: Float64Array) => Float64Array,
 ): Float64Array {
   const n = start.length;
   const x = Float64Array.from(start);
-  const project = (v: Float64Array): Float64Array => {
-    const part = rowSpacePart(rows, v, inner);
-    return v.map((value, k) => value - (part[k] as number));
-  };
   const t = samples.map((sample) => (sample.target[axis] as number) - (sample.constant[axis] as number));
   const applyW = (v: Float64Array): Float64Array => Float64Array.from(samples, (sample) => rowDot(sample.terms, v));
   const applyWT = (w: Float64Array): Float64Array => {
@@ -359,40 +388,50 @@ function limitObjective(
   return x;
 }
 
-/** x corrected back onto A x = b (the inexact projections drift off it by rounding of the inner solves): x + A^+ (b - A x). */
-function repair(rows: readonly SparseRow[], b: readonly Vec3[], x: Float64Array, axis: number, inner: number): Float64Array {
-  const n = x.length;
+/** A^+ residual by CGLS on the rows from zero, `iterations` at most. */
+function cglsPseudoInverse(rows: readonly SparseRow[], n: number, residual: Float64Array, iterations: number): Float64Array {
+  const z = new Float64Array(n);
+  let r = Float64Array.from(residual);
+  const applyT = (w: Float64Array): Float64Array => {
+    const out = new Float64Array(n);
+    rows.forEach((row, i) => {
+      const wi = w[i] as number;
+      if (wi !== 0) for (const [k, c] of row) out[k] = (out[k] as number) + c * wi;
+    });
+    return out;
+  };
+  let s = applyT(r);
+  let p = Float64Array.from(s);
+  let gamma = dot(s, s);
+  const stop = 1e-30 * Math.max(gamma, 1e-300);
+  for (let it = 0; it < iterations && gamma > stop; it++) {
+    const q = Float64Array.from(rows, (row) => rowDot(row, p));
+    const denominator = dot(q, q);
+    if (!(denominator > 1e-300)) break;
+    const alpha = gamma / denominator;
+    for (let k = 0; k < n; k++) z[k] = (z[k] as number) + alpha * (p[k] as number);
+    r = r.map((value, i) => value - alpha * (q[i] as number));
+    s = applyT(r);
+    const fresh = dot(s, s);
+    p = s.map((value, k) => value + (fresh / gamma) * (p[k] as number));
+    gamma = fresh;
+  }
+  return z;
+}
+
+/** x corrected back onto A x = b (the inexact projections drift off it by rounding of the inner solves): x + A^+ (b - A x), `pseudoInverse` = A^+. */
+function repair(
+  rows: readonly SparseRow[],
+  b: readonly Vec3[],
+  x: Float64Array,
+  axis: number,
+  pseudoInverse: (residual: Float64Array) => Float64Array,
+): Float64Array {
   let current = x;
   for (let round = 0; round < REPAIR_ROUNDS; round++) {
     const residual = Float64Array.from(rows, (row, i) => ((b[i] as Vec3)[axis] as number) - rowDot(row, current));
     if (Math.sqrt(dot(residual, residual)) < 1e-14) break;
-    // A^+ residual by CGLS on the rows
-    const z = new Float64Array(n);
-    let r = Float64Array.from(residual);
-    const applyT = (w: Float64Array): Float64Array => {
-      const out = new Float64Array(n);
-      rows.forEach((row, i) => {
-        const wi = w[i] as number;
-        if (wi !== 0) for (const [k, c] of row) out[k] = (out[k] as number) + c * wi;
-      });
-      return out;
-    };
-    let s = applyT(r);
-    let p = Float64Array.from(s);
-    let gamma = dot(s, s);
-    const stop = 1e-30 * Math.max(gamma, 1e-300);
-    for (let it = 0; it < 4 * inner && gamma > stop; it++) {
-      const q = Float64Array.from(rows, (row) => rowDot(row, p));
-      const denominator = dot(q, q);
-      if (!(denominator > 1e-300)) break;
-      const alpha = gamma / denominator;
-      for (let k = 0; k < n; k++) z[k] = (z[k] as number) + alpha * (p[k] as number);
-      r = r.map((value, i) => value - alpha * (q[i] as number));
-      s = applyT(r);
-      const fresh = dot(s, s);
-      p = s.map((value, k) => value + (fresh / gamma) * (p[k] as number));
-      gamma = fresh;
-    }
+    const z = pseudoInverse(residual);
     current = current.map((value, k) => value + (z[k] as number));
   }
   return current;

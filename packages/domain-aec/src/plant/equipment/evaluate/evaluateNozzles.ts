@@ -5,6 +5,7 @@ import type { BuildingLevel, EquipmentElement } from '@aec/building/types';
 import { eulerFromAxes } from '@lib/eulerRotation';
 import { cross3, normalize3OrZero } from '@lib/vec3';
 import { base } from '../../../building/evaluate/entities';
+import { outsideWallOf } from '../geometry/nozzleMass';
 import { placeNozzle, directionToWorld, toWorld } from '../geometry/ports';
 import type { NozzleRecord } from '../plantData';
 import { hypotOf } from '@lib/hypotOf';
@@ -20,20 +21,26 @@ export function rotationToward(direction: Vec3): Vec3 {
   return eulerFromAxes(x, y, direction);
 }
 
-/** Neck (outside diameter, wall) and flange (outside diameter, thickness) as one L-shaped revolution section along the nozzle axis. */
-function nozzleSection(nozzle: NozzleRecord, length: number): Array<[number, number]> {
+/**
+ * Neck (outside diameter, wall), flange (outside diameter, thickness) and the optional flat reinforcing pad as one revolution section along the nozzle axis. The axis starts
+ * at mid-wall, so the pad sits `padStart` (mid-wall to outside wall) up it; its top is clamped under the flange shoulder (validation keeps it clear).
+ */
+function nozzleSection(nozzle: NozzleRecord, length: number, padStart: number): Array<[number, number]> {
   const outer = nozzle.neckOutsideDiameter / 2;
   const inner = Math.max(outer - nozzle.neckWall, outer * 0.2);
   const flangeRadius = nozzle.flange.outsideDiameter / 2;
   const shoulder = Math.max(length - nozzle.flange.thickness, 0);
-  return [
-    [inner, 0],
-    [outer, 0],
-    [outer, shoulder],
-    [flangeRadius, shoulder],
-    [flangeRadius, length],
-    [inner, length],
-  ];
+  const pad = nozzle.pad;
+  const padRing: Array<[number, number]> =
+    pad === undefined
+      ? []
+      : [
+          [outer, padStart],
+          [pad.outsideDiameter / 2, padStart],
+          [pad.outsideDiameter / 2, Math.min(padStart + pad.thickness, shoulder)],
+          [outer, Math.min(padStart + pad.thickness, shoulder)],
+        ];
+  return [[inner, 0], [outer, 0], ...padRing, [outer, shoulder], [flangeRadius, shoulder], [flangeRadius, length], [inner, length]];
 }
 
 /** One revolution entity per placeable nozzle of `element`, in nozzle order. */
@@ -45,7 +52,8 @@ export function evaluateNozzles(element: EquipmentElement, level: BuildingLevel)
     if (placement === null) return [];
     const length = hypotOf(placement.face.map((value, index) => value - (placement.base[index] as number)));
     if (length <= 0) return [];
-    const section = nozzleSection(nozzle, length);
+    const padStart = Math.max(0, outsideWallOf(plant.template, nozzle) - (nozzle.projection - length));
+    const section = nozzleSection(nozzle, length, padStart);
     const entity: RevolutionEntity = {
       ...base(
         element,

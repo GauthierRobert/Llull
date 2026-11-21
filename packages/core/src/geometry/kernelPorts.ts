@@ -247,6 +247,16 @@ export interface BlendBuildNotes {
   }>;
 }
 
+/** How a multi-tool `boolean` node (`many`) ran (ASC M1a, `kernel.booleanReport`): one General Fuse / Cut, or the balanced-tree fallback. */
+export interface BooleanReport {
+  readonly mode: 'general-fuse' | 'balanced-tree';
+  readonly tools: number;
+  /** Set with `code: 'KRN_FUSE_FALLBACK'` when the General Fuse result was refused and the balanced tree ran. */
+  readonly fallback?: boolean;
+  readonly code?: 'KRN_FUSE_FALLBACK';
+  readonly reason?: string;
+}
+
 /** How an exact `deform` node built, or why it was refused (01 DEF M2, `kernel.deformReport`). Lengths in document units. */
 export interface DeformReport {
   readonly ok: boolean;

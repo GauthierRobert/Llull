@@ -16,6 +16,7 @@ import { cfdResultPort } from '../cfd/resultPort';
 import { currentScope } from '../native/deferredRun';
 import { exportFilePort } from '../exportFiles';
 import { hostVersion } from '../hostVersion';
+import { createViewportCapturePort } from '../viewport/capturePort';
 
 export function serverContext(
   onStep?: (event: PlanStepEvent) => void,
@@ -33,6 +34,7 @@ export function serverContext(
     meshAssets: defaultMeshAssetStore(),
     exportFiles: exportFilePort(),
     hostVersion: hostVersion(),
+    viewportCapture: createViewportCapturePort(),
     // inside `resolveDeferred`: the memo the runs of that resolve share (TECHNICAL_SPEC 13.9)
     resolveMemo: currentScope()?.memo ?? null,
   };

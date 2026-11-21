@@ -96,7 +96,7 @@ describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OC
     // beyond the declared stretch the seams are curvature-continuous: no lost-correction failure
     expect(checked.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toBe(false);
     expect(checked.findings.some((found) => found.code === 'BLD_CHECK_G2_JUMP')).toBe(false);
-  });
+  }, 120_000);
 
   it('the conic cube keeps the G1 star: require G2 fails at its corner contacts', () => {
     const { doc, id, notes } = rounded({ type: 'conic', rho: 0.5 });

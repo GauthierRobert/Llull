@@ -54,6 +54,7 @@ export function extractionHash(extraction: Omit<PendingExtraction, 'extractionHa
 
 const UNVERIFIED_CODES: ReadonlySet<string> = new Set([
   'SCN_FIT_LOW_COVERAGE',
+  'SCN_STEEL_LOW_COVERAGE',
   'SCN_FIT_HIGH_RMS',
   'SCN_TRACE_SKEW',
   'SCN_TRACE_BEND_RADIUS_UNMEASURED',

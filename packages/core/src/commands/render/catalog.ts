@@ -5,6 +5,14 @@ import { renderView } from './renderView';
 import { renderWalkthrough } from './renderWalkthrough';
 import { renderMotion } from './renderMotion';
 import { renderAnimation } from './renderAnimation';
+import { captureViewport } from './captureViewport';
 import { visibleEntityIds } from './visibleEntityIds';
 
-export const renderCommands = commandCatalog(renderView, renderWalkthrough, renderMotion, renderAnimation, visibleEntityIds);
+export const renderCommands = commandCatalog(
+  renderView,
+  renderWalkthrough,
+  renderMotion,
+  renderAnimation,
+  visibleEntityIds,
+  captureViewport,
+);

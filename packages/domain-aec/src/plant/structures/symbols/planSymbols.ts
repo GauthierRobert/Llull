@@ -10,7 +10,7 @@ import { elementsOf } from '@aec/building/model';
 import type { BuildingModel, GratingElement, LadderElement, RailingElement, SteelStairElement } from '@aec/building/types';
 import { findProfile } from '../../../steel/profiles';
 import { cumulativeLengths, guardedSegments, layoutRailing, pointAlong } from '../railing/railingLayout';
-import { directionOf, layoutSteelStair } from '../stair/steelStairLayout';
+import { directionOf, framePoint, layoutSteelStair, type StairFrame, type StairRegion } from '../stair/steelStairLayout';
 import { stairSizes } from '../stair/steelStairMeasure';
 import { hatchLines } from './hatch';
 
@@ -124,16 +124,21 @@ function ladderSymbol(ladder: LadderElement, factor: number): PlanPrimitive[] {
 
 function stairSymbol(doc: CadDocument, stair: SteelStairElement, factor: number): PlanPrimitive[] {
   const layout = layoutSteelStair(stair, stairSizes(doc, stair));
-  const { forward, left } = directionOf(stair.angle);
   const half = stair.width / 2;
-  const at = (station: number, across: number): Vec2 =>
-    scale([stair.start[0] + forward[0] * station + left[0] * across, stair.start[1] + forward[1] * station + left[1] * across], factor);
-  const run = layout.run;
+  const at = (frame: StairFrame, station: number, across: number): Vec2 => scale(framePoint(frame, station, across), factor);
   const primitives: PlanPrimitive[] = [
-    { t: 'poly', layer: 'S-STAR', points: [at(0, -half), at(run, -half), at(run, half), at(0, half)], closed: true },
-    ...layout.stations
-      .slice(1, -1)
-      .map((station): PlanPrimitive => ({ t: 'line', layer: 'S-STAR', a: at(station, -half), b: at(station, half) })),
+    ...layout.regions.map(
+      ({ frame, from, to, across }): PlanPrimitive => ({
+        t: 'poly',
+        layer: 'S-STAR',
+        points: [at(frame, from, across[0]), at(frame, to, across[0]), at(frame, to, across[1]), at(frame, from, across[1])],
+        closed: true,
+      }),
+    ),
+    ...layout.stations.slice(1, -1).map((station, index): PlanPrimitive => {
+      const frame = layout.riserFrames[index + 1] as StairFrame;
+      return { t: 'line', layer: 'S-STAR', a: at(frame, station, -half), b: at(frame, station, half) };
+    }),
     ...layout.landings.map(
       (plate): PlanPrimitive => ({
         t: 'poly',
@@ -143,11 +148,15 @@ function stairSymbol(doc: CadDocument, stair: SteelStairElement, factor: number)
       }),
     ),
   ];
+  const last = layout.regions[layout.regions.length - 1] as StairRegion;
+  const { frame } = last;
+  const { forward } = directionOf(frame.angle);
+  const span = last.to - last.from;
   const head = SYMBOL_SIZES_MM.arrowHead;
-  const tip = at(run * 0.9, 0);
-  const back = at(run * 0.1, 0);
+  const tip = at(frame, last.from + span * 0.9, 0);
+  const back = at(frame, last.from + span * 0.1, 0);
   const across = (distanceMm: number, side: number): Vec2 => {
-    const base = at(run * 0.9 - fromMm(doc, head) * 0.5, 0);
+    const base = at(frame, last.from + span * 0.9 - fromMm(doc, head) * 0.5, 0);
     return [base[0] + (-forward[1] * side * distanceMm) / 2, base[1] + (forward[0] * side * distanceMm) / 2];
   };
   primitives.push(
@@ -157,7 +166,7 @@ function stairSymbol(doc: CadDocument, stair: SteelStairElement, factor: number)
     {
       t: 'text',
       layer: 'S-TEXT',
-      at: at(0, half + fromMm(doc, SYMBOL_SIZES_MM.text)),
+      at: at(layout.frames[0] as StairFrame, 0, half + fromMm(doc, SYMBOL_SIZES_MM.text)),
       size: SYMBOL_SIZES_MM.text,
       text: `${stair.mark} UP ${stair.riserCount} R`,
     },

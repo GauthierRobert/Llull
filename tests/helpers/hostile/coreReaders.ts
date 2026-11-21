@@ -12,6 +12,7 @@ import { float64ToBase64 } from '@lib/float64Base64';
 import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
+import { pngHeader } from '@lib/pngHeader';
 import { parseUnit } from '@lib/quantity';
 import { parseIsoMetric, parseThreadDimensions } from '@lib/threadForm';
 import { parseBody } from '@plm/pdm/args';
@@ -120,6 +121,26 @@ const documentBuild = (records: number): string => {
   const ids = Array.from({ length: records }, (_, k) => `box-${k}`);
   const doc: CadDocument = { ...base, entities: Object.fromEntries(ids.map((id) => [id, { ...(boxEntity as Entity), id }])), order: ids };
   return serializeDocument(doc);
+};
+
+/** A saved document with one exact ruled polygon loft, its record changed by `tamper`: the hostile combinations of `polygon: true`. */
+const polygonLoftDocument = (tamper: (record: Record<string, unknown>) => void): string => {
+  const rect = (h: number): number[][] => [
+    [-h, -h],
+    [h, -h],
+    [h, h],
+    [-h, h],
+  ];
+  const made = execute(createEmptyDocument(), 'loft_sections', {
+    ruled: true,
+    sections: [
+      { section: rect(3), center: [0, 0, 0] },
+      { section: rect(1), center: [0, 0, 5] },
+    ],
+  });
+  const saved = JSON.parse(serializeDocument(made.document)) as { document: { entities: Record<string, Record<string, unknown>> } };
+  for (const record of Object.values(saved.document.entities)) tamper(record);
+  return JSON.stringify(saved);
 };
 
 /** A saved document holding one instance array (VIS1), with `tamper` applied to its parsed record: the hostile variants of the packed table. */
@@ -569,6 +590,20 @@ export const CORE_READERS: readonly HostileReader[] = [
     accepts: (result) => (result as { ok: boolean }).ok,
   },
   {
+    name: 'core: pngHeader (size of a PNG frame received from the renderer)',
+    covers: ['core/src/lib/pngHeader.ts:pngHeader'],
+    input: 'bytes',
+    build: (records) => Uint8Array.from([...png1x1(), ...new Array<number>(records * 8).fill(0)]),
+    read: (input) => pngHeader(asBytes(input)),
+    accepts: (result) => (result as { width: number } | null)?.width === 1,
+    extra: [
+      { name: 'signature only', input: () => Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]) },
+      { name: 'IHDR of the wrong length', input: () => Uint8Array.from([...png1x1().slice(0, 11), 99, ...png1x1().slice(12)]) },
+      { name: 'zero width', input: () => Uint8Array.from([...png1x1().slice(0, 16), 0, 0, 0, 0, ...png1x1().slice(20)]) },
+      { name: 'not a PNG', input: () => new Uint8Array(64).fill(255) },
+    ],
+  },
+  {
     name: 'core: parseMaterialLibrary (llull-material-library JSON)',
     covers: ['core/src/commands/materials/libraryFormat.ts:parseMaterialLibrary', 'import_material_library'],
     input: 'text',
@@ -598,6 +633,10 @@ export const CORE_READERS: readonly HostileReader[] = [
       },
       { name: 'instance array: table as a nested array', input: () => arrayDocument((record) => (record['transforms'] = [[[1]]])) },
       { name: 'instance array: component id __proto__', input: () => arrayDocument((record) => (record['componentId'] = '__proto__')) },
+      { name: 'polygon loft: ruled false', input: () => polygonLoftDocument((record) => (record['ruled'] = false)) },
+      { name: 'polygon loft: closed true', input: () => polygonLoftDocument((record) => (record['closed'] = true)) },
+      { name: 'polygon loft: with exact sections', input: () => polygonLoftDocument((record) => (record['sections'] = [])) },
+      { name: 'polygon loft: with exact faces', input: () => polygonLoftDocument((record) => (record['faces'] = [])) },
       {
         name: 'implicit body: material that is not in the document',
         input: () => implicitBodyDocument((body) => (body['materialId'] = 'ghost')),

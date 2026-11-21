@@ -39,7 +39,7 @@ function unionOf(recipes: readonly ShapeRecipe[]): ShapeRecipe | null {
 }
 
 /** The 3D solids of an instance, nested instances expanded; null when the nesting is too deep or a component is missing. */
-function instanceSolids(doc: CadDocument, instance: InstanceEntity, depth: number): Entity[] | null {
+export function instanceSolids(doc: CadDocument, instance: InstanceEntity, depth: number): Entity[] | null {
   const component = doc.components[instance.componentId];
   if (component === undefined || depth > MAX_NESTING) return null;
   const solids: Entity[] = [];
@@ -55,7 +55,8 @@ function instanceSolids(doc: CadDocument, instance: InstanceEntity, depth: numbe
   return solids;
 }
 
-function recipeOfPart(doc: CadDocument, kernel: GeometryKernel, entity: Entity): ShapeRecipe | 'unbuildable' {
+/** Recipe of an assembly part: a solid's own, an instance's solids unioned through its transform, or 'unbuildable'. */
+export function recipeOfPart(doc: CadDocument, kernel: GeometryKernel, entity: Entity): ShapeRecipe | 'unbuildable' {
   if (entity.kind !== 'instance') return operandRecipe(kernel, entity);
   const solids = instanceSolids(doc, entity as InstanceEntity, 0);
   return (solids === null ? null : unionOf(solids.map((member) => operandRecipe(kernel, member)))) ?? 'unbuildable';

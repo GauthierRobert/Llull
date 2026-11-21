@@ -86,4 +86,31 @@ describe('native kernel session', () => {
     const session = createKernelSession(fakeChild({ failWrites: true }));
     expect(await session.request('info', [])).toEqual({ result: null, error: 'NATIVE_DIED: EPIPE' });
   });
+
+  it('sends the deadline with a request and a cancel message as its own line', async () => {
+    const child = fakeChild();
+    const session = createKernelSession(child);
+    const pending = session.request('evaluate', [], 1500);
+    void session.request('info', []);
+    session.cancel();
+    expect(child.written.map((line) => JSON.parse(line) as object)).toEqual([
+      { id: 1, op: 'evaluate', args: [], deadlineMs: 1500 },
+      { id: 2, op: 'info', args: [] },
+      { cancel: 1 },
+      { cancel: 2 },
+    ]);
+    child.emitLine('{"id":1,"result":null,"error":"KRN_TIMEOUT: stage=Fuse fraction=0.5"}');
+    expect(await pending).toEqual({ result: null, error: 'KRN_TIMEOUT: stage=Fuse fraction=0.5' });
+    expect(session.alive()).toBe(true);
+  });
+
+  it('cancel does nothing once the process is gone or a write fails', () => {
+    const child = fakeChild();
+    const session = createKernelSession(child);
+    child.exit('exited with code 1');
+    session.cancel();
+    expect(child.written).toEqual([]);
+    const broken = createKernelSession(fakeChild({ failWrites: true }));
+    expect(() => broken.cancel()).not.toThrow();
+  });
 });

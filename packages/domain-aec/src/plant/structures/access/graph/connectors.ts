@@ -5,7 +5,7 @@ import { MM_PER_UNIT } from '@core/model/units';
 import { elementsOf } from '@aec/building/model';
 import type { BuildingModel, LadderElement, StairElement, SteelStairElement } from '@aec/building/types';
 import { flightPoint, stairFlights as concreteFlights, stairPoint } from '@aec/building/geometry/stairGeometry';
-import { directionOf, layoutSteelStair } from '../../stair/steelStairLayout';
+import { stairEnd } from '../../stair/steelStairLayout';
 import { stairSizes } from '../../stair/steelStairMeasure';
 import { distanceToRegion, boxesNear } from './regions';
 import { CONNECT_REACH_MM, CONNECT_Z_MM, GRADE_ID, type AccessEdge, type DanglingConnector, type SurfaceNode } from './types';
@@ -87,18 +87,14 @@ function ladderEnds(building: BuildingModel, ladder: LadderElement, factor: numb
 function steelStairEnds(doc: CadDocument, building: BuildingModel, stair: SteelStairElement, factor: number): Ends | null {
   const level = building.levels[stair.levelId];
   if (level === undefined) return null;
-  const { forward } = directionOf(stair.angle);
-  const run = layoutSteelStair(stair, stairSizes(doc, stair)).run;
+  const end = stairEnd(stair, stairSizes(doc, stair));
   const foot = (level.elevation + stair.start[2]) * factor;
   return {
     id: stair.id,
     mark: stair.mark,
     kind: 'stair',
     bottom: { point: [stair.start[0] * factor, stair.start[1] * factor], zMm: foot },
-    top: {
-      point: [(stair.start[0] + forward[0] * run) * factor, (stair.start[1] + forward[1] * run) * factor],
-      zMm: foot + stair.rise * factor,
-    },
+    top: { point: [end[0] * factor, end[1] * factor], zMm: foot + stair.rise * factor },
     clearWidthMm: stair.width * factor,
   };
 }

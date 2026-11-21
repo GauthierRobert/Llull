@@ -9,6 +9,8 @@ import type { CadDocument, Vec3 } from '../../../model/types';
 import type { ReviewIssue, ViewpointCamera } from '../../../model/review';
 import { escapeXml } from '../../../lib/escapeXml';
 import { toMetres } from '../../../model/units';
+import { documentProjection } from '../../../plugins/host';
+import type { IfcSchemaName } from '../../../plugins/plugin';
 
 export type BcfVersion = '3.0' | '2.1';
 
@@ -157,8 +159,7 @@ function bcfMarkup21Xml(
 }
 
 /**
- * A viewpoint (*.bcfv): selection, default visibility, the `colouring` groups (Coloring, one Color per group) and the camera in metres. Entities carry no IFC GUID in llull yet,
- * so each component is identified by OriginatingSystem "llull" + AuthoringToolId (its entity id).
+ * A viewpoint (*.bcfv): selection, default visibility, the `colouring` groups (Coloring, one Color per group) and the camera in metres. A component is identified by OriginatingSystem "llull" + AuthoringToolId (its entity id) and, when a plugin projection `ifcGuid` knows its IFC GlobalId (the building plugin: the IFC export GlobalId of the owning element), by the `IfcGuid` attribute.
  */
 export function bcfVisualizationXml(
   doc: CadDocument,
@@ -168,16 +169,34 @@ export function bcfVisualizationXml(
   selection: readonly string[],
   version: BcfVersion = '3.0',
   colouring: readonly ViewpointColouring[] = [],
+  ifcSchema: IfcSchemaName = 'IFC4',
 ): string {
   const metres = (v: Vec3): Vec3 => [toMetres(doc, v[0]), toMetres(doc, v[1]), toMetres(doc, v[2])];
-  const component = (id: string): string => `<Component>${text('OriginatingSystem', 'llull')}${text('AuthoringToolId', id)}</Component>`;
+  const guidOf = documentProjection('ifcGuids');
+  const guidsOf = (id: string): readonly string[] => guidOf?.(doc, id, ifcSchema) ?? [];
+  const tag = (id: string, ifc: string | undefined): string =>
+    `<Component${ifc === undefined ? '' : ` IfcGuid="${escapeXml(ifc)}"`}>${text('OriginatingSystem', 'llull')}${text('AuthoringToolId', id)}</Component>`;
+  /** One Component per product GlobalId of the entity (a pipe has several in IFC4X3_ADD2), or one with the AuthoringToolId only. */
+  const component = (id: string): string => {
+    const guids = guidsOf(id);
+    return guids.length === 0 ? tag(id, undefined) : guids.map((ifc) => tag(id, ifc)).join('');
+  };
   const components = selection.map(component).join('');
+  const coloured = new Set<string>();
+  /** An entity with GlobalIds is listed once per viewpoint (the first colour wins): entities of one element share them. */
+  const firstColour = (id: string): boolean => {
+    const guids = guidsOf(id);
+    if (guids.length === 0) return true;
+    if (guids.every((ifc) => coloured.has(ifc))) return false;
+    for (const ifc of guids) coloured.add(ifc);
+    return true;
+  };
   const coloring =
     colouring.length === 0
       ? ''
       : `<Coloring>${colouring
           .map((group) => {
-            const members = group.ids.map(component).join('');
+            const members = group.ids.filter(firstColour).map(component).join('');
             return `<Color Color="${group.colour}">${version === '3.0' ? `<Components>${members}</Components>` : members}</Color>`;
           })
           .join('')}</Coloring>`;

@@ -91,6 +91,11 @@ std::unique_ptr<Shape> prism_of_face(const Shape &face, rust::Slice<const double
 std::unique_ptr<Shape> revolution_of_face(const Shape &face, rust::Slice<const double> axis, double angle);
 // ThruSections through closed chains: `chains` concatenated, `lengths` = number of f64 of each chain.
 std::unique_ptr<Shape> skinned_solid(rust::Slice<const double> chains, rust::Slice<const uint32_t> lengths, bool ruled);
+// Ruled skin through closed polygons (ASC M5, TR-ASC-16): each section is `BRepBuilderAPI_MakePolygon` of its xyz vertices (`points` concatenated, `counts` = vertices of each
+// section, all equal, >= 3); vertex k of one section pairs with vertex k of the next. BRepOffsetAPI_ThruSections(ruled) approximates the straight sides by B-spline faces (measured, OCCT
+// 7.9.2), so the sides are built face by face (planar when the four corners are coplanar, else the bilinear ruled surface), capped with planar faces and sewn into one outward solid.
+// Null when OCC refuses (non-planar cap, degenerate side); throws on inconsistent counts or `ruled` false.
+std::unique_ptr<Shape> skinned_polygon_solid(rust::Slice<const double> points, rust::Slice<const uint32_t> counts, bool ruled);
 // ThruSections through B-spline sections (capability bsplineSections): `curves` concatenated, `lengths` = number of f64 of each one. A section is
 // degree, pole count, distinct knot count, rational flag, closing flag, xyz poles, weights (rational only), knots, multiplicities; the closing
 // flag adds the straight edge from the last pole back to the first. Null when OCC refuses; a throw (-> Err) when the data are inconsistent.

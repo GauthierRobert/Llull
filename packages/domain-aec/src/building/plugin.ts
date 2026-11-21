@@ -11,6 +11,7 @@ import { aecRetiredCommands } from '../retired';
 import { buildingErrors } from './validate';
 import { sealedBuilding } from './model';
 import { regenerateBuilding } from './evaluate/evaluateElements';
+import { buildingProjections } from './projections';
 
 const derivedBuilding = derivedModelExtension({
   key: 'building',
@@ -22,6 +23,7 @@ const derivedBuilding = derivedModelExtension({
 /** The building uid (IFC GlobalId salt) is step-scoped and sealed by the first command's result, so replay re-mints it; see `sealedBuilding`. */
 const buildingDocument: DocumentExtension = {
   ...derivedBuilding,
+  projections: buildingProjections,
   reconcile: (_previous, next) => {
     const sealed = next.building === undefined ? undefined : sealedBuilding(next.building);
     return { document: sealed === undefined || sealed === next.building ? next : { ...next, building: sealed }, notes: [], affected: [] };

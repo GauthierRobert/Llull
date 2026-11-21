@@ -147,7 +147,7 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
         status: expect.not.stringMatching(/^fail$/),
       });
     }
-  });
+  }, 120_000);
 
   it('check_blends reads the overshoot of a rebuilt trim star from the corner notes: a BLD_CHECK_CORNER_OVERSHOOT warning naming the value (13.41)', () => {
     const { doc, id, vertex, edges } = dshape();

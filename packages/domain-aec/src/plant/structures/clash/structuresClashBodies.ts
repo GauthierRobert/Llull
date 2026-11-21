@@ -86,18 +86,42 @@ function ladderBoxes(doc: CadDocument, ladder: LadderElement, level: BuildingLev
   }
 }
 
-function stairBoxes(doc: CadDocument, stair: SteelStairElement, level: BuildingLevel, emit: Emit): void {
+/** A body of a steel stair with the index (from 0) of the flight it belongs to: a landing belongs to the flight it ends. */
+export interface StairFlightBox {
+  readonly flight: number;
+  readonly box: OrientedBox;
+}
+
+export function stairFlightBoxes(doc: CadDocument, stair: SteelStairElement, level: BuildingLevel): StairFlightBox[] {
   const profile = findProfile(stair.stringerProfile);
-  if (profile === undefined) return;
+  if (profile === undefined) return [];
   const { layout } = stairQuantities(doc, stair);
   const factor = fromMm(doc, 1);
   const world = (point: Vec3): Vec3 => [point[0], point[1], level.elevation + point[2]];
-  layout.stringers.forEach((part) => emit(runBox(world(part.from), world(part.to), (profile.tw * factor) / 2, (profile.h * factor) / 2)));
+  const flightOf = (riser: number): number => layout.flights.findIndex((flight) => riser >= flight.firstRiser && riser <= flight.lastRiser);
+  const found: StairFlightBox[] = [];
+  layout.stringers.forEach((part, index) => {
+    const box = runBox(world(part.from), world(part.to), (profile.tw * factor) / 2, (profile.h * factor) / 2);
+    if (box !== null) found.push({ flight: Math.floor(index / 2), box });
+  });
+  layout.knuckles.forEach((part, index) => {
+    const box = runBox(world(part.from), world(part.to), (profile.tw * factor) / 2, (profile.h * factor) / 2);
+    if (box !== null) found.push({ flight: layout.knuckleFlights[index] as number, box });
+  });
   const thickness = treadThickness(doc, stair.tread);
-  for (const plate of [...layout.treads, ...layout.landings]) {
+  const plates: Array<[number, (typeof layout.treads)[number]]> = [
+    ...layout.treads.map((plate, index): [number, typeof plate] => [flightOf(layout.treadRisers[index] as number), plate]),
+    ...layout.landings.map((plate, index): [number, typeof plate] => [index, plate]),
+  ];
+  for (const [flight, plate] of plates) {
     const top = level.elevation + plate.top;
-    plateBoxes(plate.corners, stair.angle, top - thickness, top).forEach(emit);
+    for (const box of plateBoxes(plate.corners, stair.angle, top - thickness, top)) found.push({ flight, box });
   }
+  return found;
+}
+
+function stairBoxes(doc: CadDocument, stair: SteelStairElement, level: BuildingLevel, emit: Emit): void {
+  stairFlightBoxes(doc, stair, level).forEach(({ box }) => emit(box));
 }
 
 function gratingBoxes(doc: CadDocument, grating: GratingElement, level: BuildingLevel, emit: Emit): void {

@@ -39,13 +39,16 @@ export function liveStreamUrl(): string {
 export const hasApiToken = (): boolean => currentApiToken() !== undefined;
 
 /**
- * `/live` SSE URL carrying a fresh single-use `?ticket=` (EventSource cannot send headers; a bearer token in the URL would
+ * SSE URL of `path` carrying a fresh single-use `?ticket=` (EventSource cannot send headers; a bearer token in the URL would
  * leak into access logs). The ticket is minted over header auth; call again on every reconnect. Rejects when the mint fails.
  */
-export async function liveTicketStreamUrl(): Promise<string> {
+export async function ticketStreamUrl(path: '/live' | '/viewport/stream'): Promise<string> {
   const response = await fetch(`${SERVER_BASE}/live/ticket`, { method: 'POST', headers: serverAuthHeaders() });
   if (!response.ok) throw new Error(`live ticket request failed (${response.status})`);
   const body = (await response.json()) as { ticket?: unknown };
   if (typeof body.ticket !== 'string' || body.ticket === '') throw new Error('live ticket response malformed');
-  return `${liveStreamUrl()}?ticket=${encodeURIComponent(body.ticket)}`;
+  return `${SERVER_BASE}${path}?ticket=${encodeURIComponent(body.ticket)}`;
 }
+
+/** `/live` SSE URL with a fresh ticket (`ticketStreamUrl`). */
+export const liveTicketStreamUrl = (): Promise<string> => ticketStreamUrl('/live');

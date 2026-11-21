@@ -313,3 +313,97 @@ fn a_face_blend_spec_is_thirteen_numbers_plus_the_extra_faces_and_refuses_a_bad_
     let absent = face_blend_spec(&recipe(json!({ "radiusEnd": null, "startNear": null }))).unwrap();
     assert_eq!(absent[6..11], [0.0; 5], "null fields read as absent");
 }
+
+/// ASC M5 (TR-ASC-16): a ruled loft through `native.polygons` is built from MakePolygon sections and keeps planar faces (no B-spline approximation of straight edges);
+/// polygons with different vertex counts are refused by the facade and the straight-edge chains build instead.
+#[test]
+fn a_ruled_polygon_loft_keeps_planar_faces() {
+    let mut evaluator = Evaluator::new(16);
+    let square = |half: f64, z: f64| -> Vec<f64> {
+        [[half, half], [-half, half], [-half, -half], [half, -half]].iter().flat_map(|c| [c[0], c[1], z]).collect()
+    };
+    let chain = |half: f64, z: f64| -> Vec<f64> {
+        let c = [[half, half], [-half, half], [-half, -half], [half, -half], [half, half]];
+        c.windows(2).flat_map(|pair| [0.0, pair[0][0], pair[0][1], z, pair[1][0], pair[1][1], z]).collect()
+    };
+    let leaf = |native: Value| json!({ "op": "solid", "entity": { "kind": "loft", "native": native, "position": [0, 0, 0], "rotation": [0, 0, 0] } });
+    let frustum =
+        leaf(json!({ "polygons": [square(1.0, 0.0), square(0.5, 2.0)], "chains": [chain(1.0, 0.0), chain(0.5, 2.0)], "ruled": true }));
+    let shape = evaluator.evaluate(&frustum).unwrap().unwrap();
+    assert!((crate::mass_properties(&shape).unwrap().volume - 2.0 / 3.0 * (4.0 + 1.0 + 2.0)).abs() < 1e-9);
+    let topology = crate::queries::topology(&shape).unwrap();
+    let faces = topology["faces"].as_array().unwrap();
+    assert_eq!(faces.len(), 6, "four sides and two caps");
+    assert!(faces.iter().all(|face| face["surface"] == json!("plane")), "{faces:?}");
+    let uneven = leaf(
+        json!({ "polygons": [square(1.0, 0.0), [0.0, 0.0, 2.0, 1.0, 0.0, 2.0, 0.0, 1.0, 2.0]], "chains": [chain(1.0, 0.0), chain(0.5, 2.0)], "ruled": true }),
+    );
+    assert!((volume(evaluator.evaluate(&uneven)) - 2.0 / 3.0 * (4.0 + 1.0 + 2.0)).abs() < 1e-9, "fallback to the chains");
+}
+
+/// A twisted ruled polygon loft has bilinear (non-planar) sides: same volume as the ThruSections of the chains, the two caps stay planes.
+#[test]
+fn a_twisted_polygon_loft_has_bilinear_sides_and_the_thru_sections_volume() {
+    twisted_polygon_loft_at(1.0);
+}
+
+/// A model of 1e-3 units (sewing tolerance 1e-7 x size is below Precision::Confusion): the twisted non-planar sides still sew into a valid solid.
+#[test]
+fn a_twisted_polygon_loft_at_millimetre_scale_still_sews() {
+    twisted_polygon_loft_at(1e-3);
+}
+
+fn twisted_polygon_loft_at(scale: f64) {
+    let mut evaluator = Evaluator::new(16);
+    let turned = |angle: f64, z: f64| -> Vec<f64> {
+        (0..4)
+            .flat_map(|k| {
+                let a = angle + std::f64::consts::FRAC_PI_4 + k as f64 * std::f64::consts::FRAC_PI_2;
+                [scale * a.cos(), scale * a.sin(), scale * z]
+            })
+            .collect()
+    };
+    let chain = |polygon: &[f64]| -> Vec<f64> {
+        (0..4)
+            .flat_map(|k| {
+                let (p, q) = (&polygon[3 * k..3 * k + 3], &polygon[3 * ((k + 1) % 4)..3 * ((k + 1) % 4) + 3]);
+                [0.0, p[0], p[1], p[2], q[0], q[1], q[2]]
+            })
+            .collect()
+    };
+    let (low, high) = (turned(0.0, 0.0), turned(0.4, 2.0));
+    let leaf = |native: Value| json!({ "op": "solid", "entity": { "kind": "loft", "native": native, "position": [0, 0, 0], "rotation": [0, 0, 0] } });
+    let polygon = evaluator
+        .evaluate(&leaf(json!({ "polygons": [low, high], "chains": [chain(&low), chain(&high)], "ruled": true })))
+        .unwrap()
+        .unwrap();
+    let thru = evaluator.evaluate(&leaf(json!({ "chains": [chain(&low), chain(&high)], "ruled": true }))).unwrap().unwrap();
+    let (a, b) = (crate::mass_properties(&polygon).unwrap().volume, crate::mass_properties(&thru).unwrap().volume);
+    assert!((a - b).abs() < 1e-6 * b, "{a} vs {b}");
+    let topology = crate::queries::topology(&polygon).unwrap();
+    let planes = topology["faces"].as_array().unwrap().iter().filter(|face| face["surface"] == json!("plane")).count();
+    assert_eq!((topology["faces"].as_array().unwrap().len(), planes), (6, 2));
+    assert!(crate::features::is_valid(&polygon).unwrap());
+}
+
+/// A pairing that crosses itself (top vertices shifted by two: every side a bow-tie) sews shut but is not a valid solid: the facade returns nothing and the
+/// straight-edge chains build the frustum instead.
+#[test]
+fn a_self_crossing_polygon_pairing_falls_back_to_a_valid_chain_loft() {
+    let mut evaluator = Evaluator::new(16);
+    let square = |half: f64, z: f64, shift: usize| -> Vec<f64> {
+        let corners = [[half, half], [-half, half], [-half, -half], [half, -half]];
+        (0..4).flat_map(|k| [corners[(k + shift) % 4][0], corners[(k + shift) % 4][1], z]).collect()
+    };
+    let chain = |half: f64, z: f64| -> Vec<f64> {
+        let c = [[half, half], [-half, half], [-half, -half], [half, -half], [half, half]];
+        c.windows(2).flat_map(|pair| [0.0, pair[0][0], pair[0][1], z, pair[1][0], pair[1][1], z]).collect()
+    };
+    let leaf = |native: Value| json!({ "op": "solid", "entity": { "kind": "loft", "native": native, "position": [0, 0, 0], "rotation": [0, 0, 0] } });
+    let crossing = leaf(
+        json!({ "polygons": [square(1.0, 0.0, 0), square(0.5, 2.0, 2)], "chains": [chain(1.0, 0.0), chain(0.5, 2.0)], "ruled": true }),
+    );
+    let shape = evaluator.evaluate(&crossing).unwrap().unwrap();
+    assert!(crate::features::is_valid(&shape).unwrap());
+    assert!((crate::mass_properties(&shape).unwrap().volume - 2.0 / 3.0 * (4.0 + 1.0 + 2.0)).abs() < 1e-9, "the chains' frustum");
+}

@@ -14,10 +14,19 @@ import { similarNames } from '@lib/similarNames';
 import { isRecord } from '@lib/isRecord';
 import { DesignError } from './errors';
 import type { Statement } from './parse';
-import { AnchorRef, bindCommand, EXPRESSION_HELP, ExprRef, NameRef, type BoundCommand, type Template } from './schemaValue';
+import { AnchorRef, bindCommand, EXPRESSION_HELP, ExprRef, NameRef, ValueExprRef, type BoundCommand, type Template } from './schemaValue';
 import { exactFacePoint, frameOf, placementDelta, sidePoint, type Frame } from './anchors';
 import { runCheck, type CheckResult, type CheckScope } from './checks';
 import { convertUnits } from './units';
+import { buildFunctions, usesValueFunctions } from './functions';
+import { coerceValue } from './valueSchema';
+import { evaluateValue, RefValue, type FnDef } from './valueEval';
+import { buildValueExpr } from './valueExpr';
+import { splitAliasRef, selectIds } from './aliasRef';
+import { anchorHintText, lineRecords, metaHint } from './aliasBinding';
+import { RunBudget } from './budget';
+import { assertFreeName, runModule, type ModuleHost, type ModuleInstance, type ModuleScope } from './moduleRun';
+import type { ModuleTable } from './modules';
 
 type CommandStatement = Extract<Statement, { kind: 'command' }>;
 type CheckStatement = Extract<Statement, { kind: 'check' }>;
@@ -29,6 +38,7 @@ export const DESIGN_COMMANDS: readonly string[] = [
   'design_source',
   'check_design',
   'export_design',
+  'expand_design',
   'describe_design_syntax',
 ];
 
@@ -46,6 +56,8 @@ export interface DesignRun {
   readonly checks: CheckResult[];
   /** Commands executed (loop iterations included). */
   readonly commands: number;
+  /** Module instances run (`use`), in order. */
+  readonly modules: ModuleInstance[];
 }
 
 interface AliasRecord {
@@ -53,27 +65,36 @@ interface AliasRecord {
   readonly ids: readonly string[];
   /** Its entities (anchors, bbox / volume checks). */
   readonly geometry: readonly string[];
+  /** Entities its line created (`alias.entity` / `alias.entities`): for an entity alias its ids. */
+  readonly entities: readonly string[];
   readonly line: number;
   /** World box captured when its entities are consumed (live entities are measured when anchored on). */
   frame: Frame | null;
 }
 
-/** Why a metaHistory / session command is not a design line, and where it goes instead. */
-function metaHint(name: string): string {
-  if (name === 'set_parameter' || name === 'delete_parameter')
-    return 'Declare parameters with `param <name> = <default>` (apply_design set= overrides).';
-  if (['create_configuration', 'activate_configuration', 'save_recipe'].includes(name))
-    return `Configurations and recipes are document inputs: run \`llull ${name} …\` after apply_design.`;
-  if (name === 'set_camera' || name === 'fit_view') return 'The view is not part of the model: run it after apply_design.';
-  return 'Run it outside the design (it is not part of the recipe).';
+/** One executed command with its resolved params (`expand_design`). */
+export interface TraceLine {
+  readonly line: number;
+  readonly command: string;
+  readonly alias: string | null;
+  readonly params: unknown;
+  /** Module file the line is in, null for the root design. */
+  readonly file: string | null;
 }
 
 /** Run `statements` on `doc` (every query and command through `ctx`, default: the current context). */
-export function runDesign(doc: CadDocument, statements: readonly Statement[], ctx?: ExecutionContext): DesignRun {
-  const run = new DesignRunner(doc, ctx);
+export function runDesign(
+  doc: CadDocument,
+  statements: readonly Statement[],
+  ctx?: ExecutionContext,
+  trace?: TraceLine[],
+  modules: ModuleTable = new Map(),
+): DesignRun {
+  const run = new DesignRunner(doc, ctx, trace, modules);
+  run.defineFunctions(statements);
   run.block(statements, {});
   const checks = run.pendingChecks.map(({ statement, env }) => runCheck(statement, run.checkScope(env)));
-  return { document: run.doc, affected: [...run.affected], ...run.aliasTables(), checks, commands: run.commands };
+  return { document: run.doc, affected: [...run.affected], ...run.aliasTables(), checks, commands: run.commands, modules: run.instances };
 }
 
 /** Evaluate the `check` lines of `statements` on `doc`, with aliases bound by an earlier run (commands are not executed). */
@@ -84,17 +105,22 @@ export function evaluateChecks(
   geometry: Readonly<Record<string, readonly string[]>>,
 ): CheckResult[] {
   const run = new DesignRunner(doc, undefined);
+  run.defineFunctions(statements);
   for (const [name, ids] of Object.entries(aliases)) run.bind(name, ids, geometry[name] ?? ids);
   run.collectChecks(statements, {});
   return run.pendingChecks.map(({ statement, env }) => runCheck(statement, run.checkScope(env)));
 }
 
-class DesignRunner {
+class DesignRunner implements ModuleHost {
   doc: CadDocument;
   commands = 0;
   readonly affected = new Set<string>();
   readonly pendingChecks: { statement: CheckStatement; env: Env }[] = [];
-  private readonly aliases = new Map<string, AliasRecord>();
+  readonly aliases = new Map<string, AliasRecord>();
+  scope: ModuleScope = { prefix: '', overlay: {}, file: null };
+  readonly instances: ModuleInstance[] = [];
+  readonly layered = new Set<string>();
+  private readonly budget = new RunBudget();
   /** Entity id -> the line (and alias) that consumed it. */
   private readonly consumed = new Map<string, { line: number; by: string | null }>();
   private readonly bound = new Map<Statement, BoundCommand>();
@@ -104,8 +130,16 @@ class DesignRunner {
   constructor(
     doc: CadDocument,
     private readonly ctx: ExecutionContext | undefined,
+    private readonly trace: TraceLine[] | undefined = undefined,
+    readonly modules: ModuleTable = new Map(),
   ) {
     this.doc = doc;
+  }
+
+  functions: ReadonlyMap<string, FnDef> = new Map();
+
+  defineFunctions(statements: readonly Statement[]): void {
+    this.functions = buildFunctions(statements, this.doc);
   }
 
   block(statements: readonly Statement[], env: Env): void {
@@ -113,6 +147,7 @@ class DesignRunner {
       if (statement.kind === 'command') this.command(statement, env);
       else if (statement.kind === 'check') this.queueCheck(statement, env);
       else if (statement.kind === 'for') this.loop(statement, env);
+      else if (statement.kind === 'use') runModule(this, statement, env);
       else if (statement.kind === 'param' && this.doc.parameters[statement.name] === undefined)
         throw new DesignError(
           'DESIGN_UNKNOWN_PARAMETER',
@@ -124,7 +159,7 @@ class DesignRunner {
   }
 
   bind(name: string, ids: readonly string[], geometry: readonly string[]): void {
-    this.aliases.set(name, { ids, geometry, line: 0, frame: null });
+    this.aliases.set(name, { ids, geometry, entities: geometry, line: 0, frame: null });
   }
 
   /** Queue the checks of `statements` (loops expanded) without executing commands. */
@@ -174,10 +209,12 @@ class DesignRunner {
 
   private bounds(statement: Extract<Statement, { kind: 'for' }>, env: Env): { from: number; to: number } {
     const { line } = statement;
+    this.budget.spend(1, line);
     const from = this.evaluate(convertUnits(statement.from, this.doc, null, line), env, line);
     const to = this.evaluate(convertUnits(statement.to, this.doc, null, line), env, line);
-    if (!Number.isInteger(from) || !Number.isInteger(to))
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to))
       throw new DesignError('DESIGN_BAD_VALUE', line, `loop bounds ${from}..${to} are not integers`, 'Use integer bounds, e.g. 0..n-1.');
+    this.budget.spend(Math.max(0, to - from + 1), line);
     if (to - from + 1 > MAX_ITERATIONS)
       throw new DesignError(
         'DESIGN_LOOP_LIMIT',
@@ -227,22 +264,24 @@ class DesignRunner {
     this.approximateAnchors = [];
     const alias = statement.alias === null ? null : this.interpolate(statement.alias, env, line);
     const before = this.doc;
-    this.doc = this.exec(def.name, this.resolve(bound.params, env, line), line);
+    const params = this.resolve(bound.params, env, line);
+    this.trace?.push({ line, command: def.name, alias: alias === null ? null : this.scope.prefix + alias, params, file: this.scope.file });
+    this.doc = this.exec(def.name, params, line);
     const gone = Object.keys(before.entities).filter((id) => this.doc.entities[id] === undefined);
     this.captureFrames(before, gone);
-    for (const id of gone) this.consumed.set(id, { line, by: alias });
+    for (const id of gone) this.consumed.set(id, { line, by: alias === null ? null : this.scope.prefix + alias });
     const created = this.lastAffected.filter((id) => this.doc.entities[id] !== undefined && before.entities[id] === undefined);
     if (bound.placement !== null) this.place(created, bound.placement.on, bound.placement.align, env, line);
     if (alias !== null) this.bindLine(alias, def.name, before, created, line);
   }
 
-  private lastAffected: string[] = [];
+  lastAffected: string[] = [];
   private lastData: unknown = undefined;
   /** Anchors of the current line that fell back to a bounding-box side (no exact face available). */
   private approximateAnchors: string[] = [];
 
   /** Execute one command; a refusal or a no-op of a mutating command is a DESIGN_STEP_FAILED at `line`. */
-  private exec(name: string, params: unknown, line: number): CadDocument {
+  exec(name: string, params: unknown, line: number): CadDocument {
     const r = execute(this.doc, name, params, this.ctx);
     const annotations = getCommand(name)?.annotations;
     const quietNoop = annotations?.idempotent === true;
@@ -278,12 +317,7 @@ class DesignRunner {
 
   /** Why an anchored line may miss its face: the anchor is a bounding-box side, not an exact face. */
   private anchorHint(): string | null {
-    if (this.approximateAnchors.length === 0) return null;
-    return (
-      `${this.approximateAnchors.join(', ')} is the centre of a side of the bounding box (this kernel has no exact faces), which ` +
-      'can miss the face: anchor on the part that owns the face (wall.top rather than body.top), give the point yourself ' +
-      '(face.near=[x, y, z]), or use the OCC kernel (LLULL_KERNEL=occt).'
-    );
+    return anchorHintText(this.approximateAnchors);
   }
 
   /** "Did you mean <alias>?" when a step failed and a plain name in its params is close to a bound alias. */
@@ -319,7 +353,7 @@ class DesignRunner {
   }
 
   private anchor(ref: AnchorRef, env: Env, line: number): { point: Vec3; frame: Frame } {
-    const name = this.interpolate(ref.alias, env, line);
+    const name = this.scope.prefix + this.interpolate(ref.alias, env, line);
     const record = this.aliases.get(name);
     if (record === undefined) {
       const near = similarNames(name, [...this.aliases.keys()]);
@@ -339,25 +373,9 @@ class DesignRunner {
     return { point: exact ?? sidePoint(frame, ref.side), frame };
   }
 
-  /**
-   * Bind `alias` to what the line made: its records (non-entity ids in `affected` and `data.*Id(s)`: walls, pipes, surfaces, fastener
-   * stacks…) if any, else the entities it created, else what it changed. Geometry = its created entities (those derived from its records
-   * when it has both: `wall-1:body-0` for `wall-1`, not the wall a door cut).
-   */
+  /** Bind `alias` to what the line made (see `lineRecords`); a line that reports nothing to bind is DESIGN_UNKNOWN_ALIAS. */
   private bindLine(alias: string, command: string, before: CadDocument, created: readonly string[], line: number): void {
-    const isEntity = (id: string): boolean => this.doc.entities[id] !== undefined || before.entities[id] !== undefined;
-    const records: string[] = [];
-    const add = (id: unknown): void => {
-      if (typeof id === 'string' && id !== '' && !isEntity(id) && !records.includes(id)) records.push(id);
-    };
-    this.lastAffected.forEach(add);
-    if (isRecord(this.lastData))
-      for (const [key, value] of Object.entries(this.lastData))
-        if (/Ids?$/.test(key)) (Array.isArray(value) ? value : [value]).forEach(add);
-    const derived = created.filter((id) => records.some((record) => id.startsWith(`${record}:`)));
-    const changed = this.lastAffected.filter((id) => this.doc.entities[id] !== undefined);
-    const ids = records.length > 0 ? records : created.length > 0 ? [...created] : changed;
-    const geometry = derived.length > 0 ? derived : created.length > 0 ? [...created] : changed;
+    const { ids, geometry, entities } = lineRecords(before, this.doc, created, this.lastAffected, this.lastData);
     if (ids.length === 0)
       throw new DesignError(
         'DESIGN_UNKNOWN_ALIAS',
@@ -365,8 +383,10 @@ class DesignRunner {
         `${command} reports no id to bind "${alias}" to`,
         'Drop the alias ("_") and refer to what it made by its name, e.g. materialName="steel".',
       );
-    this.aliases.set(alias, { ids, geometry, line, frame: null });
-    for (const id of geometry) this.aliasOf.set(id, alias);
+    const name = this.scope.prefix + alias;
+    if (this.instances.length > 0) assertFreeName(this, name, line, false);
+    this.aliases.set(name, { ids, geometry, entities, line, frame: null });
+    for (const id of geometry) this.aliasOf.set(id, name);
   }
 
   /** Live geometry entities of an alias, else its live ids (a check measures geometry). */
@@ -417,9 +437,24 @@ class DesignRunner {
 
   private resolve(template: Template, env: Env, line: number): unknown {
     if (template instanceof ExprRef) return this.evaluate(template.text, env, line);
+    if (template instanceof ValueExprRef) return this.valueOf(template, env, line);
     if (template instanceof NameRef) {
-      const ids = this.namedIds(template.text, env, line);
-      return ids === null ? this.interpolate(template.text, env, line) : (ids[0] ?? template.text);
+      const ref = this.reference(template.text, env, line);
+      if (ref === null) {
+        const named = template.untyped && (Object.hasOwn(env, template.text) || Object.hasOwn(this.parameterValues(), template.text));
+        if (named) return this.evaluate(template.text, env, line);
+        const literal = this.interpolate(template.text, env, line);
+        return template.list ? [literal] : literal;
+      }
+      if (template.list) return ref.ids;
+      if (!ref.group) return ref.ids[0] ?? template.text;
+      if (template.many) return ref.ids;
+      throw new DesignError(
+        'DESIGN_ALIAS_ARITY',
+        line,
+        `${template.param || 'this param'} expects one id, got group '${template.text}' (${ref.ids.length} ids)`,
+        `Pick one: ${template.text}[0], ${template.text}[-1] or ${template.text}[i]; a list param takes the whole group.`,
+      );
     }
     if (template instanceof AnchorRef) {
       const point = this.anchor(template, env, line).point;
@@ -427,33 +462,91 @@ class DesignRunner {
     }
     if (Array.isArray(template))
       return template.flatMap((item) => {
-        const ids = item instanceof NameRef ? this.namedIds(item.text, env, line) : null;
-        return ids ?? [this.resolve(item, env, line)];
+        const ref = item instanceof NameRef ? this.reference(item.text, env, line) : null;
+        return ref?.ids ?? [this.resolve(item, env, line)];
       });
     if (template !== null && typeof template === 'object')
       return Object.fromEntries(Object.entries(template).map(([key, value]) => [key, this.resolve(value, env, line)]));
     return template;
   }
 
-  /** Live ids of the alias a word names (`sketch`, `post{i}`, `sketch[1]` = its second id), or null when it names no alias. */
-  private namedIds(text: string, env: Env, line: number): string[] | null {
-    const indexed = /^(.*)\[(\d+)\]$/.exec(text);
-    const name = this.interpolate(indexed?.[1] ?? text, env, line);
-    if (!this.aliases.has(name)) return null;
-    const ids = this.liveIds(name, line);
-    if (indexed?.[2] === undefined) return ids;
-    const id = ids[Number(indexed[2])];
-    if (id === undefined)
-      throw new DesignError(
-        'DESIGN_UNKNOWN_ALIAS',
-        line,
-        `${name} has ${ids.length} id(s), no [${indexed[2]}]`,
-        `Index from 0 to ${ids.length - 1}.`,
-      );
-    return [id];
+  /**
+   * What an alias reference word names: `sketch` (its live ids, group when it has several), `sketch[1]` / `sketch[-1]` (one id),
+   * `sketch[a..<b]` (a group), `af.entity` (its first created entity), `af.entities` (all). Null when the word names no alias and
+   * has no member / selector (then it is literal text).
+   */
+  private reference(text: string, env: Env, line: number): { ids: string[]; group: boolean } | null {
+    const parts = splitAliasRef(text);
+    if (parts === null) return null;
+    const name = this.scope.prefix + this.interpolate(parts.name, env, line);
+    if (!this.aliases.has(name)) {
+      if (parts.member === null && parts.selector === null) return null;
+      return { ids: this.liveIds(name, line), group: false };
+    }
+    const record = this.aliases.get(name);
+    const all = parts.member === null ? this.liveIds(name, line) : this.liveEntities(name, line);
+    const ids = parts.member === 'entity' ? all.slice(0, 1) : all;
+    const group = parts.member === 'entities' || (parts.member === null && (record?.ids.length ?? 0) !== 1);
+    if (parts.selector !== null) {
+      const label = `${name}${parts.member === null ? '' : `.${parts.member}`}`;
+      return selectIds(ids, label, parts.selector, (e) => this.evaluate(e, env, line), line);
+    }
+    return { ids, group };
   }
 
-  private evaluate(text: string, env: Env, line: number): number {
+  /** Live entities its line created (DESIGN_NO_ENTITY when the alias made none, DESIGN_ALIAS_CONSUMED when all are gone). */
+  private liveEntities(name: string, line: number): string[] {
+    const entities = this.aliases.get(name)?.entities ?? [];
+    const live = entities.filter((id) => this.doc.entities[id] !== undefined && !this.consumed.has(id));
+    if (live.length > 0) return live;
+    if (entities.length > 0) {
+      const consumer = this.consumed.get(entities[0] ?? '');
+      const heir = consumer?.by ? this.liveHeir(consumer.by) : null;
+      throw new DesignError(
+        'DESIGN_ALIAS_CONSUMED',
+        line,
+        `the entities of ${name} were consumed at line ${consumer?.line ?? '?'}`,
+        heir !== null ? `Use ${heir} instead.` : 'Bind the consuming line to an alias and use it.',
+      );
+    }
+    throw new DesignError(
+      'DESIGN_NO_ENTITY',
+      line,
+      `${name} has no entity`,
+      `${name} names records only; use the command that creates the entity, or refer to ${name} itself.`,
+    );
+  }
+
+  /** The alias `name` (or its `.entity` / `.entities`) as a value, undefined when unbound. */
+  private aliasValue(written: string, member: 'entity' | 'entities' | null, line: number): RefValue | undefined {
+    const name = this.scope.prefix + written;
+    const record = this.aliases.get(name);
+    if (record === undefined) return undefined;
+    if (member === null) return new RefValue(this.liveIds(name, line), record.ids.length !== 1, written);
+    const entities = this.liveEntities(name, line);
+    return member === 'entity' ? new RefValue(entities.slice(0, 1), false, null) : new RefValue(entities, true, null);
+  }
+
+  private valueOf(template: ValueExprRef, env: Env, line: number): unknown {
+    const host = {
+      line,
+      vars: env,
+      budget: this.budget,
+      parameters: this.parameterValues(),
+      functions: this.functions,
+      alias: (name: string, member: 'entity' | 'entities' | null): RefValue | undefined => this.aliasValue(name, member, line),
+      namespace: (name: string): boolean => this.hasNamespace(name),
+    };
+    return coerceValue(evaluateValue(template.expr, host), template.spec, template.param, line);
+  }
+
+  evaluate(text: string, env: Env, line: number): number {
+    this.budget.spend(1, line);
+    if (usesValueFunctions(text)) {
+      const expr = buildValueExpr(text, { units: this.doc.units, paramKey: null, line });
+      const value = this.valueOf(new ValueExprRef(expr, { type: 'number' }, 'value'), env, line);
+      return value as number;
+    }
     const values: Record<string, number> = { ...this.parameterValues(), ...env };
     const unknown = [...extractReferences(text)].filter((name) => !isBuiltinConstant(name) && values[name] === undefined);
     if (unknown.length > 0) {
@@ -470,12 +563,18 @@ class DesignRunner {
     return result.value;
   }
 
+  /** True when an alias lives under `<name>.` (a module instance namespace). */
+  private hasNamespace(name: string): boolean {
+    const prefix = `${this.scope.prefix}${name}.`;
+    return [...this.aliases.keys()].some((key) => key.startsWith(prefix));
+  }
+
   private parameterValues(): Record<string, number> {
-    return Object.fromEntries(Object.entries(this.doc.parameters).map(([name, p]) => [name, p.value]));
+    return { ...Object.fromEntries(Object.entries(this.doc.parameters).map(([name, p]) => [name, p.value])), ...this.scope.overlay };
   }
 
   /** `post{i+1}` -> `post4`. */
-  private interpolate(text: string, env: Env, line: number): string {
+  interpolate(text: string, env: Env, line: number): string {
     return text.replace(/\{([^{}]*)\}/g, (_, body: string) => {
       const value = this.evaluate(body, env, line);
       return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));

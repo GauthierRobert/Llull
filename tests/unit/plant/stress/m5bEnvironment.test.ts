@@ -286,7 +286,7 @@ describe('OCC combinations by method (scalar, srss, algebraic)', () => {
     expect((data.details?.reactions ?? []).some((row) => row.case === 'WINDY')).toBe(true);
   });
 
-  it('refuses malformed combinations: method without terms, scalar on EXP, basic with combine, a combination of a combination, an unknown term', () => {
+  it('refuses malformed combinations: method without terms, method on a primitive case, basic with combine, a combination of a combination, an unknown term', () => {
     const sc = cantilever();
     const set = (cases: unknown[]): unknown => ({ modelId: sc.id, cases, wind: [WIND] });
     const sus = { name: 'SUS', type: 'SUS', basic: ['W'] };
@@ -300,7 +300,7 @@ describe('OCC combinations by method (scalar, srss, algebraic)', () => {
     expectRefusal(
       sc.doc,
       'set_stress_load_cases',
-      set([sus, { name: 'X', type: 'EXP', combine: [term], method: 'srss' }]),
+      set([sus, { name: 'X', type: 'SUS', basic: ['W'], method: 'srss' }]),
       'PST_LOADCASE_INVALID',
     );
     expectRefusal(

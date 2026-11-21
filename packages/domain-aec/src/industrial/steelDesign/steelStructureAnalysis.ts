@@ -20,6 +20,8 @@ interface SteelCheckParams {
   readonly floorDeadLoad: number;
   /** kN/m² imposed on floor slabs outside equipment footprints. */
   readonly imposedLoad: number;
+  /** Imposed load of steel-stair landings, kN/m², with its cited source; absent = landings are not loaded. */
+  readonly stairLandingLoad?: { readonly imposedKPa: number; readonly source: string } | undefined;
   /** kg/m³ of pipe contents. */
   readonly pipeContentDensity: number;
   /** kg/m of cable tray with cables. */

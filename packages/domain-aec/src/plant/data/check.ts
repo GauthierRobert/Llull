@@ -14,6 +14,7 @@ import { naturalCompare } from './naturalSort';
 import { expectedTag } from './objectTag';
 import { allProviders, elementOf } from './providers';
 import { isOpenEnd } from './openPort';
+import { nozzleRatingFindings } from './nozzleRating';
 import { inferredNozzles } from './plantReports/inferNozzles';
 import { duplicateTags, objectRegistry } from './registry';
 import { appendAll } from '@lib/appendAll';
@@ -26,6 +27,9 @@ const RULE_ORDER = [
   'DAT_REQUIRED_PROPERTY_MISSING',
   'DAT_LINE_END_UNRESOLVED',
   'DAT_OPEN_PORT',
+  'DAT_NOZZLE_RATING_CLASS',
+  'DAT_NOZZLE_RATING_LOW',
+  'DAT_NOZZLE_RATING_UNCHECKED',
   'DAT_LINE_SIZE_MISMATCH',
   'DAT_TAG_MODEL_MISMATCH',
   'DAT_OBJECT_ORPHAN',
@@ -146,6 +150,7 @@ function lineFindings(doc: CadDocument, data: PlantDataModel, line: PlantObject)
         datFinding('DAT_LINE_END_UNRESOLVED', 'warn', `line ${line.tag} has no ${end}`, idsOf(doc, line), [`${line.tag}.${end}`]),
       );
   }
+  appendAll(findings, nozzleRatingFindings(doc, line));
   const model = elementOf(doc, line.target);
   const dn = model?.provider.dn?.(doc, model.element.id);
   const size = line.properties['nominalSize'];

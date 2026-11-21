@@ -39,8 +39,14 @@ export interface NativeInfo {
   readonly ops: readonly string[];
 }
 
-export function encodeRequest(id: number, op: string, args: readonly unknown[]): string {
-  return `${JSON.stringify({ id, op, args })}\n`;
+/** One request line; `deadlineMs` (ASC TR-ASC-04) is how long the sidecar lets the op run before it answers `KRN_TIMEOUT` and stays alive. */
+export function encodeRequest(id: number, op: string, args: readonly unknown[], deadlineMs?: number): string {
+  return `${JSON.stringify({ id, op, args, ...(deadlineMs === undefined ? {} : { deadlineMs }) })}\n`;
+}
+
+/** The cancel message of the host channel for request `id`: that request, if it is the running one, stops at its next progress poll with `KRN_TIMEOUT`; any other id is ignored. */
+export function cancelLine(id: number): string {
+  return `${JSON.stringify({ cancel: id })}\n`;
 }
 
 /** A reply line, or null for anything else on stdout (a stray library print must not break the session). */
@@ -229,7 +235,7 @@ function nativeHandle(handle: unknown, features: FeatureLowerings, wire: WireOpt
 }
 
 /** Ops whose first argument is a shape handle (every `faceQuery.<method>` too). */
-const FIRST_ARG_SHAPE_OPS: ReadonlySet<string> = new Set(['tessellate', 'massProperties', 'analyze', 'topology']);
+const FIRST_ARG_SHAPE_OPS: ReadonlySet<string> = new Set(['tessellate', 'massProperties', 'shapeBounds', 'analyze', 'topology']);
 
 export function takesShapeFirst(op: string): boolean {
   return FIRST_ARG_SHAPE_OPS.has(op) || op.startsWith('faceQuery.');
@@ -280,7 +286,7 @@ export function nativeArgs(
   features: FeatureLowerings = NO_LOWERINGS,
   wire: WireOptions = {},
 ): readonly unknown[] {
-  if (op === 'evaluate' || op === 'blendReport' || op === 'deformReport') {
+  if (op === 'evaluate' || op === 'blendReport' || op === 'deformReport' || op === 'booleanReport') {
     const recipe = args[0] as ShapeRecipe;
     return [{ key: recipeKey(recipe), recipe: nativeRecipe(recipe, features, wire) }];
   }

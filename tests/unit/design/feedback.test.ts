@@ -45,7 +45,7 @@ describe('aliases of commands that make records', () => {
     ).document;
     const top = (id: string): number => (execute(doc, 'measure_bounding_box', { entityId: id }).data as { max: number[] }).max[2] ?? 0;
     expect([top(doc.order[0] ?? ''), top(doc.order[1] ?? '')]).toEqual([1.5, 6.5]);
-    expect(apply('add_box a size=[1,1,1]\nmove_entities _ ids=[a[3]] delta=[1,0,0]').error?.code).toBe('DESIGN_UNKNOWN_ALIAS');
+    expect(apply('add_box a size=[1,1,1]\nmove_entities _ ids=[a[3]] delta=[1,0,0]').error?.code).toBe('DESIGN_INDEX_RANGE');
   });
 
   it('a consumed alias points to the live alias that finally holds it', () => {

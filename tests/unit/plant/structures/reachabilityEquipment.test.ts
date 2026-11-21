@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { buildingErrors } from '@aec/building/validate';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
 
@@ -159,5 +160,41 @@ describe('which nozzles are manways', () => {
     const expected = services.flatMap(([, isManway], index) => (isManway ? [`C-101:S${index}`] : []));
     expect(manways).toEqual(expected);
     expect(reach(model, ['nozzles']).targets).toHaveLength(services.length - expected.length);
+  });
+});
+
+describe('nozzle kind: manway (STA-FU2)', () => {
+  const withKinds = (): CadDocument =>
+    [
+      { ...nozzle('N1', [1500, 0, 6900], 'Manway'), kind: 'nozzle' },
+      { ...nozzle('K1', [1500, 300, 6900], 'inlet'), kind: 'manway' },
+      nozzle('L1', [1500, 600, 6900], 'manway 18in'),
+    ].reduce((acc, params) => apply(acc, 'add_nozzle', params), plant());
+
+  it('the stored kind decides, whatever the service says; a record without a kind keeps the service fallback', () => {
+    const doc = withKinds();
+    expect(reach(doc, ['manways']).targets.map((item) => item.tag)).toEqual(['C-101:K1', 'C-101:L1']);
+    expect(reach(doc, ['nozzles']).targets.map((item) => item.tag)).toEqual(['C-101:N1']);
+    const ports = data<{ ports: Record<string, { kind?: string }> }>(doc, 'equipment_ports', { equipment: 'C-101' }).ports;
+    expect([ports['C-101:N1']?.kind, ports['C-101:K1']?.kind, ports['C-101:L1']?.kind]).toEqual(['nozzle', 'manway', undefined]);
+  });
+
+  it('update_nozzle changes the kind and keeps it when it is omitted', () => {
+    const doc = withKinds();
+    const changed = apply(doc, 'update_nozzle', { equipment: 'C-101', mark: 'N1', kind: 'manway' });
+    expect(reach(changed, ['manways']).targets.map((item) => item.tag)).toContain('C-101:N1');
+    const kept = apply(changed, 'update_nozzle', { equipment: 'C-101', mark: 'N1', service: 'drain' });
+    expect(reach(kept, ['manways']).targets.map((item) => item.tag)).toContain('C-101:N1');
+  });
+
+  it('refuses a kind outside nozzle / manway, and load validation names a corrupt stored kind', () => {
+    const doc = withKinds();
+    expect(execute(doc, 'add_nozzle', { ...nozzle('X1', [1500, 900, 6900]), kind: 'hatch' }).rejected).toBe(true);
+    const broken = structuredClone(doc.building);
+    const equipment = Object.values(broken?.elements ?? {}).find((element) => element.category === 'equipment') as unknown as {
+      plant: { nozzles: Array<Record<string, unknown>> };
+    };
+    equipment.plant.nozzles[0] = { ...equipment.plant.nozzles[0], kind: 'hatch' };
+    expect(buildingErrors(broken).join(';')).toContain('kind must be one of nozzle, manway');
   });
 });

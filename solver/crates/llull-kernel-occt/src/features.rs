@@ -89,6 +89,7 @@ mod ffi {
         fn prism_of_face(face: &Shape, direction: &[f64]) -> Result<UniquePtr<Shape>>;
         fn revolution_of_face(face: &Shape, axis: &[f64], angle: f64) -> Result<UniquePtr<Shape>>;
         fn skinned_solid(chains: &[f64], lengths: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
+        fn skinned_polygon_solid(points: &[f64], counts: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
         fn skinned_solid_bsplines(curves: &[f64], lengths: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
         fn pipe_solid(spine: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
         fn helix_pipe_solid(helix: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
@@ -327,6 +328,17 @@ pub fn skinned_solid(chains: &[Vec<f64>], ruled: bool) -> Built {
     let lengths: Option<Vec<u32>> = chains.iter().map(|chain| u32::try_from(chain.len()).ok()).collect();
     let Some(lengths) = lengths else { return Err("loft: chain too long".to_string()) };
     built(ffi::skinned_solid(&chains.concat(), &lengths, ruled))
+}
+
+/// Ruled solid through closed polygon sections built with `BRepBuilderAPI_MakePolygon` (xyz per vertex, one flat list per section, all the same vertex count):
+/// vertex k pairs with vertex k; the sides are planar faces or bilinear ruled surfaces (no B-spline approximation of straight edges), the ends planar caps.
+pub fn skinned_polygon_solid(polygons: &[Vec<f64>], ruled: bool) -> Built {
+    let counts: Option<Vec<u32>> = polygons.iter().map(|polygon| u32::try_from(polygon.len() / 3).ok()).collect();
+    let Some(counts) = counts else { return Err("loft: polygon too long".to_string()) };
+    if polygons.iter().any(|polygon| polygon.len() % 3 != 0) {
+        return Err("loft: polygon data is not xyz triples".to_string());
+    }
+    built(ffi::skinned_polygon_solid(&polygons.concat(), &counts, ruled))
 }
 
 /// BRepOffsetAPI_ThruSections solid through B-spline sections (`bsplineSections`): one Geom_BSplineCurve per encoded section (degree, counts,

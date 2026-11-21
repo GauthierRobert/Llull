@@ -14,6 +14,7 @@ import type {
 } from '@aec/building/types';
 import { sweepFrame } from '../../shared/mesh';
 import { panelFrame, trayOutline } from '../../industrial/evaluate';
+import { connectionBoltsSeed, connectionPartSeed, plateBoltsSeed } from './ifcSeeds';
 import { buildingConnectionSolids, plateLayout, type ConnectionSolid } from '../../industrial/connections/evaluateConnections';
 import { type SteelProfile, findProfile } from '../../steel/profiles';
 import {
@@ -232,8 +233,8 @@ export function exportConnection(
     const haunch = solid.part.startsWith('haunch');
     const ref = writer.add(
       haunch
-        ? `IFCMEMBER('${context.guid(`${connection.id}:${solid.part}`)}',$,${ifcString(`${connection.mark} haunch`)},$,'HAUNCH',${local},${shape(context, [body])},${ifcString(connection.id)},.USERDEFINED.)`
-        : `IFCPLATE('${context.guid(`${connection.id}:${solid.part}`)}',$,${ifcString(`${connection.mark} end plate`)},$,'END_PLATE',${local},${shape(context, [body])},${ifcString(connection.id)},.USERDEFINED.)`,
+        ? `IFCMEMBER('${context.guid(connectionPartSeed(connection.id, solid.part))}',$,${ifcString(`${connection.mark} haunch`)},$,'HAUNCH',${local},${shape(context, [body])},${ifcString(connection.id)},.USERDEFINED.)`
+        : `IFCPLATE('${context.guid(connectionPartSeed(connection.id, solid.part))}',$,${ifcString(`${connection.mark} end plate`)},$,'END_PLATE',${local},${shape(context, [body])},${ifcString(connection.id)},.USERDEFINED.)`,
     );
     exported.push({ ref, material: connection.material });
   }
@@ -248,7 +249,7 @@ export function exportConnection(
       return writer.add(`IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(mm(bolt.depth))})`);
     });
     const ref = writer.add(
-      `IFCMECHANICALFASTENER('${context.guid(`${connection.id}:bolts`)}',$,${ifcString(`${connection.mark} bolts`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, items)},$,${ifcReal(mm(connection.boltDiameter))},${ifcReal(mm(bolts[0]?.depth ?? 0))},.BOLT.)`,
+      `IFCMECHANICALFASTENER('${context.guid(connectionBoltsSeed(connection.id))}',$,${ifcString(`${connection.mark} bolts`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, items)},$,${ifcReal(mm(connection.boltDiameter))},${ifcReal(mm(bolts[0]?.depth ?? 0))},.BOLT.)`,
     );
     exported.push({ ref, material: connection.material });
   }
@@ -279,7 +280,7 @@ export function exportPlate(
   const boltBottom = bottom - layout.boltBelow;
   const bolts = layout.bolts.map(([x, y]) => extrusion(context, circle, mm(boltLength), mm(x), mm(y), mm(boltBottom)));
   const fastenerRef = writer.add(
-    `IFCMECHANICALFASTENER('${context.guid(`${plate.id}:bolts`)}',$,${ifcString(`${plate.mark} anchors`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, bolts)},$,${ifcReal(mm(plate.boltDiameter))},${ifcReal(mm(boltLength))},.ANCHORBOLT.)`,
+    `IFCMECHANICALFASTENER('${context.guid(plateBoltsSeed(plate.id))}',$,${ifcString(`${plate.mark} anchors`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, bolts)},$,${ifcReal(mm(plate.boltDiameter))},${ifcReal(mm(boltLength))},.ANCHORBOLT.)`,
   );
   return [
     { ref: plateRef, material: plate.material },

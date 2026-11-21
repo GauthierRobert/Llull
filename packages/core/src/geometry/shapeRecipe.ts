@@ -45,7 +45,7 @@ function keyText(recipe: ShapeRecipe): string {
     case 'solid':
       return `solid(${geometryKey(recipe.entity)})`;
     case 'boolean':
-      return `${recipe.boolean}(${recipeKey(recipe.a)},${recipeKey(recipe.b)})`;
+      return `${recipe.boolean}${recipe.many === undefined ? '' : `*${recipe.many}`}(${recipeKey(recipe.a)},${recipeKey(recipe.b)})`;
     case 'fillet':
     case 'chamfer':
       return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`}${recipe.faces === undefined ? '' : `,sided[${recipe.faces.join(',')}]${recipe.size2 === undefined ? '' : `,d2=${recipe.size2}${recipe.size2End === undefined ? '' : `>${recipe.size2End}`}`}${recipe.angleDeg === undefined ? '' : `,a=${recipe.angleDeg}`}`}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`}${recipe.corners === undefined ? '' : `,corners${JSON.stringify(recipe.corners)}`})`;
@@ -390,6 +390,9 @@ function faceBlendError(node: Record<string, unknown>, child: ChildCheck): strin
   );
 }
 
+/** At most this many tool solids in one boolean (`many` and the tool list of `boolean`; also bounds what a loaded recipe may ask a kernel). */
+export const MAX_BOOLEAN_TOOLS = 1000;
+
 function brepError(node: Record<string, unknown>): string | null {
   if (typeof node['blob'] !== 'string' || !/^[0-9a-f]{64}$/.test(node['blob'])) return 'brep: blob must be a lowercase sha256 hex string';
   if (node['format'] !== 'occt-brep-v1') return `brep: unsupported format '${String(node['format'])}'`;
@@ -403,6 +406,10 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       return isRecord(node['entity']) ? leafError(node['entity'], validateLeaf) : 'solid leaf needs an entity';
     case 'boolean':
       if (!['union', 'subtract', 'intersect'].includes(String(node['boolean']))) return `unknown boolean '${String(node['boolean'])}'`;
+      if (node['many'] !== undefined && !(Number.isInteger(node['many']) && (node['many'] as number) >= 2))
+        return 'boolean: many must be an integer >= 2';
+      if (typeof node['many'] === 'number' && node['many'] > MAX_BOOLEAN_TOOLS)
+        return `boolean: many must be <= ${MAX_BOOLEAN_TOOLS} (refused: a recipe cannot size a kernel allocation)`;
       return child(node['a']) ?? child(node['b']);
     case 'fillet':
     case 'chamfer':

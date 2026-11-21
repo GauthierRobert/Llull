@@ -74,6 +74,7 @@ export class LodGeometryCache {
   private readonly geometries = new Map<string, THREE.BufferGeometry>();
   private readonly boxes = new Map<string, LocalBox>();
   private unitBox: THREE.BoxGeometry | undefined;
+  private billboard: THREE.PlaneGeometry | undefined;
 
   /** Geometry of `prototypeKey` at `lod`; `entity` (any instance of the prototype) is read only on a miss. */
   geometry(prototypeKey: string, lod: PlantLod, entity: Entity): THREE.BufferGeometry {
@@ -86,6 +87,11 @@ export class LodGeometryCache {
       this.geometries.set(key, geometry);
     }
     return geometry;
+  }
+
+  /** The shared [-1, 1]^2 quad of every impostor bucket. */
+  impostorQuad(): THREE.PlaneGeometry {
+    return (this.billboard ??= new THREE.PlaneGeometry(2, 2));
   }
 
   /** Local bounding box of the prototype (the LOD2 box); builds LOD0 when it has not been needed yet. */
@@ -120,6 +126,8 @@ export class LodGeometryCache {
     this.boxes.clear();
     this.unitBox?.dispose();
     this.unitBox = undefined;
+    this.billboard?.dispose();
+    this.billboard = undefined;
   }
 
   private rememberBox(prototypeKey: string, geometry: THREE.BufferGeometry): void {

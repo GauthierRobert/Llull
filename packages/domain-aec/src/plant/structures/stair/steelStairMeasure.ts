@@ -9,14 +9,21 @@ import { findGratingType } from '../grating/gratingTypes';
 import { layoutSteelStair, type StairLayout, type StairSizes } from './steelStairLayout';
 
 /** Section sizes of the stringers in document units (0 when the profile left the catalogue). */
-export function stairSizes(doc: CadDocument, stair: Pick<SteelStairElement, 'stringerProfile'>): StairSizes {
+export function stairSizes(doc: Pick<CadDocument, 'units'>, stair: Pick<SteelStairElement, 'stringerProfile'>): StairSizes {
   const profile = findProfile(stair.stringerProfile);
   return { stringerWeb: fromMm(doc, profile?.tw ?? 0), stringerDepth: fromMm(doc, profile?.h ?? 0) };
 }
 
 /** Thickness of the treads and landings, document units (0 for a grating type that left the catalogue). */
-export function treadThickness(doc: CadDocument, tread: SteelStairElement['tread']): number {
+export function treadThickness(doc: Pick<CadDocument, 'units'>, tread: SteelStairElement['tread']): number {
   return tread.kind === 'checker_plate' ? tread.thickness : fromMm(doc, findGratingType(tread.gratingType)?.barDepthMm ?? 0);
+}
+
+/** Mass of the tread / landing surface per plan area, kg/m² (0 for a grating type that left the catalogue). */
+export function treadMassKgM2(doc: Pick<CadDocument, 'units'>, tread: SteelStairElement['tread']): number {
+  return tread.kind === 'grating'
+    ? (findGratingType(tread.gratingType)?.massKgM2 ?? 0)
+    : (toMm(doc, tread.thickness) / 1000) * STEEL_DENSITY_KG_PER_M3;
 }
 
 export interface StairQuantities {
@@ -34,14 +41,13 @@ export function stairQuantities(doc: CadDocument, stair: SteelStairElement): Sta
   const layout = layoutSteelStair(stair, stairSizes(doc, stair));
   const metres = toMetres(doc, 1);
   const stringerM =
-    layout.stringers.reduce((sum, run) => sum + Math.hypot(run.to[0] - run.from[0], run.to[1] - run.from[1], run.to[2] - run.from[2]), 0) *
-    metres;
+    [...layout.stringers, ...layout.knuckles].reduce(
+      (sum, run) => sum + Math.hypot(run.to[0] - run.from[0], run.to[1] - run.from[1], run.to[2] - run.from[2]),
+      0,
+    ) * metres;
   const treadAreaM2 =
     [...layout.treads, ...layout.landings].reduce((sum, plate) => sum + polygonArea([...plate.corners]), 0) * metres * metres;
-  const perArea =
-    stair.tread.kind === 'grating'
-      ? (findGratingType(stair.tread.gratingType)?.massKgM2 ?? 0)
-      : (toMm(doc, stair.tread.thickness) / 1000) * STEEL_DENSITY_KG_PER_M3;
+  const perArea = treadMassKgM2(doc, stair.tread);
   const stringerKg = stringerM * (findProfile(stair.stringerProfile)?.massPerMetre ?? 0);
   const treadKg = treadAreaM2 * perArea;
   return {

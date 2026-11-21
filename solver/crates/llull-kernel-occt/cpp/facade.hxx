@@ -113,11 +113,32 @@ std::unique_ptr<Shape> scaled(const Shape &shape, double factor);
 // General affine map p -> M p + t (matrix: 9 numbers by rows, translation: 3) via BRepBuilderAPI_GTransform (01 DEF); null when the map is singular.
 std::unique_ptr<Shape> gtransformed(const Shape &shape, rust::Slice<const double> matrix, rust::Slice<const double> translation);
 std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operation, bool unify);
+
+// Tools of one multi-tool boolean (ASC TR-ASC-03): borrowed shapes, valid for the call; `note` is the fallback reason after boolean_many.
+class ToolList {
+ public:
+  std::vector<const Shape *> items;
+  mutable std::string note;
+};
+std::unique_ptr<ToolList> new_tool_list();
+void tool_list_push(ToolList &list, const Shape &shape);
+// One General Fuse (operation 0) or Cut (1) of `a` with every tool (boolean_many.cxx); null with `tools.note` set when the result is invalid.
+std::unique_ptr<Shape> boolean_many(const Shape &a, const ToolList &tools, int32_t operation, bool unify);
+// Test-only hook: the next boolean_many results count as invalid (the fallback path).
+void set_many_fault(bool on);
+rust::String tool_list_note(const ToolList &list);
+// Deadline (milliseconds from now; 0 = none) and cancel of the running request (progress.cxx).
+void set_deadline_ms(double milliseconds);
+void clear_deadline();
+void request_cancel(int64_t id);
+void set_request_id(int64_t id);
 // The same shape with every face name prefixed "<prefix>:" (a leaf entity id).
 std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix);
 
 MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_deflection);
 double bounding_diagonal(const Shape &shape);
+// Tight box (BRepBndLib::AddOptimal, no enlargement) as [xmin, ymin, zmin, xmax, ymax, zmax]; empty for an empty or unbounded shape.
+rust::Vec<double> shape_bounds(const Shape &shape);
 MassOut mass_properties(const Shape &shape);
 AnalysisOut analyze(const Shape &shape);
 

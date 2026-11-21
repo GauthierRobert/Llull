@@ -20,6 +20,8 @@ interface WorkerInit {
   readonly port: MessagePort;
   readonly testHooks: boolean;
   readonly binary: string;
+  /** Milliseconds a native op may run before the sidecar answers `KRN_TIMEOUT` (the proxy kills the worker a grace period later). */
+  readonly deadlineMs?: number;
 }
 
 function signal(status: Int32Array, value: number): void {
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
 
   const router = createKernelRouter({
     native,
+    ...(init.deadlineMs === undefined ? {} : { deadlineMs: init.deadlineMs }),
     session: () => {
       if (!session.alive()) {
         console.warn('[occt-native] the llull-kernel sidecar exited; starting a new one');

@@ -195,7 +195,11 @@ describe('import_bcf reads BCF 2.1 and reports what it cannot map', () => {
     expect(result.rejected, result.summary).toBeUndefined();
     const data = result.data as Imported & { version: string };
     expect(data).toMatchObject({ version: '2.1', created: 1, viewpoints: 1, comments: 1 });
-    expect(data.warnings.map((warning) => warning.code)).toEqual(['VIS_BCF_STATUS_RESET', 'VIS_BCF_GUID_UNMAPPED']);
+    expect(data.warnings.map((warning) => warning.code)).toEqual([
+      'VIS_BCF_STATUS_RESET',
+      'VIS_BCF_GUID_UNMAPPED',
+      'VIS_BCF_GUID_UNRESOLVED',
+    ]);
     const issue = result.document.review?.issues['iss-2'];
     expect(issue).toMatchObject({ priority: 'high', labels: ['Steel', 'L2'], dueDate: '2026-02-03', assignedTo: 'x@y.z', entityIds: [] });
     const camera = result.document.review?.viewpoints['vp-1']?.camera;

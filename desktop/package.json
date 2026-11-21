@@ -29,8 +29,5 @@
   },
   "engines": {
     "node": ">=22.12"
-  },
-  "dependencies": {
-    "llull": "file:.."
   }
 }

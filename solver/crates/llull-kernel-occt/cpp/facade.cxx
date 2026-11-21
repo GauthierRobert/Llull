@@ -45,6 +45,7 @@
 #include <TopExp_Explorer.hxx>
 #include <TopLoc_Location.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <gp_Ax1.hxx>
 #include <gp_GTrsf.hxx>
@@ -52,6 +53,7 @@
 #include <gp_Trsf.hxx>
 
 #include "llull-kernel-occt/cpp/naming.hxx"
+#include "llull-kernel-occt/cpp/progress.hxx"
 #include "llull-kernel-occt/cpp/query_support.hxx"
 #include "llull-kernel-occt/cpp/surface_bounds.hxx"
 #include "llull-kernel-occt/src/lib.rs.h"
@@ -292,7 +294,15 @@ std::unique_ptr<Shape> gtransformed(const Shape &shape, rust::Slice<const double
 namespace {
 
 template <class Builder>
-bool run_boolean(Builder &builder, TopoDS_Shape &result, Handle(BRepTools_History) & history) {
+bool run_boolean(Builder &builder, const Shape &a, const Shape &b, TopoDS_Shape &result, Handle(BRepTools_History) & history) {
+  TopTools_ListOfShape arguments, tools;
+  arguments.Append(a.shape);
+  tools.Append(b.shape);
+  builder.SetArguments(arguments);
+  builder.SetTools(tools);
+  Handle(OpProgress) progress = new OpProgress;
+  builder.Build(progress->Start());
+  if (progress->broke()) throw_timeout(*progress);
   if (!builder.IsDone()) return false;
   result = builder.Shape();
   history = builder.History();
@@ -306,14 +316,14 @@ std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operat
   Handle(BRepTools_History) history;
   bool done = false;
   if (operation == 0) {
-    BRepAlgoAPI_Fuse builder(a.shape, b.shape);
-    done = run_boolean(builder, result, history);
+    BRepAlgoAPI_Fuse builder;
+    done = run_boolean(builder, a, b, result, history);
   } else if (operation == 1) {
-    BRepAlgoAPI_Cut builder(a.shape, b.shape);
-    done = run_boolean(builder, result, history);
+    BRepAlgoAPI_Cut builder;
+    done = run_boolean(builder, a, b, result, history);
   } else if (operation == 2) {
-    BRepAlgoAPI_Common builder(a.shape, b.shape);
-    done = run_boolean(builder, result, history);
+    BRepAlgoAPI_Common builder;
+    done = run_boolean(builder, a, b, result, history);
   } else {
     throw std::invalid_argument("boolean: unknown operation");
   }
@@ -464,6 +474,14 @@ double bounding_diagonal(const Shape &shape) {
   const Bnd_Box box = bounds_of(shape.shape);
   if (box.IsVoid() || box.IsOpen()) return 0.0;
   return box.CornerMin().Distance(box.CornerMax());
+}
+
+rust::Vec<double> shape_bounds(const Shape &shape) {
+  const Bnd_Box box = bounds_of(shape.shape);
+  rust::Vec<double> out;
+  if (box.IsVoid() || box.IsOpen()) return out;
+  push_bounds(out, box);
+  return out;
 }
 
 MassOut mass_properties(const Shape &shape) {

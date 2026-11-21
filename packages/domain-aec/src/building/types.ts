@@ -483,7 +483,12 @@ export type SteelStairTread = { kind: 'grating'; gratingType: string } | { kind:
 export interface SteelStairLanding {
   afterRiser: number;
   length: number;
+  /** Turn of the stair at this landing (06 STA §13.12): quarter = 90 degrees, half = 180 degrees (the next flight returns beside this one); absent = straight. */
+  turn?: SteelStairTurn;
 }
+
+export const STEEL_STAIR_TURNS = ['quarter_left', 'quarter_right', 'half_left', 'half_right'] as const;
+export type SteelStairTurn = (typeof STEEL_STAIR_TURNS)[number];
 
 /**
  * A steel stringer stair (06 STA M5): `riserCount` equal risers of `riserHeight`, treads of depth `going`, landings, two stringers outside the

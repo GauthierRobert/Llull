@@ -75,11 +75,12 @@ const finding = (
   paths: readonly string[] = [],
 ): Finding => ({ code, severity, ids, paths, message, remediation: remediationOf(code) });
 
-/** Hash of everything the analysis reads: the stored model (without its recorded results and approval), the resolved pipes and supports, the thermal material record. */
+/** Hash of everything the analysis reads: the stored model (without its recorded results, approval and nozzle limits: checks on the results, not inputs of the solve), the resolved pipes and supports, the thermal material record. */
 export function inputHashOf(doc: CadDocument, model: StressModel, built: BuiltModel | null): string {
-  const { recorded, approval, ...stored } = model;
+  const { recorded, approval, nozzleLimits, ...stored } = model;
   void recorded;
   void approval;
+  void nozzleLimits;
   const thermal = model.conditions?.material.thermal;
   const material =
     thermal !== undefined && 'materialId' in thermal && doc.materials !== undefined && Object.hasOwn(doc.materials, thermal.materialId)
@@ -94,6 +95,14 @@ export function inputHashOf(doc: CadDocument, model: StressModel, built: BuiltMo
       components: built?.sources.components ?? null,
       branches: built?.sources.branches ?? null,
       material,
+      ...(model.hotModulus === undefined
+        ? {}
+        : {
+            hotMaterial:
+              doc.materials !== undefined && Object.hasOwn(doc.materials, model.hotModulus.materialId)
+                ? doc.materials[model.hotModulus.materialId]
+                : null,
+          }),
     }),
   );
 }

@@ -20,7 +20,7 @@ import type { DrawingsModel } from './sheet';
 import type { PmiModel } from './pmi';
 import type { DynamicsModel } from './dynamics';
 import type { InstanceArray } from './instanceArray';
-import type { PrototypeModel } from './prototype';
+import type { EntityTags, PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
 import type { DisplayModel } from './display';
 import type { CurveSegment } from './curve';
@@ -89,7 +89,7 @@ export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
 
 export type EntityKind = SolidKind | Shape2DKind | CurveKind | SheetKind | 'instance';
 
-export interface BaseEntity {
+export interface BaseEntity extends EntityTags {
   readonly id: EntityId;
   readonly kind: EntityKind;
   /** World-space origin (work-plane origin for 2D entities). */
@@ -821,7 +821,11 @@ export interface EdgeRadius {
 export type ShapeRecipe =
   /** A solid entity as authored (primitive, profile solid, or a plain triangle mesh). */
   | { readonly op: 'solid'; readonly entity: Entity }
-  | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe }
+  /**
+   * `many` (union / subtract only): `b` is the balanced union of `many` tool recipes; a kernel with a multi-tool boolean applies the tools in ONE
+   * General Fuse / Cut, every other kernel evaluates `b` as written (ASC M1a).
+   */
+  | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe; readonly many?: number }
   | EdgeBlendNode<ShapeRecipe, EdgeRadius>
   /**
    * A rolling-ball blend between two face sets that need not share an edge (BLD M4): `facesA` / `facesB` are unique face indices of the source,

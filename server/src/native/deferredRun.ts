@@ -26,11 +26,19 @@ const BYTES_PER_NUMBER = 8;
 /** Share of the run below which a remaining-time estimate is noise. */
 const MIN_FRACTION_FOR_ETA = 0.05;
 
-export type JobOutcome = MeshOpResult | MeshEngineFailure;
+/** What a deferred job is for: a native mesh op, or one frame of the desktop viewport (`viewportCapturePort.ts`, ASC M6a). */
+type DeferredOpName = MeshOpName | 'capture_viewport';
+
+/** The PNG a connected desktop renderer drew; held for the resolve only, never kept in the result cache (a capture is always fresh). */
+export interface CapturedFrame {
+  readonly frame: { readonly png: Uint8Array; readonly width: number; readonly height: number };
+}
+
+export type JobOutcome = MeshOpResult | MeshEngineFailure | CapturedFrame;
 
 /** One progress report of a native job, as the host streams it (CLI `--progress`, `POST /command` NDJSON). */
 export interface JobProgress {
-  readonly op: MeshOpName;
+  readonly op: DeferredOpName;
   /** Machine name of the stage (`max_flow`, `decimate`, ...). */
   readonly stage: string;
   /** The stage in words. */
@@ -49,7 +57,7 @@ export interface JobProgress {
 export interface DeferredJob {
   /** Content key: the same op on the same mesh and parameters gives the same key (hash of the job files). */
   readonly key: string;
-  readonly op: MeshOpName;
+  readonly op: DeferredOpName;
   /** Milliseconds between two heartbeats of a silent job. */
   readonly heartbeatMs: number;
   /** Runs the job; resolves with its result or a named failure, never rejects. `report` takes the raw `progress` events of the job. */
@@ -86,6 +94,7 @@ export function currentScope(): DeferredScope | null {
 }
 
 const isFailure = (outcome: JobOutcome): outcome is MeshEngineFailure => 'code' in outcome;
+const isFrame = (outcome: JobOutcome): outcome is CapturedFrame => 'frame' in outcome;
 
 const numbersIn = (result: MeshOpResult): number =>
   (result.mesh?.positions.length ?? 0) +
@@ -171,7 +180,7 @@ export function _resultCacheSize(): number {
 type Listener = (event: JobProgress) => void;
 
 /** One run per content key, shared by every command that waits for it (`sharedRun.ts`: per-caller signals, kill with the last waiter). */
-const running = createSharedRuns<JobOutcome, JobProgress, MeshOpName>({ replayLatest: true });
+const running = createSharedRuns<JobOutcome, JobProgress, DeferredOpName>({ replayLatest: true });
 
 function progressOf(job: DeferredJob, raw: Readonly<Record<string, unknown>>, startedAt: number, heartbeat: boolean): JobProgress {
   const elapsedMs = Date.now() - startedAt;
@@ -209,7 +218,7 @@ const startJob =
     return job
       .start(signal, (raw) => report(progressOf(job, raw, startedAt, false)))
       .then((outcome) => {
-        if (!isFailure(outcome)) resultCache.set(job.key, outcome);
+        if (!isFailure(outcome) && !isFrame(outcome)) resultCache.set(job.key, outcome);
         return outcome;
       })
       .finally(() => clearInterval(heartbeat));

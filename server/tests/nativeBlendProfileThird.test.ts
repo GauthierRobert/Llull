@@ -154,19 +154,30 @@ describeNative('DES-6c 13.39: a sharp third edge at a profile corner and at a tr
     expect(creases).toHaveLength(2);
   });
 
-  it('the trim builder refuses a CURVED sharp edge by name', () => {
+  it('the trim builder holds a CURVED sharp edge (the circular top edge): a star of 5 with the crease reported, inside the rolling-ball mitre', () => {
     const { doc, id, y } = block();
+    const edgesNear: Array<[number, number, number]> = [
+      [10, 3, 5],
+      [10, y, 2.5],
+    ];
+    const plain = execute(doc, 'fillet_edge', { id, edgesNear, radius: 0.5 });
+    expect(plain.error, plain.summary).toBeUndefined();
     const done = execute(doc, 'fillet_edge', {
       id,
-      edgesNear: [
-        [10, 3, 5],
-        [10, y, 2.5],
-      ],
+      edgesNear,
       radius: 0.5,
       corners: [{ near: [10, y, 5], type: 'setback', setback: 1.2 }],
     });
-    expect(done.document).toBe(doc);
-    expect(done.summary).toContain('BLD_CORNER_UNSUPPORTED');
-    expect(done.summary).toContain('must be a straight line');
+    expect(done.error, done.summary).toBeUndefined();
+    const result = done.affected[0] as string;
+    expect(patches(done.document, result)).toHaveLength(5);
+    const corner = (done.data as Reported).corners[0];
+    expect(corner?.crease.entryRad).toBeCloseTo(Math.PI / 2, 6);
+    expect(corner?.overshoot).toBeLessThan(1e-3 * Math.hypot(10, 10, 5));
+    const own = volume(done.document, result);
+    const mitre = volume(plain.document, plain.affected[0] as string);
+    expect(own).toBeLessThan(mitre);
+    expect(mitre - own).toBeLessThan(0.25);
+    expect(checked(done.document, result).status).not.toBe('fail');
   });
 });
