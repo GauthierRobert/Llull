@@ -196,9 +196,9 @@ describe('ifcGuids projection: ownership, documents without a building, units', 
   });
 
   it('a document without a building has no GlobalIds and resolves none', () => {
-    const doc = apply(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
-    expect(guidsOf({ ...doc, building: undefined } as CadDocument, doc.order[0] ?? '')).toEqual([]);
-    expect(entitiesOf({ ...doc, building: undefined } as CadDocument, 'ZZZZZZZZZZZZZZZZZZZZZZ')).toEqual([]);
+    const { building: _dropped, ...doc } = apply(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+    expect(guidsOf(doc, doc.order[0] ?? '')).toEqual([]);
+    expect(entitiesOf(doc, 'ZZZZZZZZZZZZZZZZZZZZZZ')).toEqual([]);
   });
 
   it('routed parts carry their part GlobalId in an mm document and none in another unit', () => {
