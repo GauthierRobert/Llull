@@ -72,7 +72,7 @@ export const exportBcf = defineCommand({
     'the profile goes out as legend labels of the topic and the warning VIS_BCF_COLOURING_LARGE names the viewpoints. data: { fileName, base64, bytes, sha256, version, topics, ' +
     'viewpoints, snapshots, coloured, warnings } — save with `--save review.bcf`. snapshotRenderer "reference" (default) keeps the archive ' +
     'byte-reproducible; "native" draws the snapshots on the GPU with llull-compute (CLI / desktop only; data.deterministic false). ' +
-    'A component of a building element also carries the IFC GlobalId the IFC export writes for that element (Component IfcGuid, in the selection and in Coloring, where each GlobalId is listed once per viewpoint, first colour wins); other entities carry only the AuthoringToolId (warning VIS_BCF_GUID_UNMAPPED lists them). Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
+    'A component also carries the IFC GlobalId of each product export_ifc writes for its entity (Component IfcGuid, same derivation as export_ifc, for the schema ifcSchema: building elements, pipes, moment connections, base plates, routed pipe parts; in the selection and in Coloring, where each GlobalId is listed once per viewpoint, first colour wins); an entity export_ifc writes no product for (grids, nozzles are ports of their equipment) carries only the AuthoringToolId (warning VIS_BCF_GUID_UNMAPPED lists them). Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
   annotations: { readOnly: true },
   params: z.object({
     issueIds: z.array(z.string()).optional().describe('Issues to export (iss-<n>), in this order. Default: every issue.'),
@@ -80,6 +80,12 @@ export const exportBcf = defineCommand({
       .enum(['3.0', '2.1'])
       .optional()
       .describe('BCF version: "3.0" (default) or "2.1" (no extensions.xml, no AspectRatio, 2.1 markup layout).'),
+    ifcSchema: z
+      .enum(['IFC4', 'IFC4X3_ADD2'])
+      .optional()
+      .describe(
+        'The export_ifc schema the IfcGuid values refer to (default IFC4, as export_ifc). It only matters for a pipe: IFC4 writes one product per pipe element, IFC4X3_ADD2 one per straight and bend, so a pipe component carries one IfcGuid per product of that schema.',
+      ),
     colours: z
       .boolean()
       .optional()
@@ -152,6 +158,7 @@ export const exportBcf = defineCommand({
           present(issue.entityIds),
           version,
           style.colouring,
+          params.ifcSchema,
         );
         entries.push({ name: `${issue.guid}/${guid}.bcfv`, data: encoder.encode(visinfo) });
         viewpointGuids.set(viewpointId, guid);
@@ -191,8 +198,10 @@ export const exportBcf = defineCommand({
     const outcome = run?.result();
     if (outcome !== undefined && 'code' in outcome) return fail(outcome.code, outcome.message, [], ['snapshotRenderer']);
     const archive = zipStore(entries);
-    const guidOf = documentProjection('ifcGuid');
-    const unmapped = [...new Set(issues.flatMap((issue) => present(issue.entityIds)))].filter((id) => guidOf?.(doc, id) === undefined);
+    const guidOf = documentProjection('ifcGuids');
+    const unmapped = [...new Set(issues.flatMap((issue) => present(issue.entityIds)))].filter(
+      (id) => (guidOf?.(doc, id, 'IFC4') ?? []).length === 0,
+    );
     const warnings = bcfWarnings(unmapped, large);
     const coloured = [...styles.values()].reduce((sum, style) => sum + (style.large ? 0 : style.coloured), 0);
     const provenance =

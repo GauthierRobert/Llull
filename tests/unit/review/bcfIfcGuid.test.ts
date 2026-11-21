@@ -75,7 +75,7 @@ describe('export_bcf IfcGuid', () => {
     const components = viewpointComponents(doc, '3.0');
     expect(xmlAttr(components[0] as XmlElement, 'IfcGuid')).toBeUndefined();
     expect(JSON.stringify(doc)).toBe(before);
-    expect(documentProjection('ifcGuid')?.(doc, 'nothing')).toBeUndefined();
+    expect(documentProjection('ifcGuids')?.(doc, 'nothing', 'IFC4')).toEqual([]);
     expect(execute(doc, 'export_bcf', { snapshots: false }).rejected).toBeUndefined();
   });
 });

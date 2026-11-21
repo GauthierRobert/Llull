@@ -5,7 +5,7 @@ import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
 import { getPiping } from '../../plant/piping/model';
 import { noop, report, exportRefusal } from '@core/commands/noop';
-import { ifcGuid } from '@lib/ifcGuid';
+import { globalIdFor } from './ifcSeeds';
 import { type Context, StepWriter, ifcString, placement } from './ifcStep';
 import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
 import { plantIfcView } from '../../plant/data/view';
@@ -69,8 +69,7 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
   const worldAxes = writer.add(`IFCAXIS2PLACEMENT3D(${origin},${zAxis},${xAxis})`);
   const modelContext = writer.add(`IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,${worldAxes},$)`);
   const body = writer.add(`IFCGEOMETRICREPRESENTATIONSUBCONTEXT('Body','Model',*,*,*,*,${modelContext},$,.MODEL_VIEW.,$)`);
-  const salt = building.uid ?? 'llull';
-  const context: Context = { writer, guid: (seed) => ifcGuid(`${salt}:${seed}`), mm: (value) => value * factor, body, zAxis, xAxis };
+  const context: Context = { writer, guid: (seed) => globalIdFor(building.uid, seed), mm: (value) => value * factor, body, zAxis, xAxis };
   const units = [
     writer.add('IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.)'),
     writer.add('IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)'),

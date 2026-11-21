@@ -54,6 +54,9 @@ function topicFields(
 /** Most records (issues + viewpoints + comments) one import creates; the import stops at the first topic past it. */
 const MAX_IMPORTED_RECORDS = 20_000;
 
+/** Most unresolved IfcGuid values named in a warning / data. */
+const MAX_LISTED_GUIDS = 100;
+
 const OPEN_STATUSES = new Set(['', 'open', 'new', 'active']);
 
 /**
@@ -65,12 +68,12 @@ export const importBcf = defineCommand({
   name: 'import_bcf',
   description:
     'Import a BCF 2.1 or 3.0 archive (.bcfzip / .bcf) as review issues: one issue per topic (title, type, priority, labels, description, assignedTo, dueDate) with its ' +
-    'viewpoints (camera metres -> document units; selected components whose OriginatingSystem is "llull" are matched by AuthoringToolId) and comments. `bcf` is the ' +
+    'viewpoints (camera metres -> document units; selected components are matched by AuthoringToolId when OriginatingSystem is "llull" and the entity exists, else by IfcGuid through the same GlobalId derivation export_ifc uses, so a BCF written for an IFC export of this model resolves) and comments. `bcf` is the ' +
     'archive as base64 (CLI: `bcf=@review.bcf`). A topic whose Guid already names an issue follows `mergePolicy`: "skip" (default) leaves it, "update" refreshes ' +
     'its title, type, priority, labels, description, assignedTo and dueDate and appends comments it does not have. Imports are never human acts: new issues are open ' +
     '(a Closed / Resolved status in the file is reported as warning VIS_BCF_STATUS_RESET); status, history, viewpoints and entities of an existing issue are not changed. ' +
-    'Limits: 64 MiB archive, 5000 topics, 20000 created records (VIS_BCF_LIMIT), inflate ratio 200. A comment keeps the BCF Author as importedAuthor (an unverified label). data { topics, created, updated, skipped, viewpoints, comments, issueIds, warnings[{code, message}] }. Errors: VIS_BCF_PARSE, VIS_BCF_VERSION. ' +
-    'Warnings: VIS_BCF_GUID_UNMAPPED (components without a matching entity), VIS_BCF_VIEWPOINT_SKIPPED, VIS_BCF_TOPIC_SKIPPED, VIS_BCF_FIELD_DROPPED, VIS_BCF_STATUS_RESET, VIS_BCF_ISSUE_SIGNED, VIS_BCF_LIMIT.',
+    'Limits: 64 MiB archive, 5000 topics, 20000 created records (VIS_BCF_LIMIT), inflate ratio 200. A comment keeps the BCF Author as importedAuthor (an unverified label). data { topics, created, updated, skipped, viewpoints, comments, issueIds, unresolvedGuids[IfcGuid values no entity resolves to, max 100], warnings[{code, message}] }. Errors: VIS_BCF_PARSE, VIS_BCF_VERSION. ' +
+    'Warnings: VIS_BCF_GUID_UNMAPPED (components without a matching entity), VIS_BCF_GUID_UNRESOLVED (the IfcGuid values of those that carry one, by name; foreign model or another document), VIS_BCF_VIEWPOINT_SKIPPED, VIS_BCF_TOPIC_SKIPPED, VIS_BCF_FIELD_DROPPED, VIS_BCF_STATUS_RESET, VIS_BCF_ISSUE_SIGNED, VIS_BCF_LIMIT.',
   annotations: { metaHistory: true },
   params: z.object({
     bcf: z.string().describe('The BCF archive, base64 (CLI: @file reads a file).'),
@@ -95,6 +98,7 @@ export const importBcf = defineCommand({
     const counts = { created: 0, updated: 0, skipped: 0, viewpoints: 0, comments: 0 };
     const issueIds: string[] = [];
     let unmapped = 0;
+    const unresolved = new Set<string>();
     const seen = new Set<string>();
     for (const topic of read.topics) {
       if (seen.has(topic.guid)) {
@@ -136,6 +140,7 @@ export const importBcf = defineCommand({
             continue;
           }
           unmapped += mapped.unmapped;
+          for (const guid of mapped.unresolvedGuids) unresolved.add(guid);
           const [id, next] = mintReviewId(review, 'vp');
           review = {
             ...next,
@@ -194,7 +199,13 @@ export const importBcf = defineCommand({
         code: 'VIS_BCF_GUID_UNMAPPED',
         message: `${unmapped} viewpoint component(s) name no entity of this document (IfcGuid only, another system, or unknown id)`,
       });
-    const data = { topics: counts.created + counts.updated, ...counts, issueIds, version: read.version, warnings };
+    if (unresolved.size > 0)
+      warnings.push({
+        code: 'VIS_BCF_GUID_UNRESOLVED',
+        message: `${unresolved.size} IfcGuid(s) match no entity of this document: ${[...unresolved].slice(0, MAX_LISTED_GUIDS).join(', ')}${unresolved.size > MAX_LISTED_GUIDS ? ', ...' : ''}`,
+      });
+    const unresolvedGuids = [...unresolved].slice(0, MAX_LISTED_GUIDS);
+    const data = { topics: counts.created + counts.updated, ...counts, issueIds, version: read.version, unresolvedGuids, warnings };
     const summary =
       `import_bcf: BCF ${read.version}: ${counts.created} issue(s) created, ${counts.updated} updated, ${counts.skipped} skipped, ` +
       `${counts.viewpoints} viewpoint(s), ${counts.comments} comment(s), ${warnings.length} warning(s)${issueIds.length > 0 ? `: ${issueIds.join(', ')}` : ''}.`;

@@ -10,6 +10,7 @@ import type { ReviewIssue, ViewpointCamera } from '../../../model/review';
 import { escapeXml } from '../../../lib/escapeXml';
 import { toMetres } from '../../../model/units';
 import { documentProjection } from '../../../plugins/host';
+import type { IfcSchemaName } from '../../../plugins/plugin';
 
 export type BcfVersion = '3.0' | '2.1';
 
@@ -168,21 +169,26 @@ export function bcfVisualizationXml(
   selection: readonly string[],
   version: BcfVersion = '3.0',
   colouring: readonly ViewpointColouring[] = [],
+  ifcSchema: IfcSchemaName = 'IFC4',
 ): string {
   const metres = (v: Vec3): Vec3 => [toMetres(doc, v[0]), toMetres(doc, v[1]), toMetres(doc, v[2])];
-  const guidOf = documentProjection('ifcGuid');
+  const guidOf = documentProjection('ifcGuids');
+  const guidsOf = (id: string): readonly string[] => guidOf?.(doc, id, ifcSchema) ?? [];
+  const tag = (id: string, ifc: string | undefined): string =>
+    `<Component${ifc === undefined ? '' : ` IfcGuid="${escapeXml(ifc)}"`}>${text('OriginatingSystem', 'llull')}${text('AuthoringToolId', id)}</Component>`;
+  /** One Component per product GlobalId of the entity (a pipe has several in IFC4X3_ADD2), or one with the AuthoringToolId only. */
   const component = (id: string): string => {
-    const ifc = guidOf?.(doc, id);
-    return `<Component${ifc === undefined ? '' : ` IfcGuid="${escapeXml(ifc)}"`}>${text('OriginatingSystem', 'llull')}${text('AuthoringToolId', id)}</Component>`;
+    const guids = guidsOf(id);
+    return guids.length === 0 ? tag(id, undefined) : guids.map((ifc) => tag(id, ifc)).join('');
   };
   const components = selection.map(component).join('');
   const coloured = new Set<string>();
-  /** A component with an IfcGuid is listed once per viewpoint (the first colour wins): entities of one element share it. */
+  /** An entity with GlobalIds is listed once per viewpoint (the first colour wins): entities of one element share them. */
   const firstColour = (id: string): boolean => {
-    const ifc = guidOf?.(doc, id);
-    if (ifc === undefined) return true;
-    if (coloured.has(ifc)) return false;
-    coloured.add(ifc);
+    const guids = guidsOf(id);
+    if (guids.length === 0) return true;
+    if (guids.every((ifc) => coloured.has(ifc))) return false;
+    for (const ifc of guids) coloured.add(ifc);
     return true;
   };
   const coloring =

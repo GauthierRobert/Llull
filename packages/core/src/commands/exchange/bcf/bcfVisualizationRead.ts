@@ -26,13 +26,17 @@ export interface BcfCamera {
 
 export interface BcfVisualization {
   readonly camera: BcfCamera;
-  /** llull entity ids (AuthoringToolId of components whose OriginatingSystem is "llull"). */
-  readonly selection: readonly string[];
-  readonly exceptions: readonly string[];
   /** DefaultVisibility of the Visibility element, when present. */
   readonly defaultVisible?: boolean;
-  /** Components that carry no llull id (IfcGuid only, or another originating system). */
-  readonly unmappedComponents: number;
+  /** The selected components as written (llull id and / or IfcGuid), for resolution by IfcGuid when the id is missing or names no entity. */
+  readonly selectionRefs: readonly BcfComponentRef[];
+  readonly exceptionRefs: readonly BcfComponentRef[];
+}
+
+/** One `Component`: its llull AuthoringToolId (when OriginatingSystem is "llull") and its IfcGuid attribute, when present. */
+export interface BcfComponentRef {
+  readonly id?: string;
+  readonly ifcGuid?: string;
 }
 
 /** First direct child named `local`. */
@@ -79,16 +83,16 @@ function cameraOf(root: XmlElement): BcfCamera | string {
     : { projection: 'orthographic', eyeM, direction, up, viewHeightM };
 }
 
-/** The llull ids of the `Component` children of `holder` (count of the others in `unmapped`). */
-function components(holder: XmlElement | undefined): { ids: string[]; unmapped: number } {
-  const ids: string[] = [];
-  let unmapped = 0;
+/** The `Component` children of `holder` as written. */
+function components(holder: XmlElement | undefined): { refs: BcfComponentRef[] } {
+  const refs: BcfComponentRef[] = [];
   for (const component of holder === undefined ? [] : xmlChildren(holder, 'Component').slice(0, MAX_COMPONENTS)) {
     const id = childText(component, 'AuthoringToolId');
-    if (childText(component, 'OriginatingSystem') === 'llull' && id !== undefined && id !== '') ids.push(id);
-    else unmapped += 1;
+    const ifcGuid = xmlAttr(component, 'IfcGuid')?.trim();
+    const llullId = childText(component, 'OriginatingSystem') === 'llull' && id !== undefined && id !== '' ? id : undefined;
+    refs.push({ ...(llullId === undefined ? {} : { id: llullId }), ...(ifcGuid === undefined || ifcGuid === '' ? {} : { ifcGuid }) });
   }
-  return { ids, unmapped };
+  return { refs };
 }
 
 /** A parsed VisualizationInfo, or why the text is not one. */
@@ -106,9 +110,8 @@ export function parseVisualizationInfo(xml: string): BcfVisualization | string {
   const declared = visibility === undefined ? undefined : xmlAttr(visibility, 'DefaultVisibility')?.trim().toLowerCase();
   return {
     camera,
-    selection: selection.ids,
-    exceptions: exceptions.ids,
+    selectionRefs: selection.refs,
+    exceptionRefs: exceptions.refs,
     ...(declared === 'true' || declared === 'false' ? { defaultVisible: declared === 'true' } : {}),
-    unmappedComponents: selection.unmapped + exceptions.unmapped,
   };
 }

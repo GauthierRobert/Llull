@@ -1024,3 +1024,7 @@ Table: the spec's `ratingTableId` (its standard and group must equal the spec's)
 Tests: `tests/unit/plant/data/nozzleRating.test.ts` (CL150 at 38 degC passes 19 bar; at 200 degC 15 bar fails against 13.8 bar and 13 bar passes; CL300 nozzle on a CL150 spec; 900 degC and PN16 / "big" ratings / no design temperature are `UNCHECKED` with the reason; a line naming no nozzle says nothing; purity). Branch table: `nozzleRatingTables.test.ts` (spec missing, no group, no table, missing / mismatched table id, imported group 2.2 pass / fail with unverified rows, PN spec + PN table pass / fail, CL nozzle on a PN table, missing design pressure, CL400 row missing, 900 degC, ambiguous tag).
 
 Also built here (BCF GlobalIds, check_display hazard warning): 09 §12.20.
+
+### 13.17 DAT-VIS-FU3 (2026-11-21): BCF IfcGuid for every IFC product, import by IfcGuid
+
+`export_ifc` and the BCF projection share `building/exchange/ifcSeeds.ts` (`globalIdFor` + product seed names), so a BCF `IfcGuid` is the GlobalId in the IFC file for pipes (per schema: one product in IFC4, a segment per straight and a fitting per bend in IFC4X3_ADD2; `export_bcf` `ifcSchema`), moment connections, base plates, routed parts and equipment nozzles (the equipment product: a nozzle is a nested `IfcDistributionPort`). A scoped export (`plant.scope`) does not change GlobalIds (seeds ignore scope). `import_bcf` resolves IfcGuid components back to entities and reports the unresolved GlobalIds by name (`VIS_BCF_GUID_UNRESOLVED`, `data.unresolvedGuids`). Details and tests: 09 §12.22.

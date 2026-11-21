@@ -22,6 +22,9 @@ export interface FastenerHoleSize {
   readonly source: string;
 }
 
+/** IFC file schemas `export_ifc` writes; they differ in how a pipe is split into products. */
+export type IfcSchemaName = 'IFC4' | 'IFC4X3_ADD2';
+
 /**
  * Read-only views of a plugin's slice that core renderers and checks consume without knowing the slice (architecture L10). Each member is
  * offered by at most one plugin; core uses the first installed extension that defines it.
@@ -36,8 +39,10 @@ export interface DocumentProjections {
   fastenerHole?(doc: CadDocument, ref: FastenerRef): FastenerHoleSize | string;
   /** Number of placed fastener stacks, or undefined when the document has none. */
   fastenerStackCount?(doc: CadDocument): number | undefined;
-  /** IFC GlobalId the IFC export gives the component that owns entity `entityId`, or undefined when no export writes it. */
-  ifcGuid?(doc: CadDocument, entityId: string): string | undefined;
+  /** IFC GlobalIds of the products `export_ifc` (file schema `schema`) writes for entity `entityId`; empty when the export writes none. */
+  ifcGuids?(doc: CadDocument, entityId: string, schema: IfcSchemaName): readonly string[];
+  /** Entity ids whose products carry GlobalId `guid` in the IFC export of either schema; empty for a foreign GlobalId. */
+  entitiesOfIfcGuid?(doc: CadDocument, guid: string): readonly string[];
 }
 
 /** A plugin's slice of the document: validation of its data and re-derivation of its geometry. */
