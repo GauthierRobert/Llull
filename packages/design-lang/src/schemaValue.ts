@@ -7,17 +7,28 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandDefinition, ParamItemSpec } from '@core/commands/types';
-import { evaluateExpression, expressionSyntaxError, extractReferences, isBuiltinConstant } from '@lib/expression';
+import { BUILTIN_FUNCTIONS, evaluateExpression, expressionSyntaxError, extractReferences, isBuiltinConstant } from '@lib/expression';
 import { isRecord } from '@lib/isRecord';
 import { similarNames } from '@lib/similarNames';
 import { DesignError } from './errors';
 import type { Pair, ValueNode } from './parse';
 import { convertUnits } from './units';
 import { isPlainRef, splitAliasRef } from './aliasRef';
+import { buildValueExpr, type Expr } from './valueExpr';
 
 /** An arithmetic expression over parameters / loop variables (units already converted). */
 export class ExprRef {
   constructor(readonly text: string) {}
+}
+
+/** A value expression (valueExpr.ts) evaluated at run time and bound to the param schema: `{…}`, `[for …]`, `(if …)`, `fn(…)`. */
+export class ValueExprRef {
+  constructor(
+    readonly expr: Expr,
+    readonly spec: ParamItemSpec,
+    /** `<param path>` named in schema errors (`sections[3].span` is built from it). */
+    readonly param: string,
+  ) {}
 }
 
 /**
@@ -43,7 +54,17 @@ export class AnchorRef {
   ) {}
 }
 
-export type Template = number | string | boolean | null | ExprRef | NameRef | AnchorRef | Template[] | { [key: string]: Template };
+export type Template =
+  | number
+  | string
+  | boolean
+  | null
+  | ExprRef
+  | NameRef
+  | AnchorRef
+  | ValueExprRef
+  | Template[]
+  | { [key: string]: Template };
 
 /** `on=a.top align=back`: place the created entity against an anchor (any command that creates entities). */
 interface Placement {
@@ -113,7 +134,13 @@ export function bindCommand(
     let walked = head;
     for (const segment of rest) {
       const child = (target[walked] ??= {});
-      if (!isRecord(child) || child instanceof ExprRef || child instanceof NameRef || child instanceof AnchorRef)
+      if (
+        !isRecord(child) ||
+        child instanceof ExprRef ||
+        child instanceof NameRef ||
+        child instanceof AnchorRef ||
+        child instanceof ValueExprRef
+      )
         throw bad(ctx, `${pair.key.join('.')} sets inside a value that is not an object`, 'Set the object with dotted keys only.');
       target = child as { [key: string]: Template };
       const freeObject: boolean = spec.type === 'object' && Object.keys(spec.properties ?? {}).length === 0;
@@ -163,7 +190,7 @@ function alignOf(node: ValueNode, ctx: BindContext): string {
 
 /** One value against its schema. `key` = `<command>.<param path>` (angle-unit lookup). */
 function bindValue(node: ValueNode, spec: ParamItemSpec, key: string, ctx: BindContext): Template {
-  if (node.kind === 'json') return node.value as Template;
+  if (node.kind === 'expr' || (node.kind === 'word' && isExpressionWord(node.text))) return valueExpression(node, spec, key, ctx);
   const branch = spec.anyOf !== undefined ? chooseBranch(node, spec.anyOf) : spec;
   if (branch.enum !== undefined) return enumValue(node, branch.enum, ctx);
   switch (branch.type) {
@@ -185,7 +212,7 @@ function bindValue(node: ValueNode, spec: ParamItemSpec, key: string, ctx: BindC
       if (node.kind !== 'list')
         throw bad(ctx, `${key} takes a list [a, b, …]`, 'Write the value as [a, b, …] (a point may be an anchor: base.top).');
       const items = branch.items ?? {};
-      return node.items.map((item) => bindValue(item, items, key, ctx));
+      return node.items.map((item, k) => bindValue(item, items, `${key}[${k}]`, ctx));
     }
     case 'object': {
       const anchor = node.kind === 'word' ? ANCHOR.exec(node.text) : null;
@@ -199,6 +226,25 @@ function bindValue(node: ValueNode, spec: ParamItemSpec, key: string, ctx: BindC
     default:
       return untypedValue(node, key, ctx);
   }
+}
+
+const CALL = /^([A-Za-z_]\w*)\(/;
+
+/** A word only the value evaluator reads: a parenthesised `if` / `let`, or a call of a user function or a list built-in. */
+function isExpressionWord(text: string): boolean {
+  const callee = CALL.exec(text)?.[1];
+  if (callee !== undefined) return !Object.hasOwn(BUILTIN_FUNCTIONS, callee);
+  return text.startsWith('(') && expressionSyntaxError(text.replace(/\{[^{}]*\}/g, '0')) !== null;
+}
+
+/** The param path of a schema key `<command>.<param path>`. */
+const paramPath = (key: string): string => key.replace(/^[^.]*\./, '');
+
+function valueExpression(node: ValueNode, spec: ParamItemSpec, key: string, ctx: BindContext): Template {
+  const text = node.kind === 'expr' || node.kind === 'word' ? node.text : '';
+  const angleKey = key.replace(/\[\d+\]/g, '').replace(/\.\d+(?=\.|$)/g, '');
+  const expr = buildValueExpr(text, { units: siLengthUnit(angleKey) ?? ctx.doc.units, paramKey: angleKey, line: ctx.line });
+  return new ValueExprRef(expr, spec, paramPath(key));
 }
 
 function chooseBranch(node: ValueNode, branches: readonly ParamItemSpec[]): ParamItemSpec {
@@ -226,10 +272,21 @@ function enumValue(node: ValueNode, members: readonly (string | number)[], ctx: 
 
 function numberValue(node: ValueNode, key: string, ctx: BindContext): Template {
   if (node.kind !== 'word') throw bad(ctx, `${key} takes a number or an expression`, 'Write a number, e.g. 12 or w/2 + 5mm.');
-  const angleKey = key.replace(/\.\d+(?=\.|$)/g, '');
+  const angleKey = key.replace(/\[\d+\]/g, '').replace(/\.\d+(?=\.|$)/g, '');
   const text = convertUnits(node.text, { units: siLengthUnit(angleKey) ?? ctx.doc.units }, angleKey, ctx.line);
   const syntaxError = expressionSyntaxError(text.replace(/\{[^{}]*\}/g, '0'));
-  if (syntaxError !== null) throw bad(ctx, `bad expression "${node.text}": ${syntaxError}`, expressionFix(node.text));
+  if (syntaxError !== null) {
+    try {
+      return new ValueExprRef(
+        buildValueExpr(node.text, { units: ctx.doc.units, paramKey: angleKey, line: ctx.line }),
+        { type: 'number' },
+        paramPath(key),
+      );
+    } catch (error) {
+      if (!(error instanceof DesignError) || error.code !== 'DESIGN_SYNTAX') throw error;
+    }
+    throw bad(ctx, `bad expression "${node.text}": ${syntaxError}`, expressionFix(node.text));
+  }
   const free = [...extractReferences(text)].filter((name) => !isBuiltinConstant(name));
   if (free.length > 0) return new ExprRef(text);
   const result = evaluateExpression(text, {});

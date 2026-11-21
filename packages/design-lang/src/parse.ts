@@ -10,7 +10,8 @@ import { isComma, isSpace, sourceLines, splitTop, type SourceLine } from './lexe
 export type ValueNode =
   | { readonly kind: 'list'; readonly items: readonly ValueNode[] }
   | { readonly kind: 'string'; readonly value: string }
-  | { readonly kind: 'json'; readonly value: unknown }
+  /** `{…}` object or `[for …]` comprehension: a value expression (valueExpr.ts), evaluated against the param schema. */
+  | { readonly kind: 'expr'; readonly text: string }
   | { readonly kind: 'word'; readonly text: string };
 
 export interface Pair {
@@ -30,6 +31,13 @@ interface Tolerance {
 export type Statement =
   | { readonly kind: 'header'; readonly line: number; readonly name: string; readonly pairs: readonly Pair[] }
   | { readonly kind: 'param'; readonly line: number; readonly name: string; readonly expression: string }
+  | {
+      readonly kind: 'fn';
+      readonly line: number;
+      readonly name: string;
+      readonly params: readonly { readonly name: string; readonly fallback: string | null }[];
+      readonly body: string;
+    }
   | {
       readonly kind: 'command';
       readonly line: number;
@@ -57,7 +65,7 @@ export type Statement =
     };
 
 /** Words that start a statement and can never be a command name (contract-tested against the registry). */
-export const RESERVED_WORDS: readonly string[] = ['design', 'param', 'check', 'expect', 'for', 'in'];
+export const RESERVED_WORDS: readonly string[] = ['design', 'param', 'check', 'expect', 'for', 'in', 'fn'];
 
 const IDENTIFIER = /^[A-Za-z_]\w*$/;
 const ALIAS = /^[A-Za-z_][\w{}+\-*/]*$/;
@@ -105,6 +113,7 @@ function parseStatement(source: SourceLine, lines: readonly SourceLine[], cursor
   const first = /^\S+/.exec(text)?.[0] ?? '';
   if (first === 'param') return parseParam(line, text);
   if (first === 'check') return parseCheck(line, text);
+  if (first === 'fn') return parseFn(line, text, cursor.depth);
   if (first === 'for') {
     const m = /^for\s+([A-Za-z_]\w*)\s+in\s+(.+?)\s*\.\.\s*(.+?)\s*\{$/.exec(text);
     if (!m?.[1] || !m[2] || !m[3]) throw syntax(line, `malformed loop "${text}"`, 'Write: for i in 0..n-1 {');
@@ -117,6 +126,30 @@ function parseStatement(source: SourceLine, lines: readonly SourceLine[], cursor
     return { kind: 'header', line, name, pairs: tokens.slice(2).map((t) => parsePair(t, line)) };
   }
   return parseCommand(line, tokens);
+}
+
+function parseFn(line: number, text: string, depth: number): Statement {
+  if (depth > 1) throw syntax(line, 'fn is only allowed at the top level', 'Move the function out of the loop.');
+  const head = /^fn\s+([A-Za-z_]\w*)\s*\(/.exec(text);
+  let close = -1;
+  for (let i = head?.[0].length ?? 0, open = 1; head !== null && i < text.length && close < 0; i++) {
+    if (text[i] === '(') open++;
+    else if (text[i] === ')' && --open === 0) close = i;
+  }
+  const equals = /^\s*=\s*(.+)$/.exec(close < 0 ? '' : text.slice(close + 1));
+  if (head?.[1] === undefined || equals?.[1] === undefined)
+    throw syntax(line, `malformed function "${text}"`, 'Write: fn tip(x, k = 2) = x * k');
+  const params = splitTop(text.slice(head[0].length, close), isComma, line).map((piece) => {
+    const parts = /^([A-Za-z_]\w*)\s*(?:=\s*(.+))?$/.exec(piece);
+    if (!parts?.[1]) throw syntax(line, `"${piece}" is not a parameter`, 'Write a name, optionally with a default: b = 2');
+    return { name: parts[1], fallback: parts[2]?.trim() ?? null };
+  });
+  const seen = new Set<string>();
+  for (const param of params) {
+    if (seen.has(param.name)) throw syntax(line, `parameter ${param.name} is declared twice`, 'Give each parameter its own name.');
+    seen.add(param.name);
+  }
+  return { kind: 'fn', line, name: head[1], params, body: equals[1].trim() };
 }
 
 function parseParam(line: number, text: string): Statement {
@@ -187,16 +220,16 @@ function parsePair(token: string, line: number): Pair {
 export function parseValue(text: string, line: number, depth = 0): ValueNode {
   if (depth > MAX_NESTING) throw syntax(line, `lists nested deeper than ${MAX_NESTING}`, 'Flatten the list.');
   if (text === '') throw syntax(line, 'missing value', 'Write a value after "=".');
+  if (/^\[\s*for\s/.test(text) || text.startsWith('{')) return { kind: 'expr', text };
   if (text.startsWith('[')) {
     if (!text.endsWith(']')) throw syntax(line, `malformed list "${text}"`, 'Close the list with "]".');
     return { kind: 'list', items: splitTop(text.slice(1, -1), isComma, line).map((item) => parseValue(item, line, depth + 1)) };
   }
-  if (text.startsWith('"') || text.startsWith('{')) {
+  if (text.startsWith('"')) {
     try {
-      const value: unknown = JSON.parse(text);
-      return typeof value === 'string' ? { kind: 'string', value } : { kind: 'json', value };
+      return { kind: 'string', value: JSON.parse(text) as string };
     } catch {
-      throw syntax(line, `malformed ${text.startsWith('"') ? 'string' : 'JSON'} ${text}`, 'Use JSON syntax inside quotes / braces.');
+      throw syntax(line, `malformed string ${text}`, 'Use JSON syntax inside quotes.');
     }
   }
   return { kind: 'word', text };

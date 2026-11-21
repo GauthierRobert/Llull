@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { getCommand } from '@core/commands/registry';
 import type { CommandDefinition } from '@core/commands/types';
 import { parseDesign, type Pair } from '@design/parse';
-import { AnchorRef, bindCommand, ExprRef, NameRef, type BoundCommand } from '@design/schemaValue';
+import { AnchorRef, bindCommand, ExprRef, NameRef, ValueExprRef, type BoundCommand } from '@design/schemaValue';
 import { DesignError } from '@design/errors';
 import { convertUnits, lengthFactor } from '@design/units';
 
@@ -80,8 +80,8 @@ describe('bindCommand', () => {
     expect(code(() => bind('set_units _ units=[1]'))).toBe('DESIGN_BAD_ENUM');
   });
 
-  it('JSON escape hatch passes a value through', () => {
-    expect(bind('add_hole h face={"near": [0, 0, 1]}').params['face']).toEqual({ near: [0, 0, 1] });
+  it('an object value is a value expression bound to the param schema', () => {
+    expect(bind('add_hole h face={"near": [0, 0, 1]}').params['face']).toBeInstanceOf(ValueExprRef);
   });
 });
 

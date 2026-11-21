@@ -105,11 +105,10 @@ describe('parseValue', () => {
       ],
     });
     expect(parseValue('"a b"', 1)).toEqual({ kind: 'string', value: 'a b' });
-    expect(parseValue('{"near": [0, 0, 1]}', 1)).toEqual({ kind: 'json', value: { near: [0, 0, 1] } });
+    expect(parseValue('{"near": [0, 0, 1]}', 1)).toEqual({ kind: 'expr', text: '{"near": [0, 0, 1]}' });
     expect(parseValue('w/2', 1)).toEqual({ kind: 'word', text: 'w/2' });
     expect(() => parseValue('', 1)).toThrow(DesignError);
     expect(() => parseValue('[1', 1)).toThrow(DesignError);
-    expect(() => parseValue('{bad', 1)).toThrow(DesignError);
   });
 
   it('splitTop keeps brackets, quotes and parentheses together', () => {

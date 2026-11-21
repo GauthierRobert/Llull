@@ -14,10 +14,15 @@ import { similarNames } from '@lib/similarNames';
 import { isRecord } from '@lib/isRecord';
 import { DesignError } from './errors';
 import type { Statement } from './parse';
-import { AnchorRef, bindCommand, EXPRESSION_HELP, ExprRef, NameRef, type BoundCommand, type Template } from './schemaValue';
+import { AnchorRef, bindCommand, EXPRESSION_HELP, ExprRef, NameRef, ValueExprRef, type BoundCommand, type Template } from './schemaValue';
 import { exactFacePoint, frameOf, placementDelta, sidePoint, type Frame } from './anchors';
 import { runCheck, type CheckResult, type CheckScope } from './checks';
 import { convertUnits } from './units';
+import { BUILTIN_FUNCTIONS } from '@lib/expression';
+import { buildFunctions } from './functions';
+import { coerceValue } from './valueSchema';
+import { evaluateValue, RefValue, type FnDef } from './valueEval';
+import { buildValueExpr } from './valueExpr';
 import { splitAliasRef, selectIds } from './aliasRef';
 
 type CommandStatement = Extract<Statement, { kind: 'command' }>;
@@ -30,6 +35,7 @@ export const DESIGN_COMMANDS: readonly string[] = [
   'design_source',
   'check_design',
   'export_design',
+  'expand_design',
   'describe_design_syntax',
 ];
 
@@ -61,6 +67,14 @@ interface AliasRecord {
   frame: Frame | null;
 }
 
+/** One executed command with its resolved params (`expand_design`). */
+export interface TraceLine {
+  readonly line: number;
+  readonly command: string;
+  readonly alias: string | null;
+  readonly params: unknown;
+}
+
 /** Why a metaHistory / session command is not a design line, and where it goes instead. */
 function metaHint(name: string): string {
   if (name === 'set_parameter' || name === 'delete_parameter')
@@ -72,8 +86,9 @@ function metaHint(name: string): string {
 }
 
 /** Run `statements` on `doc` (every query and command through `ctx`, default: the current context). */
-export function runDesign(doc: CadDocument, statements: readonly Statement[], ctx?: ExecutionContext): DesignRun {
-  const run = new DesignRunner(doc, ctx);
+export function runDesign(doc: CadDocument, statements: readonly Statement[], ctx?: ExecutionContext, trace?: TraceLine[]): DesignRun {
+  const run = new DesignRunner(doc, ctx, trace);
+  run.defineFunctions(statements);
   run.block(statements, {});
   const checks = run.pendingChecks.map(({ statement, env }) => runCheck(statement, run.checkScope(env)));
   return { document: run.doc, affected: [...run.affected], ...run.aliasTables(), checks, commands: run.commands };
@@ -87,6 +102,7 @@ export function evaluateChecks(
   geometry: Readonly<Record<string, readonly string[]>>,
 ): CheckResult[] {
   const run = new DesignRunner(doc, undefined);
+  run.defineFunctions(statements);
   for (const [name, ids] of Object.entries(aliases)) run.bind(name, ids, geometry[name] ?? ids);
   run.collectChecks(statements, {});
   return run.pendingChecks.map(({ statement, env }) => runCheck(statement, run.checkScope(env)));
@@ -107,8 +123,15 @@ class DesignRunner {
   constructor(
     doc: CadDocument,
     private readonly ctx: ExecutionContext | undefined,
+    private readonly trace: TraceLine[] | undefined = undefined,
   ) {
     this.doc = doc;
+  }
+
+  private functions: ReadonlyMap<string, FnDef> = new Map();
+
+  defineFunctions(statements: readonly Statement[]): void {
+    this.functions = buildFunctions(statements, this.doc);
   }
 
   block(statements: readonly Statement[], env: Env): void {
@@ -230,7 +253,9 @@ class DesignRunner {
     this.approximateAnchors = [];
     const alias = statement.alias === null ? null : this.interpolate(statement.alias, env, line);
     const before = this.doc;
-    this.doc = this.exec(def.name, this.resolve(bound.params, env, line), line);
+    const params = this.resolve(bound.params, env, line);
+    this.trace?.push({ line, command: def.name, alias, params });
+    this.doc = this.exec(def.name, params, line);
     const gone = Object.keys(before.entities).filter((id) => this.doc.entities[id] === undefined);
     this.captureFrames(before, gone);
     for (const id of gone) this.consumed.set(id, { line, by: alias });
@@ -420,6 +445,7 @@ class DesignRunner {
 
   private resolve(template: Template, env: Env, line: number): unknown {
     if (template instanceof ExprRef) return this.evaluate(template.text, env, line);
+    if (template instanceof ValueExprRef) return this.valueOf(template, env, line);
     if (template instanceof NameRef) {
       const ref = this.reference(template.text, env, line);
       if (ref === null) {
@@ -497,7 +523,37 @@ class DesignRunner {
     );
   }
 
+  /** The alias `name` (or its `.entity` / `.entities`) as a value, undefined when unbound. */
+  private aliasValue(name: string, member: 'entity' | 'entities' | null, line: number): RefValue | undefined {
+    const record = this.aliases.get(name);
+    if (record === undefined) return undefined;
+    if (member === null) return new RefValue(this.liveIds(name, line), record.ids.length !== 1, name);
+    const entities = this.liveEntities(name, line);
+    return member === 'entity' ? new RefValue(entities.slice(0, 1), false, null) : new RefValue(entities, true, null);
+  }
+
+  private valueOf(template: ValueExprRef, env: Env, line: number): unknown {
+    const host = {
+      line,
+      vars: env,
+      parameters: this.parameterValues(),
+      functions: this.functions,
+      alias: (name: string, member: 'entity' | 'entities' | null): RefValue | undefined => this.aliasValue(name, member, line),
+    };
+    return coerceValue(evaluateValue(template.expr, host), template.spec, template.param, line);
+  }
+
+  /** True when `text` calls a function the numeric expression parser does not know (a user function or a list built-in). */
+  private usesValueFunctions(text: string): boolean {
+    return [...text.matchAll(/([A-Za-z_]\w*)\s*\(/g)].some((m) => !Object.hasOwn(BUILTIN_FUNCTIONS, m[1] ?? ''));
+  }
+
   private evaluate(text: string, env: Env, line: number): number {
+    if (this.usesValueFunctions(text)) {
+      const expr = buildValueExpr(text, { units: this.doc.units, paramKey: null, line });
+      const value = this.valueOf(new ValueExprRef(expr, { type: 'number' }, 'value'), env, line);
+      return value as number;
+    }
     const values: Record<string, number> = { ...this.parameterValues(), ...env };
     const unknown = [...extractReferences(text)].filter((name) => !isBuiltinConstant(name) && values[name] === undefined);
     if (unknown.length > 0) {
