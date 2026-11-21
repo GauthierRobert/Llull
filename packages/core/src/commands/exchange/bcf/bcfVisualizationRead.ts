@@ -9,6 +9,9 @@ import { readXml, xmlAttr, xmlChildren, xmlText, type XmlElement } from '../../.
 /** Limits of one XML part of a BCF archive (the reader refuses more, `readXml` codes). */
 export const BCF_XML_LIMITS = { maxChars: 8_000_000, maxDepth: 64, maxElements: 200_000 } as const;
 
+/** A well-formed IFC GlobalId: 22 characters of the IFC base-64 alphabet. Anything else is untrusted text, never kept or echoed. */
+const IFC_GUID = /^[0-9A-Za-z_$]{22}$/;
+
 /** Most components kept per viewpoint list (selection, exceptions). */
 const MAX_COMPONENTS = 20_000;
 
@@ -88,9 +91,10 @@ function components(holder: XmlElement | undefined): { refs: BcfComponentRef[] }
   const refs: BcfComponentRef[] = [];
   for (const component of holder === undefined ? [] : xmlChildren(holder, 'Component').slice(0, MAX_COMPONENTS)) {
     const id = childText(component, 'AuthoringToolId');
-    const ifcGuid = xmlAttr(component, 'IfcGuid')?.trim();
+    const declared = xmlAttr(component, 'IfcGuid')?.trim();
+    const ifcGuid = declared !== undefined && IFC_GUID.test(declared) ? declared : undefined;
     const llullId = childText(component, 'OriginatingSystem') === 'llull' && id !== undefined && id !== '' ? id : undefined;
-    refs.push({ ...(llullId === undefined ? {} : { id: llullId }), ...(ifcGuid === undefined || ifcGuid === '' ? {} : { ifcGuid }) });
+    refs.push({ ...(llullId === undefined ? {} : { id: llullId }), ...(ifcGuid === undefined ? {} : { ifcGuid }) });
   }
   return { refs };
 }

@@ -24,12 +24,18 @@ export interface MappedViewpoint {
   readonly unmapped: number;
   /** IfcGuid values (no / unknown llull id) that no entity of this document resolves to, in file order, unique. */
   readonly unresolvedGuids: readonly string[];
+  /** Components with a well-formed IfcGuid that resolved to no entity (all of them; `unresolvedGuids` lists at most MAX_LISTED_GUIDS). */
+  readonly unresolvedCount: number;
 }
+
+/** Most unresolved IfcGuid values listed in a result (summary, warning, data). */
+export const MAX_LISTED_GUIDS = 100;
 
 interface ResolvedRefs {
   readonly ids: readonly string[];
   readonly unmapped: number;
   readonly unresolvedGuids: readonly string[];
+  readonly unresolvedCount: number;
 }
 
 /**
@@ -41,6 +47,7 @@ function resolveRefs(doc: CadDocument, refs: readonly BcfComponentRef[]): Resolv
   const ids = new Set<string>();
   const unresolved: string[] = [];
   let unmapped = 0;
+  let unresolvedCount = 0;
   for (const ref of refs) {
     if (ref.id !== undefined && Object.hasOwn(doc.entities, ref.id)) {
       ids.add(ref.id);
@@ -50,9 +57,11 @@ function resolveRefs(doc: CadDocument, refs: readonly BcfComponentRef[]): Resolv
     for (const id of found) ids.add(id);
     if (found.length > 0) continue;
     unmapped += 1;
-    if (ref.ifcGuid !== undefined) unresolved.push(ref.ifcGuid);
+    if (ref.ifcGuid === undefined) continue;
+    unresolvedCount += 1;
+    if (unresolved.length < MAX_LISTED_GUIDS && !unresolved.includes(ref.ifcGuid)) unresolved.push(ref.ifcGuid);
   }
-  return { ids: [...ids], unmapped, unresolvedGuids: unresolved };
+  return { ids: [...ids], unmapped, unresolvedGuids: unresolved, unresolvedCount };
 }
 
 /** The review viewpoint content of a BCF visualization, or why its camera is refused. */
@@ -76,7 +85,11 @@ export function mapVisualization(doc: CadDocument, visualization: BcfVisualizati
   const resolved = { selection: resolveRefs(doc, visualization.selectionRefs), exceptions: resolveRefs(doc, visualization.exceptionRefs) };
   const { selection, exceptions } = { selection: resolved.selection.ids, exceptions: resolved.exceptions.ids };
   const unmapped = resolved.selection.unmapped + resolved.exceptions.unmapped;
-  const unresolvedGuids = [...new Set([...resolved.selection.unresolvedGuids, ...resolved.exceptions.unresolvedGuids])];
+  const unresolvedGuids = [...new Set([...resolved.selection.unresolvedGuids, ...resolved.exceptions.unresolvedGuids])].slice(
+    0,
+    MAX_LISTED_GUIDS,
+  );
+  const unresolvedCount = resolved.selection.unresolvedCount + resolved.exceptions.unresolvedCount;
   const restricted = visualization.defaultVisible === false || exceptions.length > 0;
   return {
     camera: stored,
@@ -84,6 +97,7 @@ export function mapVisualization(doc: CadDocument, visualization: BcfVisualizati
     ...(restricted ? { visibility: { defaultVisible: visualization.defaultVisible ?? false, exceptions } } : {}),
     unmapped,
     unresolvedGuids,
+    unresolvedCount,
   };
 }
 

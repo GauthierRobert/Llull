@@ -66,7 +66,7 @@ export const importBcfViewpoint = defineCommand({
   description:
     'Import one BCF VisualizationInfo XML (*.bcfv, BCF 2.1 or 3.0) as a saved viewpoint: perspective or orthogonal camera (metres -> document units), the ' +
     'selected components (AuthoringToolId = entity id when OriginatingSystem is "llull", else the IfcGuid resolved through the export_ifc GlobalId derivation; unresolved ones dropped and their IfcGuid listed), and the visibility exceptions. Returns the id ' +
-    '(vp-<n>) in affected[0] and data { id, unmapped, unresolvedGuids }. Errors: VIS_BCF_PARSE.',
+    '(vp-<n>) in affected[0] and data { id, unmapped, unresolvedGuids (max 100), unresolvedCount }. Errors: VIS_BCF_PARSE.',
   annotations: { metaHistory: true },
   params: z.object({
     visualizationInfo: z.string().describe('The *.bcfv XML text.'),
@@ -90,9 +90,12 @@ export const importBcfViewpoint = defineCommand({
     };
     const result = changed(
       document,
-      `Imported BCF viewpoint ${id} "${name}" (${mapped.camera.projection}, ${mapped.selection.length} selected, ${mapped.unmapped} unmapped${mapped.unresolvedGuids.length > 0 ? `; unresolved IfcGuid ${mapped.unresolvedGuids.slice(0, 5).join(', ')}` : ''}).`,
+      `Imported BCF viewpoint ${id} "${name}" (${mapped.camera.projection}, ${mapped.selection.length} selected, ${mapped.unmapped} unmapped${mapped.unresolvedCount > 0 ? `; ${mapped.unresolvedCount} unresolved IfcGuid, first ${Math.min(mapped.unresolvedGuids.length, 5)}: ${mapped.unresolvedGuids.slice(0, 5).join(', ')}` : ''}).`,
       [id],
     );
-    return { ...result, data: { id, unmapped: mapped.unmapped, unresolvedGuids: mapped.unresolvedGuids } };
+    return {
+      ...result,
+      data: { id, unmapped: mapped.unmapped, unresolvedGuids: mapped.unresolvedGuids, unresolvedCount: mapped.unresolvedCount },
+    };
   },
 });

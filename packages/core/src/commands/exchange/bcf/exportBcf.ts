@@ -72,7 +72,7 @@ export const exportBcf = defineCommand({
     'the profile goes out as legend labels of the topic and the warning VIS_BCF_COLOURING_LARGE names the viewpoints. data: { fileName, base64, bytes, sha256, version, topics, ' +
     'viewpoints, snapshots, coloured, warnings } — save with `--save review.bcf`. snapshotRenderer "reference" (default) keeps the archive ' +
     'byte-reproducible; "native" draws the snapshots on the GPU with llull-compute (CLI / desktop only; data.deterministic false). ' +
-    'A component also carries the IFC GlobalId of each product export_ifc writes for its entity (Component IfcGuid, same derivation as export_ifc, for the schema ifcSchema: building elements, pipes, moment connections, base plates, routed pipe parts; in the selection and in Coloring, where each GlobalId is listed once per viewpoint, first colour wins); an entity export_ifc writes no product for (grids, nozzles are ports of their equipment) carries only the AuthoringToolId (warning VIS_BCF_GUID_UNMAPPED lists them). Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
+    'A component also carries the IFC GlobalId of each product export_ifc writes for its entity (Component IfcGuid, same derivation as export_ifc, for the schema ifcSchema: building elements, pipes, moment connections, base plates, routed pipe parts; in the selection and in Coloring, where each GlobalId is listed once per viewpoint, first colour wins); grids carry only the AuthoringToolId; a nozzle carries the GlobalId of its equipment (a port nested in that product); warning VIS_BCF_GUID_UNMAPPED lists the entities with none. Errors: VIS_ISSUE_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_BCF_INVALID, NATIVE_TOOL_MISSING.',
   annotations: { readOnly: true },
   params: z.object({
     issueIds: z.array(z.string()).optional().describe('Issues to export (iss-<n>), in this order. Default: every issue.'),
@@ -200,7 +200,7 @@ export const exportBcf = defineCommand({
     const archive = zipStore(entries);
     const guidOf = documentProjection('ifcGuids');
     const unmapped = [...new Set(issues.flatMap((issue) => present(issue.entityIds)))].filter(
-      (id) => (guidOf?.(doc, id, 'IFC4') ?? []).length === 0,
+      (id) => (guidOf?.(doc, id, params.ifcSchema ?? 'IFC4') ?? []).length === 0,
     );
     const warnings = bcfWarnings(unmapped, large);
     const coloured = [...styles.values()].reduce((sum, style) => sum + (style.large ? 0 : style.coloured), 0);

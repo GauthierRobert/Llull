@@ -23,6 +23,7 @@ import { sweepFrame } from '../../../shared/mesh';
 import { findProfile } from '../../../steel/profiles';
 import type { StairPlate } from '../stair/steelStairLayout';
 import { stairQuantities, treadThickness } from '../stair/steelStairMeasure';
+import { partSeed } from '../../../building/exchange/ifcSeeds';
 
 const STAIR_TYPES = ['.STRAIGHT_RUN_STAIR.', '.TWO_STRAIGHT_RUN_STAIR.'];
 
@@ -50,7 +51,7 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
     const [from, to] = [mm3(run.from), mm3(run.to)];
     const frame = sweepFrame(from, to, 0);
     if (frame === null) return;
-    const id = `${stair.id}:stringer-${index + 1}`;
+    const id = partSeed(stair.id, 'stringer', index + 1);
     const memberPlacement = framePlacement(context, storeyPlacement, from, frame.d, frame.u);
     const solid = extrusion(context, section, frame.length);
     parts.push(
@@ -60,7 +61,7 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
     );
   });
   layout.flights.forEach((flight, index) => {
-    const id = `${stair.id}:flight-${index + 1}`;
+    const id = partSeed(stair.id, 'flight', index + 1);
     const risers = flight.lastRiser - flight.firstRiser + 1;
     const treads = layout.treads.filter((_, position) => {
       const riser = layout.treadRisers[position] as number;
@@ -74,7 +75,7 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
     );
   });
   layout.landings.forEach((plate, index) => {
-    const id = `${stair.id}:landing-${index + 1}`;
+    const id = partSeed(stair.id, 'landing', index + 1);
     parts.push(
       writer.add(
         `IFCSLAB('${context.guid(id)}',$,${ifcString(`${stair.mark} landing ${index + 1}`)},$,$,${local},${shape(context, [plateSolid(plate)])},${ifcString(id)},.LANDING.)`,

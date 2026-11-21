@@ -23,6 +23,7 @@ import { findProfile } from '../../../steel/profiles';
 import { findGratingType } from '../grating/gratingTypes';
 import { toePlateProfile, railingQuantities } from '../railing/railingMeasure';
 import { appendAll } from '@lib/appendAll';
+import { partSeed } from '../../../building/exchange/ifcSeeds';
 
 /** One grating panel: an extruded plate, with its type, bar direction and mass in a property set. */
 export function exportGrating(context: Context, grating: GratingElement, storeyPlacement: string): Exported | null {
@@ -72,7 +73,7 @@ export function exportRailing(context: Context, doc: CadDocument, railing: Raili
     const postPlacement = framePlacement(context, storeyPlacement, mm3(base), [0, 0, 1], [1, 0, 0]);
     const solid = extrusion(context, postProfile, mm(layout.postLength));
     return writer.add(
-      `IFCMEMBER('${context.guid(`${railing.id}:post-${index + 1}`)}',$,${ifcString(`${railing.mark} post ${index + 1}`)},$,${ifcString(post.name)},${postPlacement},${shape(context, [solid])},${ifcString(`${railing.id}:post-${index + 1}`)},.POST.)`,
+      `IFCMEMBER('${context.guid(partSeed(railing.id, 'post', index + 1))}',$,${ifcString(`${railing.mark} post ${index + 1}`)},$,${ifcString(post.name)},${postPlacement},${shape(context, [solid])},${ifcString(partSeed(railing.id, 'post', index + 1))},.POST.)`,
     );
   });
   writer.add(`IFCRELAGGREGATES('${context.guid(`rel:railing-posts:${railing.id}`)}',$,$,$,${ref},(${posts.join(',')}))`);

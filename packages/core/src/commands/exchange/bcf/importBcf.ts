@@ -13,7 +13,7 @@ import { changed } from '../../noop';
 import { isProtectedIssue } from '../../review/reviewActs';
 import { mintReviewId, reviewOf, reviewRejection } from '../../review/reviewModel';
 import { BCF_MAX_ARCHIVE_BYTES, readBcfArchive, type BcfTopicRead } from './bcfRead';
-import { mapVisualization, viewpointOf } from './bcfViewpointMap';
+import { MAX_LISTED_GUIDS, mapVisualization, viewpointOf } from './bcfViewpointMap';
 
 interface BcfWarning {
   readonly code: string;
@@ -53,9 +53,6 @@ function topicFields(
 
 /** Most records (issues + viewpoints + comments) one import creates; the import stops at the first topic past it. */
 const MAX_IMPORTED_RECORDS = 20_000;
-
-/** Most unresolved IfcGuid values named in a warning / data. */
-const MAX_LISTED_GUIDS = 100;
 
 const OPEN_STATUSES = new Set(['', 'open', 'new', 'active']);
 
@@ -99,6 +96,7 @@ export const importBcf = defineCommand({
     const issueIds: string[] = [];
     let unmapped = 0;
     const unresolved = new Set<string>();
+    let unresolvedCount = 0;
     const seen = new Set<string>();
     for (const topic of read.topics) {
       if (seen.has(topic.guid)) {
@@ -140,7 +138,8 @@ export const importBcf = defineCommand({
             continue;
           }
           unmapped += mapped.unmapped;
-          for (const guid of mapped.unresolvedGuids) unresolved.add(guid);
+          unresolvedCount += mapped.unresolvedCount;
+          for (const guid of mapped.unresolvedGuids) if (unresolved.size < MAX_LISTED_GUIDS) unresolved.add(guid);
           const [id, next] = mintReviewId(review, 'vp');
           review = {
             ...next,
@@ -199,12 +198,12 @@ export const importBcf = defineCommand({
         code: 'VIS_BCF_GUID_UNMAPPED',
         message: `${unmapped} viewpoint component(s) name no entity of this document (IfcGuid only, another system, or unknown id)`,
       });
-    if (unresolved.size > 0)
+    if (unresolvedCount > 0)
       warnings.push({
         code: 'VIS_BCF_GUID_UNRESOLVED',
-        message: `${unresolved.size} IfcGuid(s) match no entity of this document: ${[...unresolved].slice(0, MAX_LISTED_GUIDS).join(', ')}${unresolved.size > MAX_LISTED_GUIDS ? ', ...' : ''}`,
+        message: `${unresolvedCount} component(s) carry an IfcGuid that matches no entity of this document; first ${unresolved.size} distinct: ${[...unresolved].join(', ')}`,
       });
-    const unresolvedGuids = [...unresolved].slice(0, MAX_LISTED_GUIDS);
+    const unresolvedGuids = [...unresolved];
     const data = { topics: counts.created + counts.updated, ...counts, issueIds, version: read.version, unresolvedGuids, warnings };
     const summary =
       `import_bcf: BCF ${read.version}: ${counts.created} issue(s) created, ${counts.updated} updated, ${counts.skipped} skipped, ` +

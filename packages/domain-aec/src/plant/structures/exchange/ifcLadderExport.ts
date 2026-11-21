@@ -23,6 +23,7 @@ import { sweepFrame } from '../../../shared/mesh';
 import { findProfile } from '../../../steel/profiles';
 import { CAGE_BAR_PROFILE, HOOP_PROFILE, LANDING_THICKNESS_MM, RUNG_PROFILE, STILE_PROFILE, type LadderRun } from '../ladder/ladderLayout';
 import { ladderQuantities } from '../ladder/ladderMeasure';
+import { partSeed } from '../../../building/exchange/ifcSeeds';
 
 /** One ladder; null when a section left the catalogue. */
 export function exportLadder(context: Context, doc: CadDocument, ladder: LadderElement, storeyPlacement: string): Exported | null {
@@ -65,17 +66,17 @@ export function exportLadder(context: Context, doc: CadDocument, ladder: LadderE
   );
   const parts: string[] = [];
   layout.stiles.forEach((run, index) => {
-    const id = `${ladder.id}:stile-${index + 1}`;
+    const id = partSeed(ladder.id, 'stile', index + 1);
     const part = member(id, `${ladder.mark} stile ${index + 1}`, '.STRINGER.', stile.name, profiles.stile, run, -ladder.facing);
     if (part !== null) parts.push(part);
   });
   layout.rungs.forEach((run, index) => {
-    const id = `${ladder.id}:rung-${index + 1}`;
+    const id = partSeed(ladder.id, 'rung', index + 1);
     const part = member(id, `${ladder.mark} rung ${index + 1}`, '.MEMBER.', 'RUNG', profiles.rung, run, 0);
     if (part !== null) parts.push(part);
   });
   layout.landings.forEach((plate, index) => {
-    const id = `${ladder.id}:landing-${index + 1}`;
+    const id = partSeed(ladder.id, 'landing', index + 1);
     const solid = extrusion(
       context,
       scaledPolygonProfile(context, plate.corners),

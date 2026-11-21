@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { globalIdFor } from '@aec/building/exchange/ifcSeeds';
 import { documentProjection } from '@core/plugins/host';
 import { bcfVisualizationXml } from '@core/commands/exchange/bcf/bcfXml';
 import { readXml, xmlAttr, xmlChildren, xmlText, type XmlElement } from '@lib/xmlRead';
@@ -196,5 +197,73 @@ describe('BCF IfcGuid of framing products', () => {
     const doc = apply(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     expect(documentProjection('ifcGuids')?.(doc, doc.order[0] ?? '', 'IFC4')).toEqual([]);
     expect(documentProjection('entitiesOfIfcGuid')?.(doc, 'ZZZZZZZZZZZZZZZZZZZZZZ')).toEqual([]);
+  });
+});
+
+/** The plant fixture plus a curved wall with a door, a straight wall with a window, a slab with an opening, a stair, an access platform (grating, railing, assembly), a steel stair and a ladder. */
+function completeFixture(): CadDocument {
+  let doc = plantWithFrame();
+  doc = apply(doc, 'add_curved_wall', { start: [60000, 0], through: [62000, 1000], end: [64000, 0] });
+  const curved = doc.order.length > 0 ? Object.keys(doc.building?.elements ?? {}).find((id) => id.startsWith('curvedWall')) : undefined;
+  doc = apply(doc, 'add_door', { wallId: curved as string, offset: 1000 });
+  doc = apply(doc, 'draw_walls', {
+    points: [
+      [60000, 5000],
+      [66000, 5000],
+    ],
+  });
+  const wall = Object.keys(doc.building?.elements ?? {}).find((id) => id.startsWith('wall-')) as string;
+  doc = apply(doc, 'add_window', { wallId: wall, offset: 3000 });
+  doc = apply(doc, 'add_slab', {
+    boundary: [
+      [60000, 8000],
+      [66000, 8000],
+      [66000, 12000],
+      [60000, 12000],
+    ],
+  });
+  doc = apply(doc, 'add_stair', { start: [70000, 0], angle: 0, riserCount: 18, landingAt: 9 });
+  doc = apply(doc, 'add_access_platform', {
+    bounds: [
+      [80000, 0],
+      [83000, 2000],
+    ],
+    topOffset: 3000,
+    gratingType: '19-W-4 1-1/4x3/16',
+    bearingBarDirection: [1, 0],
+    railing: {},
+  });
+  const deck = Object.keys(doc.building?.elements ?? {}).find((id) => id.startsWith('assembly')) as string;
+  doc = apply(doc, 'add_steel_stair', { start: [76520, 1000, 0], angle: 0, toSurfaceId: deck, riserMax: 180, going: 280 });
+  return apply(doc, 'add_ladder', { base: [81500, -250, 0], facing: [0, 1], attachTo: deck });
+}
+
+const PRODUCT_EXCLUDED =
+  /^IFC(REL|PROPERTY|DISTRIBUTIONPORT|DISTRIBUTIONSYSTEM|PROJECT|SITE|BUILDING$|BUILDINGSTOREY|FACILITY|BRIDGE|ROAD|RAILWAY|MARINE|FACILITYPART|ZONE|GROUP|MATERIAL|UNIT|SIUNIT)/;
+
+describe('BCF IfcGuid covers every product export_ifc writes', () => {
+  const doc = completeFixture();
+  it.each(['IFC4', 'IFC4X3_ADD2'] as const)('every product GlobalId of the %s file is an IfcGuid of some entity', (schema) => {
+    const ifc = data<{ ifc: string }>(doc, 'export_ifc', { timestamp: '2026-01-01T00:00:00', schema }).ifc;
+    const project = documentProjection('ifcGuids');
+    const entityIds = [
+      ...Object.values(doc.building?.elements ?? {}).flatMap((element) => element.entityIds),
+      ...Object.values(doc.plant?.piping?.entityIds ?? {}).flat(),
+    ];
+    /** An element with no entity of its own (the platform assembly) has nothing a BCF component can name: its product is exempt. */
+    const entityless = Object.values(doc.building?.elements ?? {})
+      .filter((element) => element.entityIds.length === 0)
+      .map((element) => globalIdFor(doc.building?.uid, element.id));
+    const known = new Set([...entityIds.flatMap((id) => project?.(doc, id, schema) ?? []), ...entityless]);
+    const missing = [...readStep(ifc).entities.values()]
+      .filter((entity) => /^IFC[A-Z0-9]+$/.test(entity.type) && !PRODUCT_EXCLUDED.test(entity.type))
+      .flatMap((entity) => {
+        const guid = stepString(entity.args[0] as string);
+        return guid === undefined || guid.length !== 22 || known.has(guid) ? [] : [`${entity.type} ${String(entity.args[2])}`];
+      });
+    expect(missing).toEqual([]);
+    const categories = new Set(Object.values(doc.building?.elements ?? {}).map((element) => element.category));
+    for (const category of ['curvedWall', 'door', 'window', 'slab', 'stair', 'grating', 'railing', 'ladder', 'steelStair', 'assembly'])
+      expect(categories.has(category as never), category).toBe(true);
   });
 });
