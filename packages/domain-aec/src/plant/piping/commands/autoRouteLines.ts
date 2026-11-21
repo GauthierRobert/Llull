@@ -13,6 +13,7 @@ import {
   type LineEntry,
   type LineOutcome,
 } from '../autoRoute/lines';
+import { branchStructureError } from '../autoRoute/branchRequests';
 import { applyBranches, type BranchRequest } from '../autoRoute/branches';
 import { refuse } from '../model';
 import { legsInput, portOrPoint, viaInput } from './routeInput';
@@ -211,22 +212,19 @@ export const autoRouteLines = defineCommand({
         [`lines.${twice}.lineId`],
       );
     const branches = (params.branches ?? []) as BranchRequest[];
-    const badBranch = branches.findIndex(
-      (branch, at) =>
-        !params.lines.some((line) => line.lineId === branch.headerLineId) ||
-        params.lines.some((line) => line.lineId === branch.lineId) ||
-        branches.findIndex((other) => other.lineId === branch.lineId) !== at,
-    );
-    if (badBranch >= 0)
+    const badBranch = branchStructureError(params.lines, branches);
+    if (badBranch !== undefined)
       return refuse(
         doc,
         'auto_route_lines',
         'RTE_AUTOROUTE_LINES_INVALID',
-        `branch ${branches[badBranch]?.lineId}: its headerLineId must be a line of lines, and the branch line must not be one of lines nor listed twice`,
-        [branches[badBranch]?.lineId ?? ''],
-        [`branches.${badBranch}`],
+        badBranch.message,
+        [badBranch.lineId],
+        [`branches.${badBranch.index}`],
       );
-    const unsequenced = branches.findIndex((branch) => params.sequence !== undefined && !params.sequence.includes(branch.headerLineId));
+    const unsequenced = branches.findIndex(
+      (branch) => params.sequence !== undefined && params.partial !== true && !params.sequence.includes(branch.headerLineId),
+    );
     if (unsequenced >= 0)
       return refuse(
         doc,

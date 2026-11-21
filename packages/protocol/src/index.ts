@@ -23,7 +23,7 @@ export type {
 } from './feaTools';
 export { buildFeaToolDefinitions, FEA_SOLVE_THREADS, FEA_SOLVE_TIMEOUT_S } from './feaTools';
 export { buildLibraryToolDefinitions, type MaterialLibraryStorePort, type LibraryRegistration } from './libraryTools';
-export { buildNativeToolDefinitions } from './nativeTools';
+export { buildNativeToolDefinitions, nativeLinesForwardedKeys } from './nativeTools';
 
 export { buildAllTools, searchTools } from './discovery';
 

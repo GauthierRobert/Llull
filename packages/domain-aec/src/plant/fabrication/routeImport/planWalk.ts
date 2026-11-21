@@ -102,6 +102,8 @@ function elbowStep(w: Walk, component: NetworkComponent, exit: NetworkPoint): St
   const centre = component.centre ?? cornerOf(a, b);
   const next = sub3(exit.xyz, centre);
   w.points.push(isShifted(w.shift) && distance3(exit.xyz, centre) > 1e-6 ? storedCorner(centre, w.shift, normalize3(next)) : centre);
+  w.shifts.push(w.legShifts);
+  w.legShifts = [ZERO];
   w.shift = ZERO;
   return 'advance';
 }
@@ -140,7 +142,7 @@ function eccentricReducerStep(s: PlanState, w: Walk, component: NetworkComponent
   const centre = sub3(midpoint(entry.xyz, exit.xyz), add3(w.shift, [step.offset[0] / 2, step.offset[1] / 2, step.offset[2] / 2]));
   w.inline.push({ type: 'reducer', componentId: component.id, centre, dn2: exit.boreMm, flat: step.flat });
   w.shift = add3(w.shift, step.offset);
-  w.shifts.push(w.shift);
+  w.legShifts.push(w.shift);
   return 'advance';
 }
 

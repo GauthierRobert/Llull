@@ -11,7 +11,7 @@ import { distance3, normalize3, sub3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
 import type { NetworkComponent, NetworkPoint } from '../model';
 import { ZERO } from './eccentric';
-import { addBranch, arrive, comp, createState, dedupe, free, refuse, take, type PlanState, type Walk } from './planState';
+import { addBranch, arrive, comp, createState, free, refuse, take, type PlanState, type Walk } from './planState';
 import type { PlanOptions, PlannedRun, PlannedSupport, RoutePlan, RouteRefusal, Seed } from './planTypes';
 import { startClosure, startFlangeSet, walkRun } from './planWalk';
 
@@ -49,21 +49,21 @@ function pickStart(s: PlanState): NetworkPoint | RouteRefusal {
   return startEnd;
 }
 
-/** An olet whose centre, less an offset carried along the run (an eccentric reducer upstream), is on this run's centreline branches off it at that stored point. */
+/** An olet whose centre, less an offset in force on a segment of this run (an eccentric reducer upstream on that leg), is on that segment of the centreline branches off it at that stored point. */
 function branchOlets(
   s: PlanState,
   seed: Seed,
   line: readonly Vec3[],
-  shifts: readonly Vec3[],
+  shifts: readonly (readonly Vec3[])[],
   olets: readonly OletCandidate[],
   pending: Set<number>,
 ): void {
   for (const { component, i } of olets) {
     if (!pending.has(i) || component.branch === undefined) continue;
     const centre = component.centre ?? component.branch.xyz;
-    const stored = shifts
-      .map((shift) => sub3(centre, shift))
-      .find((point) => line.some((p, k) => k > 0 && onSegment(point, line[k - 1] as Vec3, p)));
+    const stored = line
+      .flatMap((p, k) => (k === 0 ? [] : (shifts[k] ?? []).map((shift) => ({ point: sub3(centre, shift), a: line[k - 1] as Vec3, b: p }))))
+      .find((candidate) => onSegment(candidate.point, candidate.a, candidate.b))?.point;
     if (stored === undefined) continue;
     pending.delete(i);
     take(s, i);
@@ -94,7 +94,8 @@ function walkSeed(
     key: seed.startKey,
     end: seed.start,
     shift: ZERO,
-    shifts: [ZERO],
+    shifts: [[]],
+    legShifts: [ZERO],
     cap: undefined,
     startCap: undefined,
   };
@@ -107,7 +108,9 @@ function walkSeed(
   if (walked !== undefined) return walked;
   arrive(s, w.key);
   w.points.push(w.cap?.tip ?? sub3(w.end, w.shift));
-  const line = dedupe(w.points);
+  w.shifts.push(w.legShifts);
+  const kept = w.points.flatMap((point, k) => (k === 0 || distance3(point, w.points[k - 1] as Vec3) > 1e-6 ? [k] : []));
+  const line = kept.map((k) => w.points[k] as Vec3);
   if (line.length < 2)
     return refuse('ISO_ROUTE_UNSUPPORTED', `run ${seed.key} has no length (it starts and ends at one point)`, w.consumed);
   runs.push({
@@ -122,7 +125,14 @@ function walkSeed(
     ...(seed.parent === undefined ? {} : { parent: seed.parent }),
     consumed: w.consumed,
   });
-  branchOlets(s, seed, line, w.shifts, olets, pending);
+  branchOlets(
+    s,
+    seed,
+    line,
+    kept.map((k) => w.shifts[k] as Vec3[]),
+    olets,
+    pending,
+  );
   return undefined;
 }
 

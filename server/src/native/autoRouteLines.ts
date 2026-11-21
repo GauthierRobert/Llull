@@ -7,9 +7,10 @@
  * native code and this planner never write the document, and an atomic refusal leaves it as it was.
  */
 
-import type { FeaHost, FeaToolResult } from '@protocol/index';
+import { nativeLinesForwardedKeys, type FeaHost, type FeaToolResult } from '@protocol/index';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
+import { branchStructureError } from '@aec/index';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import type { NativeDeps } from './fatigueField';
@@ -120,6 +121,14 @@ export async function runAutoRouteLines(
   const read = readLinesParams(params);
   if ('isError' in read) return read;
   const { lines, common, partial, attempts, window } = read;
+  const rawBranches = params['branches'];
+  if (Array.isArray(rawBranches)) {
+    const typed = rawBranches
+      .filter(isRecord)
+      .map((entry) => ({ lineId: String(entry['lineId']), headerLineId: String(entry['headerLineId']) }));
+    const bad = typed.length === rawBranches.length ? branchStructureError(lines as { lineId: string }[], typed) : undefined;
+    if (bad !== undefined) return failure('RTE_AUTOROUTE_LINES_INVALID', bad.message, [bad.lineId]);
+  }
   const deadline = Date.now() + 1000 * (window ?? DEFAULT_LINES_TIMEOUT_S);
   const base = host.getDoc();
   const lineById = new Map(lines.map((line) => [line['lineId'] as string, line]));
@@ -181,12 +190,13 @@ export async function runAutoRouteLines(
       ...line,
       ...(solutions.has(line['lineId'] as string) ? { solution: solutions.get(line['lineId'] as string) } : {}),
     })),
+    ...Object.fromEntries(nativeLinesForwardedKeys().flatMap((key) => (params[key] === undefined ? [] : [[key, params[key]]]))),
     common,
-    ...(Array.isArray(params['branches']) ? { branches: params['branches'] } : {}),
     order: 'given',
     sequence: best.planned.map((entry) => entry.line['lineId']),
-    // Always all-or-nothing over the planned lines: a document that changed during the plan is refused as a whole.
-    partial: false,
+    // All-or-nothing over the planned lines (a document that changed during the plan is refused as a whole), except that with branches the
+    // request's partial is kept: a branch that cannot be placed, or whose header failed natively, is reported as in process.
+    partial: params['branches'] !== undefined && partial,
   });
   return {
     summary: `${TOOL}: ${lines.length} line(s) planned with llull-compute route in ${passes.length} pass(es). ${committed.summary}`,

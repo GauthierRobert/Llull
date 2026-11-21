@@ -255,7 +255,7 @@ describe('export -> route import', () => {
     expect(bare(again)).toBe(bare(text));
   });
 
-  it('a weldolet downstream of the reducer re-imports as a route and re-exports the same file (olet matched on the shifted axis)', () => {
+  it('olets before, between and after the reducer and expander, and on the riser, re-import as a route and re-exports the same file (olet matched on the shifted axis)', () => {
     const line = cs150Line(150, '3005');
     const tie = addTie(line.doc, 'A', [0, 0, 0], [1, 0, 0], { dn: 150 });
     const routedHeader = ok(tie.doc, 'route_pipe', {
@@ -270,20 +270,42 @@ describe('export -> route import', () => {
         { type: 'reducerEccentric', tag: 'RE-2', dn2: 150, flat: 'bottom', at: { leg: 0, centreDistance: 2500 } },
       ],
     });
-    const added = ok(routedHeader.document, 'add_branch', {
-      runId: (routedHeader.data as { runId: string }).runId,
-      at: { leg: 0, distance: 4000 },
-      dn: 50,
-      legs: [{ direction: '+Z', length: 500 }],
-    });
+    const runId = (routedHeader.data as { runId: string }).runId;
+    // Olets on the unshifted part (1000), between the reducer and the expander (2000, +27: a DN100 header only has an equal tee in CS150), after both (4000, +54) and on the riser after the elbow.
+    const at = [
+      { leg: 0, distance: 1000, direction: '+Z' },
+      { leg: 0, distance: 2000, direction: '+Z', dn: 100 },
+      { leg: 0, distance: 4000, direction: '+Z' },
+      { leg: 1, distance: 500, direction: '+Y' },
+    ];
+    let added = routedHeader;
+    for (const place of at)
+      added = ok(added.document, 'add_branch', {
+        runId,
+        at: { leg: place.leg, distance: place.distance },
+        dn: (place as { dn?: number }).dn ?? 50,
+        legs: [{ direction: place.direction, length: 500 }],
+      });
     const lineId = Object.keys(piping(added.document).lines)[0] as string;
     const text = (data<{ files: PcfFile[] }>(added.document, 'export_pcf', { lineIds: [lineId] }).files[0] as PcfFile).content;
-    expect(records(text, 'OLET')).toHaveLength(1);
+    const centres = (content: string, type: string): string[] =>
+      records(content, type)
+        .map((record) => record.find((line) => line.startsWith('CENTRE-POINT')) ?? '')
+        .sort();
+    expect(centres(text, 'TEE')).toEqual(['CENTRE-POINT 2000.0 0.0 27.0']);
+    expect(centres(text, 'OLET')).toEqual(
+      ['CENTRE-POINT 1000.0 0.0 0.0', 'CENTRE-POINT 4000.0 0.0 54.0', 'CENTRE-POINT 5000.0 0.0 500.0'].sort(),
+    );
     const imported = execute(cs150Document(), 'import_pcf', { text, as: 'route', spec: 'CS150' });
     expect(imported.rejected, imported.summary).toBeUndefined();
     const again = (data<{ files: PcfFile[] }>(imported.document, 'export_pcf', {}).files[0] as PcfFile).content;
-    expect(records(again, 'OLET')[0]?.find((line) => line.startsWith('CENTRE-POINT'))).toBe('CENTRE-POINT 4000.0 0.0 54.0');
-    const bare = (value: string): string => value.replace(/^ {4}UNIQUE-COMPONENT-IDENTIFIER .*\n/gm, '');
-    expect(bare(again)).toBe(bare(text));
+    for (const type of ['TEE', 'OLET']) expect(centres(again, type)).toEqual(centres(text, type));
+    // The same components with the same co-ordinates; only the order of the branch pipes (and so their numbering) differs, so compare the record sets.
+    const set = (value: string): string[] =>
+      value
+        .replace(/^ {4}(UNIQUE-)?COMPONENT-IDENTIFIER .*\n/gm, '')
+        .split(/\n(?=[A-Z])/)
+        .sort();
+    expect(set(again)).toEqual(set(text));
   });
 });
