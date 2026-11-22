@@ -6,7 +6,7 @@
 //! ordering with an index tie-break, no timing input.
 
 use crate::scene::Scene;
-use crate::scene_cpu::{depth_plane, fill_loops, fill_record, SceneBuffers};
+use crate::scene_cpu::{depth_plane, fill_loops, fill_record, fill_record_depth, SceneBuffers};
 use rayon::prelude::*;
 
 /// Culling policy: `Auto` enables it from `HIZ_MIN_FILLS` fills (measured, TECHNICAL_SPEC 12.28).
@@ -18,8 +18,9 @@ pub enum Hiz {
 }
 
 /// Fill count from which `Hiz::Auto` culls (below it the pyramid costs more than it saves).
-pub const HIZ_MIN_FILLS: usize = 250_000;
+pub const HIZ_MIN_FILLS: usize = 400_000;
 const CHUNK: usize = 64;
+const X_LIMIT: f64 = 1_099_511_627_776.0;
 const MIN_OCCLUDER_PIXELS: usize = 64;
 
 /// What one fill pass did.
@@ -44,6 +45,7 @@ enum Bound {
         y0: usize,
         y1: usize,
         zmin: f64,
+        zmax: f64,
     },
 }
 
@@ -69,12 +71,19 @@ fn bound_of(scene: &Scene, record: &[f64]) -> Bound {
     if !(zmin.is_finite() && zmax.is_finite()) {
         return Bound::Unbounded;
     }
-    let (x0, x1) = ((left - 0.5).ceil().max(0.0), (right - 0.5).floor().min(w as f64 - 1.0));
+    if left.abs() > X_LIMIT || right.abs() > X_LIMIT {
+        return Bound::Unbounded;
+    }
+    // Rows are exactly `fill`'s; columns come from interpolated crossings that can round one ulp past a vertex, so pad by one pixel.
+    let (x0, x1) = (((left - 0.5).ceil() - 1.0).max(0.0), ((right - 0.5).floor() + 1.0).min(w as f64 - 1.0));
     let (y0, y1) = ((top - 0.5).ceil().max(0.0), (bottom - 0.5).floor().min(h as f64 - 1.0));
-    if x0 > x1 || y0 > y1 {
+    if y0 > y1 {
         return Bound::Empty;
     }
-    Bound::Boxed { x0: x0 as usize, x1: x1 as usize, y0: y0 as usize, y1: y1 as usize, zmin }
+    if x0 > x1 {
+        return Bound::Unbounded;
+    }
+    Bound::Boxed { x0: x0 as usize, x1: x1 as usize, y0: y0 as usize, y1: y1 as usize, zmin, zmax }
 }
 
 /// Max-depth pyramid over the scratch depth: level 0 is the buffer, each next level takes the max of 2x2 cells (+inf = nothing drawn).
@@ -123,9 +132,9 @@ impl Pyramid {
 }
 
 /// True when every pixel of the box ends nearer than the box's nearest possible depth (strict, with a float32 / rounding margin).
-fn hidden(pyramid: &Pyramid, x0: usize, x1: usize, y0: usize, y1: usize, zmin: f64) -> bool {
+fn hidden(pyramid: &Pyramid, x0: usize, x1: usize, y0: usize, y1: usize, zmin: f64, zmax: f64) -> bool {
     let farthest = pyramid.max_over(x0, x1, y0, y1);
-    zmin - 1e-6 * zmin.abs().max(farthest.abs()) > farthest
+    zmin - 1e-6 * zmin.abs().max(zmax.abs()).max(farthest.abs()) > farthest
 }
 
 fn occluder_pass(scene: &Scene, bounds: &[Bound]) -> (Pyramid, usize) {
@@ -147,23 +156,25 @@ fn occluder_pass(scene: &Scene, bounds: &[Bound]) -> (Pyramid, usize) {
     }
     candidates.truncate(take);
     candidates.sort_unstable_by(order);
-    let mut scratch = SceneBuffers::empty(scene);
+    let mut scratch = vec![f32::INFINITY; w * h];
     for (_, index) in &candidates {
-        fill_record(scene, &mut scratch, *index);
+        fill_record_depth(scene, &mut scratch, *index);
     }
-    (Pyramid::build(scratch.depth, w, h), candidates.len())
+    (Pyramid::build(scratch, w, h), candidates.len())
 }
 
-fn union_box(bounds: &[Bound]) -> Option<(usize, usize, usize, usize, f64)> {
-    let mut union: Option<(usize, usize, usize, usize, f64)> = None;
+fn union_box(bounds: &[Bound]) -> Option<(usize, usize, usize, usize, f64, f64)> {
+    let mut union: Option<(usize, usize, usize, usize, f64, f64)> = None;
     for b in bounds {
         match *b {
             Bound::Empty => {}
             Bound::Unbounded => return None,
-            Bound::Boxed { x0, x1, y0, y1, zmin } => {
+            Bound::Boxed { x0, x1, y0, y1, zmin, zmax } => {
                 union = Some(match union {
-                    None => (x0, x1, y0, y1, zmin),
-                    Some((ux0, ux1, uy0, uy1, uz)) => (ux0.min(x0), ux1.max(x1), uy0.min(y0), uy1.max(y1), uz.min(zmin)),
+                    None => (x0, x1, y0, y1, zmin, zmax),
+                    Some((ux0, ux1, uy0, uy1, uz0, uz1)) => {
+                        (ux0.min(x0), ux1.max(x1), uy0.min(y0), uy1.max(y1), uz0.min(zmin), uz1.max(zmax))
+                    }
                 });
             }
         }
@@ -187,8 +198,8 @@ pub fn fill_all_with(scene: &Scene, mode: Hiz) -> (SceneBuffers, HizStats) {
     let mut stats = HizStats { enabled, fills, occluders, culled: 0 };
     for (chunk_index, chunk) in bounds.chunks(CHUNK).enumerate() {
         let first = chunk_index * CHUNK;
-        if let Some((x0, x1, y0, y1, zmin)) = union_box(chunk) {
-            if hidden(&pyramid, x0, x1, y0, y1, zmin) {
+        if let Some((x0, x1, y0, y1, zmin, zmax)) = union_box(chunk) {
+            if hidden(&pyramid, x0, x1, y0, y1, zmin, zmax) {
                 stats.culled += chunk.iter().filter(|b| matches!(b, Bound::Boxed { .. })).count();
                 continue;
             }
@@ -196,7 +207,7 @@ pub fn fill_all_with(scene: &Scene, mode: Hiz) -> (SceneBuffers, HizStats) {
         for (offset, bound) in chunk.iter().enumerate() {
             match *bound {
                 Bound::Empty => {}
-                Bound::Boxed { x0, x1, y0, y1, zmin } if hidden(&pyramid, x0, x1, y0, y1, zmin) => stats.culled += 1,
+                Bound::Boxed { x0, x1, y0, y1, zmin, zmax } if hidden(&pyramid, x0, x1, y0, y1, zmin, zmax) => stats.culled += 1,
                 _ => fill_record(scene, &mut buffers, first + offset),
             }
         }

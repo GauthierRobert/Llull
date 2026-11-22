@@ -190,3 +190,54 @@ fn hiz_measurement() {
         identical(&scene);
     }
 }
+
+/// Reviewer's case: `fill` computes a span end as p.x + t * (q.x - p.x), which can round one ulp past the vertex and write a column the
+/// vertex box does not cover.
+#[test]
+fn span_end_rounding_past_the_vertex_box_is_not_culled() {
+    let mut b = Builder::new(64, 32, 1);
+    let (occluder, target) = (b.face(1.0), b.face(2.0));
+    b.polygon(occluder, &[[0.0, 0.0, 1.0], [48.4, 0.0, 1.0], [48.4, 32.0, 1.0], [0.0, 32.0, 1.0]]);
+    b.polygon(
+        target,
+        &[
+            [6.043520814290471, 5.385920643446412, 5.0],
+            [48.49999999999999, 14.500000000000002, 5.0],
+            [6.043520814290471, 14.500000000000002, 5.0],
+        ],
+    );
+    identical(&b.0);
+}
+
+fn near_boundary(rng: &mut Rng, limit: u32) -> f64 {
+    let centre = f64::from((rng.next() * f64::from(limit)) as u32) + 0.5;
+    match (rng.next() * 4.0) as u32 {
+        0 => centre.next_down(),
+        1 => centre.next_up(),
+        2 => centre,
+        _ => centre + (rng.next() - 0.5) * 1e-9,
+    }
+}
+
+#[test]
+fn float_boundary_geometry_fuzz_is_bit_identical() {
+    let mut rng = Rng(99);
+    for _ in 0..600 {
+        let mut b = Builder::new(64, 32, 1);
+        let face = b.face(1.0);
+        for _ in 0..3 {
+            let (x, y) = (near_boundary(&mut rng, 64), near_boundary(&mut rng, 32));
+            let (w, h) = (20.0 + rng.next() * 44.0, 10.0 + rng.next() * 22.0);
+            b.polygon(
+                face,
+                &[[x, y, 1.0 + rng.next()], [x + w, y, 1.0 + rng.next()], [x + w, y + h, 1.0 + rng.next()], [x, y + h, 1.0 + rng.next()]],
+            );
+        }
+        for _ in 0..40 {
+            let pts: Vec<[f64; 3]> =
+                (0..3).map(|_| [near_boundary(&mut rng, 64), near_boundary(&mut rng, 32), 3.0 + rng.next() * 6.0]).collect();
+            b.polygon(face, &pts);
+        }
+        identical(&b.0);
+    }
+}

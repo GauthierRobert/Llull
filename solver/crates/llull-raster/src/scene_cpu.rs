@@ -53,7 +53,8 @@ pub(crate) fn depth_plane(points: &[Point]) -> Option<impl Fn(f64, f64) -> f64> 
 }
 
 /// Even-odd scanline fill of `loops` with a depth test (strictly nearer wins).
-fn fill(buffers: &mut SceneBuffers, w: usize, h: usize, loops: &[Vec<Point>], face: i32) {
+/// `faces` may be empty (depth-only pass).
+fn fill(depth: &mut [f32], faces: &mut [i32], w: usize, h: usize, loops: &[Vec<Point>], face: i32) {
     let all: Vec<Point> = loops.iter().flatten().copied().collect();
     let Some(depth_at) = depth_plane(&all) else { return };
     let (mut top, mut bottom) = (f64::INFINITY, f64::NEG_INFINITY);
@@ -88,9 +89,11 @@ fn fill(buffers: &mut SceneBuffers, w: usize, h: usize, loops: &[Vec<Point>], fa
             while x <= xb {
                 let index = y as usize * w + x as usize;
                 let z = depth_at(x + 0.5, sy);
-                if z < f64::from(buffers.depth[index]) {
-                    buffers.depth[index] = z as f32;
-                    buffers.face[index] = face;
+                if z < f64::from(depth[index]) {
+                    depth[index] = z as f32;
+                    if !faces.is_empty() {
+                        faces[index] = face;
+                    }
                 }
                 x += 1.0;
             }
@@ -116,7 +119,14 @@ pub(crate) fn fill_loops(scene: &Scene, fill_record: &[f64]) -> Vec<Vec<Point>> 
 pub(crate) fn fill_record(scene: &Scene, buffers: &mut SceneBuffers, index: usize) {
     let (w, h) = scene.buffer_size();
     let record = &scene.fills[index * 3..index * 3 + 3];
-    fill(buffers, w, h, &fill_loops(scene, record), record[0] as i32);
+    fill(&mut buffers.depth, &mut buffers.face, w, h, &fill_loops(scene, record), record[0] as i32);
+}
+
+/// Rasterises fill record `index` into a depth buffer only (the Hi-Z occluder pass).
+pub(crate) fn fill_record_depth(scene: &Scene, depth: &mut [f32], index: usize) {
+    let (w, h) = scene.buffer_size();
+    let record = &scene.fills[index * 3..index * 3 + 3];
+    fill(depth, &mut [], w, h, &fill_loops(scene, record), record[0] as i32);
 }
 
 /// The filled faces of `scene` in draw order (the stage the GPU path replaces); Hi-Z culling on large scenes (`scene_hiz`).
