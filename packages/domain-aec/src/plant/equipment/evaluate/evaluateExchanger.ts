@@ -1,6 +1,6 @@
 /**
  * Derived geometry of a parametric shell-and-tube exchanger (plant 03 EQP §2): shell, channels, tubesheets, bonnets / shell cover (exact head
- * sections), flat covers, saddle blocks and nozzles, all tagged `element:<id>`. The tube bundle, baffles and pass partitions are internals: data
+ * sections), flat covers, saddle blocks, bracket lugs, the kettle weir plate and nozzles, all tagged `element:<id>`. The tube bundle, baffles and pass partitions are internals: data
  * only, no geometry.
  */
 
@@ -9,10 +9,13 @@ import type { BuildingLevel, EquipmentElement } from '@aec/building/types';
 import type { ExchangerEnd, ExchangerGeometry } from '../geometry/exchangerFrame';
 import { resolveExchanger } from '../geometry/exchangerFrame';
 import type { ShellSegment } from '../geometry/exchangerShell';
+import { kettleWeir } from '../geometry/kettleWeir';
 import { toWorld } from '../geometry/ports';
 import { headBand, ringSection } from '../geometry/vesselProfile';
 import type { ExchangerTemplate } from '../plantData';
 import { evaluateNozzles } from './evaluateNozzles';
+import { lugEntities } from './lugEntities';
+import { weirEntity } from './weirEntity';
 import { polygonSection, revolutionPart, supportBox, type Section } from './revolutionPart';
 
 /** Saddle block width across the shell as a fraction of the outside diameter (same as vessel saddles). */
@@ -121,6 +124,7 @@ function verticalSupports(
       );
     return parts;
   }
+  if (support.type === 'lugs') return lugEntities(element, level, support, geometry.radius + geometry.shellThickness, geometry.datum);
   if (support.type !== 'legs') return [];
   return Array.from({ length: support.count }, (_unused, index): Entity => {
     const azimuth = ((index + 0.5) * 2 * Math.PI) / support.count;
@@ -136,6 +140,11 @@ function verticalSupports(
   });
 }
 
+function weirEntities(element: EquipmentElement, level: BuildingLevel, template: ExchangerTemplate, geometry: ExchangerGeometry): Entity[] {
+  const weir = kettleWeir(template, geometry);
+  return weir === null ? [] : [weirEntity(element, level, weir, geometry.datum)];
+}
+
 /** Entities of a parametric exchanger element, nozzles included. */
 export function evaluateExchanger(element: EquipmentElement, level: BuildingLevel, template: ExchangerTemplate): Entity[] {
   const geometry = resolveExchanger(template);
@@ -148,6 +157,7 @@ export function evaluateExchanger(element: EquipmentElement, level: BuildingLeve
     ...geometry.segments.map((segment) => make(segment.name, segmentLabel(segment), segmentSection(segment))),
     ...endParts(make, geometry, geometry.front, 'front'),
     ...endParts(make, geometry, geometry.rear, 'rear'),
+    ...weirEntities(element, level, template, geometry),
     ...(geometry.vertical ? verticalSupports(element, level, template, geometry) : saddleBlocks(element, level, template, geometry)),
     ...evaluateNozzles(element, level),
   ];

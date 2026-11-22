@@ -155,8 +155,8 @@ const outsideRadius = (template: ExchangerTemplate): number =>
 function exchangerDatum(template: ExchangerTemplate): number {
   const { support } = template;
   if (support.type === 'saddles') return support.axisElevation;
-  const base = support.type === 'none' ? support.baseElevation : 0;
-  if (template.orientation === 'vertical') return support.type === 'none' ? base : support.height;
+  const base = support.type === 'none' || support.type === 'lugs' ? support.baseElevation : 0;
+  if (template.orientation === 'vertical') return support.type === 'none' || support.type === 'lugs' ? base : support.height;
   return base + outsideRadius(template);
 }
 

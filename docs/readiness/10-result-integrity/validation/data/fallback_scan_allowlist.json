@@ -525,6 +525,11 @@
       "file": "domain-dynamics/src/flight/aeroSweep.ts",
       "match": "const incidenceDeg = section.incidenceDeg ?? 0;",
       "reason": "documented param default: section incidence omitted means 0 (flat section), stated in the generate_aero_table param description"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/lugParams.ts",
+      "match": "baseElevation: input.baseElevation ?? 0 }",
+      "reason": "lugs support: the elevation of the bottom tangent line above the level defaults to 0 = on the level, a placement not an engineering input; named in defaulted (support.baseElevation) like the none support"
     }
   ]
 }

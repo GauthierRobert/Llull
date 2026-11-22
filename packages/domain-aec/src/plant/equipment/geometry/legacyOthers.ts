@@ -7,6 +7,7 @@ import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { ExchangerTemplate, PumpTemplate, TankTemplate } from '../plantData';
 import { resolveExchanger } from './exchangerFrame';
 import { exchangerMass } from './exchangerMass';
+import { lugPlanRadius } from './lugs';
 import { pumpLayout } from './pumpLayout';
 import { eaveRadius, roofRise, tankBase } from './tankFrame';
 import { tankMass } from './tankMass';
@@ -28,7 +29,7 @@ export function exchangerLegacy(doc: Units, template: ExchangerTemplate): Legacy
   const mass = exchangerMass(toMetres(doc, 1), template, geometry);
   const notes = [
     'operating weight = empty + both sides full at their specific gravity (a side without specificGravity adds nothing)',
-    'floating head, floating tubesheet, U-bends, baffles, tie rods, pass partitions, kettle weir, saddle plates, skirt / legs and nozzles are not part of the weight',
+    'floating head, floating tubesheet, U-bends, baffles, tie rods, pass partitions, saddle plates, skirt / legs and nozzles are not part of the weight (the kettle weir plate and bracket lugs are)',
   ];
   if (mass.densityDefaulted) notes.push(`material density defaulted to ${STEEL_DENSITY_KG_PER_M3} kg/m3 (steel)`);
   if (geometry.vertical) {
@@ -38,7 +39,9 @@ export function exchangerLegacy(doc: Units, template: ExchangerTemplate): Legacy
         ? geometry.outerRadius + support.thickness + support.baseRingWidth
         : support.type === 'legs'
           ? support.pitchDiameter / 2 + support.legWidth / 2
-          : 0;
+          : support.type === 'lugs'
+            ? lugPlanRadius(geometry.radius + geometry.shellThickness, support)
+            : 0;
     const side = 2 * Math.max(geometry.outerRadius, supportRadius);
     return { size: [side, side, geometry.rear.outsideApex + geometry.zOffset], shape: 'vertical_vessel', weight: mass.operatingKg, notes };
   }

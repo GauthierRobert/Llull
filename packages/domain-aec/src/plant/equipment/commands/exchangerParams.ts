@@ -9,6 +9,7 @@ import { fromMm, MM_PER_UNIT } from '@core/model/units';
 import { parseTema } from '../codecheck/tema';
 import { tubeWallRow, TUBE_WALL_SOURCE } from '../data/temaTables';
 import type { ExchangerChannel, ExchangerKettle, ExchangerSideDesign, ExchangerTemplate, TemaDesignation, TubeBundle } from '../plantData';
+import { weirPositionProblem } from '../geometry/kettleWeir';
 import { designInputSchema, isVesselIssue, resolveSupport, supportInputSchema, type VesselIssue } from './vesselParams';
 
 export const channelSchema = z.object({
@@ -61,8 +62,8 @@ export const exchangerShape = {
     .enum(['horizontal', 'vertical'])
     .optional()
     .describe(
-      'horizontal (default): tube axis along the equipment X, support saddles or none. vertical: tube axis along Z, FRONT HEAD AT THE BOTTOM, support skirt, legs or none; ' +
-        'support.height (skirt / legs) or support.baseElevation (none) is the elevation of the bottom tangent line, the outer end of the front channel. Not for the kettle (K).',
+      'horizontal (default): tube axis along the equipment X, support saddles or none. vertical: tube axis along Z, FRONT HEAD AT THE BOTTOM, support skirt, legs, lugs or none; ' +
+        'support.height (skirt / legs) or support.baseElevation (none / lugs) is the elevation of the bottom tangent line, the outer end of the front channel. Not for the kettle (K).',
     ),
   kettle: z
     .object({
@@ -91,8 +92,20 @@ export const exchangerShape = {
         .number()
         .positive()
         .describe(
-          'Overflow weir height above the lowest inside point of the enlarged shell, document units; must be below enlargedInsideDiameter. Internal: stored and shown on the data sheet, no geometry.',
+          'Overflow weir height above the lowest inside point of the enlarged shell, document units; must be below enlargedInsideDiameter. With weirStation + weirThickness the weir is a plate across the enlarged shell (mesh, weight, liquid volume to the weir); without them it is data only.',
         ),
+      weirStation: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Axial station of the weir plate CENTRE measured from the REAR END of the shell toward the front, document units (a floating / U rear has no rear tubesheet; this is where its face would be). Give it with weirThickness. The plate must lie inside the enlarged length (weirStation - weirThickness / 2 >= 0 and weirStation + weirThickness / 2 <= enlargedLength), else EQP_WEIR_OUT_OF_RANGE.',
+        ),
+      weirThickness: z
+        .number()
+        .positive()
+        .optional()
+        .describe('Thickness of the weir plate, document units; a caller input, never defaulted. Give it with weirStation.'),
     })
     .optional()
     .describe(
@@ -158,7 +171,7 @@ export const exchangerShape = {
   support: supportInputSchema
     .optional()
     .describe(
-      'Horizontal: saddles { stations from the front end of the shell, width, axisElevation } or none. Vertical: skirt { height, thickness?, baseRingWidth? }, legs { count >= 3, height, pitchDiameter?, legWidth? } or none { baseElevation }. Lugs are not modelled. Default none on the level.',
+      'Horizontal: saddles { stations from the front end of the shell, width, axisElevation } or none. Vertical: skirt { height, thickness?, baseRingWidth? }, legs { count >= 3, height, pitchDiameter?, legWidth? } or none { baseElevation }. lugs { count >= 2, lugHeight, lugWidth, lugProjection, lugThickness, lugBasePlateThickness, lugElevation above the bottom tangent line, lugBoltHoleDiameter?, baseElevation? } (bracket lugs on the shell; every dimension required, EQP_SUPPORT_INVALID when missing or off the shell). Default none on the level.',
     ),
   design: z
     .object({
@@ -271,6 +284,16 @@ function resolveKettle(input: ExchangerInput, allowance: number, defaulted: stri
       `kettle.weirHeight ${kettle.weirHeight} must be below enlargedInsideDiameter ${kettle.enlargedInsideDiameter}`,
       'kettle.weirHeight',
     );
+  if ((kettle.weirStation === undefined) !== (kettle.weirThickness === undefined))
+    return issue(
+      'EQP_PARAM_INVALID',
+      'kettle.weirStation and kettle.weirThickness are given together (the weir plate needs both) or not at all',
+      kettle.weirStation === undefined ? 'kettle.weirStation' : 'kettle.weirThickness',
+    );
+  if (kettle.weirStation !== undefined && kettle.weirThickness !== undefined) {
+    const problem = weirPositionProblem(kettle.weirStation, kettle.weirThickness, kettle.enlargedLength);
+    if (problem !== null) return issue('EQP_WEIR_OUT_OF_RANGE', problem, 'kettle.weirStation');
+  }
   if (kettle.enlargedThickness === undefined) defaulted.push('kettle.enlargedThickness');
   const enlargedThickness = kettle.enlargedThickness ?? input.shellThickness;
   if (enlargedThickness <= allowance)
@@ -285,6 +308,9 @@ function resolveKettle(input: ExchangerInput, allowance: number, defaulted: stri
     transitionLength: kettle.transitionLength,
     enlargedThickness,
     weirHeight: kettle.weirHeight,
+    ...(kettle.weirStation === undefined || kettle.weirThickness === undefined
+      ? {}
+      : { weirStation: kettle.weirStation, weirThickness: kettle.weirThickness }),
   };
 }
 
@@ -384,6 +410,11 @@ export function buildExchangerTemplate(
       support: { type: 'none' },
     },
     defaulted,
+    {
+      from: input.tubesheetThickness + frontChannel.length,
+      to: input.tubesheetThickness + frontChannel.length + shellLength,
+      rootRadius: input.shellInsideDiameter / 2 + input.shellThickness,
+    },
   );
   if (isVesselIssue(support)) return issue(support.code, support.message, support.path);
   if (input.support === undefined) defaulted.push('support');

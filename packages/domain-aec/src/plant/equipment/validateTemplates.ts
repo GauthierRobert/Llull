@@ -3,22 +3,43 @@
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { appendAll } from '@lib/appendAll';
+import { weirPositionProblem } from './geometry/kettleWeir';
 
 const SUPPORT_NUMBERS: ReadonlyMap<string, readonly string[]> = new Map([
   ['skirt', ['height', 'thickness', 'baseRingWidth']],
   ['legs', ['count', 'height', 'pitchDiameter', 'legWidth']],
+  ['lugs', ['count', 'lugHeight', 'lugWidth', 'lugProjection', 'lugThickness', 'lugBasePlateThickness', 'lugElevation', 'baseElevation']],
   ['saddles', ['width', 'axisElevation']],
   ['none', ['baseElevation']],
 ]);
 
+/** Lug dimensions must be > 0 (count an integer >= 2) and the lug must be built: base plate below the height, bolt hole inside the base plate. */
+function lugErrors(support: Record<string, unknown>, at: string): string[] {
+  const errors = positive(support, ['lugHeight', 'lugWidth', 'lugProjection', 'lugThickness', 'lugBasePlateThickness'], `${at}.support`);
+  if (!Number.isInteger(support['count']) || (support['count'] as number) < 2) errors.push(`${at}.support.count must be an integer >= 2`);
+  const { lugHeight, lugBasePlateThickness, lugBoltHoleDiameter, lugWidth, lugProjection } = support;
+  if (isPositiveNumber(lugHeight) && isPositiveNumber(lugBasePlateThickness) && lugBasePlateThickness >= lugHeight)
+    errors.push(`${at}.support.lugBasePlateThickness must be below lugHeight`);
+  if (lugBoltHoleDiameter !== undefined) {
+    if (!isPositiveNumber(lugBoltHoleDiameter)) errors.push(`${at}.support.lugBoltHoleDiameter must be a number > 0`);
+    else if (
+      (isPositiveNumber(lugWidth) && lugBoltHoleDiameter >= lugWidth) ||
+      (isPositiveNumber(lugProjection) && lugBoltHoleDiameter >= lugProjection)
+    )
+      errors.push(`${at}.support.lugBoltHoleDiameter must be below lugWidth and lugProjection`);
+  }
+  return errors;
+}
+
 export function supportErrors(support: unknown, at: string): string[] {
   if (!isRecord(support) || typeof support['type'] !== 'string' || !SUPPORT_NUMBERS.has(support['type']))
-    return [`${at}.support.type must be skirt, legs, saddles or none`];
+    return [`${at}.support.type must be skirt, legs, lugs, saddles or none`];
   const errors = (SUPPORT_NUMBERS.get(support['type']) as readonly string[])
     .filter((name) => !isFiniteNumber(support[name]) || (support[name] as number) < 0)
     .map((name) => `${at}.support.${name} must be a number >= 0`);
   if (support['type'] === 'saddles' && !(Array.isArray(support['stations']) && support['stations'].every(isFiniteNumber)))
     errors.push(`${at}.support.stations must be an array of numbers`);
+  if (support['type'] === 'lugs') appendAll(errors, lugErrors(support, at));
   return errors;
 }
 
@@ -90,6 +111,16 @@ function kettleErrors(template: Record<string, unknown>, at: string): string[] {
     errors.push(`${at}.kettle.enlargedInsideDiameter must exceed shellInsideDiameter`);
   if (isPositiveNumber(enlarged) && isPositiveNumber(weirHeight) && weirHeight >= enlarged)
     errors.push(`${at}.kettle.weirHeight must be below enlargedInsideDiameter`);
+  const { weirStation, weirThickness } = kettle;
+  if ((weirStation === undefined) !== (weirThickness === undefined))
+    errors.push(`${at}.kettle.weirStation and weirThickness are given together or not at all`);
+  else if (weirStation !== undefined) {
+    appendAll(errors, positive(kettle, ['weirStation', 'weirThickness'], `${at}.kettle`));
+    if (isPositiveNumber(weirStation) && isPositiveNumber(weirThickness) && isPositiveNumber(enlargedLength)) {
+      const problem = weirPositionProblem(weirStation, weirThickness, enlargedLength);
+      if (problem !== null) errors.push(`${at}.kettle: ${problem}`);
+    }
+  }
   const tubes = template['tubes'];
   if (
     isRecord(tubes) &&
@@ -154,7 +185,7 @@ export function exchangerErrors(template: Record<string, unknown>, at: string): 
   const orientation = template['orientation'];
   if (orientation !== 'horizontal' && orientation !== 'vertical') errors.push(`${at}.orientation must be horizontal or vertical`);
   const support = template['support'];
-  const allowed = orientation === 'vertical' ? ['skirt', 'legs', 'none'] : ['saddles', 'none'];
+  const allowed = orientation === 'vertical' ? ['skirt', 'legs', 'lugs', 'none'] : ['saddles', 'none'];
   if (isRecord(support) && !allowed.includes(support['type'] as string))
     errors.push(
       `${at}.support.type must be ${allowed.slice(0, -1).join(', ')} or ${allowed[allowed.length - 1]} for a ${String(orientation)} exchanger`,

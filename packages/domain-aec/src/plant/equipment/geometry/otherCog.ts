@@ -10,6 +10,8 @@ import { segmentFluidVolume, segmentInside, segmentMetal } from './exchangerShel
 import { exchangerMass } from './exchangerMass';
 import type { ShellSegment } from './exchangerShell';
 import { headFillCentroid, headMetalCentroid } from './headCentroid';
+import { kettleWeir } from './kettleWeir';
+import { lugVolumes } from './lugs';
 import { pumpLayout } from './pumpLayout';
 import { courseBottoms, roofRise, tankBase, tankLiquidVolume } from './tankFrame';
 import { tankMass } from './tankMass';
@@ -69,7 +71,17 @@ export function exchangerCog(scale: number, template: ExchangerTemplate, nozzleL
     const end = part.startsWith('front') ? geometry.front : geometry.rear;
     return endPartX(end, end.radius, part.replace(/^(front|rear)/, '') as EndPart);
   };
-  const metal = mass.parts.map((part): CogPart => ({ part: part.part, kg: part.kg, at: axisPoint(geometry, xOf(part.part)) }));
+  const weir = kettleWeir(template, geometry);
+  const { support } = template;
+  const metal = mass.parts.map((part): CogPart => {
+    if (part.part === 'lugs' && support.type === 'lugs')
+      return { part: part.part, kg: part.kg, at: [0, 0, geometry.datum + support.lugElevation + lugVolumes(support).centreHeight] };
+    if (part.part === 'weir' && weir !== null) {
+      const at = axisPoint(geometry, (weir.xFront + weir.xRear) / 2);
+      return { part: part.part, kg: part.kg, at: [at[0], at[1], at[2] - weir.centroidBelowAxis] };
+    }
+    return { part: part.part, kg: part.kg, at: axisPoint(geometry, xOf(part.part)) };
+  });
   const empty = [...metal, ...nozzleLumps];
   const cubic = powInt(scale, 3);
   const bore = tubes.outsideDiameter - 2 * tubes.wallThickness;
@@ -110,7 +122,7 @@ export function exchangerCog(scale: number, template: ExchangerTemplate, nozzleL
     approximations: [
       NOZZLE_APPROXIMATION,
       'tubes: one lump at the middle of the tube length; the U-bends and floating head of U / P / S / T / W rears are not modelled',
-      'baffles, tie rods, pass partitions, kettle weir, saddle plates, skirt / legs and the weld metal are not modelled',
+      'baffles, tie rods, pass partitions, saddle plates, skirt / legs and the weld metal are not modelled (the kettle weir plate and bracket lugs are)',
     ],
   };
 }

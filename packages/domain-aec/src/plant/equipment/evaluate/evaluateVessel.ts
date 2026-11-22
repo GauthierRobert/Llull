@@ -11,6 +11,7 @@ import { resolveVessel, skirtRadii, type VesselGeometry } from '../geometry/vess
 import { ringSection, vesselBand } from '../geometry/vesselProfile';
 import type { PlatformClip, VesselTemplate } from '../plantData';
 import { evaluateNozzles } from './evaluateNozzles';
+import { lugEntities } from './lugEntities';
 import { revolutionPart as revolution, supportBox as box } from './revolutionPart';
 
 /** Saddle block width across the vessel as a fraction of the outside diameter (the block rests under the shell, tangent at the bottom). */
@@ -45,6 +46,7 @@ function verticalSupports(element: EquipmentElement, level: BuildingLevel, templ
       );
     return parts;
   }
+  if (support.type === 'lugs') return lugEntities(element, level, support, geometry.radius + geometry.shellThickness, geometry.datum);
   if (support.type !== 'legs') return [];
   return Array.from({ length: support.count }, (_unused, index): Entity => {
     const azimuth = ((index + 0.5) * 2 * Math.PI) / support.count;

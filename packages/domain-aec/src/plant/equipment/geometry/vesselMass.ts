@@ -8,6 +8,7 @@ import type { VesselDesignData, VesselTemplate } from '../plantData';
 import { headMetalVolume } from './headOffset';
 import { headVolume } from './heads';
 import { horizontalVolume, verticalVolume } from './partialVolume';
+import { lugVolumes } from './lugs';
 import { skirtRadii, type VesselGeometry } from './vesselFrame';
 import { powInt } from '@lib/powInt';
 
@@ -51,6 +52,14 @@ function supportParts(template: VesselTemplate, geometry: VesselGeometry, cubic:
         part: 'legs',
         kg: support.count * support.legWidth * support.legWidth * support.height * cubic * density,
         method: 'count x square section x height x density',
+      },
+    ];
+  if (support.type === 'lugs')
+    return [
+      {
+        part: 'lugs',
+        kg: support.count * lugVolumes(support).volume * cubic * density,
+        method: 'count x (web t x projection x (height - base plate) + (width x projection - bolt hole) x base plate thickness) x density',
       },
     ];
   return [];

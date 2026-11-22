@@ -1,6 +1,6 @@
 /**
  * IFC of parametric plant equipment (03 EQP §6, FR-EQP-18): the body is one IfcRevolvedAreaSolid per revolved part (shell + heads wall section,
- * skirt, nozzle necks, platform clips) and an IfcExtrudedAreaSolid per support / envelope block, taken from the same derived entities the viewport and the
+ * skirt, nozzle necks, platform clips) and an IfcExtrudedAreaSolid per support / lug / envelope block and per kettle weir plate, taken from the same derived entities the viewport and the
  * STEP export use; every nozzle is an IfcDistributionPort (FlowDirection from its service, placement = the port frame, Z = the direction away from the
  * equipment) nested in the product (IfcRelNests). The profile of a revolved part is an IfcIndexedPolyCurve: lines and circular arcs stay exact
  * (IfcLineIndex, IfcArcIndex); the ellipsoidal head offset and cubic Bézier pieces have no IFC curve there and are written as sampled polylines (the reason
@@ -14,7 +14,7 @@
 import { revolutionAxisIndex } from '@core/geometry/revolution';
 import { segmentPoint } from '@core/geometry/curveSegments';
 import type { CurveSegment } from '@core/model/curve';
-import type { BoxEntity, Entity, RevolutionEntity, Vec3 } from '@core/model/types';
+import type { BoxEntity, Entity, ExtrusionEntity, RevolutionEntity, Vec3 } from '@core/model/types';
 import type { Vec2 } from '@core/model/vectors';
 import { applyEulerXYZ } from '@lib/eulerRotation';
 import { cross3, normalize3OrZero, map3 } from '@lib/vec3';
@@ -28,7 +28,7 @@ import { equipmentPorts } from '../../plant/equipment/geometry/ports';
 import { addNamedPset, type PlantIfcRun } from './ifcPlant';
 import { ratedPressureProperties } from './ifcNozzleRating';
 import { addPort, nest, type Flow, type Port, type PortState } from './ifcPorts';
-import { type Context, direction, ifcReal, ifcString, point3, rectangleProfile } from './ifcStep';
+import { type Context, direction, ifcReal, ifcString, point3, polygonProfile, rectangleProfile } from './ifcStep';
 
 export interface EquipmentBody {
   /** Solids of the body (IfcRevolvedAreaSolid, IfcExtrudedAreaSolid) in the frame of the product placement. */
@@ -155,6 +155,19 @@ function boxSolid(context: Context, frame: Frame, entity: BoxEntity): string {
   );
 }
 
+/** A planar extrusion (kettle weir plate): the polygon profile in mm in the entity frame, extruded along the entity +Z. */
+function extrudedSolid(context: Context, frame: Frame, entity: ExtrusionEntity): string {
+  const xAxis = frame.axis([1, 0, 0], entity.rotation);
+  const zAxis = frame.axis([0, 0, 1], entity.rotation);
+  const profile = polygonProfile(
+    context,
+    entity.profile.map(([x, y]): Vec2 => [context.mm(x), context.mm(y)]),
+  );
+  return context.writer.add(
+    `IFCEXTRUDEDAREASOLID(${profile},${placement3(context, frame.point(entity.position), zAxis, xAxis)},${direction(context, [0, 0, 1])},${ifcReal(context.mm(entity.depth))})`,
+  );
+}
+
 /** Solids of the derived entities of a parametric equipment (shared with the tests: pure over `entities`). */
 export function bodyOfEntities(
   context: Context,
@@ -169,6 +182,7 @@ export function bodyOfEntities(
   for (const entity of entities) {
     if (entity.kind === 'revolution') solids.push(revolvedSolid(context, frame, entity, x3));
     else if (entity.kind === 'box') solids.push(boxSolid(context, frame, entity));
+    else if (entity.kind === 'extrusion') solids.push(extrudedSolid(context, frame, entity));
     else skipped.push({ part: entity.id, kind: entity.kind });
   }
   return { solids, skipped };

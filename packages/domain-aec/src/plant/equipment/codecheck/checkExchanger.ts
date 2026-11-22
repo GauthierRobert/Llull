@@ -8,6 +8,7 @@ import type { EquipmentElement } from '@aec/building/types';
 import type { HeadSpec } from '../model';
 import type { ExchangerEnd } from '../geometry/exchangerFrame';
 import { resolveExchanger } from '../geometry/exchangerFrame';
+import { LUGS_NOT_CHECKED } from '../geometry/lugs';
 import type { ExchangerSideDesign, ExchangerTemplate, PlantEquipmentData, VesselTemplate } from '../plantData';
 import { PLANT_EQUIPMENT_SCHEMA } from '../plantData';
 import { asmeThickness, type CodeFinding } from './asme';
@@ -231,5 +232,10 @@ export function checkExchanger(element: EquipmentElement, mmPerUnit: number): El
   if (template.tubes.wallUnverified)
     found.push(warning('EQP_TABLE_UNVERIFIED', `tube wall from a grade B table row (${template.tubes.wallSource})`, 'tubes.wallThickness'));
   appendAll(found, nozzleFindings(template, plant.nozzles));
-  return { issues: issuesOf(element, found), reviewRequired: true, reviewReason: EXCHANGER_REVIEW_REASON, notChecked: NOT_CHECKED };
+  return {
+    issues: issuesOf(element, found),
+    reviewRequired: true,
+    reviewReason: EXCHANGER_REVIEW_REASON,
+    notChecked: template.support.type === 'lugs' ? [...NOT_CHECKED, LUGS_NOT_CHECKED] : NOT_CHECKED,
+  };
 }
