@@ -9,7 +9,7 @@ import type { CadDocument } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
 import { deriveRun } from '@aec/plant/piping/routeParts';
 import { execute } from '@core/commands/registry';
-import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
 import { addTie, cs150Document, cs150Line } from './rteFixtures';
 
@@ -159,6 +159,148 @@ describe('what the shifted branch axis cannot take', () => {
     const derived = deriveRun(added.document, run);
     expect(derived.ok).toBe(false);
     expect(!derived.ok && derived.code).toBe('RTE_BRANCH_ON_FITTING');
+  });
+});
+
+describe('a run continuing from the shifted branch end, inline parts on a second leg, a header edit that breaks the branch', () => {
+  const h = header(true);
+  const added = ok(h.doc, 'add_branch', tee(h.runId));
+  const branch = branchRunOf(added.document, h.runId);
+
+  it('a run that continues from the end of a one-leg shifted branch is refused by name (the continuation reads the stored end: a silent 27 mm gap otherwise)', () => {
+    const line = ok(added.document, 'create_pipeline', { service: 'P', sequence: '9', spec: 'CS150', dn: 100 });
+    const cont = execute(line.document, 'route_pipe', {
+      lineId: line.affected[0],
+      from: { portId: `${branch.id}:end` },
+      legs: [{ direction: '-Y', length: 500 }],
+    });
+    expect(cont.rejected, cont.summary).toBe(true);
+    expect(cont.summary).toContain('RTE_BRANCH_ON_FITTING');
+    expect(cont.document).toBe(line.document);
+  });
+
+  it('with a second leg along the offset the end is not moved, so a continuation is fine', () => {
+    const bent = ok(
+      h.doc,
+      'add_branch',
+      tee(h.runId, [
+        { direction: '-Y', length: 500 },
+        { direction: '+Z', length: 400 },
+      ]),
+    );
+    const bentRun = branchRunOf(bent.document, h.runId);
+    const line = ok(bent.document, 'create_pipeline', { service: 'P', sequence: '9', spec: 'CS150', dn: 100 });
+    const cont = execute(line.document, 'route_pipe', {
+      lineId: line.affected[0],
+      from: { portId: `${bentRun.id}:end` },
+      legs: [{ direction: '+Z', length: 500 }],
+    });
+    expect(cont.rejected, cont.summary).toBeUndefined();
+  });
+
+  it('inline components on the second leg of a shifted branch move with the corner: a joint 400 mm along leg 1 sits at z 27 + 400 (the leg starts at the shifted corner)', () => {
+    const bent = ok(
+      h.doc,
+      'add_branch',
+      tee(h.runId, [
+        { direction: '-Y', length: 500 },
+        { direction: '+Z', length: 700 },
+      ]),
+    );
+    const run = branchRunOf(bent.document, h.runId);
+    const inserted = ok(bent.document, 'insert_inline_component', {
+      runId: run.id,
+      type: 'flangedJoint',
+      at: { leg: 1, centreDistance: 400 },
+    });
+    const derived = deriveRun(inserted.document, branchRunOf(inserted.document, h.runId));
+    expect(derived.ok).toBe(true);
+    const centre = derived.ok ? derived.inline[0]?.centre : undefined;
+    expect(centre?.[0]).toBeCloseTo(3000, 9);
+    expect(centre?.[1]).toBeCloseTo(-500, 9);
+    expect(centre?.[2]).toBeCloseTo(427, 9);
+  });
+
+  it('a header edit that makes a two-leg branch underivable is refused as RTE_BRANCH_ON_FITTING (not RTE_INLINE_DOES_NOT_FIT), document unchanged', () => {
+    const plain = header(false);
+    const bent = ok(
+      plain.doc,
+      'add_branch',
+      tee(plain.runId, [
+        { direction: '-Y', length: 500 },
+        { direction: '+X', length: 400 },
+      ]),
+    );
+    expectRefusal(
+      bent.document,
+      'insert_inline_component',
+      { runId: plain.runId, type: 'reducerEccentric', tag: 'RE-1', dn2: 100, flat: 'top', at: { leg: 0, centreDistance: 2000 } },
+      'RTE_BRANCH_ON_FITTING',
+    );
+  });
+});
+
+describe('import tolerance: the spec angle tolerance decides whether a branch offset is carried sideways', () => {
+  /**
+   * Flat DN150 header with a 6x4 flat-top reducer (offset 27 mm up) and a DN100 tee whose branch leaves 1.5 degrees off the vertical, so the offset is 1.5 degrees off the
+   * branch. The RTE drops that residual (0.7 mm) within a 2 degree tolerance and carries it beyond a 1 degree one; the file it writes then has the branch pipe 0.7 mm off the tee
+   * outlet, so the test closes that gap by hand (a file from another tool is connected) and imports it under both tolerances.
+   */
+  const tiltedFile = (toleranceDeg: number): { text: string; doc: CadDocument } => {
+    const doc = apply(cs150Document(), 'edit_pipe_spec', {
+      specId: 'CS150',
+      ops: [{ op: 'setHeader', fields: { elbowAngles: { anglesDeg: [90, 45], toleranceDeg, trimmedAllowed: false } } }],
+    });
+    const line = apply(doc, 'create_pipeline', { service: 'P', sequence: '3105', spec: 'CS150', dn: 150 });
+    const lineId = line.plant?.piping?.lineOrder.at(-1) as string;
+    const tie = addTie(line, 'A', [0, 0, 0], [1, 0, 0], { dn: 150 });
+    const routed = ok(tie.doc, 'route_pipe', {
+      lineId,
+      from: { portId: tie.id },
+      legs: [
+        { direction: '+X', length: 4000 },
+        { direction: '+Z', length: 1000 },
+      ],
+      inline: [{ type: 'reducerEccentric', tag: 'RE-1', dn2: 100, flat: 'top', at: { leg: 0, centreDistance: 2000 } }],
+    });
+    const runId = (routed.data as { runId: string }).runId;
+    const added = ok(routed.document, 'add_branch', tee(runId, [{ direction: [0.02618, 0, 0.99966], length: 500 }]));
+    return { text: pcfOf(added.document, { lineIds: [lineId] }), doc };
+  };
+  /** The branch pipe (the last PIPE record) moved so that it starts exactly at the tee's BRANCH1-POINT. */
+  const connected = (text: string): string => {
+    const outlet = /BRANCH1-POINT (\S+) (\S+) (\S+) /.exec(text) as RegExpExecArray;
+    const last = text.lastIndexOf('PIPE\n');
+    const [, x1, y1, z1, x2, y2, z2] = /END-POINT (\S+) (\S+) (\S+) 100 BW\n\s+END-POINT (\S+) (\S+) (\S+) 100 BW/.exec(
+      text.slice(last),
+    ) as RegExpExecArray;
+    const delta = [Number(outlet[1]) - Number(x1), Number(outlet[2]) - Number(y1), Number(outlet[3]) - Number(z1)] as const;
+    const at = (x: string, y: string, z: string): string =>
+      [Number(x) + delta[0], Number(y) + delta[1], Number(z) + delta[2]].map((v) => v.toFixed(1)).join(' ');
+    return `${text.slice(0, last)}PIPE\n    END-POINT ${at('0', '0', '0').replace(/^/, '')}`.length > 0
+      ? text.slice(0, last) +
+          text
+            .slice(last)
+            .replace(
+              /END-POINT (\S+) (\S+) (\S+) 100 BW\n(\s+)END-POINT (\S+) (\S+) (\S+) 100 BW/,
+              () =>
+                `END-POINT ${at(x1 as string, y1 as string, z1 as string)} 100 BW\n    END-POINT ${at(x2 as string, y2 as string, z2 as string)} 100 BW`,
+            )
+      : text;
+  };
+  const branchEnd = (doc: CadDocument): readonly number[] => {
+    const runs = Object.values(piping(doc).runs);
+    return (runs.find((run) => run.pis.length === 0 && run.end.point[2] > 400 && run.end.point[2] < 1000) as PipeRun).end.point;
+  };
+
+  it('a 2 degree spec tolerance: the 0.7 mm residual of a 1.5 degree tilt is dropped, so the stored branch end is the file end (a fixed 1 degree rule would un-shift it)', () => {
+    const wide = tiltedFile(2);
+    const text = connected(wide.text);
+    expect(text).not.toBe(wide.text);
+    const within = execute(wide.doc, 'import_pcf', { text, as: 'route', spec: 'CS150' });
+    expect(within.rejected, within.summary).toBeUndefined();
+    const fileEnd = Number(/END-POINT \S+ \S+ \S+ 100 BW\n\s+END-POINT (\S+) /.exec(text.slice(text.lastIndexOf('PIPE\n')))?.[1]);
+    expect(branchEnd(within.document)[0]).toBeCloseTo(fileEnd, 1);
   });
 });
 

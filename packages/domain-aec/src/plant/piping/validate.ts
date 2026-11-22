@@ -212,7 +212,7 @@ function cappedEndRefErrors(runs: unknown): string[] {
       return isRecord(targetEnd) &&
         (targetEnd['cap'] !== undefined || targetEnd['blind'] !== undefined || targetEnd['spectacle'] !== undefined)
         ? [
-            `plant.piping.runs.${id}.${side}.ref continues from the ${targetEnd['blind'] === undefined ? 'capped' : 'blind-flanged'} end ${ref['runId']}:${String(ref['end'])}`,
+            `plant.piping.runs.${id}.${side}.ref continues from the ${targetEnd['spectacle'] !== undefined ? 'spectacle-blinded' : targetEnd['blind'] === undefined ? 'capped' : 'blind-flanged'} end ${ref['runId']}:${String(ref['end'])}`,
           ]
         : [];
     }),

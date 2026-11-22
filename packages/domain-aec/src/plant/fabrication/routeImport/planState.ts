@@ -88,7 +88,7 @@ export function arrive(s: PlanState, key: string): void {
 
 export function addBranch(s: PlanState, parent: string, centre: Vec3, outlet: NetworkPoint, shift: Vec3 = [0, 0, 0]): void {
   s.branches += 1;
-  const sideways = branchSideways(shift, add3(centre, shift), outlet.xyz);
+  const sideways = branchSideways(shift, add3(centre, shift), outlet.xyz, s.options.angleToleranceDeg);
   s.seeds.push({
     key: `branch-${s.branches}`,
     start: centre,

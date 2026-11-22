@@ -68,6 +68,8 @@ export interface RouteRefusal {
 export interface PlanOptions {
   /** Flat side of the eccentric reducers whose END-POINTs lie on one axis (the file does not say). */
   readonly eccentricFlat?: FlatSide | undefined;
+  /** Elbow-angle tolerance of the spec (degrees): a branch offset within it of the branch direction is not carried sideways (as `withBranchShifts`); absent = the RTE default. */
+  readonly angleToleranceDeg?: number | undefined;
 }
 
 export interface Seed {

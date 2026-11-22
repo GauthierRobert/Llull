@@ -8,7 +8,7 @@
 import type { Vec3 } from '@core/model/vectors';
 import type { PartPort, PipeLine, RoutedPart } from '@aec/plant/types';
 import type { RunDerivation } from '../piping/deriveTypes';
-import type { NetworkComponent, NetworkPoint, PcfComponentType, PipingNetwork } from './model';
+import type { IsoIssue, NetworkComponent, NetworkPoint, PcfComponentType, PipingNetwork } from './model';
 
 export interface RouteRun {
   readonly runId: string;
@@ -93,9 +93,10 @@ function typeOf(part: RoutedPart): PcfComponentType | { readonly skip: string } 
     case 'stubIn':
       return { skip: 'a stub-in has no PCF component: the branch pipe is welded to the header' };
     case 'inline':
+      if (part.typeKey === 'spectacleBlind' && part.ports.length === 1 && part.state !== 'open') return 'FLANGE-BLIND';
       if (part.typeKey === 'spectacleBlind')
         return {
-          skip: `a spectacle blind (${part.state ?? 'closed'}) has no PCF component: the keyword list (docs/plant/05 validation pcf_keywords.json) has no spectacle blind, and FLANGE-BLIND is a closed end; the part is left out, the flanges and gaskets around it are written`,
+          skip: `a spectacle blind (${part.state ?? 'closed'}${part.ports.length === 1 ? ', run end' : ', between flanges'}) has no PCF component: the keyword list (docs/plant/05 validation pcf_keywords.json) has no spectacle blind; only a closed run-end one is written, as FLANGE-BLIND; the part is left out, the flanges and gaskets around it are written`,
         };
       return part.typeKey === 'instrument' ? 'INSTRUMENT' : { skip: 'a generic inline part has no PCF component' };
   }
@@ -151,12 +152,14 @@ export function routeNetwork(input: RouteLineInput): RouteNetwork {
   attributes['PROJECT-IDENTIFIER'] = (input.project ?? '').trim().replace(/\s+/g, '-') || 'llull';
   const components: NetworkComponent[] = [];
   const skipped: Array<{ partId: string; reason: string }> = [];
+  const omitted: string[] = [];
   const bolts: Array<{ partId: string; centre: Vec3 | null; studs: number; diameterMm: number | null }> = [];
   for (const { derivation } of input.runs) {
     for (const part of derivation.parts) {
       const type = typeOf(part);
       if (typeof type !== 'string') {
         skipped.push({ partId: part.id, reason: type.skip });
+        if (part.typeKey === 'spectacleBlind') omitted.push(part.id);
         continue;
       }
       const skey = type === 'PIPE' || type === 'GASKET' || type === 'BOLT' ? undefined : skeyOf(part);
@@ -181,5 +184,26 @@ export function routeNetwork(input: RouteLineInput): RouteNetwork {
       });
     }
   }
-  return { network: { lineId: line.lineNumber, attributes, components, source: 'route', warnings: [] }, skipped, bolts };
+  return {
+    network: { lineId: line.lineNumber, attributes, components, source: 'route', warnings: omittedWarnings(omitted) },
+    skipped,
+    bolts,
+  };
+}
+
+/** The bill of material and the spool weight are read from the PCF components, so a spectacle blind left out of the PCF is missing from them: say so. */
+function omittedWarnings(ids: readonly string[]): IsoIssue[] {
+  return ids.length === 0
+    ? []
+    : [
+        {
+          code: 'ISO_SPECTACLE_NOT_IN_PCF',
+          severity: 'warning',
+          message: `spectacle blind(s) ${ids.join(', ')} are not written to the PCF (no spectacle keyword): the bill of material, the spool weights and the take-off of the PCF omit them; the spool weight is a lower bound (piping_takeoff counts them)`,
+          ids,
+          paths: [],
+          remediation:
+            'Add the plate to the bill of material by hand, or read piping_takeoff (counts.spectacleBlind); the flanges and gaskets around it are in the PCF.',
+        },
+      ];
 }

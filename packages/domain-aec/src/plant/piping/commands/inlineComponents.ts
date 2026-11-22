@@ -58,8 +58,12 @@ function componentData(run: PipeRun, derivation: RunDerivation, component: Inlin
 function commitComponent(doc: CadDocument, command: string, next: PipeRun, component: InlineComponent, verb: string): CommandResult {
   const result = rederive(withRuns(doc, [next]), [next.id]);
   if (!result.ok) {
+    // A branch run that can no longer follow the shifted axis keeps its own code (detail.sideways); other branch collisions read as the component not fitting.
+    const cascaded = result.detail?.['sideways'] !== undefined;
     const code =
-      result.code === 'RTE_BRANCH_ON_FITTING' || result.code === 'RTE_SEGMENT_TOO_SHORT' ? 'RTE_INLINE_DOES_NOT_FIT' : result.code;
+      !cascaded && (result.code === 'RTE_BRANCH_ON_FITTING' || result.code === 'RTE_SEGMENT_TOO_SHORT')
+        ? 'RTE_INLINE_DOES_NOT_FIT'
+        : result.code;
     return refuseDerivation(doc, command, result, next.id, code);
   }
   const derivation = result.derivations[next.id] as RunDerivation;
