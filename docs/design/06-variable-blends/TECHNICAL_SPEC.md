@@ -2222,7 +2222,7 @@ Probes in `corner_exact::build` (removed): the gap of each attempt at 64 poles s
 
 `kNodes` 128 -> 1024 in `blend_corner_exact.cxx` (the cost is 1024 tangent evaluations per piece of a chain with joints, microseconds). Measured: the midpoint error at h 0.0025 of chain 4 3.7e-6 -> 6.4e-8; a step to 8192 nodes changes nothing further. The creased cylinder-block grid (r 0.3 to 2, ball 1 to 3.5, 11 pairs x 3 sharp edges = 33 steps): BEFORE (the 13.39.5 figures, 10 pairs per sharp edge) 11 of 30 built, AFTER (11 pairs per sharp edge, a superset of those) 30 of 33 build, including the circular top edge at every pair. The `curved sharp edge` refusal in `blend_corner.cxx` is removed.
 
-### 13.42.3 Still refused, by name, NOT explained
+### 13.42.3 Still refused, by name, NOT explained (explained and fixed in 13.43)
 
 3 of 33 still miss the blend ends, with the existing message (`the exact-boundary star is the only patch that holds the crease ... leave the edges by ...`): the straight top edge sharp at r 1 / ball 2.5 (3e-6, just over the limit), the edge against the cylinder at r 0.8 / ball 1.5 (1.0e-5) and r 1 / ball 2 (1.8e-5); r 2 / ball 3.5 with the straight top edge is a rolling-ball refusal (OCCT). Their gap is a smooth bias of one chain (a bump of 1e-5 over 0.3 of the chain, not noise: the h^4 law holds there) and is NOT the map: 8192 nodes leave them unchanged. Ruled out: the tangent of the vertices against the support normal (|t . n| 1e-7 at every vertex), the spokes (no sample over 1e-6), the loop-edge tolerance (1e-7 on the chain; the other piece's 4.9e-6 is not where the gap is). Not found.
 
@@ -2233,3 +2233,31 @@ The built cases of 13.39.4 change in the 7th digit (sharp 1 r 0.5 ball 1.2: volu
 ### 13.42.5 Tests and red-proof
 
 `blend_profile_third_tests.rs`: `the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke` now runs 12 cases (sharp 0 at five pairs, sharp 1 at three, sharp 2 at four; G0 under 1e-6 x the diagonal, G1, pole under 5e-6, inside the source, under the mitre); `what_the_trim_builder_does_not_take_at_a_sharp_edge_is_refused_by_name` asserts the circular edge builds; `a_creased_trim_star_that_misses_the_blend_ends_is_refused_with_the_measure` uses the edge against the cylinder at r 1 / ball 2 (1.8e-5). Server `nativeBlendProfileThird.test.ts`: the circular edge builds through `fillet_edge` (star of 5, crease 90 degrees, overshoot under the gate, under the mitre by less than 0.25). Red-proof: `kNodes` back to 128 fails `the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke` (a curved-edge case is not built).
+
+## 13.43 As built: the bottom edge of a sub-patch equals its chain; the 3 creased misses of 13.42.3 build (DES-6c, 2026-11-22)
+
+### 13.43.1 The cause
+
+13.42.3 left 3 creased cases refusing with `leave the edges by 3e-6 ... 1.8e-5`. The cause is not the chain, the map or the blend-end curve; it is the bicubic corner term of `Patch::at_cubic`.
+
+Probe (removed): per chain and per attempt, the largest distance between `surface(t, 0)` and `Side::point(t)` over 400 samples (loop gap) and between the neighbours along the spokes. Case: edge against the cylinder sharp, r 1 / ball 2.
+
+1. The spoke gap is 0 everywhere. The loop gap of chains 3 (one piece, one edge) and 4 (three pieces) does NOT fall with the pole count: chain 4 1.8e-5 at 24, 36, 48 and 64 poles, chain 3 4.6e-6 at 14 ... 64 poles (a fit error would fall like h^6). Both are smooth functions of t, peaking at t = 0.333 (chain 4) and t = 0.667 (chain 3). `Side::point(t)` itself is smooth on both (mid-point deviation 2.8e-5 / 9.8e-4 at h = 1e-2, falling like h^2 down to 1e-5): the interpolant is a faithful fit of the WRONG function.
+2. At v = 0 `at_cubic` must reduce to `bottom = Side::point(u)`: `p_u(u, 0) - p_uv(u, 0)` cancels only if the u-tangent in the bicubic corner term (`a.leaving`, `tangent(1)`) is the one the Hermite blend `cross_left(0)` / `cross_right(0)` uses. Those are PROJECTED on the support plane (`project(., n)`), the corner term was not. The difference is the component of the chain tangent along the support normal at the vertex, times the Hermite weight u (1 - u)^2 (peak 4/27 at u = 1/3) for the start vertex and -u^2 (1 - u) (peak at 2/3) for the end vertex: exactly the two peaks measured. The tangent of a blend-end edge leaves its support by the edge tolerance (6.55e-6 on that edge; chain 4's first piece is the same edge), so the offset is of that order: 4.6e-6 (chain 3), 1.8e-5 (chain 4, whose tangent is longer).
+3. The 13.42 probe read the tangent against the normal (1e-7, unit vector) and rejected it; it never compared `surface(u, 0)` with `Side::point(u)`. Not separately measured: the size of the dropped component per vertex; the attribution to the edge tolerance is an inference from the 6.55e-6 tolerance and the matching order of the gap, and the red-proof below (the three cases refuse with the old term and build with the new one) is the evidence.
+
+### 13.43.2 The fix (`cpp/blend_corner_exact.cxx`, `Patch::at_cubic`)
+
+`corner_su` at v = 0 is `project(a.leaving, a.normal_left)` and `project(tangent(1), b.normal_right)`, the vectors `cross_left` and `cross_right` start from (`spoke_normal(., 0)` is exactly `normal_left` / `normal_right`). The bottom edge of every sub-patch is then the chain to the interpolation error. The G2 stars use the same `at_cubic` as their natural patch and take it too. No other change: the gates, the attempts and `kNodes` are as they were.
+
+### 13.43.3 Measured
+
+Cylinder block, sharp edge x 11 radius / ball pairs ((0.3, 1), (0.3, 1.5), (0.5, 1.2), (0.5, 1.5), (0.5, 2), (0.8, 1.5), (0.8, 2), (1, 2), (1, 2.5), (1, 3), (2, 3.5)) = 33 steps: 31 build (13.42: 30 of a smaller grid, 3 refused with the gap). The 3 of 13.42.3 (the straight top edge sharp at r 1 / ball 2.5, the edge against the cylinder at r 0.8 / ball 1.5 and r 1 / ball 2) build (r 1 / ball 2.5 reads 472.94 against the mitre 474.26: the sliver of 13.42.4, so that case is not in the mitre-bounded test). The two that do not, both by name and for other reasons: the circular top edge sharp at r 1 / ball 3 (`stands 0.01549 outside the part, above 0.015`, the overshoot gate of 13.39.6) and the straight top edge sharp at r 2 / ball 3.5 (`the rolling-ball blend of the edges at the corners could not be built`, OCCT). No `leave the edges by` refusal remains in this grid.
+
+### 13.43.4 Tests
+
+`blend_profile_third_tests.rs`: `the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke` gains (2, 0.8, 1.5) and (2, 1, 2) (G0 under 1e-6 x the diagonal, G1, pole, inside the source, under the mitre); the old refusal test `a_creased_trim_star_that_misses_the_blend_ends_is_refused_with_the_measure` is replaced by `a_creased_trim_star_over_the_overshoot_limit_is_refused_with_the_measure` (r 1 / ball 2 against the cylinder now builds; the circular edge at r 1 / ball 3 is refused with the overshoot measure). Red-proof: with the old `corner_su` the three added cases are refused with the gap, 3e-6 to 1.8e-5. The `leave the edges by` message itself stays covered by `blend_corner_tests.rs`.
+
+### 13.43.5 Not done
+
+The test `a_trim_star_that_stands_outside_the_part_is_measured_and_refused_above_the_limit` (end of `blend_profile_third_tests.rs`) has a comment that swallowed its last lines (`// the same gate on the cylinder block ... let (block, vertex, _) ...` on one line): that assertion (cylinder block, sharp 2 at r 0.3 / ball 2 stands 0.015 outside) has never run. Left as found.
