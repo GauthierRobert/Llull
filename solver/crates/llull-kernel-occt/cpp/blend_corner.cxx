@@ -1801,7 +1801,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       std::vector<size_t> order(job.patch_loop.size());
       for (size_t k = 0; k < order.size(); ++k) order[k] = k;
       const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
-      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) != key_of(b) ? key_of(a) < key_of(b) : a < b; });
       for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
     }
     for (size_t k = 0; k < job.patches.size(); ++k) {
@@ -2353,7 +2353,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       std::vector<size_t> order(job.patch_loop.size());
       for (size_t k = 0; k < order.size(); ++k) order[k] = k;
       const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
-      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) != key_of(b) ? key_of(a) < key_of(b) : a < b; });
       for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
     }
     for (size_t k = 0; k < job.patches.size(); ++k) {
@@ -2481,9 +2481,10 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       if (!patch_continuity[c].empty()) log.key("continuity").string(patch_continuity[c]);
       if (patch_continuity[c] == "G2") {
         const corner_exact::SpokeReading &spokes = patch_spokes[c];
-        log.key("spokes").string(spokes.reach > 0 ? "G2-beyond-reach" : "G1").key("spokeJump").number(spokes.jump);
-        if (spokes.reach > 0) log.key("spokeReach").number(spokes.reach).key("spokeRelative").number(spokes.relative).key("spokeVertexRelative").number(spokes.vertex_relative);
+        log.key("spokes").string(spokes.fan ? "G2-fan" : spokes.reach > 0 ? "G2-beyond-reach" : "G1").key("spokeJump").number(spokes.jump);
+        if (spokes.reach > 0 || spokes.fan) log.key("spokeReach").number(spokes.reach).key("spokeRelative").number(spokes.relative).key("spokeVertexRelative").number(spokes.vertex_relative);
         if (!spokes.refused.empty()) log.key("spokeRefused").string(spokes.refused);
+        if (!spokes.fan_refused.empty()) log.key("spokeFanRefused").string(spokes.fan_refused);
       }
       if (!patch_g2[c].empty()) log.key("g2Refused").string(patch_g2[c]);
       log.key("setbacks").begin_array();

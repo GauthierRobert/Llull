@@ -812,7 +812,7 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
   function star(
     curvature: (edge: number, t: number) => [number, number],
     params: Record<string, unknown>,
-    declared?: { reach: number; fromPole?: boolean },
+    declared?: { reach: number; fromPole?: boolean; fan?: boolean },
   ): { findings: Finding[]; contacts: Contact[]; status: string } {
     const name = (rank: number): string =>
       `blend(v:e(${SOURCE}:a|${SOURCE}:b),e(${SOURCE}:a|${SOURCE}:c),e(${SOURCE}:b|${SOURCE}:c))#${rank}`;
@@ -849,7 +849,7 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
         {
           vertex: [0, 0, 0] as [number, number, number],
           continuity: 'G2' as const,
-          spokes: 'G2-beyond-reach' as const,
+          spokes: declared?.fan === true ? ('G2-fan' as const) : ('G2-beyond-reach' as const),
           spokeReach: declared?.reach ?? 0,
           setbacks: [],
         },
@@ -943,6 +943,16 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
     const lost = expect.objectContaining({ severity: 'fail', edge: 1, limit: 0.1, value: expect.any(Number) });
     expect(result.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toEqual([lost, lost]);
     expect(result.status).toBe('fail');
+  });
+
+  it('spokes "G2-fan" declare no tangent-only stretch: a jump next to the vertex is a FAIL BLD_CHECK_SPOKE_G2_LOST', () => {
+    const result = star(
+      declaredJump((t) => t > 0.05 && t < 0.15),
+      { require: 'G2' },
+      { reach: 0, fan: true },
+    );
+    expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST' && found.severity === 'fail')).toBe(true);
+    expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toBe(false);
   });
 
   it('the stretch is counted from the vertex whichever way the seam runs: samples from the pole, a jump at t > 0.8 is inside it', () => {

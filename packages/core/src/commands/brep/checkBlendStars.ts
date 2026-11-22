@@ -38,13 +38,16 @@ export interface CornerInput {
   readonly spokeReach?: number;
 }
 
-/** The spoke stretch every G2 corner star of `recipe` declares (the notes of its blend nodes), or 0 when there is none or one of them has G1 spokes. */
+/** The stretch `spokeReachOf` reports for a solid whose G2 stars all have vertex fans: no tangent-only stretch, yet curvature-continuous spokes (a reach of 0 means G1 seams). */
+const NO_STRETCH = Number.MIN_VALUE;
+
+/** The spoke stretch every G2 corner star of `recipe` declares (the notes of its blend nodes; NO_STRETCH for "G2-fan" spokes, tangent-only nowhere), or 0 when there is none or one of them has G1 spokes. */
 export function spokeReachOf(kernel: GeometryKernel, recipe: ShapeRecipe): number {
   const stars = [...filletNodes(recipe), ...blendNodes(recipe)].flatMap((node) =>
     (kernel.blendReport?.(node)?.notes?.corners ?? []).filter((corner) => corner.continuity === 'G2'),
   );
-  if (stars.length === 0 || !stars.every((corner) => corner.spokes === 'G2-beyond-reach')) return 0;
-  return maxOf(stars.map((corner) => corner.spokeReach ?? 0));
+  if (stars.length === 0 || !stars.every((corner) => corner.spokes === 'G2-beyond-reach' || corner.spokes === 'G2-fan')) return 0;
+  return Math.max(NO_STRETCH, maxOf(stars.map((corner) => corner.spokeReach ?? 0)));
 }
 
 /** Whether the samples of the seam `edge` of a star run from its vertex (the end that touches a contact edge with a blend or flat face) to the pole, else from the pole. */

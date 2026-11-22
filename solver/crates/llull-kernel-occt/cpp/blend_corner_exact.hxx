@@ -23,6 +23,8 @@ struct SpokeReading {
   double relative = 0;         // largest share of the larger of the two curvatures beyond the stretch (the whole spoke when reach is 0)
   double vertex_relative = 0;  // the same within the stretch next to the vertices
   std::string refused;         // G1 spokes of a G2 star: why the G2 spokes were refused (the measure against the gate)
+  bool fan = false;            // the vertex fans of 13.45: the spokes are curvature-continuous all the way to the vertices (reach 0; relative / vertex_relative are read over the fans)
+  std::string fan_refused;     // G2-beyond-reach spokes: why the vertex fans were not built (the measure against their gates)
 };
 
 struct Patches {

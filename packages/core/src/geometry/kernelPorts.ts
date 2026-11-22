@@ -225,8 +225,8 @@ export interface BlendBuildNotes {
     readonly patch?: 'exact' | 'plate';
     /** A star: "G2" when it is curvature-continuous to its blend and flat faces (a curvature profile, 13.36), else "G1". */
     readonly continuity?: 'G1' | 'G2';
-    /** A G2 star: how its sub-patches meet each other along the spokes. "G2-beyond-reach": curvature-continuous beyond the first `spokeReach` of each spoke from its vertex and tangent only within it (13.38); "G1": tangent only. */
-    readonly spokes?: 'G1' | 'G2-beyond-reach';
+    /** A G2 star: how its sub-patches meet each other along the spokes. "G2-beyond-reach": curvature-continuous beyond the first `spokeReach` of each spoke from its vertex and tangent only within it (13.38); "G2-fan": curvature-continuous all the way to the vertices, the corners of the sub-patches at each vertex being small polar fans (13.45; `spokeReach` 0); "G1": tangent only. */
+    readonly spokes?: 'G1' | 'G2-beyond-reach' | 'G2-fan';
     /** A G2 star: the largest jump of the normal curvature across a spoke (1/unit, whole spoke). */
     readonly spokeJump?: number;
     /** A G2 star with G2 spokes: the share of each spoke, from its vertex, over which the curvature correction fades in (the stretch where the seam is still G1). */
@@ -237,6 +237,8 @@ export interface BlendBuildNotes {
     readonly spokeVertexRelative?: number;
     /** G1 spokes of a G2 star: why the G2 spokes were refused (the measure against the gate). */
     readonly spokeRefused?: string;
+    /** "G2-beyond-reach" spokes: why the vertex fans were not built (the measure against their gates). */
+    readonly spokeFanRefused?: string;
     /** Why the G2 star was refused (the G1 star was built instead). */
     readonly g2Refused?: string;
     /** The rolling-ball trim builder: the largest distance a point of the corner star stands outside the source solid, in document units (13.39.3); refused above 1e-3 x the diagonal. */
