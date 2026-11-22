@@ -2261,3 +2261,38 @@ Cylinder block, sharp edge x 11 radius / ball pairs ((0.3, 1), (0.3, 1.5), (0.5,
 ### 13.43.5 Not done
 
 The test `a_trim_star_that_stands_outside_the_part_is_measured_and_refused_above_the_limit` (end of `blend_profile_third_tests.rs`) has a comment that swallowed its last lines (`// the same gate on the cylinder block ... let (block, vertex, _) ...` on one line): that assertion (cylinder block, sharp 2 at r 0.3 / ball 2 stands 0.015 outside) had never run. Restored on its own lines 2026-11-22: it runs and passes (sharp 2 at r 0.3 / ball 2 is still refused with `stands 0.015 … outside the part, above`).
+
+## 13.44 The G2 obstruction at a spoke vertex: derivation and result (DES-6c, 2026-11-22)
+
+Question (the item left in 13.36.6 / 13.38.4): can the spokes of a G2 star be curvature-continuous all the way, and if not, why. Result: **the centre is not the problem and already holds; the stretch next to a LOOP vertex is a real obstruction for any pair of patches that have a 3-jet at the vertex, independent of the degree and of the centre. No code is changed.** The "reach" `spokeReach` 0.2 of 13.38 is measured from the vertex of the loop (where a spoke leaves the support contacts), not from the star's centre.
+
+### 13.44.1 The centre (n patches, one point): satisfied by construction
+
+At the centre `C` the n sub-patches collapse their top edge to the point. Along spoke `k` the second fundamental form at `C` is fixed by the arriving data: `II(s_k, s_k) = n . spoke_k''` and `II(s_k, w) = -n_k' . w`. These agree across all n spokes iff they are the values of ONE quadratic form `II_C` (3 numbers) on the n arrival directions: for n > 3 that is n - 3 equations on the n values `II(s_k, s_k)`, plus one twist equation per wedge, `n_k' . s_(k+1) = n_(k+1)' . s_k`. The code takes `II_C` umbilic with curvature `kappa_c` (`curvature_at_centre`): `n_k' = kappa_c s_k` (`rate_at_centre`, `blend_corner_exact.cxx` line 331) and the normal part of `spoke''` is `-kappa_c |s_k|^2` (line 802). These satisfy every one of those equations identically for any n, odd or even. The shared central point, tangent plane (`centre_normal`) and quadric are the free central data, and they are used. The G2 measure along each spoke is under the gate up to 0.99 of its length (13.38.6); the last 1 % is the collapsed row (`S_u = 0`, the correction is nil at it). No least-squares fit of the central quadric is needed: the boundary curvatures at the star's outer edges do not constrain it (the central data is interior); they enter only at the loop vertices.
+
+### 13.44.2 The loop vertex `V`: the jet compatibility
+
+At `V` the spoke `s` separates sub-patch A (bottom edge `e_A`, support A) from sub-patch B (`e_B`, support B); all four surfaces share the tangent plane at `V`. Write the height of each surface over that plane as a Taylor jet; its cubic part is a symmetric trilinear form `C` on the plane (4 numbers). Requirements:
+
+1. Contact G2 along the whole edge of patch X with its support (all `u`, so also to first order along the edge): `C_X(e_X, ., .) = G_X`, the cubic data of the support along its edge. That is 3 numbers per patch (`eee, eec, ecc` in a basis `(e_X, c_X)`, `c_X` the other direction in the plane); only `C_X(c_X, c_X, c_X) = t_X` is left over.
+2. G2 across the spoke to first order along it: the curvature form and its derivative along `s` agree, `C_A(s, ., .) = C_B(s, ., .)` (3 numbers: `sss` the spoke's third derivative = the bump, `ssw` = the acceleration of the normal field, `sww` = the slope of the curvature across the spoke).
+
+Unknowns: `C_A, C_B` = 8; equations 3 + 3 + 3 = 9. One compatibility condition remains, whatever the surfaces are made of. Expand `s = alpha e_X + beta c_X`: `C_X(s, ., .) = alpha G_X + beta [G_X(c,e) on ee, G_X(c,c) on ec, t_X on cc]`, so `K = C_A(s,.,.) = K_A0 + beta_A t_A eps_A^2 = K_B0 + beta_B t_B eps_B^2`, `eps_X` the covector that is zero on `e_X`. The forms `eps_A^2, eps_B^2` span a plane of the 3-dimensional space of symmetric forms; the functional that vanishes on it is evaluation at `(e_A, e_B)`. The condition is therefore
+
+`C_A(s, e_A, e_B) = C_B(s, e_A, e_B)`, and each side needs only fixed data: expand `e_B` on `(e_A, c_A)` (resp. `e_A` on `(e_B, c_B)`); `t` never enters because `eps_X(e_X) = 0`.
+
+It is a property of the two supports at `V` (their third-order data along their edges and the angle between `e_A` and `e_B`): nothing in the sub-patches is left to move. On the cube corner support A is the flat face (`G_A = 0`, its height over the common plane is 0), so the condition reads `C_B(s, e_A, e_B) = 0` for the blend B, whose curvature leaves zero linearly along its edge, and it fails; this is consistent with the mismatch measured in 13.38.4 (slopes of the curvature across the spoke -0.076 and -0.77 at the vertex). The condition was derived here, not evaluated numerically on the cube.
+
+### 13.44.3 What this proves, and corrects
+
+- Independent of the polynomial degree and of the number of poles: the condition lives in the 3-jet at `V`; patches of any degree that are C3 at `V` have jets, so they all meet it or all miss it. Only the transition (`kSpokeReach`, 13.38.2) decides how far from `V` the seam can be made G2, which is why a shorter reach costs contact accuracy (0.1 refused).
+- 13.38.4 explained it as "any C3 polynomial patch has the same mixed derivative from both sides". That is imprecise: A and B are different patches in different parametrizations and need not share `S_uuv`. The condition above is the geometric statement (the vertex-enclosure compatibility at the loop vertex). It also explains why the tangential twist components tried in 13.38.4 moved the slope by under 1 %: they are reparametrizations and do not change the jet.
+- The two data that remain free per vertex (`bump`, `accel`) are already used for the contact conditions of 13.36.2.3; the stretch is the one leftover equation.
+
+### 13.44.4 The smallest change that would remove it, not built
+
+The jet must stop existing at `V`: near `V` the slope of the curvature along `s` depends on the direction of approach (edge A, edge B, spoke), i.e. a cubic term homogeneous of degree 0 in the direction (Gregory-type blending `(v X + u Y)/(u + v)` of the twists). Options: (a) a rational / Gregory corner: its denominator vanishes at `V`, so it is not a NURBS (all weights positive); `Geom_BSplineSurface` cannot hold it exactly, only a fit with knots refined toward `V`, whose error near `V` is the transition itself (the 0.1 reach already fails the contact gate at 64 poles); (b) a patch with a degenerate corner at `V` (a collapsed edge, as at a sphere pole) can have a direction-dependent geometric jet and is representable as a B-spline with coincident poles, but its construction (reparametrizing both wedges around `V`) is a new builder, not a change to the Hermite-Coons patch. Neither was built: no speculative code, and the gain is a seam that is G2 inside the first fifth of a spoke where the curvature is tiny (worst absolute jump 0.0148 per mm on the cube), while the build gates and `check_blends` (BLD_CHECK_SPOKE_G2 warn within the reach, BLD_CHECK_SPOKE_G2_LOST fail beyond it) stay as they are.
+
+### 13.44.5 Tests
+
+None added: no behaviour changed. `blend_g2corner_tests.rs` and `nativeBlendG2Corners.test.ts` keep pinning `spokes: "G2-beyond-reach"` and the G1 fallback; they were not re-run for this documentation-only change.
