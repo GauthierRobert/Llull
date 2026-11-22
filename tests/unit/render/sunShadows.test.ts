@@ -4,7 +4,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { siteLightOf, sunShadowNote } from '@core/commands/render/siteLight';
 import { prepareRasterScene } from '@core/commands/render/rasterScene';
-import type { RenderLight } from '@core/commands/render/camera';
+import type { Camera, RenderLight } from '@core/commands/render/camera';
 import {
   GROUND_CELLS,
   GROUND_COLOR,
@@ -132,7 +132,7 @@ function levels(faces: Float64Array, owner: number): number[] {
   for (let i = 0; i < faces.length; i += 8) if (faces[i + 6] === owner) found.add(Math.round(faces[i] ?? 0));
   return [...found].sort((a, b) => a - b);
 }
-const camera = { position: [1, 1, 50] as Vec3, target: [1, 1, 0] as Vec3, up: [0, 1, 0] as Vec3 };
+const camera: Camera = { position: [1, 1, 50], target: [1, 1, 0], up: [0, 1, 0] };
 const prepare = (light?: RenderLight, polygons = boxFaces()): ReturnType<typeof prepareRasterScene> =>
   prepareRasterScene(polygons, camera, 8, 100, 100, 3, light);
 
