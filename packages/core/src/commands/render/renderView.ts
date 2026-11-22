@@ -265,7 +265,7 @@ function renderOnce(doc: CadDocument, params: RenderViewParams, ctx: ExecutionCo
   const notes = [
     renderNotes(base, options.cut),
     siteLightOf(unstyled)?.note ?? '',
-    sunShadowNote(options.light, base.polygonCount, options.mode !== 'vector'),
+    sunShadowNote(options.light, base.sunShadows, options.mode !== 'vector'),
   ]
     .filter((n) => n !== '')
     .join(' ');

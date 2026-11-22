@@ -11,6 +11,7 @@ import { makeProjector } from './camera';
 import { MAX_POLYGONS, applyBudget, type EntityPolygons } from './budget';
 import { cutEntityPolygons, unitPlanes } from './clip';
 import { splitForDepth } from './depthSplit';
+import { withSunPlan } from './sunShadows';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import { orderedEntities } from '../entity/entityOps';
 
@@ -105,6 +106,7 @@ export function renderDocument(
   const underlays = drawables.filter((d): d is ImageEntity => d.kind === 'image');
   const rasterSettings = raster ? { radius, ...(options.pixels !== undefined ? { pixels: options.pixels } : {}) } : null;
   const caption = options.caption !== false;
+  const sun = raster ? withSunPlan(options.light, polygons) : { light: options.light, report: undefined };
   const svg = buildSvg(
     polygons,
     underlays,
@@ -117,7 +119,7 @@ export function renderDocument(
     background,
     rasterSettings,
     caption,
-    options.light,
+    sun.light,
   );
   return {
     view,
@@ -133,6 +135,7 @@ export function renderDocument(
     skippedEntityIds: fitted.skippedEntityIds,
     ...(fitted.simplifiedEntityIds.length + fitted.skippedEntityIds.length > 0 ? { polygonTotal: fitted.totalPolygons } : {}),
     cutEntityIds,
+    ...(sun.report === undefined ? {} : { sunShadows: sun.report }),
     svg: perspective
       ? svg
       : appendAnnotationText(svg, doc, drawables, makeProjector(cam, orthoHalf, width, height), worldPerPx, background),
