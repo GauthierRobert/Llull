@@ -89,7 +89,7 @@ export function withBranchShifts<T extends Shiftable>(env: Env, fits: readonly T
  * The run whose axis a branch run derives on: its stored first point moved by `sideways` (the part of the header offset perpendicular to the branch, from
  * `branchStartSetup`). One leg: the whole pipe moves with it (the end must be an open end); more legs: the first leg translates and the corner after it moves
  * with it, which only works when `sideways` runs along the second leg (it then starts that much further along its own axis).
- * @failure the end is connected to a port (it cannot follow), the offset is not along the second leg, or the run carries branches of its own (they sit on the stored axis) -> RTE_BRANCH_ON_FITTING naming the branch run
+ * @failure the end is connected to a port or another run continues from it (it cannot follow), the offset is not along the second leg, or the run carries branches of its own (they sit on the stored axis) -> RTE_BRANCH_ON_FITTING naming the branch run
  */
 export function shiftedBranchRun(env: Env, sideways: Vec3 | undefined): PipeRun | DerivationFailure {
   const run = env.run;
@@ -120,6 +120,15 @@ export function shiftedBranchRun(env: Env, sideways: Vec3 | undefined): PipeRun 
       );
   }
   const moveEnd = next === undefined;
+  const continuation = moveEnd
+    ? Object.values(getPiping(env.doc).runs).find((other) =>
+        [other.start.ref, other.end.ref].some((ref) => ref?.kind === 'runEnd' && ref.runId === run.id && ref.end === 'end'),
+      )
+    : undefined;
+  if (continuation !== undefined)
+    return refuse(
+      `run ${continuation.id} continues from its end, which would move sideways with the shifted axis while the continuation reads the stored end (a silent gap); give the branch a second leg along the offset, or remove the continuation`,
+    );
   return {
     ...run,
     start: { ...run.start, point: add3(run.start.point, sideways) },

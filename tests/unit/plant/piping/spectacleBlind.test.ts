@@ -189,7 +189,9 @@ describe('spectacleBlind inline between two flanges', () => {
     type Pcf = { files: Array<{ content: string; skipped: Array<{ reason: string }> }> };
     const file = data<Pcf>(doc, 'export_pcf', { lineIds: [lineId] }).files[0];
     expect(file?.content).not.toContain('SPECTACLE');
-    expect(file?.skipped.map((entry) => entry.reason).join(' ')).toContain('spectacle blind (closed) has no PCF component');
+    expect(file?.skipped.map((entry) => entry.reason).join(' ')).toContain(
+      'spectacle blind (closed, between flanges) has no PCF component',
+    );
     expect((file?.content ?? '').split('FLANGE\n').length - 1).toBe(2);
     expect((file?.content ?? '').split('GASKET\n').length - 1).toBe(2);
     type Ifc = { ifc: string; piping: { productCount: number } };
@@ -210,11 +212,39 @@ describe('spectacleBlind inline between two flanges', () => {
     expect(guids[1]).toEqual(guids[0]);
   });
 
-  it('is a clash body: a solid box of the larger disc (228.6) and the plate thickness (20) about the pipe axis', () => {
-    const { doc } = withBlind();
-    const body = pipingClashBodies(doc).find((candidate) => candidate.id.includes('/inline-') && candidate.kind === 'solid');
-    expect(body).toBeDefined();
-    expect(JSON.stringify(body?.box)).toContain('114.3');
+  it('is two clash bodies per state: the disc in the line on the axis and the spare one 60 mm (webLength) up, exact boxes', () => {
+    for (const [state, onAxis, spare] of [
+      ['closed', 114.3, 84.15],
+      ['open', 84.15, 114.3],
+    ] as const) {
+      const { doc } = withBlind(state);
+      const solids = pipingClashBodies(doc).filter((candidate) => candidate.id.includes('/inline-') && candidate.kind === 'solid');
+      expect(solids).toHaveLength(2);
+      const [main, other] = solids;
+      expect(main?.box.center).toEqual([2000, expect.closeTo(0, 9), expect.closeTo(0, 9)]);
+      expect(main?.box.half).toEqual([expect.closeTo(onAxis, 9), expect.closeTo(onAxis, 9), expect.closeTo(10, 9)]);
+      expect(other?.box.center).toEqual([2000, expect.closeTo(0, 9), expect.closeTo(60, 9)]);
+      expect(other?.box.half).toEqual([expect.closeTo(spare, 9), expect.closeTo(spare, 9), expect.closeTo(10, 9)]);
+    }
+  });
+
+  it('draws per state which disc is on the axis: closed = solid disc 228.6, open = ring 168.3 with the pipe bore (114.3); the spare is the other, 60 mm up', () => {
+    const radii = (doc: CadDocument, id: string): { outer: number; inner: number; at: readonly number[] } => {
+      const entity = doc.entities[id] as unknown as { profile: Array<[number, number]>; position: number[] };
+      return {
+        outer: Math.max(...entity.profile.map(([r]) => r)),
+        inner: Math.min(...entity.profile.map(([r]) => r)),
+        at: entity.position,
+      };
+    };
+    const closed = withBlind('closed');
+    const plate = Object.keys(closed.doc.entities).find((id) => id.includes('/inline-') && !id.endsWith('/spare')) as string;
+    expect(radii(closed.doc, plate)).toMatchObject({ outer: 114.3, inner: 0 });
+    expect(radii(closed.doc, `${plate}/spare`)).toMatchObject({ outer: 84.15, inner: 57.15 });
+    expect(radii(closed.doc, `${plate}/spare`).at[2]).toBeCloseTo(60, 9);
+    const open = withBlind('open');
+    expect(radii(open.doc, plate)).toMatchObject({ outer: 84.15, inner: 57.15 });
+    expect(radii(open.doc, `${plate}/spare`)).toMatchObject({ outer: 114.3, inner: 0 });
   });
 });
 
@@ -285,5 +315,63 @@ describe('spectacleBlind as a run end closure', () => {
     const raw = JSON.parse(JSON.stringify(closed.plant?.piping)) as { runs: Record<string, { end: Record<string, unknown> }> };
     (raw.runs[runId] as { end: Record<string, unknown> }).end['spectacle'] = 'half';
     expect(pipingErrors(raw)).toEqual([expect.stringContaining('spectacle must be "open" or "closed"')]);
+  });
+});
+
+describe('a spectacle blind closing a run end shows everywhere', () => {
+  const closedEnd = (state: 'open' | 'closed'): { doc: CadDocument; runId: string; lineId: string } => {
+    const base = openRun(spectacleDocument());
+    return { ...base, doc: ok(base.doc, 'set_run_end_cap', { runId: base.runId, end: 'end', closure: 'spectacleBlind', state }).document };
+  };
+
+  it('has display entities, two clash bodies, an IFC product (.OBSTRUCTION.) and a BCF guid; the plate lies between x 4980 and 5000', () => {
+    const { doc, runId } = closedEnd('closed');
+    const ids = Object.keys(doc.entities).filter((id) => id.includes('/inline-'));
+    expect(ids).toHaveLength(2);
+    const plate = doc.entities[ids.find((id) => !id.endsWith('/spare')) as string] as unknown as { position: number[] };
+    expect(plate.position[0]).toBeCloseTo(5000, 9);
+    const solids = pipingClashBodies(doc).filter((candidate) => candidate.id.includes('/inline-') && candidate.kind === 'solid');
+    expect(solids).toHaveLength(2);
+    expect(solids[0]?.box.center[0]).toBeCloseTo(4990, 9);
+    expect(solids[0]?.box.half[0]).toBeCloseTo(114.3, 9);
+    type Ifc = { ifc: string };
+    expect(data<Ifc>(doc, 'export_ifc', {}).ifc.split('.OBSTRUCTION.').length - 1).toBe(1);
+    expect(documentProjection('ifcGuids')?.(doc, ids[0] as string, 'IFC4')).toHaveLength(1);
+    expect(derivedOf(doc, runId).parts.filter((part) => part.typeKey === 'spectacleBlind')).toHaveLength(1);
+  });
+
+  it('is written to the PCF as FLANGE-BLIND when closed (re-imports as a blind-flange closure); open is skipped with a warning naming the BOM / weight gap', () => {
+    const closed = closedEnd('closed');
+    type Pcf = { files: Array<{ content: string; skipped: unknown[]; warnings: Array<{ code: string }> }> };
+    const file = data<Pcf>(closed.doc, 'export_pcf', { lineIds: [closed.lineId] }).files[0];
+    expect(file?.content).toContain('FLANGE-BLIND\n');
+    expect(file?.skipped).toHaveLength(0);
+    const open = closedEnd('open');
+    const skipped = data<Pcf>(open.doc, 'export_pcf', { lineIds: [open.lineId] }).files[0];
+    expect(skipped?.content).not.toContain('FLANGE-BLIND');
+    expect(skipped?.skipped).toHaveLength(1);
+    expect(skipped?.warnings.map((warning) => warning.code)).toContain('ISO_SPECTACLE_NOT_IN_PCF');
+  });
+
+  it('an inline spectacle blind also raises ISO_SPECTACLE_NOT_IN_PCF, and its PCF re-imports as a route refusal (the 20 mm gap between the two gaskets is not a joint the route import knows)', () => {
+    const { doc, lineId } = withBlind();
+    type Pcf = { files: Array<{ content: string; warnings: Array<{ code: string }> }> };
+    const file = data<Pcf>(doc, 'export_pcf', { lineIds: [lineId] }).files[0];
+    expect(file?.warnings.map((warning) => warning.code)).toContain('ISO_SPECTACLE_NOT_IN_PCF');
+    const imported = execute(spectacleDocument(), 'import_pcf', { text: file?.content ?? '', as: 'route', spec: 'CS150' });
+    expect(imported.rejected).toBe(true);
+    expect(imported.document).toEqual(spectacleDocument());
+  });
+});
+
+describe('load validation names the closure', () => {
+  it('a run continuing from a spectacle-blinded end says spectacle-blinded, not capped', () => {
+    const { doc, runId } = openRun(spectacleDocument());
+    const closed = ok(doc, 'set_run_end_cap', { runId, end: 'end', closure: 'spectacleBlind' }).document;
+    const raw = JSON.parse(JSON.stringify(closed.plant?.piping)) as { runs: Record<string, { start: Record<string, unknown> }> };
+    const other = JSON.parse(JSON.stringify(raw.runs[runId]));
+    other.start.ref = { kind: 'runEnd', runId, end: 'end' };
+    raw.runs['run-x'] = { ...other, id: 'run-x' };
+    expect(pipingErrors(raw).join(' ')).toContain('spectacle-blinded');
   });
 });

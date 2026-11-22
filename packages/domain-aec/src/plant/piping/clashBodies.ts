@@ -22,6 +22,7 @@ import { getPiping } from './model';
 import { operatorBodies } from './operator';
 import { supportsByRun } from './runSupports';
 import { deriveRun } from './routeParts';
+import { spectacleLayout } from './spectacleLayout';
 import { attachedRunIds, refRunId } from './runLinks';
 
 /** The box of a straight piece from `a` to `b` with a square section of half side `half`; null for a zero-length piece. */
@@ -59,16 +60,21 @@ function flangePieces(part: RoutedPart): Piece[] {
   ];
 }
 
-/** The plate of a spectacle blind: the larger of its two discs (the ring and the solid disc), `thickness` thick between the two faces; the web and handle are inside that envelope. */
+/** The two discs of a spectacle blind, each `thickness` thick: the one in the line on the pipe axis and the spare one `webLength` toward the up side (`spectacleLayout`). */
 function spectaclePieces(part: RoutedPart): Piece[] {
-  const [first, second] = part.ports;
-  const { discDiameterClosed: closed, discDiameterOpen: open } = part.dims;
-  if (first === undefined || second === undefined || closed === undefined || open === undefined) return [];
-  return [{ from: first.position, to: second.position, half: Math.max(closed, open) / 2, insulated: false }];
+  const layout = spectacleLayout(part);
+  if (layout === null) return [];
+  return [layout.inLine, layout.spare].map((disc) => ({
+    from: disc.centreStart,
+    to: add3(disc.centreStart, scale3(layout.axis, layout.thickness)),
+    half: disc.diameter / 2,
+    insulated: false,
+  }));
 }
 
 /** The straight pieces of a part's solid body (none for parts that are not modelled). */
 function pieces(part: RoutedPart): Piece[] {
+  if (part.typeKey === 'spectacleBlind') return spectaclePieces(part);
   const [first, second, third] = part.ports;
   const od = part.dims['outsideDiameter'];
   if (part.kind === 'cap' || part.typeKey === 'flangeBlind')
@@ -93,7 +99,6 @@ function pieces(part: RoutedPart): Piece[] {
     case 'flange':
       return flangePieces(part);
     case 'inline':
-      if (part.typeKey === 'spectacleBlind') return spectaclePieces(part);
       return od === undefined
         ? []
         : [{ from: first.position, to: second.position, half: Math.max(part.dims['bodyOd'] ?? od, od) / 2, insulated: false }];

@@ -54,10 +54,14 @@ function derivedOnce(doc: CadDocument, run: PipeRun, path: readonly string[]): D
   return derivations.get(doc, run) ?? derivations.set(doc, run, derive(doc, run, path));
 }
 
-/** A branch hangs on its header: when the header does not derive (moved port, missing part) the branch is broken with the header's code. */
+/**
+ * A branch hangs on its header and a continuation on the run it continues from: when that run does not derive (moved port, missing part, a shifted axis the end cannot follow)
+ * the dependent run is broken with the upstream's code.
+ */
 function headerFailure(doc: CadDocument, run: PipeRun, path: readonly string[]): DerivationFailure | undefined {
-  if (run.start.ref?.kind !== 'branch') return undefined;
-  const header = getPiping(doc).runs[run.start.ref.runId];
+  const ref = run.start.ref;
+  if (ref?.kind !== 'branch' && ref?.kind !== 'runEnd') return undefined;
+  const header = getPiping(doc).runs[ref.runId];
   if (header !== undefined && [...path, run.id].includes(header.id))
     return fail(
       'RTE_UNKNOWN_RUN',
@@ -66,7 +70,8 @@ function headerFailure(doc: CadDocument, run: PipeRun, path: readonly string[]):
       ['start'],
     );
   const parent = header === undefined ? null : derivedOnce(doc, header, [...path, run.id]);
-  if (parent !== null && isFailure(parent)) return { ...parent, message: `header ${header?.id}: ${parent.message}` };
+  if (parent !== null && isFailure(parent))
+    return { ...parent, message: `${ref.kind === 'branch' ? 'header' : 'upstream run'} ${header?.id}: ${parent.message}` };
   return undefined;
 }
 

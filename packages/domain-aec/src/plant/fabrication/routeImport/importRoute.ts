@@ -4,6 +4,7 @@
  * from the file's: the difference is measured and reported (`ISO_ROUTE_DIMENSIONS_CHANGED`), never hidden. Pure apart from the nested commands.
  */
 
+import { createSpecLookup, isMiss } from '../../piping/specLookup';
 import { report } from '@core/commands/noop';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
@@ -90,7 +91,12 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
       ['valveTypes'],
     );
   const valveTypes = Object.fromEntries(Object.entries(args.valveTypes).map(([key, type]) => [resolveKey(key)[0] as string, type]));
-  const plan = planRoute(file.components, { eccentricFlat: args.eccentricFlat });
+  const lookup = createSpecLookup(doc, spec.trim());
+  const angleToleranceDeg = isMiss(lookup) ? undefined : lookup.elbowAngles().toleranceDeg;
+  const plan = planRoute(file.components, {
+    eccentricFlat: args.eccentricFlat,
+    ...(angleToleranceDeg === undefined ? {} : { angleToleranceDeg }),
+  });
   if (!plan.ok) return refuseIso(doc, 'import_pcf', plan.code, `as route: ${plan.message}`, plan.ids, ['as']);
   if (args.supports && plan.supports.length > 0 && Object.keys(getBuilding(doc).levels).length === 0)
     return refuseIso(

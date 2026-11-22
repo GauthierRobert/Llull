@@ -84,13 +84,18 @@ export const storedCorner = (centre: Vec3, shift: Vec3, next: Vec3): Vec3 => sub
  * The part of a header `shift` perpendicular to the branch (`outlet` - `centre`, both in file co-ordinates) that the RTE moves the derived branch start by, or
  * undefined when the shift is along the branch or within the default angle tolerance of it (same rule as `piping/branchShift.ts`, which uses the run's own tolerance).
  */
-export function branchSideways(shift: Vec3, centre: Vec3, outlet: Vec3): Vec3 | undefined {
+export function branchSideways(
+  shift: Vec3,
+  centre: Vec3,
+  outlet: Vec3,
+  toleranceDeg: number = DEFAULT_ANGLE_TOLERANCE_DEG,
+): Vec3 | undefined {
   const size = len3(shift);
   const direction = normalize3(sub3(outlet, centre));
   if (!(size > 1e-9) || !(len3(direction) > 0)) return undefined;
   const sideways = sub3(shift, scale3(direction, dot3(shift, direction)));
   const angleDeg = (Math.acos(Math.min(1, Math.abs(dot3(shift, direction)) / size)) * 180) / Math.PI;
-  return len3(sideways) > Math.max(1e-3, 1e-6 * size) && angleDeg > DEFAULT_ANGLE_TOLERANCE_DEG ? sideways : undefined;
+  return len3(sideways) > Math.max(1e-3, 1e-6 * size) && angleDeg > toleranceDeg ? sideways : undefined;
 }
 
 /** The stored points of a branch run read off the file: the derived axis is moved by `sideways`, the start is stored; one leg moves its end, more legs the first corner. */
