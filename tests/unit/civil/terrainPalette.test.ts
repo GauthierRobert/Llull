@@ -6,6 +6,8 @@ import { validateEntityValue } from '@core/commands/persistence/guards';
 import { cptColour, parseCpt, type Cpt } from '@lib/cpt';
 import { DEM2, terrainVertexColours } from '@aec/civil/surface/terrainPalette';
 import { tessellateEntity } from '@core/commands/render/polygons';
+import { civilErrors } from '@aec/civil/validate';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { surveyedDocument } from './fixtures';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 
@@ -68,6 +70,16 @@ describe('parseCpt syntax and refusals', () => {
     expect(result.cpt.foreground).toEqual([4, 5, 6]);
     expect(result.cpt.nan).toEqual([7, 7, 7]);
   });
+  it('chooses gray or r g b by the token count', () => {
+    const gray = parseCpt('0 0 10 255\n');
+    expect(gray.ok && gray.cpt.slices).toEqual([{ z0: 0, rgb0: [0, 0, 0], z1: 10, rgb1: [255, 255, 255] }]);
+    const rgb = parseCpt('0 0 0 0 10 255 255 255\n');
+    expect(rgb.ok && rgb.cpt.slices).toEqual([{ z0: 0, rgb0: [0, 0, 0], z1: 10, rgb1: [255, 255, 255] }]);
+    const mixed = parseCpt('0 5 10 1 2 3\n');
+    expect(mixed.ok && mixed.cpt.slices).toEqual([{ z0: 0, rgb0: [5, 5, 5], z1: 10, rgb1: [1, 2, 3] }]);
+    const annotated = parseCpt('0 0 10 255 L\n');
+    expect(annotated.ok && annotated.cpt.slices[0]?.rgb1).toEqual([255, 255, 255]);
+  });
   it('a normalised table without a RANGE stays normalised; with [R=a/b] in the title it scales', () => {
     const plain = parseCpt('0 0/0/0 1 255/255/255\n');
     expect(plain.ok && plain.cpt.slices[0]?.z1).toBe(1);
@@ -81,7 +93,12 @@ describe('parseCpt syntax and refusals', () => {
   });
   it.each([
     ['HSV', '# COLOR_MODEL = HSV\n0 0/0/0 1 1/1/1\n', 'COLOR_MODEL'],
-    ['hinge', '# HARD_HINGE\n# RANGE = -10/10\n0 0/0/0 1 1/1/1\n', 'hinged'],
+    ['HARD_HINGE', '# HARD_HINGE\n# RANGE = -10/10\n0 0/0/0 1 1/1/1\n', 'HARD_HINGE tables'],
+    ['SOFT_HINGE on a table with real z', '# SOFT_HINGE\n-5 0/0/0 5 1/1/1\n', 'SOFT_HINGE tables'],
+    ['z 1e309', '0 0/0/0 1e309 1/1/1\n', 'z value is not finite'],
+    ['z NaN', 'NaN 0/0/0 1 1/1/1\n', 'line 1'],
+    ['RANGE 1e309', '# RANGE = 0/1e309\n0 0/0/0 1 1/1/1\n', 'not finite'],
+    ['RANGE NaN', '# RANGE = NaN/10\n0 0/0/0 1 1/1/1\n', 'not numeric'],
     ['no slices', '# only a comment\nB black\n', 'no colour slices'],
     ['colour names', '0 red 1 blue\n', 'line 1'],
     ['bad B', 'B nonsense\n0 0/0/0 1 1/1/1\n', 'unreadable B'],
@@ -145,12 +162,20 @@ describe('set_civil_display terrainTint', () => {
     const millimetres = terrainVertexColours([0, 0, 500_000], 'dem2', 0, 0.001);
     expect(millimetres).toEqual([232, 215, 125]);
   });
-  it('a unit change re-derives the tint', () => {
+  it('a unit change re-derives the tint: the vertex at x = 100 m stays the colour of 304.8 m', () => {
     const tinted = execute(terrain(), 'set_civil_display', { terrainTint: 'dem2' }).document;
-    const inches = execute(tinted, 'set_units', { units: 'ft' }).document;
-    const fresh = execute(inches, 'set_civil_display', { terrainTint: 'none' }).document;
+    const feet = execute(tinted, 'set_units', { units: 'ft' }).document;
+    const top = Math.max(...(tin(feet).mesh.positions.filter((_, i) => i % 3 === 0) as number[]));
+    expect(vertexColour(tin(feet), top)).toEqual(Array.from(cptColour(DEM2, 304.8)));
+    expect(vertexColour(tin(feet), top)).not.toEqual(vertexColour(tin(tinted), 100));
+    const fresh = execute(feet, 'set_civil_display', { terrainTint: 'none' }).document;
     expect(tin(fresh).vertexColors).toBeUndefined();
-    expect(tin(inches).vertexColors).toBeDefined();
+  });
+  it('save and load re-derive the same tinted TIN', () => {
+    const tinted = execute(terrain(), 'set_civil_display', { terrainTint: 'dem2' }).document;
+    const loaded = deserializeDocument(serializeDocument(tinted));
+    expect(tin(loaded)).toEqual(tin(tinted));
+    expect(loaded.civil?.terrainTint).toBe('dem2');
   });
   it('is off unless chosen: a document that never opts in, or goes back to none, is bit-identical', () => {
     const plain = terrain();
@@ -169,11 +194,19 @@ describe('set_civil_display terrainTint', () => {
     const tinted = execute(plain, 'set_civil_display', { terrainTint: 'dem2' }).document;
     expectNoOp(execute(tinted, 'set_civil_display', { terrainTint: 'dem2' }), tinted, 'already dem2');
   });
-  it('rejects an unknown palette; a bad saved tint is refused on load', () => {
-    const doc = terrain();
-    expect(execute(doc, 'set_civil_display', { terrainTint: 'etopo1' }).summary).toContain('rejected');
-    const empty = createEmptyDocument();
-    expect(execute(empty, 'set_civil_display', { terrainTint: 'dem2' }).document.civil?.terrainTint).toBe('dem2');
+  it('rejects an unknown palette', () => {
+    expect(execute(terrain(), 'set_civil_display', { terrainTint: 'etopo1' }).summary).toContain('rejected');
+    expect(execute(createEmptyDocument(), 'set_civil_display', { terrainTint: 'dem2' }).document.civil?.terrainTint).toBe('dem2');
+  });
+  it('refuses a bad saved tint on load', () => {
+    const saved = serializeDocument(execute(terrain(), 'set_civil_display', { terrainTint: 'dem2' }).document);
+    expect(civilErrors({ objects: {}, order: [], counters: {}, terrainTint: 'etopo1' })).toEqual([
+      'civil.terrainTint must be "none" or "dem2"',
+    ]);
+    expect(civilErrors({ objects: {}, order: [], counters: {}, terrainTint: 'none' })).toEqual([]);
+    const parsedSave = JSON.parse(saved) as { document: { civil: { terrainTint: string } } };
+    parsedSave.document.civil.terrainTint = 'etopo1';
+    expect(() => deserializeDocument(JSON.stringify(parsedSave))).toThrow(/terrainTint/);
   });
   it('vertexColors validation: 3 bytes per vertex', () => {
     const mesh = tin(execute(terrain(), 'set_civil_display', { terrainTint: 'dem2' }).document);

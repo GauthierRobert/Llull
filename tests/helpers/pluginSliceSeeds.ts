@@ -259,6 +259,19 @@ function pipingSeedDocument(): CadDocument {
   return next.document;
 }
 
+/** The civil golden plan, then the terrain tint and a site ground elevation (the civil document extension's reconcile re-derives the tint). */
+function civilTintedDocument(): CadDocument {
+  const steps: GoldenAction[] = [
+    ...(plans['civil_site_terrain_road_drainage'] ?? []),
+    { command: 'set_civil_display', params: { terrainTint: 'dem2' } },
+    {
+      command: 'set_site_context',
+      params: { latitudeDeg: 48, longitudeDeg: 2, dateTime: '2026-06-21T12:00:00+02:00', groundElevation: 101 },
+    },
+  ];
+  return planDocument(steps, 'civil_site_terrain_road_drainage_tinted');
+}
+
 const planOf = (table: Record<string, GoldenAction[]>, name: string) => (): CadDocument => planDocument(table[name], name);
 
 /** The golden PLM plan needs a signature port that accepts a confirmation naming its signer (as tests/golden/golden.test.ts does). */
@@ -477,7 +490,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   civil: {
     roots: ['civil'],
-    build: planOf(plans, 'civil_site_terrain_road_drainage'),
+    build: civilTintedDocument,
     query: { name: 'describe_civil', params: constant({}) },
     mutate: { name: 'set_coordinate_system', params: constant({ name: 'Fuzz CRS' }) },
   },

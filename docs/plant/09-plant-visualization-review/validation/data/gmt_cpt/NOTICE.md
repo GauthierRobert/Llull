@@ -15,4 +15,9 @@ Source: https://raw.githubusercontent.com/GenericMappingTools/gmt/master/share/c
 and https://raw.githubusercontent.com/GenericMappingTools/gmt/master/LICENSE.TXT, downloaded 2026-11-22.
 sha256 of every file: `../../sources.md`.
 
-Not used: `etopo1.cpt` (same directory). Its header credits third parties (Lester M. Anderson, CASP; NOAA/NGDC) and states no licence.
+Why dem2 and not `etopo1.cpt` (same directory): dem2 is accepted on GMT's own redistribution (a GMT author wrote or modified it, and it ships in GMT
+under the licence above). Its upstream, the DEM_poster table by Dewez at cpt-city, is named in the header only; its own terms are NOT verified
+(cpt-city was not reachable from the build host, and the GMT repository carries no licence text for the colour tables). `etopo1.cpt` credits third parties
+(Lester M. Anderson, CASP; NOAA/NGDC) and states no terms, so it was not vendored.
+
+The installer ships the notice and the licence text in `resources/third-party-data/` (`THIRD_PARTY_DATA/` at the repository root).
