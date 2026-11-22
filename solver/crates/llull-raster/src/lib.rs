@@ -14,6 +14,7 @@ pub mod scene;
 pub mod scene_cpu;
 #[cfg(feature = "gpu")]
 pub mod scene_gpu;
+pub mod scene_hiz;
 pub mod serve;
 
 use llull_protocol::{sha256_hex, Output};
