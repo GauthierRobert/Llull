@@ -225,7 +225,7 @@ export interface BlendBuildNotes {
     readonly patch?: 'exact' | 'plate';
     /** A star: "G2" when it is curvature-continuous to its blend and flat faces (a curvature profile, 13.36), else "G1". */
     readonly continuity?: 'G1' | 'G2';
-    /** A G2 star: how its sub-patches meet each other along the spokes. "G2-beyond-reach": curvature-continuous beyond the first `spokeReach` of each spoke from its vertex and tangent only within it (13.38); "G2-fan": curvature-continuous all the way to the vertices, the corners of the sub-patches at each vertex being small polar fans (13.45; `spokeReach` 0); "G1": tangent only. */
+    /** A G2 star: how its sub-patches meet each other along the spokes. "G2-beyond-reach": curvature-continuous beyond the first `spokeReach` of each spoke from its vertex and tangent only within it (13.38); "G2-fan" (the default, 13.46): curvature-continuous all the way to the vertices, the corners of the sub-patches at each vertex being small polar fans (13.45; `spokeReach` 0); "G1": tangent only. */
     readonly spokes?: 'G1' | 'G2-beyond-reach' | 'G2-fan';
     /** A G2 star: the largest jump of the normal curvature across a spoke (1/unit, whole spoke). */
     readonly spokeJump?: number;

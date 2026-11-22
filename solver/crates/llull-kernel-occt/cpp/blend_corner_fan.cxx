@@ -19,6 +19,7 @@
 #include <BRepLib.hxx>
 #include <BRep_Builder.hxx>
 #include <Geom2d_Line.hxx>
+#include <Standard_Failure.hxx>
 #include <TColStd_Array1OfInteger.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TColgp_Array2OfPnt.hxx>
@@ -210,7 +211,7 @@ Handle(Geom_BSplineSurface) interpolate(const std::vector<std::vector<gp_XYZ>> &
   return new Geom_BSplineSurface(grid, along_r.first, along_s.first, along_r.second, along_s.second, kDegree, kDegree);
 }
 
-// The sub-patch less its two corner triangles, a face of the same surface bounded by pcurves in (u, v).
+// The sub-patch less its two corner triangles, a face of the same surface bounded by pcurves in (u, v); a null face when OCCT could not make it.
 TopoDS_Face trimmed_face(const Handle(Geom_BSplineSurface) &surface, double a_left, double a_right, double b) {
   const gp_Pnt2d corners[6] = {gp_Pnt2d(a_left, 0), gp_Pnt2d(1 - a_right, 0), gp_Pnt2d(1, b), gp_Pnt2d(1, 1), gp_Pnt2d(0, 1), gp_Pnt2d(0, b)};
   const double tolerance = 1e-7;
@@ -234,17 +235,19 @@ TopoDS_Face trimmed_face(const Handle(Geom_BSplineSurface) &surface, double a_le
     }
     const gp_Dir2d direction(to.X() - from.X(), to.Y() - from.Y());
     BRepBuilderAPI_MakeEdge maker(new Geom2d_Line(from, direction), surface, vertices[k], vertices[(k + 1) % 6], 0.0, from.Distance(to));
+    if (!maker.IsDone()) return TopoDS_Face();
     wire.Add(maker.Edge());
   }
+  if (!wire.IsDone()) return TopoDS_Face();
   BRepBuilderAPI_MakeFace maker(surface, wire.Wire(), true);
+  if (!maker.IsDone()) return TopoDS_Face();
   TopoDS_Face face = maker.Face();
   BRepLib::BuildCurves3d(face, 1e-9);
   return face;
 }
 
-}  // namespace
-
-bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, Fans &out, std::string &why) {
+bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, bool inject_fault, Fans &out, std::string &why) {
+  if (inject_fault) throw Standard_Failure("fault injected by the test hook");
   const size_t m = surfaces.size();
   std::vector<double> a_left(m), a_right(m);
   // the extent along the bottom edge: the corner triangle has about the same size along both its legs
@@ -268,10 +271,18 @@ bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double 
     }
   }
   out = Fans();
-  for (size_t k = 0; k < m; ++k) out.trimmed.push_back(trimmed_face(surfaces[k], a_left[k], a_right[k], kSpan));
+  for (size_t k = 0; k < m; ++k) {
+    out.trimmed.push_back(trimmed_face(surfaces[k], a_left[k], a_right[k], kSpan));
+    if (out.trimmed.back().IsNull()) {
+      why = "a trimmed sub-patch could not be made into a face";
+      return false;
+    }
+  }
   out.marks.assign(std::size(kMarks), 0.0);
-  std::array<double, 4> worst{0, 0, 0, 0};
-  int pole_counts[][2] = {{24, 20}, {24, 24}, {24, 28}, {30, 32}, {36, 40}};
+  std::array<double, 6> worst{0, 0, 0, 0, 0, 0};
+  // cheapest first (each face costs an integral in every analysis of the shell, 13.46): the cube passes at 22 x 26, the box and the other bodies climb the ladder; 20 x 26 meets the gates too but
+  // reads 0.10 relative at the 0.25 % mark of the spoke (0.076 at 22 x 26, 0.056 at 24 x 28), which is why the ladder starts at 22
+  int pole_counts[][2] = {{22, 26}, {24, 26}, {22, 28}, {24, 28}, {30, 32}, {36, 40}};
   for (const auto &counts : pole_counts) {
     // a knot of multiplicity 4 where the correction of 13.38 has finished fading in (its weight is C3 there)
     const Basis basis_r(counts[0], {0.2 / kSpan}, 4), basis_s(counts[1]);
@@ -283,7 +294,7 @@ bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double 
     out.fans.clear();
     out.seam_relative = out.seam_jump = out.arc_gap = out.arc_angle = out.arc_g2 = 0;
     out.marks.assign(std::size(kMarks), 0.0);
-    double seam_excess = 0, arc_excess = 0;
+    double seam_excess = 0, arc_excess = 0, tau_gap = 0, tau_angle = 0;
     for (size_t k = 0; k < m; ++k) {
       const size_t previous = (k + m - 1) % m;
       Corner corners[2];
@@ -341,14 +352,20 @@ bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double 
       };
       for (int s = 1; s <= kSamples; ++s) {
         double jump = 0, scale = 0;
-        if (!seam(static_cast<double>(s) / kSamples, jump, scale)) continue;
+        if (!seam(static_cast<double>(s) / kSamples, jump, scale)) {
+          seam_excess = 1e300;  // a sample that cannot be evaluated refuses
+          continue;
+        }
         out.seam_jump = std::max(out.seam_jump, jump);
         seam_excess = std::max(seam_excess, jump - (kG2Relative * scale + kG2Floor / mean_length));
         if (scale > kG2Floor / mean_length) out.seam_relative = std::max(out.seam_relative, jump / scale);
       }
       for (size_t q = 0; q < std::size(kMarks); ++q) {
         double jump = 0, scale = 0;
-        if (!seam(kMarks[q] / kSpan, jump, scale)) continue;
+        if (!seam(kMarks[q] / kSpan, jump, scale)) {
+          seam_excess = 1e300;
+          continue;
+        }
         seam_excess = std::max(seam_excess, jump - (kG2Relative * scale + kG2Floor / mean_length));
         if (scale > 1e-300) out.marks[q] = std::max(out.marks[q], jump / scale);
       }
@@ -362,29 +379,73 @@ bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double 
             Vec su, sv, suu, svv, suv, pu, pv, puu, pvv, puv;
             fan[side]->D2(r, param_s, p, su, sv, suu, svv, suv);
             Vec n = su ^ sv, tangent = pass == 0 ? sv : su;
-            if (!unit(n) || !unit(tangent)) continue;
+            if (!unit(n) || !unit(tangent)) {
+              arc_excess = 1e300;
+              continue;
+            }
             const gp_Pnt2d at = corners[side].uv(r, corners[side].tau_of(param_s));
             corners[side].surface->D2(at.X(), at.Y(), q, pu, pv, puu, pvv, puv);
             Vec nq = pu ^ pv;
-            if (!unit(nq)) continue;
+            if (!unit(nq)) {
+              arc_excess = 1e300;
+              continue;
+            }
             if (nq * n < 0) nq.Reverse();
             Vec w = n ^ tangent;
             double kappa_fan = 0, kappa_patch = 0;
-            if (!unit(w) || !second_form(su, sv, suu, svv, suv, w, n, kappa_fan) || !second_form(pu, pv, puu, pvv, puv, w, nq, kappa_patch)) continue;
+            if (!unit(w) || !second_form(su, sv, suu, svv, suv, w, n, kappa_fan) || !second_form(pu, pv, puu, pvv, puv, w, nq, kappa_patch)) {
+              arc_excess = 1e300;
+              continue;
+            }
             out.arc_gap = std::max(out.arc_gap, p.Distance(q));
             out.arc_angle = std::max(out.arc_angle, std::acos(std::min(1.0, n * nq)));
             out.arc_g2 = std::max(out.arc_g2, std::fabs(kappa_fan - kappa_patch));
             arc_excess = std::max(arc_excess, std::fabs(kappa_fan - kappa_patch) - (kG2Relative * std::max(std::fabs(kappa_fan), std::fabs(kappa_patch)) + kG2Floor / mean_length));
           }
       }
-      out.fans.push_back(BRepBuilderAPI_MakeFace(fan[0], 0.0, 1.0, 0.0, 1.0, 1e-7).Face());
-      out.fans.push_back(BRepBuilderAPI_MakeFace(fan[1], 0.0, 1.0, 0.0, 1.0, 1e-7).Face());
+      // the seam of the two fans at a vertex (tau = 1): position and normal
+      for (int s = 1; s <= kSamples; ++s) {
+        const double r = static_cast<double>(s) / kSamples;
+        gp_Pnt p0, p1;
+        Vec su, sv, suu, svv, suv;
+        fan[0]->D1(r, 1.0, p0, su, sv);
+        Vec n0 = su ^ sv;
+        fan[1]->D1(r, 0.0, p1, su, sv);
+        Vec n1 = su ^ sv;
+        if (!unit(n0) || !unit(n1)) {
+          tau_gap = 1e300;
+          continue;
+        }
+        if (n1 * n0 < 0) n1.Reverse();
+        tau_gap = std::max(tau_gap, p0.Distance(p1));
+        tau_angle = std::max(tau_angle, std::acos(std::min(1.0, n0 * n1)));
+      }
+      for (int side = 0; side < 2; ++side) {
+        const BRepBuilderAPI_MakeFace maker(fan[side], 0.0, 1.0, 0.0, 1.0, 1e-7);
+        if (!maker.IsDone()) {
+          why = "a vertex fan could not be made into a face";
+          return false;
+        }
+        out.fans.push_back(maker.Face());
+      }
     }
-    if (out.arc_gap <= 0.5 * max_gap && out.arc_angle <= kAngle && arc_excess <= 0 && seam_excess <= 0) return true;
-    worst = {out.arc_gap, out.arc_angle, arc_excess, seam_excess};
+    if (out.arc_gap <= 0.5 * max_gap && out.arc_angle <= kAngle && arc_excess <= 0 && seam_excess <= 0 && tau_gap <= 0.5 * max_gap && tau_angle <= kAngle) return true;
+    worst = {out.arc_gap, out.arc_angle, arc_excess, seam_excess, tau_gap, tau_angle};
   }
-  why = "the vertex fans leave the sub-patches by " + std::to_string(worst[0]) + " (" + std::to_string(worst[1]) + " rad, curvature over the gate by " + std::to_string(worst[2]) + ") and their seams are over the gate by " + std::to_string(worst[3]);
+  why = "the vertex fans leave the sub-patches by " + std::to_string(worst[0]) + " (" + std::to_string(worst[1]) + " rad, curvature over the gate by " + std::to_string(worst[2]) + "), their seams are over the curvature gate by " + std::to_string(worst[3]) + " and the two fans at a vertex meet with a gap of " + std::to_string(worst[4]) + " and an angle of " + std::to_string(worst[5]) + " rad (gates: curvature, G0, G1)";
   return false;
+}
+
+}  // namespace
+
+bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, bool inject_fault, Fans &out, std::string &why) {
+  try {
+    return build_fans(surfaces, max_gap, mean_length, inject_fault, out, why);
+  } catch (const Standard_Failure &failure) {
+    why = std::string("an OCCT exception inside the vertex fans: ") + failure.DynamicType()->Name() + " " + (failure.GetMessageString() ? failure.GetMessageString() : "");
+    out = Fans();
+    return false;
+  }
 }
 
 }  // namespace llull::corner_exact

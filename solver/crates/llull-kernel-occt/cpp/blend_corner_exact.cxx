@@ -11,7 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
+
 #include <array>
 #include <cassert>
 #include <thread>
@@ -37,8 +37,8 @@ namespace llull {
 namespace {
 // Test hook (set_corner_spoke_gate): the share of the contact gate the curvature jump across a spoke may use (1: as the contacts; 0: none, so the G2 spokes are always refused).
 std::atomic<double> g_spoke_gate{1.0};
-// Hook (set_corner_fan): 1: a G2 star gets the vertex fans of 13.45 when they meet their gates; 0 (default: the sewn solid is 20x slower to analyse, 13.45.3): never; 2: always refused (the fallback to the G2-beyond-reach spokes).
-std::atomic<int> g_fan_mode{0};
+// Hook (set_corner_fan): 1 (default): a G2 star gets the vertex fans of 13.45 when they meet their gates; 0: never (the 13.38 spokes); 2: always refused (the fallback to the G2-beyond-reach spokes); 3: an OCCT exception thrown inside make_fans (the same fallback).
+std::atomic<int> g_fan_mode{1};
 }  // namespace
 
 void set_corner_spoke_gate(double scale) { g_spoke_gate.store(scale); }
@@ -1308,12 +1308,13 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     if (others_met && spoke_excess <= 0) {
       out.g2_built = g2;
       if (attempt.reach == 0.0) out.spokes.refused = spokes_refused;
-      if (g2 && attempt.reach > 0 && g_fan_mode.load() != 0) {
+      const int fan_mode = g_fan_mode.load();
+      if (g2 && attempt.reach > 0 && fan_mode != 0) {
         Fans fans;
         double fan_length = 0;
         for (const Side &side : star.sides) fan_length += side.length / static_cast<double>(m);
-        if (g_fan_mode.load() == 2) why = "refused by the test hook";
-        if (g_fan_mode.load() != 2 && make_fans(surfaces, max_gap, fan_length, fans, why)) {
+        if (fan_mode == 2) why = "refused by the test hook";
+        if (fan_mode != 2 && make_fans(surfaces, max_gap, fan_length, fan_mode == 3, fans, why)) {
           double unused = 0;
           const SpokeReading beyond = read_spokes(star, surfaces, attempt.reach, fan_length, unused, kFanSpan);
           out.spokes.fan = true;
@@ -1328,8 +1329,9 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
           }
           for (size_t k = 0; k < fans.fans.size(); ++k) {
             out.faces.push_back(fans.fans[k]);
-            out.loop_index.push_back(star.sides[k / 2].source);
-            out.part.push_back(star.sides[k / 2].part);
+            const size_t owner = (k / 2 + (k % 2 == 1 ? fans.trimmed.size() - 1 : 0)) % fans.trimmed.size();  // the second fan of vertex k lies on sub-patch k - 1
+            out.loop_index.push_back(star.sides[owner].source);
+            out.part.push_back(star.sides[owner].part);
           }
           return true;
         }

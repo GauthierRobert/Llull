@@ -101,6 +101,8 @@ fn patch_degrees(shape: &Shape) -> Vec<(u64, u64)> {
 fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
+    // pins the 13.38 spokes: the vertex fans (the default since 13.46) are off here
+    crate::test_bridge::set_corner_fan(0);
     let shape = profile_cube(1.0, 1.0, 0.5);
     assert!(analyze(&shape).unwrap().valid);
     assert_eq!(corners_of(&shape), all("G2"));
@@ -142,6 +144,9 @@ fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes(
 #[test]
 fn unequal_sizes_other_shape_factors_and_a_larger_blend_stay_g2() {
     let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    // pins the 13.38 spokes: the vertex fans (the default since 13.46) are off here
+    crate::test_bridge::set_corner_fan(0);
     let uneven = make_box([0.0; 3], [10.0, 7.0, 5.0]).unwrap().unwrap();
     let count = topology(&uneven).unwrap()["edges"].as_array().unwrap().len();
     let specs: Vec<f64> = (0..count).flat_map(|edge| [edge as f64, 1.0, 0.5, 0.8 + 0.1 * (edge % 4) as f64, NAN, -1.0, 0.0]).collect();

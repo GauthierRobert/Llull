@@ -34,20 +34,24 @@ export interface CornerInput {
   readonly tolerances: Tolerances;
   readonly plateTolerances: Tolerances;
   readonly requireG2: boolean;
-  /** The stretch of each spoke, from its vertex, that the corner stars of this solid declare tangent-only (data.profile.corners[].spokeReach); 0: unknown, or some star has G1 spokes. */
-  readonly spokeReach?: number;
+  /** The stretch of each spoke, from its vertex, that the corner stars of this solid declare tangent-only (data.profile.corners[].spokeReach); `reach` 0 and no fans: unknown, or some star has G1 spokes. */
+  readonly spokeReach?: SpokeReach;
 }
 
-/** The stretch `spokeReachOf` reports for a solid whose G2 stars all have vertex fans: no tangent-only stretch, yet curvature-continuous spokes (a reach of 0 means G1 seams). */
-const NO_STRETCH = Number.MIN_VALUE;
+/** What the corner stars of a solid declare about their spokes: the tangent-only stretch (`reach`, 0 = none) and whether every G2 star has vertex fans (`fans`: curvature-continuous all along the spoke). */
+export interface SpokeReach {
+  readonly reach: number;
+  readonly fans: boolean;
+}
 
-/** The spoke stretch every G2 corner star of `recipe` declares (the notes of its blend nodes; NO_STRETCH for "G2-fan" spokes, tangent-only nowhere), or 0 when there is none or one of them has G1 spokes. */
-export function spokeReachOf(kernel: GeometryKernel, recipe: ShapeRecipe): number {
+/** The spoke stretch every G2 corner star of `recipe` declares (the notes of its blend nodes; `fans` when all of them are "G2-fan"), or `{ reach: 0, fans: false }` when there is none, one has G1 or unknown spokes. */
+export function spokeReachOf(kernel: GeometryKernel, recipe: ShapeRecipe): SpokeReach {
   const stars = [...filletNodes(recipe), ...blendNodes(recipe)].flatMap((node) =>
     (kernel.blendReport?.(node)?.notes?.corners ?? []).filter((corner) => corner.continuity === 'G2'),
   );
-  if (stars.length === 0 || !stars.every((corner) => corner.spokes === 'G2-beyond-reach' || corner.spokes === 'G2-fan')) return 0;
-  return Math.max(NO_STRETCH, maxOf(stars.map((corner) => corner.spokeReach ?? 0)));
+  if (stars.length === 0 || !stars.every((corner) => corner.spokes === 'G2-beyond-reach' || corner.spokes === 'G2-fan'))
+    return { reach: 0, fans: false };
+  return { reach: maxOf(stars.map((corner) => corner.spokeReach ?? 0)), fans: stars.every((corner) => corner.spokes === 'G2-fan') };
 }
 
 /** Whether the samples of the seam `edge` of a star run from its vertex (the end that touches a contact edge with a blend or flat face) to the pole, else from the pole. */
@@ -131,7 +135,7 @@ export function overshootFindings(
 /** Appends the corner rows and findings of one solid; returns how many contacts the kernel could not measure. */
 export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findings: Finding[]): number {
   const { world, samples, tolerances, plateTolerances, requireG2 } = input;
-  const spokeReach = input.spokeReach ?? 0;
+  const { reach: spokeReach, fans: spokeFans } = input.spokeReach ?? { reach: 0, fans: false };
   const { kernel, shape, topology, graph, entityId, unit } = world;
   let unverified = 0;
   const longestEdgeOf = (face: number): number =>
@@ -204,7 +208,10 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
       for (const seam of seams) {
         const contactEdges = outer.map((contact) => contact.edge);
         const fromVertex = runsFromVertex(topology, seam.edge, contactEdges);
-        appendAll(findings, spokeFinding(entityId, face.index, seam.edge, seam.samples, spokeReach, fromVertex, cornerTolerances, unit));
+        appendAll(
+          findings,
+          spokeFinding(entityId, face.index, seam.edge, seam.samples, spokeReach, spokeFans, fromVertex, cornerTolerances, unit),
+        );
       }
     else if (requireG2)
       for (const seam of seams)

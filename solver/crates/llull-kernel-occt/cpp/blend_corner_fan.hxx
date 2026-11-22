@@ -21,7 +21,7 @@ struct Fans {
   std::vector<double> marks;         // the relative jump at 0.25, 0.5, 1, 2, 4, 8, 16, 24 % of the spoke
 };
 
-// `surfaces[k]` are the sub-patches of the ring (the spoke between k - 1 and k is u = 0 of k and u = 1 of k - 1). False with `why` when a fan cannot be built within the gates.
-bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, Fans &out, std::string &why);
+// `surfaces[k]` are the sub-patches of the ring (the spoke between k - 1 and k is u = 0 of k and u = 1 of k - 1). False with `why` when a fan cannot be built within the gates or OCCT throws (`inject_fault`: the test hook throws inside).
+bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, bool inject_fault, Fans &out, std::string &why);
 
 }  // namespace llull::corner_exact

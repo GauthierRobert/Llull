@@ -812,7 +812,7 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
   function star(
     curvature: (edge: number, t: number) => [number, number],
     params: Record<string, unknown>,
-    declared?: { reach: number; fromPole?: boolean; fan?: boolean },
+    declared?: { reach: number; fromPole?: boolean; fan?: boolean; spokes?: string },
   ): { findings: Finding[]; contacts: Contact[]; status: string } {
     const name = (rank: number): string =>
       `blend(v:e(${SOURCE}:a|${SOURCE}:b),e(${SOURCE}:a|${SOURCE}:c),e(${SOURCE}:b|${SOURCE}:c))#${rank}`;
@@ -849,7 +849,7 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
         {
           vertex: [0, 0, 0] as [number, number, number],
           continuity: 'G2' as const,
-          spokes: declared?.fan === true ? ('G2-fan' as const) : ('G2-beyond-reach' as const),
+          spokes: declared?.spokes ?? (declared?.fan === true ? ('G2-fan' as const) : ('G2-beyond-reach' as const)),
           spokeReach: declared?.reach ?? 0,
           setbacks: [],
         },
@@ -956,6 +956,16 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
       'all along the seam, where the vertex fans',
     );
     expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toBe(false);
+  });
+
+  it('a G2 star whose spokes are unknown or absent is read as G1 seams: one warn on the whole seam, never the fan FAIL', () => {
+    for (const spokes of ['', 'G3-magic']) {
+      const result = star(g2Star, { require: 'G2' }, { reach: 0, spokes });
+      expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toBe(false);
+      expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2' && found.message.includes('all along the seam'))).toBe(
+        true,
+      );
+    }
   });
 
   it('the stretch is counted from the vertex whichever way the seam runs: samples from the pole, a jump at t > 0.8 is inside it', () => {

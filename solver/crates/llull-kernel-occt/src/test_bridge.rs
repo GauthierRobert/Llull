@@ -44,7 +44,7 @@ mod ffi {
         fn set_corner_g2_star(on: bool);
         /// The share of the contact gate the curvature jump across a spoke of a G2 star may use (1: default; 0: never met, so the spokes stay G1).
         fn set_corner_spoke_gate(scale: f64);
-        /// The vertex fans of a G2 star (BLD 13.45): 1 built when they meet their gates, 0 (default) never, 2 always refused (the G2-beyond-reach spokes).
+        /// The vertex fans of a G2 star (BLD 13.45): 1 (default) built when they meet their gates, 0 never, 2 always refused (the G2-beyond-reach spokes).
         fn set_corner_fan(mode: i32);
         /// Every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
         fn set_law_inversion_fault(after: i32);
@@ -127,7 +127,7 @@ pub fn set_corner_spoke_gate(scale: f64) {
     ffi::set_corner_spoke_gate(scale);
 }
 
-/// Test hook: the vertex fans of a G2 star (BLD 13.45): 1 built when they meet their gates, 0 (default) never, 2 always refused with a named reason.
+/// Test hook: the vertex fans of a G2 star (BLD 13.45): 1 (default) built when they meet their gates, 0 never, 2 always refused with a named reason, 3 an OCCT exception thrown inside the construction.
 pub fn set_corner_fan(mode: i32) {
     ffi::set_corner_fan(mode);
 }

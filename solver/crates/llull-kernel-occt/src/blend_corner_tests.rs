@@ -830,7 +830,7 @@ impl Drop for CornerHooks {
         crate::test_bridge::set_corner_fault(-1);
         crate::test_bridge::set_corner_spawn_limit(-1);
         crate::test_bridge::set_corner_exact_patch(1);
-        crate::test_bridge::set_corner_fan(0);
+        crate::test_bridge::set_corner_fan(1);
         crate::test_bridge::set_corner_trim(false);
         crate::test_bridge::set_corner_crease_gate(true);
         crate::test_bridge::set_corner_c0_knots(false);

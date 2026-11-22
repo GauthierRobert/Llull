@@ -3,7 +3,7 @@
 // the surface lies in the convex hull of the poles of each Bezier patch (weights are positive), so a patch whose pole box is inside the box of the points found so far (within the tolerance) cannot
 // widen it, and only the patches that can are split (de Casteljau, by `Segment`) and their new corner points added. The found box may fall short of the exact extreme by at most the tolerance
 // `kBoundsRelativeTolerance` x the diagonal of the face's box (a patch is skipped when its pole box leaves the found box by no more), so the returned box is padded by that tolerance on every side and
-// ENCLOSES the exact one; it overshoots it by at most twice the tolerance. The guarantee is relative (1e-9 of the diagonal), outward. `false` when the face is not a plain full-patch B-spline, the search does
+// ENCLOSES the exact one; it overshoots it by at most twice the tolerance. The guarantee is relative (1e-9 of the diagonal), outward. `false` when the face is not a B-spline that fills its rectangle (a full patch, or one with a share of at least kMinFill: 13.46), the search does
 // not finish, or a patch reaches kBoundsMaxDepth without being inside the found box (the caller uses AddOptimal).
 #pragma once
 
@@ -38,6 +38,31 @@ inline void add_samples(Bnd_Box &box, const Handle(Geom_BezierSurface) &patch) {
     for (int j = 0; j <= kGrid; ++j) box.Add(patch->Value(static_cast<double>(i) / kGrid, static_cast<double>(j) / kGrid));
 }
 
+// A face with one wire that fills at least this share of the rectangle [u0, u1] x [v0, v1] of its surface (a sewn sub-patch, or one with its corners cut off by a straight line): its box is bounded by that of
+// the whole rectangle, which overshoots the face's own only by the cut-off corners (BLD 13.46: the vertex fans cover them with the same geometry to within their displacement).
+constexpr double kMinFill = 0.85;
+
+inline bool fills_rectangle(const TopoDS_Face &face, double u0, double u1, double v0, double v1) {
+  int wires = 0;
+  for (TopoDS_Iterator it(face); it.More(); it.Next())
+    if (it.Value().ShapeType() == TopAbs_WIRE) ++wires;
+  if (wires != 1 || !(u1 > u0) || !(v1 > v0)) return false;
+  constexpr int kSegments = 16;
+  double twice_area = 0;
+  for (TopExp_Explorer edges(face, TopAbs_EDGE); edges.More(); edges.Next()) {
+    const TopoDS_Edge edge = TopoDS::Edge(edges.Current());
+    const BRepAdaptor_Curve2d curve(edge, face);
+    const double sign = edge.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0;
+    gp_Pnt2d previous = curve.Value(curve.FirstParameter());
+    for (int k = 1; k <= kSegments; ++k) {
+      const gp_Pnt2d next = curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * k / kSegments);
+      twice_area += sign * (previous.X() * next.Y() - next.X() * previous.Y());
+      previous = next;
+    }
+  }
+  return std::fabs(twice_area) >= 2 * kMinFill * (u1 - u0) * (v1 - v0);
+}
+
 // Adds the box of `face` (a plain full-patch B-spline face with many patches) to `box`; false (box untouched) when the face does not qualify or the search is too long.
 inline bool add_spline_bounds(const TopoDS_Face &face, Bnd_Box &box, int max_depth = kBoundsMaxDepth) {
   const Handle(Geom_Surface) surface = BRep_Tool::Surface(face);
@@ -49,7 +74,7 @@ inline bool add_spline_bounds(const TopoDS_Face &face, Bnd_Box &box, int max_dep
   spline->Bounds(s0, s1, t0, t1);
   const double slack = 1e-9 * std::max({1.0, std::fabs(s1 - s0), std::fabs(t1 - t0)});
   if (std::fabs(u0 - s0) > slack || std::fabs(u1 - s1) > slack || std::fabs(v0 - t0) > slack || std::fabs(v1 - t1) > slack) return false;
-  if (!is_full_patch(face, u0, u1, v0, v1)) return false;
+  if (!is_full_patch(face, u0, u1, v0, v1) && !fills_rectangle(face, u0, u1, v0, v1)) return false;
   GeomConvert_BSplineSurfaceToBezierSurface converter(spline);
   const int nu = converter.NbUPatches(), nv = converter.NbVPatches();
   if (nu * nv < kBoundsMinPatches) return false;

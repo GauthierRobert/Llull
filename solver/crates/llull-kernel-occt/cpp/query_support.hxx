@@ -4,7 +4,11 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
+#include <mutex>
 #include <optional>
+#include <unordered_map>
+#include <vector>
 #include <sstream>
 #include <string>
 
@@ -103,7 +107,7 @@ inline std::string guard_note(double worst) {
 // occtFaceMetrics.ts: BRepGProp surface properties of one face. `refined` (Shape::refined_mass and a freeform face: `adaptive_rule`): the adaptive
 // rule when its own error estimate is within kRefinedFaceDrift, else the fixed Gauss rule (that rule is wrong across a C0 knot of a boundary, a
 // straight radius law with a kink); a tripped guard raises `*tripped` (may be null) to its estimate.
-inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, double *tripped = nullptr) {
+inline FaceMetric face_metric_uncached(const TopoDS_Face &face, bool refined, double *tripped) {
   GProp_GProps props;
   if (refined) {
     GProp_GProps adaptive;
@@ -118,6 +122,45 @@ inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, dou
   const TopoDS_Compound spans = span_faces(face, cut, false);
   BRepGProp::SurfaceProperties(cut > 0 ? static_cast<TopoDS_Shape>(spans) : static_cast<TopoDS_Shape>(face), props, Standard_False, Standard_False);
   return {props.Mass(), props.CentreOfMass()};
+}
+
+// The metric of a face again (topology, the face graph, a second read of the same shape): the integral costs 0.1 s on a B-spline face of a corner star (BLD 13.46). The key is the face itself
+// (same TShape and location, so an edited copy is a new face); the entry holds the face, which keeps its TShape alive so that an address is never reused. The guard estimate is kept
+// with the metric and raised again on a hit. Bounded: the table is emptied when it outgrows kMetricCacheLimit faces.
+constexpr size_t kMetricCacheLimit = 20000;
+
+inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, double *tripped = nullptr) {
+  struct Entry {
+    TopoDS_Face face;
+    bool refined;
+    FaceMetric metric;
+    double worst;
+  };
+  static std::mutex lock;
+  static std::unordered_map<const void *, std::vector<Entry>> table;
+  static size_t count = 0;
+  const void *key = face.TShape().get();
+  {
+    const std::lock_guard<std::mutex> guard(lock);
+    const auto found = table.find(key);
+    if (found != table.end())
+      for (const Entry &entry : found->second)
+        if (entry.refined == refined && entry.face.IsSame(face)) {
+          if (tripped != nullptr && std::isfinite(entry.worst) && !(*tripped >= entry.worst)) *tripped = entry.worst;
+          return entry.metric;
+        }
+  }
+  double worst = std::numeric_limits<double>::quiet_NaN();
+  const FaceMetric metric = face_metric_uncached(face, refined, &worst);
+  if (tripped != nullptr && std::isfinite(worst) && !(*tripped >= worst)) *tripped = worst;
+  const std::lock_guard<std::mutex> guard(lock);
+  if (count >= kMetricCacheLimit) {
+    table.clear();
+    count = 0;
+  }
+  table[key].push_back({face, refined, metric, worst});
+  ++count;
+  return metric;
 }
 
 // `[uMin, uMax, vMin, vMax]` of an adaptor restricted to its face (occtFaceSurface.ts uvRange).

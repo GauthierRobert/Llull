@@ -2335,7 +2335,7 @@ So: the obstruction of 13.44.2 is real and a B-spline cannot remove it in this c
 
 ## 13.45 As built: vertex fans, curvature-continuous spokes all the way to the loop vertices (DES-6c, 2026-11-21)
 
-Result: the vertex fan 13.44.7 asks for is built (`cpp/blend_corner_fan.cxx`) and works: **every mark of 13.44.7 passes the curvature gate on the cube and the box 10 x 7 x 5, and the fan is never worse than G2-beyond-reach on any star test body.** New `spokes` value `"G2-fan"` (`spokeReach` 0), built when the hook `set_corner_fan(1)` is on; a star whose fans miss a gate keeps the 13.38 spokes and says why (`spokeFanRefused`). **Not the default** (13.45.3): the default stays `"G2-beyond-reach"`.
+Result: the vertex fan 13.44.7 asks for is built (`cpp/blend_corner_fan.cxx`) and works: **every mark of 13.44.7 passes the curvature gate on the cube and the box 10 x 7 x 5, and the fan is never worse than G2-beyond-reach on any star test body.** New `spokes` value `"G2-fan"` (`spokeReach` 0), built when the hook `set_corner_fan(1)` is on; a star whose fans miss a gate keeps the 13.38 spokes and says why (`spokeFanRefused`). **Not the default when built** (13.45.3); it became the default in 13.46.
 
 ### 13.45.1 Construction
 
@@ -2364,3 +2364,44 @@ The fan shell is far slower to use: `fillet_edge` of the curvature cube through 
 `blend_g2fan_tests.rs`: marks on the cube and the box, never worse on the five bodies (marks, volume, contacts, validity), refusal fallback and the off hook (`set_corner_fan`: 0 off, 2 refused). `blend_g2corner_tests.rs` pins the 13.38 numbers with the fans off. TS: `G2-fan` in the notes, `spokeReachOf` (no tangent-only stretch: the whole seam is judged, BLD_CHECK_SPOKE_G2_LOST fails). Left: stars with joints in a chain (a C0 knot inside a corner triangle) are refused by the gates and keep 13.38; time and face count double; the 0.25 % mark reads 0.05 relative but passes the gate (curvature there under 1e-3 per length).
 
 Before the default flips (review of the merge, 2026-11-22; none matters while the fans are off): an OCCT exception inside `make_fans` must fall back to the 13.38 spokes (`try`/`catch Standard_Failure`, `IsDone()` before `.Face()`/`.Wire()`/`.Edge()`), not lose the corner; a sample the gates cannot evaluate must refuse (excess 1e300, as the star gate does), not be skipped; the fan-to-fan side (tau = 1) needs a G0 + G1 pass (0.5 x max gap, kAngle); a test where the gates themselves refuse (not hook mode 2), with 66-face parity; the second fan at a vertex takes the provenance of sub-patch k - 1, not k; `spokeReachOf` should report fans as a flag, not a `Number.MIN_VALUE` reach; the sort tie-break `(loop_key, part)` is a default-path change, deterministic and pinned by `blend_g2corner_tests.rs`. The tool descriptions name "G2-fan" as coming only from a kernel built with vertex fans on.
+
+## 13.46 As built: the vertex fans are the default (DES-6c, 2026-11-22)
+
+Result: `g_fan_mode` defaults to 1. Every condition of 13.45.3 held: the review items are done (A), a fan-shell `fillet_edge` of the curvature cube costs 1.5 to 1.65x the 13.38 build (B), the whole `llull-kernel-occt` suite, clippy `-D warnings`, fmt and the server blend suites pass with the fans on (C). A star whose fans miss a gate still keeps the 13.38 spokes and says why; hook mode 0 is the 13.38 build (the Rust tests that pin its numbers set it).
+
+### 13.46.1 Robustness (all in `blend_corner_fan.cxx`, `blend_corner_exact.cxx`; tests in `blend_g2fan_tests.rs`)
+
+- `make_fans` wraps the construction in `try`/`catch (Standard_Failure)`: the exception becomes `spokeFanRefused` ("an OCCT exception inside the vertex fans: ...") and the star keeps the 13.38 spokes. `IsDone()` is checked before every `.Edge()`, `.Wire()`, `.Face()` (a null trimmed face refuses by name). Hook mode 3 throws inside `make_fans`: `an_occt_exception_inside_the_fans_falls_back_to_the_beyond_reach_spokes` (66 faces, G2-beyond-reach, reason names the exception).
+- A gate sample that cannot be evaluated (seam, marks, arc, bottom edge, the new tau = 1 pass) sets its excess to 1e300: the attempt refuses, nothing is skipped.
+- New pass at tau = 1: the fan of sub-patch k at s = 1 against the fan of sub-patch k - 1 at s = 0, 100 samples of r: gap within 0.5 x the contact gate, normal angle within kAngle (measured on the cube 5e-15 and 2.6e-8 rad). The refusal reason reports the gap and angle.
+- The gates themselves refusing (not hook 2): `fans_that_miss_a_gate_keep_the_beyond_reach_spokes_and_name_the_gate`: the block cut by a cylinder of radius 15 with a curvature profile of size 0.2 gets fans at one corner and seven corners miss the seam curvature gate (the chain at the bottom has a joint, a C0 knot where the support changes, inside the corner triangle: the 13.45.3 left case); those say "over the curvature gate by", stay G2-beyond-reach, and the face count is the 13.38 count plus 12 per fan corner (78 = 66 + 12).
+- Provenance: the second fan of vertex k lies on sub-patch k - 1 (`(k/2 + m - 1) % m` for odd k). Unused `<cstdlib>` removed; `g_fan_mode` is read once into a local.
+- TS: `spokeReachOf` returns `{ reach, fans }` (`SpokeReach`), `spokeFinding` takes `fans`; the messages are unchanged. A star whose `spokes` is absent or unknown reads as G1 seams (`reach` 0, no fans): test in `tests/unit/blendCorners.test.ts`. Tool descriptions (`fillet_edge`, the remediation strings of `check_blends`, `kernelPorts.ts`) now name "G2-fan" as the default with `spokeFanRefused` for the fallback; the contract snapshot changed only in the `fillet_edge` description.
+
+### 13.46.2 Cost: where the time went (profiled by gdb sampling and timers around each phase, release, the cube, curvature profile size 1, shape 0.5)
+
+The fan construction itself is cheap (`make_fans` 55 ms per vertex, all 8 vertices 0.5 s). The rest was downstream, and mostly not the fans:
+
+1. `BRepBndLib::AddOptimal` over the whole shell: `bounds_of` tried the Bezier-patch bound (`add_spline_bounds`, 40x faster) first, but it only accepted a face whose pcurves were straight lines on its four sides, and every sewn B-spline face failed that test, so the whole shell went through the PSO optimal box (24 s with the fans, 6 s without, three times per `analyze` + `mass_properties` + `shape_bounds`). `surface_bounds.hxx` now also accepts a one-wire face that fills at least 0.85 of the rectangle of its surface in (u, v) (shoelace area of its pcurves: the sewn sub-patches, the trimmed ones at 0.86 and more): bounds 24.0 s -> 4.3 s with the fans (6.5 s -> 3.6 s without). The box can exceed the exact one by the cut-off corners of a trimmed face, which the fans cover with the same geometry to within their displacement: `the_bounds_of_the_fan_shell_are_the_box_of_the_part` pins the cube box to 1e-6 with and without fans and the area equal to 1e-6.
+2. `face_graph` (`edgeConvexity`): `convexity_at` projected the edge midpoint on both faces with `ShapeAnalysis_Surface::ValueOfUV`, which builds a search net of the whole B-spline surface per call (0.1 s per call). It now reads (u, v) off the pcurve of the edge (checked to lie on the surface, else the projection): `face_graph` 13.6 s -> 1.1 s without fans, 31.7 s -> 3.5 s with.
+3. `solid_of_shells` integrated the volume of every sewn shell only to tell an outer shell from voids: now only when there are several shells (one volume integral less per build, about 2 s with fans).
+4. `face_metric` (area and centre of a face, used by `topology` and `face_graph`) is cached per face (same TShape and location, bounded at 20000 faces, the guard estimate kept): the face graph after a topology read costs nothing (4 ms).
+5. The fan ladder starts at 22 x 26 poles (r x s) instead of 24 x 20: 24 x 20 and 24 x 24 never passed the arc gate on the cube, 24 x 28 did; 22 x 26 passes with the same gates (0.25 % mark 0.076 relative against 0.056 at 24 x 28; 20 x 26 meets the gates too but reads 0.10, hence the floor of 22). Order: 22x26, 24x26, 22x28, 24x28, 30x32, 36x40 (a failed attempt costs 18 ms). Fewer knot spans per face means fewer Gauss points in every integral (BRepGProp integrates by span).
+
+Timings (`fillet_edge` of the curvature cube through the native kernel and the worker, the same machine; `LLULL_FAN_MODE`-style comparison with the hook; seconds):
+
+| step | before: fans off | before: fans on | after: fans off | after: fans on |
+| --- | --- | --- | --- | --- |
+| fillet_edge, whole | 24.0 | 47.5 to 49.3 (74 in 13.45.3, under load) | 9.6 to 9.8 | 14.9 to 16.0 |
+| face_graph | 13.7 | 28.8 | 0.004 | 0.01 |
+| bounds of the shell (Rust) | 6.5 | 24.0 | 3.6 | 4.3 |
+| analyze (Rust) | 8.3 | 28.9 | 5.6 | 9.7 |
+
+Fans on over fans off: 2.0x before, 1.5 to 1.65x after (14.9 to 16.0 s against 9.6 to 9.8 s). The `nativeBlendRails.test.ts` size sweep (180 s timeout, 456 s before) passes inside its timeout with the fans on.
+
+### 13.46.3 Tests and gates
+
+`cargo test --release -p llull-kernel-occt`: 395 passed, 4 ignored (full suite, fans on by default); `blend_g2fan_tests` 6 tests (marks on the cube and box, never worse on five bodies, refused by hook, exception, gates refuse, bounds); `blend_g2corner_tests` pins 13.38 with hook 0. clippy `-D warnings` and `cargo fmt --check` clean. Server (`server/`, release kernel): every `tests/nativeBlend*.test.ts`, `nativeChamferCorner`, `nativeFillet*` and `nativeKernel*` passes (56 files, 646 tests); `nativeBlendG2Corners` was rewritten for the fan default (G2-fan, no finding under require G2, 144 corner faces). TS: `tests/unit/blendCorners.test.ts`, contract + golden.
+
+Left: the fan shell still has 2.5x the faces (tessellation +1 s, volume integral per face); a star with a chain joint inside a corner triangle keeps the 13.38 spokes (13.45.3, now tested); the face area / volume integrals could use a lower Gauss order per span (not available through BRepGProp; an own integrator is the next lever); `surface_bounds` accepts a face of fill 0.85 or more by its rectangle, which can overshoot an imported trimmed face by its cut-off corners.
+

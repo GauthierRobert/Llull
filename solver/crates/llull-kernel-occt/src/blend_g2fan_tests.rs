@@ -226,3 +226,69 @@ fn refused_vertex_fans_leave_the_beyond_reach_spokes_with_the_reason() {
     assert_eq!(spokes_of(&plain), vec!["G2-beyond-reach".to_string(); 8]);
     assert!(corner_notes(&plain).iter().all(|corner| corner["spokeFanRefused"].is_null()));
 }
+
+/// BLD §13.46: an OCCT exception inside the fan construction (hook mode 3) is caught: every corner keeps the G2-beyond-reach spokes (66 faces as with the fans off) and names the exception.
+#[test]
+fn an_occt_exception_inside_the_fans_falls_back_to_the_beyond_reach_spokes() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_fan(3);
+    let shape = profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap();
+    assert!(is_valid(&shape).unwrap());
+    assert_eq!(corners_of(&shape), all("G2"));
+    assert_eq!(spokes_of(&shape), vec!["G2-beyond-reach".to_string(); 8]);
+    assert_eq!(faces_of(&shape), 66);
+    for corner in corner_notes(&shape) {
+        assert!(
+            corner["spokeFanRefused"].as_str().is_some_and(|why| why.contains("OCCT exception") && why.contains("fault injected")),
+            "{corner}"
+        );
+    }
+}
+
+/// BLD §13.46: the box of the fan shell comes from the Bezier patches of its faces (the trimmed sub-patches count by their rectangle) and is the box of the part: the blends round the edges
+/// inside it, so it is the cube itself to 1e-6, with the fans and without; the volume, area and the corner count are the same.
+#[test]
+fn the_bounds_of_the_fan_shell_are_the_box_of_the_part() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let mut areas = Vec::new();
+    for mode in [0, 1] {
+        crate::test_bridge::set_corner_fan(mode);
+        let shape = profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap();
+        let bounds = crate::shape_bounds(&shape).unwrap().expect("a box");
+        for (axis, value) in bounds.iter().enumerate() {
+            let expected = if axis < 3 { 0.0 } else { 10.0 };
+            assert!((value - expected).abs() < 1e-6, "mode {mode}: {bounds:?}");
+        }
+        areas.push(crate::analyze(&shape).unwrap().area);
+    }
+    assert!((areas[0] - areas[1]).abs() < 1e-6 * areas[0], "{areas:?}");
+}
+
+/// BLD §13.46: the gates themselves refuse (not the hook): on the block cut by a cylinder (radius 15, size 0.2) one corner gets its fans and the other seven miss the seam curvature gate
+/// (the chain of the bottom has a joint where the support changes, inside a corner triangle, 13.45.3). They keep the 13.38 spokes, name the gate, and the face count is the 13.38 one plus 12 per fan corner.
+#[test]
+fn fans_that_miss_a_gate_keep_the_beyond_reach_spokes_and_name_the_gate() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (block, _, _) = crate::blend_corner_tests::cut_block_vertex(15.0);
+    crate::test_bridge::set_corner_fan(0);
+    let reference = profile_of(&block, 0.2, 1.0, 0.5).unwrap();
+    crate::test_bridge::set_corner_fan(1);
+    let shape = profile_of(&block, 0.2, 1.0, 0.5).unwrap();
+    assert!(is_valid(&shape).unwrap());
+    let spokes = spokes_of(&shape);
+    let fans = spokes.iter().filter(|spokes| *spokes == "G2-fan").count();
+    assert!(fans >= 1 && fans < spokes.len(), "{spokes:?}");
+    assert_eq!(corners_of(&shape), corners_of(&reference));
+    assert_eq!(faces_of(&shape), faces_of(&reference) + 12 * fans);
+    for (spoke, corner) in spokes.iter().zip(corner_notes(&shape)) {
+        if spoke == "G2-fan" {
+            assert!(corner["spokeFanRefused"].is_null(), "{corner}");
+        } else {
+            assert_eq!(spoke, "G2-beyond-reach");
+            assert!(corner["spokeFanRefused"].as_str().is_some_and(|why| why.contains("over the curvature gate by")), "{corner}");
+        }
+    }
+}
