@@ -458,7 +458,7 @@ Scope: §4.2, TR-ASC-06 data side (no renderer), §6 interop, decision D1. Code:
   the whole pattern (test). `export_step_ap242` already plans one shared part per component and one NEXT_ASSEMBLY_USAGE_OCCURRENCE
   per instance (test with a recording kernel). Needs the native kernel and is NOT verified here (no sidecar in this container): the
   exact STEP text, and `mapped_item` shape reuse, which is chosen by OCCT's XCAF writer, not by TS code.
-- **Left.** Renderer (InstancedMesh / BatchedMesh / `instanceId` picking, TR-ASC-06) for a later lane; `PatternInstanceSet` /
+- **Left.** (Renderer: done, see the paragraph below and §13.12.) `PatternInstanceSet` /
   `patternOf` connection members (M3); flipping the default to `instances` (D1) once every command accepts instances; pattern fuse.
 
 **Renderer (M2, as built).** `src/ui/viewport/3d/componentInstancePlan.ts` (pure) + `ComponentInstancedRenderer.tsx`, wired in `Entities.tsx`.
@@ -470,8 +470,7 @@ member is selected; section / clip planes are the scene-wide ones (click guarded
 filtered entity list as the per-entity path. Instances that are animated, finished, ghosted, transitioning, mirrored (negative scale), under 8 in
 number, or of a component with 2D / nested / decaled children stay on the per-entity path. Reuses `useBatchCapacity`, `makeMaterialArgs`,
 `writeBucketColours`. Tests: `tests/component/ComponentInstancedRenderer.test.tsx` (1,000-member polar array = one InstancedMesh, matrices, pick, single-instance tint).
-Not built: `BatchedMesh` for unique parts (not used by the plant renderer either; no measurement justifies it), hover by `instanceId`, a
-BVH for picking 10,000 instances (default three raycast), LOD swap for far instances, a measured `renderer.info.render.calls` (no GPU here).
+Not built then: `BatchedMesh` for unique parts (not used by the plant renderer either; no measurement justifies it). Hover, BVH picking and LOD followed on 2026-11-22 (§13.12); what is still left is listed there.
 
 ### 13.6 As built (M3) (2026-11-21)
 
@@ -648,3 +647,49 @@ A prototype was built and measured; its code is not on the branch because it is 
 - **Left.** (1) FreeCAD export keeps ThruSections sides. (2) `coupling: 'vertices'` is not on this path. (3) Only
   `measure_bounding_box` uses exact bounds (and `frameOf` through it); the other bounds consumers (§4.5 says "every") keep `entityBoundsInDoc`; widen later.
   (4) Whole-document cost at 2,450 parts is unmeasured (one `evaluate` + one `shapeBounds` per kernel-backed entity on a cold cache).
+
+### 13.12 As built (M2 renderer leftovers) (2026-11-22)
+
+Scope: hover, BVH picking, LOD, D1 and measurements for the component-batch renderer of §13.4. All in `src/ui/viewport/3d/`; no command or
+document change (L1/L4): hover and LOD are presentation. `ComponentInstancedRenderer.tsx` is now a thin wrapper; the batch mesh moved to
+`componentBatch/ComponentBatchMesh.tsx` with the pure helpers beside it.
+
+- **Hover.** `onPointerMove` on a batch mesh maps `event.instanceId` -> tier slot -> instance index -> entity id, the same resolution as
+  the click. The hovered instance is mixed 45 % with a hover colour (`componentColours.paintInstance`), written into the one tier mesh
+  for the previous and the new instance only (2 colour writes), through a ref: no React state, no store write, so `Entities` and the
+  other batches do not re-render and the mesh is not rebuilt. `hoverThrottle.createThrottle`: leading + trailing, 33 ms window; leaving
+  the mesh clears at once. A point clipped away by a section plane does not hover.
+- **BVH picking (TR-ASC-06).** `three-mesh-bvh` ^0.9.16 was already a dependency (MIT, bundled, offline; `bvhSetup.ts` patches
+  `Mesh.raycast`), so no new package and no C7 record is needed. Broad phase: the core `InstanceBvh` (`@core/geometry/instanceBvh`, the plant
+  renderer's) built over the world AABB of every instance (`componentPick.worldBoxes`); narrow phase: the existing `plantPick.bucketRaycast`
+  (three-mesh-bvh accelerated `Mesh.raycast` on the instance matrix, `computeBoundsTree` on the tier geometries), so a section-clipped hit
+  is dropped and the next hit behind it stays pickable. Tests (`tests/unit/componentBatch/componentPick.test.ts`): on 300 seeded
+  (mulberry32) random rays over 2,450 instances of a 960-triangle sphere, the BVH pick and three's brute-force `InstancedMesh.raycast`
+  give the same first-hit `instanceId` and the same distance; the ray broad phase keeps under 10 % of the instances.
+- **Pick time, measured in node (no GPU), 2,450 instances x 960 triangles, 200 seeded rays, this container:** brute force 0.80 ms per pick,
+  BVH 0.045 ms per pick (about 18x). Three's default already skips most instances with a bounding-sphere test, so the absolute gain at
+  2,450 is under a millisecond; it grows with N (the default is O(N) per pick and per pointer move). Machine-dependent: re-measure on the
+  reference workstation.
+- **LOD.** Per batch with at least 24 instances, every instance is drawn at one of three tiers by the projected diagonal of its world box
+  (`componentLod.assignTiers`, `projectedPixels`, pure and deterministic): tier 0 the real mesh; tier 1 under 48 px the in-process
+  decimation (`decimateMesh`, core TS, 25 % of the triangles, mesh children of at least 512 triangles only; primitives have none);
+  tier 2 under 8 px the bounding box (the VIS-M8 / plant LOD2 box). The 48 / 8 px thresholds are the plant renderer's. A 15 % hysteresis
+  band holds the coarser tier so an instance on a threshold does not flicker. The tiers are re-evaluated in `useFrame` at most every
+  100 ms and only when the camera changed; a change copies matrices and colours from master arrays into the three tier meshes
+  (`packTiers`) and invalidates one frame. Draw calls: one per non-empty tier per child (at most 3, was 1); empty tiers draw nothing.
+  Picking and hover use the tier's slot -> index map, so they agree with what is drawn. Tests: `componentLod.test.ts` (thresholds,
+  hysteresis, perspective and orthographic, determinism, partition), `componentLodGeometry.test.ts` (decimation shrinks, no coarse mesh
+  for small meshes and primitives, box in the same frame).
+- **Tests added/changed:** `tests/component/ComponentInstancedRenderer.test.tsx` (hover colours exactly one instance, mesh not rebuilt,
+  restored on leave, document untouched; the draw-call test counts non-empty meshes), `hoverThrottle.test.ts`.
+- **D1 (default of `array_* as`): NOT flipped.** The proposal's own condition is "until every command accepts instances". It is not met:
+  `as: "instances"` moves the source into a component and later commands that held the source id (fillet, shell, offset, constraints,
+  ...) stop resolving it (§13.4 relocation note), and only `boolean`, mass / bounds and `check_assembly` read instances. That is a
+  property of the command set, not something a measurement here can change; flipping would also change the golden corpus. Reopen when the
+  solid-editing commands accept instances (or resolve to instance 0).
+- **Left.** (1) On-screen fps and a measured `renderer.info.render.calls` for the turbofan: need a GPU, so VIS-HUMAN (owner on the desktop
+  app); the 30 fps / 200 draw-call budget of §8 stays unverified, and the tier thresholds are unmeasured on screen. (2) Tier 1 exists only
+  for mesh children: primitives (cylinder, sphere ...) have no in-process coarse build in a component child (the plant's `LodGeometryCache`
+  builds them in the entity-local frame, not the component frame), and a native `llull-meshops` decimation is not used (Rust lane).
+  Primitives go straight from full to box. (3) The decimated mesh is built synchronously on first use (a large mesh child can stall one
+  frame); move it to a worker if the owner sees a hitch. (4) `BatchedMesh` for unique parts: not built (see above). (5) D1 as above.
