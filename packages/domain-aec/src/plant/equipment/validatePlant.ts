@@ -20,7 +20,13 @@ function vesselErrors(template: Record<string, unknown>, at: string): string[] {
   const heads = template['heads'];
   for (const name of ['first', 'second'])
     if (!isRecord(heads) || !headSpecSchema.safeParse(heads[name]).success) errors.push(`${at}.heads.${name} must be a head spec`);
-  return [...errors, ...supportErrors(template['support'], at)];
+  const fit = ['insideDiameter', 'tangentLength', 'shellThickness'].every((name) => isPositiveNumber(template[name]))
+    ? {
+        shell: { from: 0, to: template['tangentLength'] as number },
+        rootRadius: (template['insideDiameter'] as number) / 2 + (template['shellThickness'] as number),
+      }
+    : null;
+  return [...errors, ...supportErrors(template['support'], at, template['orientation'] === 'horizontal' ? undefined : fit)];
 }
 
 function locationErrors(location: unknown, at: string): string[] {

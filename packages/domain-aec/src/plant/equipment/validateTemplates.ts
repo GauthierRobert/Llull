@@ -3,6 +3,8 @@
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { appendAll } from '@lib/appendAll';
+import { lugFitProblem } from './geometry/lugs';
+import type { LugSupport } from './plantData';
 import { weirPositionProblem } from './geometry/kettleWeir';
 
 const SUPPORT_NUMBERS: ReadonlyMap<string, readonly string[]> = new Map([
@@ -13,25 +15,28 @@ const SUPPORT_NUMBERS: ReadonlyMap<string, readonly string[]> = new Map([
   ['none', ['baseElevation']],
 ]);
 
-/** Lug dimensions must be > 0 (count an integer >= 2) and the lug must be built: base plate below the height, bolt hole inside the base plate. */
-function lugErrors(support: Record<string, unknown>, at: string): string[] {
-  const errors = positive(support, ['lugHeight', 'lugWidth', 'lugProjection', 'lugThickness', 'lugBasePlateThickness'], `${at}.support`);
+/** Lug dimensions must be > 0 (count an integer 2..MAX_LUGS) and the lug must be built and lie on the shell (the same `lugFitProblem` as the commands). */
+function lugErrors(support: Record<string, unknown>, at: string, fit: LugFit | null): string[] {
+  const dims = ['lugHeight', 'lugWidth', 'lugProjection', 'lugThickness', 'lugBasePlateThickness', 'lugElevation'] as const;
+  const errors = positive(support, dims.slice(0, 5), `${at}.support`);
+  if (!isFiniteNumber(support['lugElevation']) || (support['lugElevation'] as number) < 0)
+    errors.push(`${at}.support.lugElevation must be a number >= 0`);
   if (!Number.isInteger(support['count']) || (support['count'] as number) < 2) errors.push(`${at}.support.count must be an integer >= 2`);
-  const { lugHeight, lugBasePlateThickness, lugBoltHoleDiameter, lugWidth, lugProjection } = support;
-  if (isPositiveNumber(lugHeight) && isPositiveNumber(lugBasePlateThickness) && lugBasePlateThickness >= lugHeight)
-    errors.push(`${at}.support.lugBasePlateThickness must be below lugHeight`);
-  if (lugBoltHoleDiameter !== undefined) {
-    if (!isPositiveNumber(lugBoltHoleDiameter)) errors.push(`${at}.support.lugBoltHoleDiameter must be a number > 0`);
-    else if (
-      (isPositiveNumber(lugWidth) && lugBoltHoleDiameter >= lugWidth) ||
-      (isPositiveNumber(lugProjection) && lugBoltHoleDiameter >= lugProjection)
-    )
-      errors.push(`${at}.support.lugBoltHoleDiameter must be below lugWidth and lugProjection`);
-  }
-  return errors;
+  const hole = support['lugBoltHoleDiameter'];
+  if (hole !== undefined && !isPositiveNumber(hole)) errors.push(`${at}.support.lugBoltHoleDiameter must be a number > 0`);
+  if (errors.length > 0 || fit === null) return errors;
+  const problem = lugFitProblem(support as unknown as LugSupport, fit.shell, fit.rootRadius);
+  return problem === null ? [] : [`${at}.${problem.path}: ${problem.message}`];
 }
 
-export function supportErrors(support: unknown, at: string): string[] {
+/** Where lugs may stand: shell ends as heights above the bottom tangent line and the shell outside radius, null when the body itself is invalid. */
+export interface LugFit {
+  readonly shell: { readonly from: number; readonly to: number };
+  readonly rootRadius: number;
+}
+
+/** `fit` = the body the lugs hang on (null: its dimensions are invalid, reported elsewhere); `undefined` for a horizontal vessel, which takes no lugs. */
+export function supportErrors(support: unknown, at: string, fit?: LugFit | null): string[] {
   if (!isRecord(support) || typeof support['type'] !== 'string' || !SUPPORT_NUMBERS.has(support['type']))
     return [`${at}.support.type must be skirt, legs, lugs, saddles or none`];
   const errors = (SUPPORT_NUMBERS.get(support['type']) as readonly string[])
@@ -39,7 +44,8 @@ export function supportErrors(support: unknown, at: string): string[] {
     .map((name) => `${at}.support.${name} must be a number >= 0`);
   if (support['type'] === 'saddles' && !(Array.isArray(support['stations']) && support['stations'].every(isFiniteNumber)))
     errors.push(`${at}.support.stations must be an array of numbers`);
-  if (support['type'] === 'lugs') appendAll(errors, lugErrors(support, at));
+  if (support['type'] === 'lugs')
+    appendAll(errors, fit === undefined ? [`${at}.support.type lugs hang on a vertical body only`] : lugErrors(support, at, fit));
   return errors;
 }
 
@@ -134,6 +140,23 @@ function kettleErrors(template: Record<string, unknown>, at: string): string[] {
   return errors;
 }
 
+/** Heights of the shell ends above the front tangent line and the shell outside radius of an exchanger record, or null when a field is invalid. */
+function exchangerLugFit(template: Record<string, unknown>): LugFit | null {
+  const { tubes, frontChannel, tema } = template;
+  if (!isRecord(tubes) || !isRecord(frontChannel) || !isRecord(tema)) return null;
+  const numbers = [
+    tubes['length'],
+    frontChannel['length'],
+    template['tubesheetThickness'],
+    template['shellInsideDiameter'],
+    template['shellThickness'],
+  ];
+  if (!numbers.every(isPositiveNumber)) return null;
+  const [length, channel, sheet, inside, wall] = numbers as number[] as [number, number, number, number, number];
+  const from = sheet + channel;
+  return { shell: { from, to: from + length - (tema['fixedTubesheet'] === true ? 2 : 1) * sheet }, rootRadius: inside / 2 + wall };
+}
+
 export function exchangerErrors(template: Record<string, unknown>, at: string): string[] {
   const errors = positive(template, ['shellInsideDiameter', 'shellThickness', 'tubesheetThickness'], at);
   if (typeof template['temaType'] !== 'string') errors.push(`${at}.temaType must be a string`);
@@ -191,7 +214,7 @@ export function exchangerErrors(template: Record<string, unknown>, at: string): 
       `${at}.support.type must be ${allowed.slice(0, -1).join(', ')} or ${allowed[allowed.length - 1]} for a ${String(orientation)} exchanger`,
     );
   appendAll(errors, kettleErrors(template, at));
-  return [...errors, ...supportErrors(support, at)];
+  return [...errors, ...supportErrors(support, at, orientation === 'vertical' ? exchangerLugFit(template) : null)];
 }
 
 export function tankErrors(template: Record<string, unknown>, at: string): string[] {

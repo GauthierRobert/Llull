@@ -28,7 +28,7 @@ import { equipmentPorts } from '../../plant/equipment/geometry/ports';
 import { addNamedPset, type PlantIfcRun } from './ifcPlant';
 import { ratedPressureProperties } from './ifcNozzleRating';
 import { addPort, nest, type Flow, type Port, type PortState } from './ifcPorts';
-import { type Context, direction, ifcReal, ifcString, point3, polygonProfile, rectangleProfile } from './ifcStep';
+import { type Context, direction, ifcReal, ifcString, point3, rectangleProfile } from './ifcStep';
 
 export interface EquipmentBody {
   /** Solids of the body (IfcRevolvedAreaSolid, IfcExtrudedAreaSolid) in the frame of the product placement. */
@@ -85,7 +85,7 @@ const REVOLUTION_FRAMES: ReadonlyArray<{ radial: Vec3; axial: Vec3; handed: 1 | 
 ];
 
 /** The profile as points and IfcIndexedPolyCurve segments (profile coordinates in mm, the axial coordinate signed by `handed`). */
-function profileCurve(context: Context, entity: RevolutionEntity, handed: 1 | -1, x3: boolean): string {
+function profileCurve(context: Context, entity: Pick<RevolutionEntity, 'curves' | 'profile'>, handed: 1 | -1, x3: boolean): string {
   const scale = (point: Vec2): Vec2 => [context.mm(point[0]), handed * context.mm(point[1])];
   const segments: ReadonlyArray<CurveSegment<Vec2>> =
     entity.curves ??
@@ -155,14 +155,11 @@ function boxSolid(context: Context, frame: Frame, entity: BoxEntity): string {
   );
 }
 
-/** A planar extrusion (kettle weir plate): the polygon profile in mm in the entity frame, extruded along the entity +Z. */
-function extrudedSolid(context: Context, frame: Frame, entity: ExtrusionEntity): string {
+/** A planar extrusion (kettle weir plate): the profile in mm in the entity frame (exact arcs, like the revolved parts), extruded along the entity +Z. */
+function extrudedSolid(context: Context, frame: Frame, entity: ExtrusionEntity, x3: boolean): string {
   const xAxis = frame.axis([1, 0, 0], entity.rotation);
   const zAxis = frame.axis([0, 0, 1], entity.rotation);
-  const profile = polygonProfile(
-    context,
-    entity.profile.map(([x, y]): Vec2 => [context.mm(x), context.mm(y)]),
-  );
+  const profile = context.writer.add(`IFCARBITRARYCLOSEDPROFILEDEF(.AREA.,$,${profileCurve(context, entity, 1, x3)})`);
   return context.writer.add(
     `IFCEXTRUDEDAREASOLID(${profile},${placement3(context, frame.point(entity.position), zAxis, xAxis)},${direction(context, [0, 0, 1])},${ifcReal(context.mm(entity.depth))})`,
   );
@@ -182,7 +179,7 @@ export function bodyOfEntities(
   for (const entity of entities) {
     if (entity.kind === 'revolution') solids.push(revolvedSolid(context, frame, entity, x3));
     else if (entity.kind === 'box') solids.push(boxSolid(context, frame, entity));
-    else if (entity.kind === 'extrusion') solids.push(extrudedSolid(context, frame, entity));
+    else if (entity.kind === 'extrusion') solids.push(extrudedSolid(context, frame, entity, x3));
     else skipped.push({ part: entity.id, kind: entity.kind });
   }
   return { solids, skipped };

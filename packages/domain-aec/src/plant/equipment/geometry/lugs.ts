@@ -33,9 +33,12 @@ export const lugAzimuth = (index: number, count: number): number => ((index + 0.
 /** Largest plan radius of the lugs about the axis (the outer corner of the base plate). */
 export const lugPlanRadius = (rootRadius: number, lug: LugSupport): number => Math.hypot(rootRadius + lug.lugProjection, lug.lugWidth / 2);
 
+/** Most lugs on one body (a named limit: more would not be bracket lugs on a pressure vessel; refused with the path support.count). */
+export const MAX_LUGS = 24;
+
 type LugDimensions = Pick<
   LugSupport,
-  'count' | 'lugHeight' | 'lugWidth' | 'lugElevation' | 'lugBasePlateThickness' | 'lugBoltHoleDiameter' | 'lugProjection'
+  'count' | 'lugHeight' | 'lugWidth' | 'lugElevation' | 'lugBasePlateThickness' | 'lugBoltHoleDiameter' | 'lugProjection' | 'lugThickness'
 >;
 
 /** Why a lug set does not fit the body, or null. `shell` = heights of the shell ends above the bottom tangent line; `rootRadius` = the shell outside radius. */
@@ -44,6 +47,7 @@ export function lugFitProblem(
   shell: { readonly from: number; readonly to: number },
   rootRadius: number,
 ): { message: string; path: string } | null {
+  if (lug.count > MAX_LUGS) return { message: `lugs needs count <= ${MAX_LUGS} (got ${lug.count})`, path: 'support.count' };
   if (lug.lugBasePlateThickness >= lug.lugHeight)
     return {
       message: `lugBasePlateThickness ${lug.lugBasePlateThickness} must be below lugHeight ${lug.lugHeight} (the web stands on the base plate)`,
@@ -59,9 +63,12 @@ export function lugFitProblem(
       message: `${lug.count} lugs of width ${lug.lugWidth} do not fit the shell circumference ${(2 * Math.PI * rootRadius).toPrecision(6)}`,
       path: 'support.lugWidth',
     };
-  if (lug.lugBoltHoleDiameter !== undefined && (lug.lugBoltHoleDiameter >= lug.lugWidth || lug.lugBoltHoleDiameter >= lug.lugProjection))
+  if (lug.lugThickness >= lug.lugWidth)
+    return { message: `lugThickness ${lug.lugThickness} must be below lugWidth ${lug.lugWidth}`, path: 'support.lugThickness' };
+  const side = (lug.lugWidth - lug.lugThickness) / 2;
+  if (lug.lugBoltHoleDiameter !== undefined && (lug.lugBoltHoleDiameter >= side || lug.lugBoltHoleDiameter >= lug.lugProjection))
     return {
-      message: `lugBoltHoleDiameter ${lug.lugBoltHoleDiameter} must be below lugWidth ${lug.lugWidth} and lugProjection ${lug.lugProjection}`,
+      message: `lugBoltHoleDiameter ${lug.lugBoltHoleDiameter} must be below (lugWidth - lugThickness) / 2 = ${side} (the web stands in the middle of the base plate) and below lugProjection ${lug.lugProjection}`,
       path: 'support.lugBoltHoleDiameter',
     };
   return null;
