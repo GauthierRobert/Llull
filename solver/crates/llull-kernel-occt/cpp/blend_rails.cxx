@@ -28,6 +28,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepLib.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_ReShape.hxx>
@@ -900,7 +901,7 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
   }
   const auto volume_of = [](const TopoDS_Shape &body) {
     GProp_GProps props;
-    BRepGProp::VolumeProperties(body, props);
+    llull::query::volume_properties(body, props);
     return props.Mass();
   };
   // The section only changes the shape of the corner cut: the volume moves the same way as the circular fillet's, and by a bounded multiple of it

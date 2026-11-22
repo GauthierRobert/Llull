@@ -20,6 +20,7 @@
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
@@ -67,7 +68,7 @@ gp_Pnt set_centroid(const FaceSet &set) {
   GProp_GProps props;
   for (const TopoDS_Face &face : set) {
     GProp_GProps one;
-    BRepGProp::SurfaceProperties(face, one);
+    llull::query::surface_properties(face, one);
     props.Add(one);
   }
   return props.CentreOfMass();

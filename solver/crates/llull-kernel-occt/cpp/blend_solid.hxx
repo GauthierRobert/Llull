@@ -8,6 +8,7 @@
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepLib.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
@@ -62,7 +63,7 @@ inline TopoDS_Solid solid_of_shells(const TopoDS_Shape &sewn, std::string &why) 
     double volume = 0;
     if (shells.size() > 1) {
       GProp_GProps properties;
-      BRepGProp::VolumeProperties(solid, properties);
+      llull::query::volume_properties(solid, properties);
       volume = properties.Mass();
     }
     pieces.push_back({solid, volume});

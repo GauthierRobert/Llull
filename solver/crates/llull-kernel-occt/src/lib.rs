@@ -90,6 +90,8 @@ mod features_tests;
 #[cfg(test)]
 mod many_tests;
 #[cfg(test)]
+mod mass_patch_tests;
+#[cfg(test)]
 mod mesh_tests;
 #[cfg(test)]
 mod naming_tests;

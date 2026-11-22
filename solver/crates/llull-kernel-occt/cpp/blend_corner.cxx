@@ -49,6 +49,7 @@
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepLib.hxx>
 #include <BRepOffsetAPI_MakeFilling.hxx>
 #include <BRep_Tool.hxx>
@@ -837,7 +838,7 @@ double lower_diagonal(const std::vector<TopoDS_Face> &members, size_t patch_coun
 
 double volume_of(const TopoDS_Shape &shape) {
   GProp_GProps props;
-  BRepGProp::VolumeProperties(shape, props);
+  llull::query::volume_properties(shape, props);
   return props.Mass();
 }
 
@@ -1624,7 +1625,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     // the box around the vertex has faces too, far from the solid: they carry no piece of it
     if (on_planes.empty()) return false;
     GProp_GProps props;
-    BRepGProp::SurfaceProperties(face, props);
+    llull::query::surface_properties(face, props);
     gp_Pnt inside_point = props.CentreOfMass();
     for (TopExp_Explorer it(face, TopAbs_EDGE); it.More(); it.Next()) {
       const BRepAdaptor_Curve curve(TopoDS::Edge(it.Current()));
@@ -2340,7 +2341,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     {
       // A convex corner removes material, a concave one adds it: the centre of the patch lies IN the source solid for the first, OUT of it for the second.
       GProp_GProps props;
-      if (!job.has_centre) BRepGProp::SurfaceProperties(job.patches.front(), props);
+      if (!job.has_centre) llull::query::surface_properties(job.patches.front(), props);
       BRepClass3d_SolidClassifier classifier(shape);
       classifier.Perform(job.has_centre ? job.centre : props.CentreOfMass(), std::max(blend::kInsideTolerance, 1e-9 * diagonal));
       const TopAbs_State expected = plan.concave[c] ? TopAbs_OUT : TopAbs_IN;
