@@ -63,7 +63,7 @@ function exchangerVolume(doc: CadDocument, element: EquipmentElement, template: 
             liquidVolumeToWeirM3: weir.liquidVolume * cubic,
             method:
               'circular segment of the enlarged inside radius up to weirHeight (R^2 acos((R - h) / R) - (R - h) sqrt(2 R h - h^2)) x enlarged-cylinder length between the cone and the front face of the weir plate',
-            note: 'bundle displacement not subtracted; the cone and the overflow side behind the weir are not included',
+            note: 'bundle displacement not subtracted; the tube bundle is modelled to the shell end, so the plate cuts through it and the shell-side volume still subtracts tubes behind the weir; the cone and the overflow side behind the weir are not included',
           },
         }),
     ...(selected === undefined ? {} : { side: request.side, totalVolumeM3: selected.volumeM3 }),

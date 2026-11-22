@@ -26,7 +26,21 @@ export const exchangerPatchSchema = z
   .object({
     temaType: exchangerShape.temaType.optional(),
     orientation: exchangerShape.orientation,
-    kettle: exchangerShape.kettle.unwrap().partial().optional().describe('Kettle fields to change (TEMA K only); the others are kept.'),
+    kettle: exchangerShape.kettle
+      .unwrap()
+      .partial()
+      .extend({
+        weirStation: z
+          .number()
+          .positive()
+          .nullable()
+          .optional()
+          .describe(
+            'Weir plate centre from the rear end of the shell (see add_heat_exchanger); null REMOVES the weir plate (weirStation and weirThickness are dropped, weirHeight stays as data).',
+          ),
+      })
+      .optional()
+      .describe('Kettle fields to change (TEMA K only); the others are kept.'),
     shellInsideDiameter: exchangerShape.shellInsideDiameter.optional(),
     shellThickness: exchangerShape.shellThickness.optional(),
     corrosionAllowance: exchangerShape.corrosionAllowance,
@@ -140,6 +154,15 @@ function keptKettle(template: ExchangerTemplate): Partial<ExchangerKettle> {
   return rest;
 }
 
+/** The stored kettle with the patch on top; `weirStation: null` drops the weir plate (both of its fields). */
+function mergedKettle(template: ExchangerTemplate, patch: ExchangerPatch['kettle']): Partial<ExchangerKettle> {
+  const { weirStation, ...rest } = defined(patch);
+  const merged = { ...keptKettle(template), ...rest, ...(typeof weirStation === 'number' ? { weirStation } : {}) };
+  if (weirStation !== null) return merged;
+  const { weirStation: _station, weirThickness: _thickness, ...without } = merged;
+  return without;
+}
+
 const KETTLE_REQUIRED = ['enlargedInsideDiameter', 'enlargedLength', 'transitionLength', 'weirHeight'] as const;
 
 function exchangerInputOf(template: ExchangerTemplate, patch: ExchangerPatch): ExchangerInput {
@@ -163,7 +186,7 @@ function exchangerInputOf(template: ExchangerTemplate, patch: ExchangerPatch): E
     orientation: patch.orientation ?? template.orientation,
     ...(shellLetter(temaType) !== 'K' || (template.kettle === undefined && patch.kettle === undefined)
       ? {}
-      : { kettle: { ...keptKettle(template), ...defined(patch.kettle) } }),
+      : { kettle: mergedKettle(template, patch.kettle) }),
     shellInsideDiameter: patch.shellInsideDiameter ?? template.shellInsideDiameter,
     shellThickness: patch.shellThickness ?? template.shellThickness,
     corrosionAllowance: patch.corrosionAllowance ?? template.corrosionAllowance,

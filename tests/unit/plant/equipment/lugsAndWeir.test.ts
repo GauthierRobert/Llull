@@ -103,7 +103,8 @@ describe('lugs on a vertical vessel', () => {
   it('is revised through update_equipment_parameters and a bad lug leaves the vessel as it was', () => {
     const plain = apply(mmDocument(), 'add_vessel', separatorParams);
     const revised = apply(plain, 'update_equipment_parameters', { equipment: 'V-101', set: { support: lugs } });
-    expect(equipmentOf(revised, 'V-101').plant?.template).toMatchObject({ support: { type: 'lugs', count: 4, lugElevation: 1000 } });
+    expect(equipmentOf(revised, 'V-101').plant?.template).toMatchObject({ support: lugs });
+    expect((equipmentOf(revised, 'V-101').plant?.template as { support: unknown }).support).toEqual(lugs);
     expectRefusal(
       plain,
       'update_equipment_parameters',
@@ -116,10 +117,13 @@ describe('lugs on a vertical vessel', () => {
   it.each([
     ['a missing dimension', { lugProjection: undefined }, 'support.lugProjection'],
     ['one lug', { count: 1 }, 'support.count'],
+    ['more lugs than the named limit', { count: 25, lugWidth: 50 }, 'support.count'],
+    ['a bolt hole that does not fit beside the web', { lugBoltHoleDiameter: 100 }, 'support.lugBoltHoleDiameter'],
+    ['a web as wide as the base plate', { lugThickness: 200 }, 'support.lugThickness'],
     ['a lug above the shell', { lugElevation: 3900 }, 'support.lugElevation'],
     ['a base plate as thick as the lug', { lugBasePlateThickness: 300 }, 'support.lugBasePlateThickness'],
     ['a bolt hole wider than the base plate', { lugBoltHoleDiameter: 200 }, 'support.lugBoltHoleDiameter'],
-    ['lugs wider than the circumference', { count: 40, lugWidth: 150 }, 'support.lugWidth'],
+    ['lugs wider than the circumference', { count: 24, lugWidth: 250 }, 'support.lugWidth'],
   ])('refuses %s by name and leaves the document unchanged', (_name, patch, path) => {
     expectRefusal(mmDocument(), 'add_vessel', { ...separatorParams, support: { ...lugs, ...patch } }, 'EQP_SUPPORT_INVALID', path);
   });
@@ -180,6 +184,61 @@ describe('lugs on a vertical exchanger', () => {
     expect(JSON.stringify(data(revised, 'check_equipment', {}))).toContain('lug structural checks');
   });
 
+  it('the revised support is exactly the lugs, and lugs can be replaced by legs without a trace of them', () => {
+    const horizontal = apply(mmDocument(), 'add_heat_exchanger', bemParams);
+    const lugged = apply(horizontal, 'update_equipment_parameters', {
+      equipment: 'E-301',
+      exchanger: { orientation: 'vertical', support: exchanger.support },
+    });
+    const support = (d: CadDocument): unknown => (equipmentOf(d, 'E-301').plant?.template as { support: unknown }).support;
+    expect(support(lugged)).toEqual({ ...lugs, lugElevation: 400, lugBoltHoleDiameter: undefined });
+    const legs = apply(lugged, 'update_equipment_parameters', {
+      equipment: 'E-301',
+      exchanger: { support: { type: 'legs', count: 4, height: 1000 } },
+    });
+    // pitch circle 2 x (300 + 8), leg width 10 % of the outside radius
+    expect(support(legs)).toEqual({ type: 'legs', count: 4, height: 1000, pitchDiameter: 616, legWidth: 30.8 });
+    expect(partsOf(legs).filter((part) => part.startsWith('lug-'))).toEqual([]);
+  });
+
+  it('exports exactly 8 more extruded solids than the same exchanger without lugs', () => {
+    const plain = apply(mmDocument(), 'add_heat_exchanger', { ...exchanger, support: { type: 'none', baseElevation: 2000 } });
+    const count = (d: CadDocument): number =>
+      data<{ ifc: string }>(d, 'export_ifc', { timestamp: '2026-01-01T00:00:00' }).ifc.match(/IFCEXTRUDEDAREASOLID/g)?.length ?? 0;
+    expect(count(doc) - count(plain)).toBe(8);
+  });
+
+  it('is pure and survives a save / load with the same derived entities', () => {
+    const input = mmDocument();
+    const before = JSON.stringify(input);
+    execute(input, 'add_heat_exchanger', exchanger);
+    expect(JSON.stringify(input)).toBe(before);
+    expect(JSON.stringify(deserializeDocument(serializeDocument(doc)).entities)).toBe(JSON.stringify(doc.entities));
+  });
+
+  it('load validation fit-checks the lugs of an exchanger (elevation, count, fixed-tubesheet shell range)', () => {
+    const stored = JSON.parse(serializeDocument(doc)) as {
+      document: { building: { elements: Record<string, { plant: { template: { support: Record<string, unknown> } } }> } };
+    };
+    const reject = (change: (support: Record<string, unknown>) => void): string => {
+      const copy = JSON.parse(JSON.stringify(stored)) as typeof stored;
+      change(
+        (Object.values(copy.document.building.elements)[0] as NonNullable<(typeof copy.document.building.elements)[string]>).plant.template
+          .support,
+      );
+      try {
+        deserializeDocument(JSON.stringify(copy));
+      } catch (error) {
+        return String(error);
+      }
+      return '';
+    };
+    expect(reject((s) => (s['lugElevation'] = 99999))).toMatch(/must lie on the shell/);
+    expect(reject((s) => (s['lugElevation'] = 100))).toMatch(/must lie on the shell/);
+    expect(reject((s) => (s['count'] = 400))).toMatch(/count <= 24/);
+    expect(reject(() => undefined)).toBe('');
+  });
+
   it('refuses lugs on a horizontal exchanger', () => {
     expectRefusal(mmDocument(), 'add_heat_exchanger', { ...bemParams, support: lugs }, 'EQP_SUPPORT_INVALID', 'support.type');
   });
@@ -187,12 +246,15 @@ describe('lugs on a vertical exchanger', () => {
 
 describe('load validation of lugs', () => {
   const stored = JSON.parse(serializeDocument(apply(mmDocument(), 'add_vessel', { ...separatorParams, support: lugs }))) as {
-    document: { building: { elements: Record<string, { plant: { template: { support: Record<string, unknown> } } }> } };
+    document: {
+      building: { elements: Record<string, { plant: { template: { support: Record<string, unknown> } & Record<string, unknown> } }> };
+    };
   };
-  const rejects = (change: (support: Record<string, unknown>) => void): string => {
+  const rejects = (change: (support: Record<string, unknown>, template: Record<string, unknown>) => void): string => {
     const copy = JSON.parse(JSON.stringify(stored)) as typeof stored;
     const element = Object.values(copy.document.building.elements)[0];
-    change((element as NonNullable<typeof element>).plant.template.support);
+    const { template } = (element as NonNullable<typeof element>).plant;
+    change(template.support, template);
     try {
       deserializeDocument(JSON.stringify(copy));
     } catch (error) {
@@ -202,10 +264,27 @@ describe('load validation of lugs', () => {
   };
 
   it.each([
+    ['a lug floating far above the shell', (s: Record<string, unknown>) => (s['lugElevation'] = 99999), /lug .* must lie on the shell/],
+    ['400 lugs of width 1000', (s: Record<string, unknown>) => ((s['count'] = 400), (s['lugWidth'] = 1000)), /count <= 24/],
+    [
+      'lugs on a horizontal vessel',
+      (_s: Record<string, unknown>, t: Record<string, unknown>) => (t['orientation'] = 'horizontal'),
+      /vertical body only/,
+    ],
+    ['24 lugs wider than the circumference', (s: Record<string, unknown>) => ((s['count'] = 24), (s['lugWidth'] = 250)), /circumference/],
     ['a zero thickness', (s: Record<string, unknown>) => (s['lugThickness'] = 0), /lugThickness must be a number > 0/],
     ['one lug', (s: Record<string, unknown>) => (s['count'] = 1), /count must be an integer >= 2/],
     ['a base plate as thick as the lug', (s: Record<string, unknown>) => (s['lugBasePlateThickness'] = 300), /below lugHeight/],
-    ['a bolt hole wider than the lug', (s: Record<string, unknown>) => (s['lugBoltHoleDiameter'] = 500), /below lugWidth/],
+    [
+      'a bolt hole wider than the lug',
+      (s: Record<string, unknown>) => (s['lugBoltHoleDiameter'] = 500),
+      /lugBoltHoleDiameter .* below \(lugWidth - lugThickness\) \/ 2/,
+    ],
+    [
+      'a bolt hole beside the web that does not fit',
+      (s: Record<string, unknown>) => (s['lugBoltHoleDiameter'] = 100),
+      /beside|middle of the base plate/,
+    ],
     ['a bolt hole of 0', (s: Record<string, unknown>) => (s['lugBoltHoleDiameter'] = 0), /lugBoltHoleDiameter must be a number > 0/],
   ])('rejects %s', (_name, change, message) => {
     expect(rejects(change)).toMatch(message);
@@ -314,6 +393,41 @@ describe('kettle weir plate and liquid level', () => {
     );
     const revised = apply(doc, 'update_equipment_parameters', { equipment: 'E-402', exchanger: { shellThickness: 9 } });
     expect(equipmentOf(revised, 'E-402').plant?.template).toMatchObject({ kettle: { weirStation: 400, weirThickness: 12 } });
+  });
+
+  it('is pure, survives a save / load with the same derived entities, and a rotated weir stands across the rotated shell axis', () => {
+    const input = mmDocument();
+    const before = JSON.stringify(input);
+    execute(input, 'add_heat_exchanger', withWeir);
+    expect(JSON.stringify(input)).toBe(before);
+    expect(JSON.stringify(deserializeDocument(serializeDocument(doc)).entities)).toBe(JSON.stringify(doc.entities));
+    const turned = apply(mmDocument(), 'add_heat_exchanger', { ...withWeir, location: [1000, 2000], planRotationDeg: 30 });
+    const weir = entityOf<ExtrusionEntity>(turned, 'weir');
+    const shell = entityOf<{ axis: [number, number, number]; rotation: [number, number, number] }>(turned, 'kettleShell');
+    const depth = applyEulerXYZ([0, 0, 1], [0, 0, 0], weir.rotation);
+    const axis = applyEulerXYZ(shell.axis, [0, 0, 0], shell.rotation);
+    expect(Math.abs(axis[0]) + Math.abs(axis[1])).toBeGreaterThan(0.99);
+    depth.forEach((value, index) => expect(value).toBeCloseTo(axis[index] as number, 9));
+    // the profile y stays vertical
+    expect(applyEulerXYZ([0, 1, 0], [0, 0, 0], weir.rotation)[2]).toBeCloseTo(1, 9);
+  });
+
+  it('weirStation: null removes the weir plate and keeps weirHeight; the volume then has no kettleWeir block', () => {
+    const removed = apply(doc, 'update_equipment_parameters', { equipment: 'E-402', exchanger: { kettle: { weirStation: null } } });
+    expect(partsOf(removed)).not.toContain('weir');
+    const template = equipmentOf(removed, 'E-402').plant?.template as { kettle: Record<string, unknown> };
+    expect(template.kettle).toEqual({
+      enlargedInsideDiameter: 900,
+      enlargedLength: 2000,
+      transitionLength: 300,
+      enlargedThickness: 10,
+      weirHeight: 500,
+    });
+    expect(data(removed, 'vessel_volume', { equipment: 'E-402' })).not.toHaveProperty('kettleWeir');
+    expect(weightsOf(removed, 'E-402').body.emptyKg).toBeCloseTo(weightsOf(plain, 'E-403').body.emptyKg, 9);
+    expect(data<{ kettleWeir: { note: string } }>(doc, 'vessel_volume', { equipment: 'E-402' }).kettleWeir.note).toContain(
+      'cuts through it',
+    );
   });
 
   it('load validation rejects a weir outside the enlarged length and a half-given weir', () => {

@@ -203,6 +203,35 @@ function buildingWithEquipment(): CadDocument {
   ]);
   doc = run(doc, 'add_heat_exchanger', { ...bemParams, location: [15000, 20000] });
   doc = withNozzles(doc, 'E-301', bemNozzles);
+  const lugs = {
+    type: 'lugs',
+    count: 4,
+    lugHeight: 300,
+    lugWidth: 200,
+    lugProjection: 150,
+    lugThickness: 20,
+    lugBasePlateThickness: 25,
+    lugBoltHoleDiameter: 30,
+    lugElevation: 1000,
+    baseElevation: 2000,
+  };
+  doc = run(doc, 'add_vessel', { ...separatorParams, tag: 'V-102', location: [0, 30000], support: lugs });
+  doc = run(doc, 'add_heat_exchanger', {
+    ...bemParams,
+    tag: 'E-302',
+    temaType: 'AKU',
+    location: [15000, 30000],
+    rearChannel: undefined,
+    support: undefined,
+    kettle: {
+      enlargedInsideDiameter: 900,
+      enlargedLength: 2000,
+      transitionLength: 300,
+      weirHeight: 500,
+      weirStation: 400,
+      weirThickness: 12,
+    },
+  });
   doc = run(doc, 'add_storage_tank', { ...tankParams, location: [60000, 30000] });
   return run(doc, 'add_pump', { ...pumpParams, location: [30000, 20000] });
 }
