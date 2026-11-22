@@ -28,6 +28,7 @@
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <GProp_GProps.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepFeat_MakePrism.hxx>
@@ -926,13 +927,13 @@ int most_star_poles(const Shape &shape) {
 // 0.25 x area x thickness bound of has_cavity tolerates (a real cavity removes about area x thickness).
 double volume_of(const TopoDS_Shape &shape) {
   GProp_GProps properties;
-  BRepGProp::VolumeProperties(shape, properties);
+  llull::query::volume_properties(shape, properties);
   return properties.Mass();
 }
 
 double area_of(const TopoDS_Shape &shape) {
   GProp_GProps properties;
-  BRepGProp::SurfaceProperties(shape, properties);
+  llull::query::surface_properties(shape, properties);
   return properties.Mass();
 }
 
@@ -1100,7 +1101,7 @@ TopoDS_Shape outward_solid(const std::vector<TopoDS_Shape> &faces, double tolera
   TopoDS_Shape solid = sewn_solid(faces, tolerance);
   if (solid.IsNull()) return solid;
   GProp_GProps volume;
-  BRepGProp::VolumeProperties(solid, volume);
+  llull::query::volume_properties(solid, volume);
   if (volume.Mass() < 0) solid.Reverse();
   // A self-crossing index pairing (bow-tie side, crossing sides) still sews shut: refuse an invalid solid so the caller falls back to the chains.
   if (!BRepCheck_Analyzer(solid, Standard_True).IsValid()) return TopoDS_Shape();
@@ -1300,7 +1301,7 @@ std::unique_ptr<Shape> pipe_shell_solid(rust::Slice<const double> spine, const S
       if (nearest > check) return nullptr;
     }
     GProp_GProps properties;
-    BRepGProp::VolumeProperties(solid, properties);
+    llull::query::volume_properties(solid, properties);
     if (!(properties.Mass() > 0)) return nullptr;
     if (volume > 0 && std::abs(properties.Mass() - volume) > 1e-4 * volume) return nullptr;
     return wrap(solid);

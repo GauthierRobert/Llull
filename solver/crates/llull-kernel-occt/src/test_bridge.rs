@@ -54,6 +54,14 @@ mod ffi {
         fn set_law_node_cap(nodes: i32);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
+        /// The strip integrator against BRepGProp's fixed rule on the whole shape (area 0, volume 1): `[faces taken, 10 numbers, 10 numbers]` (mass, centre, inertia about the origin xx yy zz xy xz yz), empty when no face is taken.
+        fn patch_properties_probe(shape: &Shape, volume: i32) -> Vec<f64>;
+        /// The strip integrator on (default) or off (every face by BRepGProp).
+        /// The same on a synthetic B-spline face (`cpp/mass_patch_probe.cxx`: kinds 0 to 6, plus 8 for the reversed face).
+        fn patch_synthetic_probe(kind: i32, volume: i32) -> Vec<f64>;
+        fn set_patch_integrator(on: bool);
+        /// The Gauss order of the strip integrator in both directions (0: from the degree).
+        fn set_patch_order(order: i32);
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
         fn oriented_angle_probe(shape: &Shape, face: i32, reverse: bool) -> f64;
         /// The same for a creased star: every B-spline face is a sub-patch, `sharp_edge` the unrounded edge it continues.
@@ -78,6 +86,36 @@ pub fn oriented_angle(shape: &Shape, face: i32, reverse: bool) -> f64 {
 
 pub fn boundary_angle(shape: &Shape, face: i32, drop_one: bool) -> f64 {
     ffi::boundary_angle_probe(crate::inner(shape).expect("a shape"), face, drop_one)
+}
+
+/// `None` when the strip integrator takes no face of the shape; else (faces taken, strip numbers, BRepGProp numbers, seconds of each).
+pub fn patch_properties(shape: &Shape, volume: bool) -> Option<PatchProperties> {
+    unpack(&ffi::patch_properties_probe(crate::inner(shape).expect("a shape"), i32::from(volume)))
+}
+
+pub type PatchProperties = (usize, [f64; 10], [f64; 10], [f64; 2]);
+
+fn unpack(found: &[f64]) -> Option<PatchProperties> {
+    if found.is_empty() {
+        return None;
+    }
+    let (mut strips, mut fixed) = ([0.0; 10], [0.0; 10]);
+    strips.copy_from_slice(&found[1..11]);
+    fixed.copy_from_slice(&found[11..21]);
+    Some((found[0] as usize, strips, fixed, [found[21], found[22]]))
+}
+
+/// The same for the synthetic face `kind`.
+pub fn patch_synthetic(kind: i32, volume: bool) -> Option<PatchProperties> {
+    unpack(&ffi::patch_synthetic_probe(kind, i32::from(volume)))
+}
+
+pub fn set_patch_integrator(on: bool) {
+    ffi::set_patch_integrator(on);
+}
+
+pub fn set_patch_order(order: i32) {
+    ffi::set_patch_order(order);
 }
 
 pub fn span_cut_count(shape: &Shape) -> i32 {

@@ -16,6 +16,7 @@
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepLib.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
@@ -355,14 +356,14 @@ rust::String mesh_to_brep_json(rust::Slice<const double> positions, rust::Slice<
   TopoDS_Solid solid = solid_maker.Solid();
   BRepLib::OrientClosedSolid(solid);
   GProp_GProps volume;
-  BRepGProp::VolumeProperties(solid, volume);
+  llull::query::volume_properties(solid, volume);
   if (volume.Mass() < 0) {
     solid.Reverse();
-    BRepGProp::VolumeProperties(solid, volume);
+    llull::query::volume_properties(solid, volume);
   }
   const BRepCheck_Analyzer check(solid);
   GProp_GProps area;
-  BRepGProp::SurfaceProperties(solid, area);
+  llull::query::surface_properties(solid, area);
   std::ostringstream stream;
   BRepTools::Write(solid, stream);
   JsonWriter json;

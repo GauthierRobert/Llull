@@ -27,6 +27,7 @@
 
 #include "llull-kernel-occt/cpp/facade.hxx"
 #include "llull-kernel-occt/cpp/json_writer.hxx"
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include "llull-kernel-occt/cpp/mass_spans.hxx"
 
 namespace llull {
@@ -119,6 +120,10 @@ inline FaceMetric face_metric_uncached(const TopoDS_Face &face, bool refined, do
   // the fixed rule too: by knot span when the face is a graded full B-spline patch (mass_spans.hxx)
   int cut = 0;
   const TopoDS_Compound spans = span_faces(face, cut, false);
+  if (!refined && cut == 0) {
+    GProp_GProps strips;
+    if (fast_surface_properties(face, strips)) return {strips.Mass(), strips.CentreOfMass()};
+  }
   BRepGProp::SurfaceProperties(cut > 0 ? static_cast<TopoDS_Shape>(spans) : static_cast<TopoDS_Shape>(face), props, Standard_False, Standard_False);
   return {props.Mass(), props.CentreOfMass()};
 }

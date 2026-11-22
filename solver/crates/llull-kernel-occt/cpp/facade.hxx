@@ -112,6 +112,11 @@ void set_shell_fault(int32_t fault);
 int32_t last_shell_star_poles();
 // Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
 int32_t span_cut_count(const Shape &shape);
+// Test-only: the strip integrator (mass_patch.hxx) against BRepGProp's fixed rule on the whole shape, area (0) or volume (1): [faces taken, 10 numbers, 10 numbers]; empty when no face is taken.
+rust::Vec<double> patch_properties_probe(const Shape &shape, int32_t volume);
+rust::Vec<double> patch_synthetic_probe(int32_t kind, int32_t volume);
+void set_patch_integrator(bool on);
+void set_patch_order(int32_t order);
 // Test-only seams of the mixed corner guards (blend_corner.cxx): the oriented patch angle of face `face` (optionally reversed in a rebuilt shell) and the boundary angle against its neighbours (-1: not measured).
 double oriented_angle_probe(const Shape &shape, int32_t face, bool reverse);
 double oriented_angle_creased_probe(const Shape &shape, int32_t face, bool reverse, int32_t sharp_edge);

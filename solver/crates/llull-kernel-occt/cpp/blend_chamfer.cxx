@@ -27,6 +27,7 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRep_Tool.hxx>
 #include <GCPnts_UniformAbscissa.hxx>
@@ -92,7 +93,7 @@ bool triangle(const gp_Pnt &corner, const gp_Pnt &a, const gp_Pnt &b, TopoDS_Wir
 
 double volume_of(const TopoDS_Shape &shape) {
   GProp_GProps props;
-  BRepGProp::VolumeProperties(shape, props);
+  llull::query::volume_properties(shape, props);
   return props.Mass();
 }
 
