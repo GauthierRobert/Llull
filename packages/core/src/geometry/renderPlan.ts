@@ -103,6 +103,7 @@ export const NON_GEOMETRY_KEYS: ReadonlySet<string> = new Set([
   'patternSourceId',
   'decals',
   'faceColors',
+  'vertexColors',
 ]);
 
 /** Locale-independent string order (UTF-16 code units), so plans are identical on every machine. */

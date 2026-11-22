@@ -25,7 +25,9 @@ const PLANT_KINDS: ReadonlySet<Entity['kind']> = new Set([
 /** True when the plant renderer can draw `entity` (a mesh with per-face colours, or any other kind, stays on the per-entity path). */
 export function isPlantBatchable(entity: Entity): boolean {
   if (!PLANT_KINDS.has(entity.kind)) return false;
-  return entity.kind !== 'mesh' || entity.faceColors === undefined || entity.faceColors.length === 0;
+  return (
+    entity.kind !== 'mesh' || ((entity.faceColors === undefined || entity.faceColors.length === 0) && entity.vertexColors === undefined)
+  );
 }
 
 /**

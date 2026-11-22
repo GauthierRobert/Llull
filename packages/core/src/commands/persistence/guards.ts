@@ -364,6 +364,14 @@ function meshProblem(v: Record<string, unknown>): string | null {
     (!Array.isArray(faceColors) || !faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color'])))
   )
     return 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
+  const vertexColors = v['vertexColors'];
+  if (
+    vertexColors !== undefined &&
+    (!Array.isArray(vertexColors) ||
+      vertexColors.length !== positions.length ||
+      !vertexColors.every((c) => isFiniteNumber(c) && c >= 0 && c <= 255))
+  )
+    return 'vertexColors must be 3 numbers in [0, 255] per mesh vertex';
   const provenance = meshProvenanceProblem(v, indices.length / 3);
   if (provenance !== null) return provenance;
   const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);

@@ -23,6 +23,17 @@ export function buildMeshSolidGeometry(mesh: MeshData, colors?: ReadonlyArray<nu
   return creased;
 }
 
+/** `mesh` with per-vertex `color` from `bytes` (sRGB 0-255, r, g, b per vertex: `MeshSolidEntity.vertexColors`), converted to the working colour space. */
+export function buildVertexColoredGeometry(mesh: MeshData, bytes: ReadonlyArray<number>): THREE.BufferGeometry {
+  const colour = new THREE.Color();
+  const linear: number[] = [];
+  for (let i = 0; i + 2 < bytes.length; i += 3) {
+    colour.setRGB((bytes[i] ?? 0) / 255, (bytes[i + 1] ?? 0) / 255, (bytes[i + 2] ?? 0) / 255, THREE.SRGBColorSpace);
+    linear.push(colour.r, colour.g, colour.b);
+  }
+  return buildMeshSolidGeometry(mesh, linear);
+}
+
 export function buildTriangleSoupGeometry(triangles: readonly Triangle[]): THREE.BufferGeometry | null {
   const positions = triangles.flat(2);
   if (positions.length === 0) return null;

@@ -168,7 +168,11 @@ export interface CivilCrs {
   readonly calibration?: SiteCalibration;
 }
 
+/** Hypsometric tint of TIN surfaces: `dem2` = GMT dem2 palette by height above the site ground; absent / `none` = plain layer colour. */
+export type TerrainTint = 'none' | 'dem2';
+
 export interface CivilModel {
+  readonly terrainTint?: TerrainTint;
   readonly crs?: CivilCrs;
   readonly objects: Readonly<Record<string, CivilObject>>;
   /** Creation / evaluation order. */

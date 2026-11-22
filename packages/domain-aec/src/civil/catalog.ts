@@ -3,6 +3,7 @@
 import { commandCatalog } from '@core/commands/schema';
 import { createSurface, importSurveyPoints, updateSurface } from './survey/surveyCommands';
 import { surfaceElevation, surfaceReport } from './surface/surfaceQueries';
+import { setCivilDisplay } from './surface/displayCommand';
 import { importSurveyDxf } from './survey/surveyDxf';
 import { deleteCivilObject, describeCivil } from './civilCommands';
 import { earthworksCommands } from './earthworks/earthworksCommands';
@@ -14,6 +15,6 @@ import { civilSheetCommands } from './sheets/civilSheetCommands';
 
 // prettier-ignore
 export const civilCommands = commandCatalog(
-  importSurveyPoints, importSurveyDxf, createSurface, updateSurface, surfaceElevation, surfaceReport, describeCivil, deleteCivilObject,
+  importSurveyPoints, importSurveyDxf, createSurface, updateSurface, surfaceElevation, surfaceReport, describeCivil, deleteCivilObject, setCivilDisplay,
   ...earthworksCommands, ...roadCommands, ...drainageCommands, ...civilExchangeCommands, ...crsCommands, ...civilSheetCommands,
 );

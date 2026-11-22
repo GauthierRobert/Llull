@@ -1,7 +1,7 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
-import type { FaceGroup, MeshAssetRef, MeshSource } from './meshProvenance';
+import type { FaceGroup, MeshAssetRef, MeshSource, VertexTint } from './meshProvenance';
 import type { EdgeBlendNode, FaceBlendParams, FullRoundParams, JointRadius } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
@@ -147,7 +147,7 @@ export interface ExtrusionEntity extends BaseEntity {
  * @invariant `brep`, when present, is the exact construction tree the kernel tessellated into `mesh` (before `position`/`rotation`); a
  *   command that rewrites `mesh` must rewrite or drop `brep`
  */
-export interface MeshSolidEntity extends BaseEntity {
+export interface MeshSolidEntity extends BaseEntity, VertexTint {
   readonly kind: 'mesh';
   mesh: MeshData;
   /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */

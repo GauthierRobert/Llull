@@ -39,9 +39,9 @@ function withMaterialColor(doc: CadDocument, e: Entity): Entity {
 
 /** `e` drawn flat in `color` (a mesh's per-face colours are dropped). */
 function withColorOverride(e: Entity, color: string): Entity {
-  if (!('faceColors' in e)) return { ...e, color };
-  const { faceColors: _faceColors, ...rest } = e;
-  return { ...rest, color };
+  if (!('faceColors' in e) && !('vertexColors' in e)) return { ...e, color };
+  const { faceColors: _faceColors, vertexColors: _vertexColors, ...rest } = e as Entity & { faceColors?: unknown; vertexColors?: unknown };
+  return { ...rest, color } as Entity;
 }
 
 /** Z-up orthographic SVG render of every entity in `doc.order`. @pure */

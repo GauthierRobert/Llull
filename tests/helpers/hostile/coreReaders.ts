@@ -8,6 +8,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { evaluateExpression } from '@lib/expression';
 import { compileExpression } from '@lib/expressionProgram';
+import { parseCpt } from '@lib/cpt';
 import { float64ToBase64 } from '@lib/float64Base64';
 import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
@@ -709,5 +710,13 @@ export const CORE_READERS: readonly HostileReader[] = [
     build: (records) => repeated('', (k) => `box${k} fillet `, 'edge', records),
     read: (input) => [parseQuery(asText(input)), orRefusal(() => parseCommandResponse(parsedJson(asText(input)), 200))],
     accepts: () => true,
+  },
+  {
+    name: 'core: parseCpt (GMT colour palette table)',
+    covers: ['core/src/lib/cpt.ts:parseCpt'],
+    input: 'text',
+    build: (records) => repeated('# RANGE = 0/4900\n', (k) => `${k} ${k % 256}/0/0 ${k + 1} 0/${k % 256}/0\n`, 'B black\n', records),
+    read: (input) => parseCpt(asText(input)),
+    accepts: (result) => (result as { ok: boolean }).ok,
   },
 ];
