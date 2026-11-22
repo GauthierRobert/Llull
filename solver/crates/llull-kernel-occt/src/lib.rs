@@ -42,6 +42,8 @@ mod blend_end_tests;
 #[cfg(test)]
 mod blend_g2corner_tests;
 #[cfg(test)]
+mod blend_g2vertex_probe_tests;
+#[cfg(test)]
 mod blend_joint_tests;
 #[cfg(test)]
 mod blend_legs_curvature_tests;
