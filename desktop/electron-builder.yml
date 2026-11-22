@@ -18,6 +18,9 @@ extraResources:
   # llull's own licence (LIC1); third-party notices ship with python/ and native/.
   - from: ../LICENSE
     to: LICENSE
+  # Notice + licence texts of the third-party DATA embedded in the bundles (GMT dem2 palette, dodo piping tables).
+  - from: ../THIRD_PARTY_DATA
+    to: third-party-data
   # Renderer bundle (npm run build:web); the backend serves it, so the API base is the page origin.
   - from: ../dist
     to: web

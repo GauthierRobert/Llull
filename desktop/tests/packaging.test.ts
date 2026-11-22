@@ -29,6 +29,21 @@ describe('installer packaging', () => {
     expect(read('desktop/electron-builder.yml')).toMatch(/^ {2}- '!node_modules\/\*\*'$/m);
   });
 
+  it('ships the third-party data notice, with licence texts equal to the vendored originals', () => {
+    expect(read('desktop/electron-builder.yml')).toMatch(/^ {2}- from: \.\.\/THIRD_PARTY_DATA\n {4}to: third-party-data$/m);
+    const notice = read('THIRD_PARTY_DATA/NOTICE.md');
+    expect(notice).toContain('dem2.cpt');
+    expect(notice).toContain('LICENSE-GMT.TXT');
+    expect(notice).toContain('LICENSE-dodo-LGPL-3.0.txt');
+    const pack = 'docs/plant';
+    expect(read('THIRD_PARTY_DATA/LICENSE-GMT.TXT')).toBe(
+      read(`${pack}/09-plant-visualization-review/validation/data/gmt_cpt/LICENSE-GMT.TXT`),
+    );
+    expect(read('THIRD_PARTY_DATA/LICENSE-dodo-LGPL-3.0.txt')).toBe(
+      read(`${pack}/01-piping-specs-catalog/validation/data/LICENSE-dodo-LGPL-3.0.txt`),
+    );
+  });
+
   it('extracts the Python archive with the system tar', () => {
     const script = read('desktop/scripts/prepare-python.mjs');
     expect(script).toContain('execFileSync(systemTar(),');

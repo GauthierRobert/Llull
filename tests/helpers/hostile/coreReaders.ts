@@ -718,5 +718,12 @@ export const CORE_READERS: readonly HostileReader[] = [
     build: (records) => repeated('# RANGE = 0/4900\n', (k) => `${k} ${k % 256}/0/0 ${k + 1} 0/${k % 256}/0\n`, 'B black\n', records),
     read: (input) => parseCpt(asText(input)),
     accepts: (result) => (result as { ok: boolean }).ok,
+    extra: [
+      { name: 'z beyond double range (1e309)', input: () => '0 0/0/0 1e309 1/1/1\n' },
+      { name: 'NaN z', input: () => 'NaN 0/0/0 1 1/1/1\n' },
+      { name: 'RANGE 1e309', input: () => '# RANGE = 0/1e309\n0 0/0/0 1 1/1/1\n' },
+      { name: 'RANGE NaN', input: () => '# RANGE = NaN/10\n0 0/0/0 1 1/1/1\n' },
+      { name: 'hinge header', input: () => '# HARD_HINGE\n# RANGE = -1/1\n-1 0/0/0 1 1/1/1\n' },
+    ],
   },
 ];
