@@ -2260,4 +2260,4 @@ Cylinder block, sharp edge x 11 radius / ball pairs ((0.3, 1), (0.3, 1.5), (0.5,
 
 ### 13.43.5 Not done
 
-The test `a_trim_star_that_stands_outside_the_part_is_measured_and_refused_above_the_limit` (end of `blend_profile_third_tests.rs`) has a comment that swallowed its last lines (`// the same gate on the cylinder block ... let (block, vertex, _) ...` on one line): that assertion (cylinder block, sharp 2 at r 0.3 / ball 2 stands 0.015 outside) has never run. Left as found.
+The test `a_trim_star_that_stands_outside_the_part_is_measured_and_refused_above_the_limit` (end of `blend_profile_third_tests.rs`) has a comment that swallowed its last lines (`// the same gate on the cylinder block ... let (block, vertex, _) ...` on one line): that assertion (cylinder block, sharp 2 at r 0.3 / ball 2 stands 0.015 outside) had never run. Restored on its own lines 2026-11-22: it runs and passes (sharp 2 at r 0.3 / ball 2 is still refused with `stands 0.015 … outside the part, above`).
