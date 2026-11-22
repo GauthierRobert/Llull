@@ -77,6 +77,8 @@ export interface Seed {
   readonly startKey: string;
   readonly dn: number;
   readonly parent?: string;
+  /** Branch off a shifted header axis: the part of the header offset perpendicular to the branch (file points of the branch are on the shifted axis). */
+  readonly sideways?: Vec3;
 }
 
 export type PlannedCap = NonNullable<PlannedRun['cap']>;

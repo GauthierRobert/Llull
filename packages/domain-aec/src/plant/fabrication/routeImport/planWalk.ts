@@ -113,7 +113,7 @@ function teeStep(s: PlanState, w: Walk, component: NetworkComponent): Step {
   const centre = component.centre ?? (a !== undefined && b !== undefined ? midpoint(a, b) : undefined);
   if (component.branch === undefined || centre === undefined)
     return refuse('ISO_ROUTE_UNSUPPORTED', `tee ${component.id} has no branch point`, [component.id]);
-  addBranch(s, w.seed.key, sub3(centre, w.shift), component.branch);
+  addBranch(s, w.seed.key, sub3(centre, w.shift), component.branch, w.shift);
   return 'advance';
 }
 

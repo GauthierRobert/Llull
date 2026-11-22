@@ -38,6 +38,8 @@ export interface BranchFit {
   readonly shift: Vec3;
   /** Sideways residual of the shift that the branch run does not take up (within the angle tolerance), mm; absent when none. */
   readonly residualMm?: number;
+  /** The part of `shift` perpendicular to the branch beyond the angle tolerance: the branch run's derived start moves by it; absent when none. */
+  readonly sideways?: Vec3;
   readonly direction: Vec3;
   /** Tee M, olet A (centre of the header to the outlet face), stub-in OD / 2: where the branch pipe starts along the branch. */
   readonly branchStart: number;
@@ -342,6 +344,7 @@ export function branchStartSetup(
     portId,
     fittingId: fit.partId,
     ...(len3(fit.shift) > 0 ? { startAlongMm: dot3(fit.shift, fit.direction) } : {}),
+    ...(fit.sideways === undefined ? {} : { startSideways: fit.sideways }),
     ...(fit.kind === 'stubIn' ? { weldless: true } : {}),
   };
 }

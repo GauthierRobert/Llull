@@ -8,7 +8,8 @@
 import type { Entity, RevolutionEntity } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, RoutedPart } from '@aec/plant/types';
-import { add3, len3, scale3, sub3 } from '@lib/vec3';
+import { add3, dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { unitVector } from './legs';
 import { operatorBodies, type OperatorKind } from './operator';
 import {
   axisOf,
@@ -152,6 +153,40 @@ function blindEntities(part: RoutedPart, line: PipeLine): Entity[] {
   return [cylinder(part, line, FLANGE_LAYER_ID, 'Blind flange', part.centre, mating.direction, thickness, od / 2)];
 }
 
+/**
+ * A spectacle blind: the plate drawn as the open ring and the solid disc side by side along the web (the row's `discDiameterOpen` / `discDiameterClosed`, `webLength` apart)
+ * toward the handle side (perpendicular to the pipe, up, else +X), each `thickness` thick from the upstream face; the disc in the line (per `state`) is centred on the pipe axis.
+ */
+function spectacleEntities(part: RoutedPart, line: PipeLine): Entity[] {
+  const [first, second] = part.ports;
+  const { thickness, discDiameterClosed: closed, discDiameterOpen: open, webLength: web } = part.dims;
+  if (first === undefined || second === undefined || part.centre === undefined) return [];
+  if (thickness === undefined || closed === undefined || open === undefined || web === undefined) return [];
+  const axis = unitVector(sub3(second.position, first.position));
+  const up: Vec3 = Math.abs(axis[2]) < 0.999 ? [0, 0, 1] : [1, 0, 0];
+  const side = unitVector(sub3(up, scale3(axis, dot3(up, axis))));
+  const inLine = part.state === 'open' ? 'open' : 'closed';
+  const spare = scale3(side, inLine === 'closed' ? -web : web);
+  const disc = (label: string, id: string, centre: Vec3, diameter: number): RevolutionEntity => ({
+    ...cylinder(part, line, FLANGE_LAYER_ID, label, add3(centre, scale3(axis, -thickness / 2)), axis, thickness, diameter / 2),
+    id,
+  });
+  return [
+    disc(
+      inLine === 'closed' ? 'Spectacle blind (closed)' : 'Spectacle blind (open)',
+      part.id,
+      part.centre,
+      inLine === 'closed' ? closed : open,
+    ),
+    disc(
+      inLine === 'closed' ? 'Spectacle ring' : 'Spectacle disc',
+      `${part.id}/spare`,
+      add3(part.centre, spare),
+      inLine === 'closed' ? open : closed,
+    ),
+  ];
+}
+
 /** A coupling or union: a cylinder over the row length between the two faces, at the larger of the row `bodyOd` and the pipe outside diameter. */
 function straightEntities(part: RoutedPart, line: PipeLine): Entity[] {
   if (part.typeKey !== 'coupling' && part.typeKey !== 'union') return [];
@@ -181,7 +216,7 @@ export function partEntities(part: RoutedPart, line: PipeLine): Entity[] {
     case 'olet':
       return oletEntities(part, line);
     case 'inline':
-      return straightEntities(part, line);
+      return part.typeKey === 'spectacleBlind' ? spectacleEntities(part, line) : straightEntities(part, line);
     case 'cap':
       return capEntities(part, line);
     case 'flange':

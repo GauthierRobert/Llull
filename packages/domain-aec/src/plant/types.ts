@@ -110,6 +110,8 @@ export interface RunEnd {
   readonly cap?: true;
   /** An open end closed by a blind flange of the line spec (`set_run_end_cap` closure blindFlange): flange set + gasket + blind row read at derivation; never with `ref` or `cap`. */
   readonly blind?: true;
+  /** An open end closed by a spectacle blind of the line spec (`set_run_end_cap` closure spectacleBlind): flange set + gasket + plate row read at derivation; its state `open` | `closed`; never with `ref`, `cap` or `blind`. */
+  readonly spectacle?: 'open' | 'closed';
 }
 
 /** How an auto-routed run was found (`auto_route_pipe`): the validated solution's numbers and the engine that produced them. */
@@ -145,6 +147,8 @@ export interface InlineComponent {
   readonly lengthMm?: number;
   /** Instruments: `FL` (flanged: a flange set from the spec on each face) or `BW`; absent = `FL`. */
   readonly endType?: 'FL' | 'BW';
+  /** Spectacle blinds: `closed` (the solid disc is in the line, default) or `open` (the open ring is). */
+  readonly state?: 'open' | 'closed';
 }
 
 /** A branch off a header run: the branch run `branchRunId` starts at the point `distance` along leg `leg` of the header centreline. */
@@ -246,6 +250,8 @@ export interface RoutedPart {
   readonly onPart?: string;
   /** Bolt sets: stud count. */
   readonly studs?: number;
+  /** Spectacle blinds: the state of the plate (`closed` = the solid disc is in the line). */
+  readonly state?: 'open' | 'closed';
   /** Row dimensions the display geometry reads (outside diameter, wall, thickness, ring diameters ...), mm. */
   readonly dims: Readonly<Record<string, number>>;
   /** Not every dimension of the catalogue row is grade A (AF-32). */

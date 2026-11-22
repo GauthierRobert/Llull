@@ -8,7 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
 import { deriveRun } from '@aec/plant/piping/routeParts';
 import { execute } from '@core/commands/registry';
-import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { data, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
 import { addTie, cs150Document, cs150Line } from '../piping/rteFixtures';
 
@@ -81,13 +81,7 @@ describe('tee downstream of an eccentric reducer (branch axis on the shifted leg
     expect(pipe?.ports[0]?.position[0]).toBeCloseTo(3000, 6);
   });
 
-  it('a branch perpendicular to the offset is still refused (document unchanged), and a branch before the reducer is not shifted', () => {
-    expectRefusal(
-      base.doc,
-      'add_branch',
-      { runId: base.runId, at: { leg: 0, distance: 3000 }, dn: 100, legs: [{ direction: '-Y', length: 500 }] },
-      'RTE_BRANCH_ON_FITTING',
-    );
+  it('a branch before the reducer is not shifted', () => {
     const before = ok(base.doc, 'add_branch', {
       runId: base.runId,
       at: { leg: 0, distance: 1000 },

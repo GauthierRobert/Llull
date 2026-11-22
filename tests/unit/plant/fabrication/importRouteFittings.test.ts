@@ -166,13 +166,18 @@ describe('eccentric reducers in route mode', () => {
     record('ELBOW', 5, ['3848.0 0.0 27.0 100 BW', '4000.0 0.0 179.0 100 BW'], '    CENTRE-POINT 4000.0 0.0 27.0\n    SKEY ELBW\n') +
     record('PIPE', 6, ['4000.0 0.0 179.0 100 BW', '4000.0 0.0 1000.0 100 BW']);
 
-  it('a tee downstream of the reducer is rebuilt on the stored axis (branch along the offset); a branch across the offset is refused', () => {
+  it('a tee downstream of the reducer is rebuilt on the stored axis (branch along the offset); a branch across the offset is rebuilt with its run on the stored axis', () => {
     const result = route(teeFile('2285.0 0.0 200.0') + record('PIPE', 7, ['2285.0 0.0 200.0 100 BW', '2285.0 0.0 1000.0 100 BW']));
     expect(result.rejected).toBeUndefined();
     expect(routeData(result).route.runs).toHaveLength(2);
     const across = route(teeFile('2285.0 200.0 27.0') + record('PIPE', 7, ['2285.0 200.0 27.0 100 BW', '2285.0 1000.0 27.0 100 BW']));
-    expect(across.rejected).toBe(true);
-    expect(across.summary).toContain('RTE_BRANCH_ON_FITTING');
+    expect(across.rejected).toBeUndefined();
+    expect(routeData(across).route.runs).toHaveLength(2);
+    const stored = Object.values(across.document.plant?.piping?.runs ?? {}).find(
+      (run) => run.start.point[1] === 0 && run.start.point[0] === 2285,
+    );
+    expect(stored?.start.point).toEqual([2285, 0, 0]);
+    expect(stored?.end.point).toEqual([2285, 1000, 0]);
   });
 
   it('is pure: the document passed in is not changed', () => {

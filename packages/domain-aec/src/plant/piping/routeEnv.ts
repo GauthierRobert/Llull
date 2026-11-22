@@ -45,11 +45,13 @@ export interface EndSetup {
   /** Open end closed by a cap: the catalogue row (one port, length = the interval occupied). */
   readonly cap?: CatalogueRow;
   /** Open end closed by a blind flange: the blind row and its thickness (the flange set and gasket are `set`; `length` = thickness + set length). */
-  readonly blind?: { readonly row: CatalogueRow; readonly thickness: number };
+  readonly blind?: { readonly row: CatalogueRow; readonly thickness: number; readonly state?: 'open' | 'closed' };
   /** Branch start on a stub-in: the first piece is not butt welded to the part (the set-on branch weld is the one weld). */
   readonly weldless?: boolean;
   /** Branch start downstream of an eccentric reducer: how far along the first leg the branch axis start lies from the stored start (header offset . branch direction), mm. */
   readonly startAlongMm?: number;
+  /** Branch start downstream of an eccentric reducer, header offset perpendicular to the branch beyond the angle tolerance: the derived start of the branch run moves by it (`shiftedBranchRun`). */
+  readonly startSideways?: Vec3;
 }
 
 export const partOf = (

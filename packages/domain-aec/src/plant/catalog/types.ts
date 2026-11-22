@@ -32,6 +32,7 @@ export const COMPONENT_TYPES = [
   'flangeWeldNeck',
   'flangeSlipOn',
   'flangeBlind',
+  'spectacleBlind',
   'flangeSocketWeld',
   'flangeThreaded',
   'flangeLapJoint',
