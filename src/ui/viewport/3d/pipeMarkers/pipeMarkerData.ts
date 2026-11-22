@@ -2,6 +2,7 @@
 // per run, and write the instance matrices (document units) of the arrows. The arrow geometry points along +Y, like the port glyphs.
 
 import type { Vec3 } from '@core/model/types';
+import type { PipeMarker as StoredPipeMarker } from '@core/model/display';
 import { arrowQuaternion } from '../ports/portGlyphs';
 
 export interface PipeMarker {
@@ -9,6 +10,8 @@ export interface PipeMarker {
   readonly tangent: Vec3;
   /** Field colour of the run's rule (#rrggbb). */
   readonly colour: string;
+  /** Arrow length in mm; absent = `MARKER_LENGTH_MM` (the `pipe_markers` placement carries no legend size). */
+  readonly lengthMm?: number;
 }
 
 interface PipeMarkerLabel {
@@ -16,6 +19,8 @@ interface PipeMarkerLabel {
   readonly positionMm: Vec3;
   readonly letters: string;
   readonly colour: string;
+  /** Letter height in mm (stored markers: the A13.1 row); absent = a default tied to the arrow length. */
+  readonly heightMm?: number;
 }
 
 export interface PipeMarkerScene {
@@ -73,8 +78,8 @@ export function parsePipeMarkers(data: unknown): PipeMarkerScene {
 /** Column-major 4x4 matrices (16 floats per marker) in document units: arrow of `lengthMm` along the tangent, base at the placement. */
 export function markerMatrices(markers: readonly PipeMarker[], mmPerUnit: number, lengthMm: number = MARKER_LENGTH_MM): Float32Array {
   const out = new Float32Array(markers.length * 16);
-  const scale = lengthMm / mmPerUnit;
   markers.forEach((marker, index) => {
+    const scale = (marker.lengthMm ?? lengthMm) / mmPerUnit;
     const [x, y, z, w] = arrowQuaternion(marker.tangent);
     const [x2, y2, z2] = [x + x, y + y, z + z];
     const [xx, xy, xz, yy, yz, zz] = [x * x2, x * y2, x * z2, y * y2, y * z2, z * z2];
@@ -102,4 +107,62 @@ export function markerMatrices(markers: readonly PipeMarker[], mmPerUnit: number
     );
   });
   return out;
+}
+
+/** Field colour per pipe id of a `pipe_markers` answer (null: no rule matches); the ids in it are the pipes that exist. */
+export function parsePipeColours(data: unknown): ReadonlyMap<string, string | null> {
+  const runs = record(data)?.['runs'];
+  const out = new Map<string, string | null>();
+  if (!Array.isArray(runs)) return out;
+  for (const run of runs) {
+    const entry = record(run);
+    if (typeof entry?.['id'] !== 'string') continue;
+    const colour = record(entry['rule'])?.['fieldHex'];
+    out.set(entry['id'], typeof colour === 'string' && HEX.test(colour) ? colour : null);
+  }
+  return out;
+}
+
+/** Colour of a stored marker on a pipe with no matching rule. */
+const NEUTRAL_MARKER_COLOUR = '#c8d0dc';
+
+/**
+ * Scene of the stored `display.pipeMarkers` (add_pipe_markers). Markers of a pipe that no longer exists (`colours` has no entry) are not drawn.
+ * Arrow length = the A13.1 field length of the marker; a bidirectional marker is two half-length arrows leaving the placement both ways.
+ * One text label per lettered pipe, on its middle marker, at the A13.1 letter height. At most 2 arrow instances per stored marker.
+ */
+export function storedMarkerScene(stored: readonly StoredPipeMarker[], colours: ReadonlyMap<string, string | null>): PipeMarkerScene {
+  const byPipe = new Map<string, StoredPipeMarker[]>();
+  for (const marker of stored) {
+    if (!colours.has(marker.pipeId) || !isVec3(marker.positionMm) || !isVec3(marker.tangent)) continue;
+    byPipe.set(marker.pipeId, [...(byPipe.get(marker.pipeId) ?? []), marker]);
+  }
+  const markers: PipeMarker[] = [];
+  const labels: PipeMarkerLabel[] = [];
+  for (const [pipeId, list] of byPipe) {
+    list.sort((a, b) => a.atMm - b.atMm);
+    const colour = colours.get(pipeId) ?? NEUTRAL_MARKER_COLOUR;
+    for (const marker of list) {
+      const position: Vec3 = [...marker.positionMm];
+      const tangent: Vec3 = [...marker.tangent];
+      if (marker.bidirectional) {
+        const back: Vec3 = [-tangent[0], -tangent[1], -tangent[2]];
+        markers.push({ positionMm: position, tangent, colour, lengthMm: marker.fieldLengthMm / 2 });
+        markers.push({ positionMm: position, tangent: back, colour, lengthMm: marker.fieldLengthMm / 2 });
+      } else {
+        markers.push({ positionMm: position, tangent, colour, lengthMm: marker.fieldLengthMm });
+      }
+    }
+    const middle = list[Math.floor(list.length / 2)];
+    if (middle?.letters !== undefined && middle.letters !== '' && labels.length < MAX_LABELS) {
+      labels.push({
+        runId: pipeId,
+        positionMm: [...middle.positionMm],
+        letters: middle.letters,
+        colour: middle.letterHex !== undefined && HEX.test(middle.letterHex) ? middle.letterHex : '#ffffff',
+        heightMm: middle.letterHeightMm,
+      });
+    }
+  }
+  return { markers, labels };
 }
