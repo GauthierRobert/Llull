@@ -952,6 +952,9 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
       { reach: 0, fan: true },
     );
     expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST' && found.severity === 'fail')).toBe(true);
+    expect(result.findings.find((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')?.message).toContain(
+      'all along the seam, where the vertex fans',
+    );
     expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toBe(false);
   });
 
