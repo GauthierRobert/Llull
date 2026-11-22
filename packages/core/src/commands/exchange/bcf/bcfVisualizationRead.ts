@@ -4,6 +4,7 @@
  */
 
 import type { Vec3 } from '../../../model/vectors';
+import { ignoredInVisualization } from './bcfIgnored';
 import { readXml, xmlAttr, xmlChildren, xmlText, type XmlElement } from '../../../lib/xmlRead';
 
 /** Limits of one XML part of a BCF archive (the reader refuses more, `readXml` codes). */
@@ -34,6 +35,8 @@ export interface BcfVisualization {
   /** The selected components as written (llull id and / or IfcGuid), for resolution by IfcGuid when the id is missing or names no entity. */
   readonly selectionRefs: readonly BcfComponentRef[];
   readonly exceptionRefs: readonly BcfComponentRef[];
+  /** Names of the elements / attributes present in the file that no import field holds (bcfIgnored.ts). */
+  readonly ignored: readonly string[];
 }
 
 /** One `Component`: its llull AuthoringToolId (when OriginatingSystem is "llull") and its IfcGuid attribute, when present. */
@@ -116,6 +119,7 @@ export function parseVisualizationInfo(xml: string): BcfVisualization | string {
     camera,
     selectionRefs: selection.refs,
     exceptionRefs: exceptions.refs,
+    ignored: [...ignoredInVisualization(root)],
     ...(declared === 'true' || declared === 'false' ? { defaultVisible: declared === 'true' } : {}),
   };
 }

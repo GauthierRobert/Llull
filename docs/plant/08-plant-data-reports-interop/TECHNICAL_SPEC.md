@@ -1029,3 +1029,7 @@ Also built here (BCF GlobalIds, check_display hazard warning): 09 §12.20.
 
 `export_ifc` and the BCF projection share `building/exchange/ifcSeeds.ts` (`globalIdFor` + product seed names), so a BCF `IfcGuid` is the GlobalId in the IFC file for pipes (per schema: one product in IFC4, a segment per straight and a fitting per bend in IFC4X3_ADD2; `export_bcf` `ifcSchema`), moment connections, base plates, routed parts and equipment nozzles (the equipment product: a nozzle is a nested `IfcDistributionPort`). A scoped export (`plant.scope`) does not change GlobalIds (seeds ignore scope). `import_bcf` resolves IfcGuid components back to entities and reports the unresolved GlobalIds by name (`VIS_BCF_GUID_UNRESOLVED`, `data.unresolvedGuids`). Details and tests: 09 §12.22.
 Review fixes (curved walls, openings, access elements, stairs, slab openings, validated IfcGuid text): 09 §12.23.
+
+### 13.18 DAT-VIS-FU3 (2026-11-22): BCF XSD validation, import loss report
+
+The buildingSMART BCF-XML 3.0 and 2.1 schemas are vendored unmodified (09 `validation/data/bcf_3_0/`, `bcf_2_1/`, CC BY-ND 4.0, NOTICE + sha256 rows in 09 `validation/sources.md`), and `server/tests/bcfSchema.test.ts` validates every BCF part `export_bcf` (3.0, 2.1) and `export_bcf_viewpoint` write, IfcGuid components included, with `xmllint --schema` (skipped by tool). The writer was already valid. `import_bcf` now reports by name what it does not import (`data.ignored`, warning `VIS_BCF_ELEMENT_IGNORED`). Details: 09 §12.28.
