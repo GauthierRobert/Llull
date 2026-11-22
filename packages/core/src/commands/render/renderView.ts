@@ -16,7 +16,7 @@ import { appendCageNetOverlays, overlayKinds } from './overlayCage';
 import { orderedEntities } from '../entity/entityOps';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
-import { siteLightOf, sunShadowNote } from './siteLight';
+import { siteLightOf, skyNote, sunShadowNote } from './siteLight';
 import { surfaceShadingOf } from './surfaceShading';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
 import { is2D } from '../../model/types';
@@ -212,6 +212,12 @@ const renderViewParams = z.object({
     .describe(
       "Raster mode with a site context (set_site_context): draw the sun's shadows (shadow map along the computed sun, none when the sun is below the horizon) and, when the site has groundElevation, a finite ground plane at that height that receives them. Default: true. false = lit by the sun without shadows or ground plane. Without a site context nothing changes.",
     ),
+  sky: z
+    .boolean()
+    .optional()
+    .describe(
+      'Raster mode with a site context (set_site_context): fill the background (pixels no geometry covers) with the Preetham daylight sky of the computed sun (three.js Sky.js model, defaults turbidity 2, rayleigh 1, mie 0.005, mieDirectionalG 0.8; the dark night colour when the sun is below the horizon). Default: true. false = the flat background colour. Without a site context nothing changes.',
+    ),
   showLabels: z
     .boolean()
     .optional()
@@ -266,6 +272,7 @@ function renderOnce(doc: CadDocument, params: RenderViewParams, ctx: ExecutionCo
     renderNotes(base, options.cut),
     siteLightOf(unstyled)?.note ?? '',
     sunShadowNote(options.light, base.sunShadows, options.mode !== 'vector'),
+    skyNote(options.light, options.mode !== 'vector'),
   ]
     .filter((n) => n !== '')
     .join(' ');

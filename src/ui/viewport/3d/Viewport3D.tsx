@@ -30,6 +30,7 @@ import { NavigationController, WALKABLE_GROUP_NAME } from './navigation/Navigati
 import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
+import { SiteSky } from './SiteSky';
 import { CANVAS_DPR_RANGE, RenderRig } from './RenderRig';
 import { CaptureRig } from './capture/CaptureRig';
 import { MechanismOverlay } from './MechanismOverlay';
@@ -144,6 +145,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         contactShadowOpacity={palette.contactShadowOpacity}
         groundShadowOpacity={palette.groundShadowOpacity}
       />
+
+      <SiteSky />
 
       <Grid
         args={[40, 40]}

@@ -81,9 +81,16 @@ export function makeProjector(cam: Camera, orthoHalf: number, width: number, hei
 const LIGHT_DIR: Vec3 = normalize3([0.6, -0.8, 1.0]);
 const AMBIENT = 0.35;
 
+/** `RenderLight.sky`: the unit direction toward the sun (Z-up, also when it is below the horizon: the model's own night output); see `skyRaster.ts`. */
+export interface SkyLight {
+  readonly sunDirection: Vec3;
+}
+
 /** Key light override of a render (site-context sun): `direction` is the unit vector toward the light in model axes; null = sky light only (sun below the horizon). */
 export interface RenderLight {
   readonly direction: Vec3 | null;
+  /** Present = the raster background (pixels no face covers) shows the Preetham sky of this sun. */
+  readonly sky?: SkyLight;
   /** Present = raster sun shadows (when the sun is up) and the ground plane at `groundElevation` (null = none); see `sunShadows.ts`. */
   readonly shadows?: {
     readonly groundElevation: number | null;
