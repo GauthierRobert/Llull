@@ -113,7 +113,7 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
       'vertical exchanger on saddles',
       'equipment-1',
       (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['orientation'] = 'vertical'),
-      /skirt, legs or none for a vertical exchanger/,
+      /skirt, legs, lugs or none for a vertical exchanger/,
     ],
     [
       'kettle record on a non-K shell',

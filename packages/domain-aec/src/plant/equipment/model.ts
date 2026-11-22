@@ -55,11 +55,13 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EQP_NOT_PARAMETRIC:
     'Recreate it with add_vessel, or keep it as a block and add nozzles with location { on: "free", position, direction }.',
   EQP_SUPPORT_INVALID:
-    'Skirt / legs belong to vertical vessels, saddles to horizontal ones; legs >= 3; saddle stations inside 0..tangentLength.',
+    'Skirt / legs / lugs belong to vertical vessels, saddles to horizontal ones; legs >= 3, lugs >= 2 with every lug dimension given and the lug on the shell; saddle stations inside 0..tangentLength.',
   EQP_TEMA_INVALID:
     'Use three TEMA letters: front head A, B, C, D or N; shell E, F, G, H, J, K or X; rear head L, M, N, P, S, T, U or W, e.g. BEM, AES, AEU.',
   EQP_EXCHANGER_UNSUPPORTED:
-    'Kettle (K) is horizontal with a removable-bundle rear (P, S, T, U, W); front D needs frontChannel.thickness and coverThickness; vertical exchangers stand on skirt / legs / none, horizontal ones on saddles / none.',
+    'Kettle (K) is horizontal with a removable-bundle rear (P, S, T, U, W); front D needs frontChannel.thickness and coverThickness; vertical exchangers stand on skirt / legs / lugs / none, horizontal ones on saddles / none.',
+  EQP_WEIR_OUT_OF_RANGE:
+    'Give weirStation (plate centre, from the rear end of the shell) and weirThickness so that the whole plate lies inside kettle.enlargedLength.',
   EQP_X_SHELL_NOZZLES: 'Add a shell inlet and a shell outlet on opposite sides of the shell (orientationDeg 180 apart) with add_nozzle.',
   EQP_PUMP_SIZE_UNKNOWN:
     'Give envelope { a, f, h1, h2, suctionDn, dischargeDn } from the vendor datasheet, or a size of the shipped tables (ISO 2858: 50-32-160, 50-32-200, 65-40-250, 80-50-200; B73.1: AA, AB, A05, A60).',

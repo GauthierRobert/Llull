@@ -10,6 +10,7 @@ import type { EquipmentTemplate, NozzleRecord, VesselDesignData, VesselTemplate 
 import { headFillCentroid, headMetalCentroid } from './headCentroid';
 import { headMetalVolume } from './headOffset';
 import type { HeadShape } from './heads';
+import { lugVolumes } from './lugs';
 import { nozzleMassParts } from './nozzleMass';
 import { horizontalVolume } from './partialVolume';
 import { placeNozzle } from './ports';
@@ -98,6 +99,8 @@ function metalParts(
     if (part === `insulation ${frame.firstName}`) return at(-layerCentroid(first, radius, headThickness, insulation));
     if (part === `insulation ${frame.secondName}`) return at(length + layerCentroid(second, radius, headThickness, insulation));
     if (part === 'skirt' || part === 'legs') return { part, kg, at: [0, 0, datum / 2] };
+    if (part === 'lugs' && template.support.type === 'lugs')
+      return { part, kg, at: [0, 0, datum + template.support.lugElevation + lugVolumes(template.support).centreHeight] };
     if (part === 'baseRing') return { part, kg, at: [0, 0, (template.support.type === 'skirt' ? template.support.thickness : 0) / 2] };
     const item = (design?.internals ?? []).find((candidate) => `internals: ${candidate.label}` === part);
     if (item !== undefined && item.position === undefined) defaulted.push(`${part}: position = middle of the shell`);

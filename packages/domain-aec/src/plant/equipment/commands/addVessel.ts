@@ -149,9 +149,9 @@ export const addVessel = defineCommand({
   name: 'add_vessel',
   description:
     'Create a parametric pressure vessel (equipment element with a tag): cylindrical shell with two formed heads (ellipsoidal 2:1, torispherical by ' +
-    'standard or radii, hemispherical, flat, conical), a support (skirt, legs, saddles or none) and optional design data. Dimensions are INSIDE ' +
+    'standard or radii, hemispherical, flat, conical), a support (skirt, legs, lugs, saddles or none) and optional design data. Dimensions are INSIDE ' +
     'diameter and tangent-to-tangent length in document units; thicknesses are nominal and include the corrosion allowance. Vertical vessels: ' +
-    'heads {top, bottom}, support skirt / legs (height = floor to the bottom tangent line). Horizontal vessels: heads {left, right}, support ' +
+    'heads {top, bottom}, support skirt / legs (height = floor to the bottom tangent line) or lugs { count >= 2, lugHeight, lugWidth, lugProjection, lugThickness, lugBasePlateThickness, lugElevation above the bottom tangent line, lugBoltHoleDiameter?, baseElevation? } (bracket lugs on the shell; every dimension is required, none is defaulted). Horizontal vessels: heads {left, right}, support ' +
     'saddles { stations from the left tangent line, width, axisElevation } or none. The geometry is derived (exact revolutions) and the legacy ' +
     'size / shape / weight fields are re-derived so clash checks, floor loads and schedules keep working. The tag must be unique. Next: add_nozzle ' +
     'for connections (their ports are "<tag>:<mark>"), vessel_volume for volumes, update_equipment_parameters to revise. Returns elementId, tag, ' +

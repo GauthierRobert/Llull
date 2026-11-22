@@ -33,6 +33,8 @@ export function vesselDatum(template: VesselTemplate): number {
       return support.height;
     case 'saddles':
       return support.axisElevation;
+    case 'lugs':
+      return support.baseElevation;
     case 'none':
       return template.orientation === 'vertical' ? support.baseElevation : support.baseElevation + outerRadius;
   }

@@ -4,6 +4,7 @@
  */
 
 import type { EquipmentElement } from '@aec/building/types';
+import { LUGS_NOT_CHECKED } from '../geometry/lugs';
 import { resolveVessel } from '../geometry/vesselFrame';
 import { asmeThickness } from './asme';
 import { COVERAGE_CODES, issuesOf, type ElementCheck, type Found } from './findings';
@@ -56,5 +57,6 @@ export function checkVessel(element: EquipmentElement, mmPerUnit: number): Eleme
       finding: { code: 'EQP_TABLE_UNVERIFIED', message: 'a head standard row below grade A gives the head proportions', paths: ['heads'] },
     });
   appendAll(found, nozzleFindings(plant.template, plant.nozzles));
-  return { issues: issuesOf(element, found), reviewRequired };
+  const lugs = plant.template.support.type === 'lugs';
+  return { issues: issuesOf(element, found), reviewRequired, ...(lugs ? { notChecked: [LUGS_NOT_CHECKED] } : {}) };
 }

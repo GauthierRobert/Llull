@@ -35,7 +35,7 @@ export const exchangerPatchSchema = z
     frontChannel: channelSchema.partial().optional().describe('Front channel fields to change { length, thickness, coverThickness }.'),
     rearChannel: channelSchema.partial().optional().describe('Rear channel fields to change (fixed-tubesheet rears L, M, N only).'),
     support: exchangerShape.support.describe(
-      'New support; replaces the whole support (saddles { stations, width, axisElevation } or none; vertical: skirt, legs or none). Changing orientation needs a suiting support in the same patch.',
+      'New support; replaces the whole support (saddles { stations, width, axisElevation } or none; vertical: skirt, legs, lugs or none). Changing orientation needs a suiting support in the same patch.',
     ),
     design: z
       .object({

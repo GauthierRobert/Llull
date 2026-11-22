@@ -54,7 +54,34 @@ export type SupportSpec =
   | { readonly type: 'skirt'; readonly height: number; readonly thickness: number; readonly baseRingWidth: number }
   | { readonly type: 'legs'; readonly count: number; readonly height: number; readonly pitchDiameter: number; readonly legWidth: number }
   | { readonly type: 'saddles'; readonly stations: readonly number[]; readonly width: number; readonly axisElevation: number }
+  | LugSupport
   | { readonly type: 'none'; readonly baseElevation: number };
+
+/**
+ * Vertical vessel / exchanger hung on bracket lugs on the shell. Every dimension is a caller input (no lug standard is shipped). A lug is a base (bearing)
+ * plate `lugWidth` wide (tangential) x `lugProjection` (radial) x `lugBasePlateThickness` at the bottom of the lug, with a vertical web plate
+ * `lugThickness` thick x `lugProjection` x (`lugHeight` - `lugBasePlateThickness`) on it; the root of the plate is the shell outside radius (the curvature of
+ * the shell is ignored). Lugs are spread evenly, none on the north axis (first at half a step), like legs.
+ */
+export interface LugSupport {
+  readonly type: 'lugs';
+  readonly count: number;
+  /** Overall height of one lug, base plate included. */
+  readonly lugHeight: number;
+  /** Tangential width of the base plate (and of the lug). */
+  readonly lugWidth: number;
+  /** Radial distance from the shell outside surface to the outer end of the lug. */
+  readonly lugProjection: number;
+  /** Thickness of the vertical web plate. */
+  readonly lugThickness: number;
+  readonly lugBasePlateThickness: number;
+  /** Diameter of the bolt hole through the base plate (absent: no hole). */
+  readonly lugBoltHoleDiameter?: number;
+  /** Elevation of the bottom of the lugs above the bottom tangent line. */
+  readonly lugElevation: number;
+  /** Elevation of the bottom tangent line above the level (the lugs rest on the structure, not on the floor). */
+  readonly baseElevation: number;
+}
 
 export interface TraySpec {
   readonly count: number;
@@ -133,8 +160,12 @@ export interface ExchangerKettle {
   /** Axial length of the cone from the restricted to the enlarged diameter. */
   readonly transitionLength: number;
   readonly enlargedThickness: number;
-  /** Overflow weir height above the lowest inside point of the enlarged shell (internal: data only, no geometry). */
+  /** Overflow weir height above the lowest inside point of the enlarged shell. */
   readonly weirHeight: number;
+  /** Axial station of the weir plate centre, measured from the rear end of the shell toward the front (both weir fields, or none: then no weir plate is modelled). */
+  readonly weirStation?: number;
+  /** Thickness of the weir plate (with `weirStation`). */
+  readonly weirThickness?: number;
 }
 
 /** Design data of one side of an exchanger (same fields and rules as the vessel design, no operating liquid level). */
