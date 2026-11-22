@@ -16,6 +16,7 @@ import { centrelineLength } from './fittings';
 import { defaultMinWeldSpacing } from './jointStack';
 import { epsilonFor, unitVector } from './legs';
 import { getPiping, runPoints } from './model';
+import { shiftedBranchRun } from './branchShift';
 import { legShifts } from './legShifts';
 import { derivedBranch, layoutBranches, teeSlot } from './routeBranch';
 import { mintSet, setupEnd } from './routeEnds';
@@ -53,10 +54,14 @@ function derivedOnce(doc: CadDocument, run: PipeRun, path: readonly string[]): D
   return derivations.get(doc, run) ?? derivations.set(doc, run, derive(doc, run, path));
 }
 
-/** A branch hangs on its header: when the header does not derive (moved port, missing part) the branch is broken with the header's code. */
+/**
+ * A branch hangs on its header and a continuation on the run it continues from: when that run does not derive (moved port, missing part, a shifted axis the end cannot follow)
+ * the dependent run is broken with the upstream's code.
+ */
 function headerFailure(doc: CadDocument, run: PipeRun, path: readonly string[]): DerivationFailure | undefined {
-  if (run.start.ref?.kind !== 'branch') return undefined;
-  const header = getPiping(doc).runs[run.start.ref.runId];
+  const ref = run.start.ref;
+  if (ref?.kind !== 'branch' && ref?.kind !== 'runEnd') return undefined;
+  const header = getPiping(doc).runs[ref.runId];
   if (header !== undefined && [...path, run.id].includes(header.id))
     return fail(
       'RTE_UNKNOWN_RUN',
@@ -65,7 +70,8 @@ function headerFailure(doc: CadDocument, run: PipeRun, path: readonly string[]):
       ['start'],
     );
   const parent = header === undefined ? null : derivedOnce(doc, header, [...path, run.id]);
-  if (parent !== null && isFailure(parent)) return { ...parent, message: `header ${header?.id}: ${parent.message}` };
+  if (parent !== null && isFailure(parent))
+    return { ...parent, message: `${ref.kind === 'branch' ? 'header' : 'upstream run'} ${header?.id}: ${parent.message}` };
   return undefined;
 }
 
@@ -107,16 +113,20 @@ function layoutRun(i: RunInputs): RunCtx | DerivationFailure {
   const mint: Mint = (kind) => `${run.id}/${kind}-${(counters[kind] = (counters[kind] ?? 0) + 1)}`;
   const startIds = start.set === null ? null : mintSet(mint);
   const startCapId = start.cap === undefined ? null : mint('cap');
-  const startBlindId = start.blind === undefined ? null : mint('flange');
+  const startBlindId = start.blind === undefined ? null : mint(start.blind.state === undefined ? 'flange' : 'inline');
   const inlineSlots = layoutInline(env, lengths, dirs, mint);
   if (isFailure(inlineSlots)) return inlineSlots;
   const endIds = end.set === null ? null : mintSet(mint);
   const endCapId = end.cap === undefined ? null : mint('cap');
-  const endBlindId = end.blind === undefined ? null : mint('flange');
+  const endBlindId = end.blind === undefined ? null : mint(end.blind.state === undefined ? 'flange' : 'inline');
   const fits = layoutBranches(env);
   if (isFailure(fits)) return fits;
-  const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
-  if (isFailure(shifts)) return shifts;
+  const legShift = legShifts(env, inlineSlots, dirs, eps);
+  if (isFailure(legShift)) return legShift;
+  const shifts = {
+    ...legShift,
+    start: legShift.start.map((value, leg) => (leg === 0 && start.startAlongMm !== undefined ? value + start.startAlongMm : value)),
+  };
   const slotsByLeg = new Map<number, Slot[]>();
   for (const slot of [...inlineSlots, ...fits.filter((fit) => fit.kind === 'tee').map((fit) => teeSlot(env, fit))])
     slotsByLeg.set(slot.leg, [...(slotsByLeg.get(slot.leg) ?? []), slot]);
@@ -148,7 +158,22 @@ function layoutRun(i: RunInputs): RunCtx | DerivationFailure {
     joints,
     legs: [],
     inline: [],
-    warnings: [...shifts.warnings, ...i.chosen.warnings],
+    warnings: [
+      ...shifts.warnings,
+      ...fits.flatMap((fit) =>
+        fit.residualMm === undefined
+          ? []
+          : [
+              {
+                code: 'RTE_ECCENTRIC_OFFSET',
+                ids: [run.id, fit.point.id],
+                message: `branch ${fit.point.id}: the eccentric offset of the header is not exactly along the branch; the ${+fit.residualMm.toFixed(4)} mm sideways residual is dropped (within the angle tolerance)`,
+                detail: { branch: fit.point.id, residualMm: fit.residualMm },
+              },
+            ],
+      ),
+      ...i.chosen.warnings,
+    ],
     addJoint: (joint): void => {
       if (joint.parts.some((id) => id.startsWith('open:'))) return;
       joints.push({ id: `${run.id}/joint-${joints.length + 1}`, ...joint });
@@ -201,11 +226,14 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
   if (isFailure(start)) return start;
   const end = setupEnd(env, run.end, 'end', dnEnd);
   if (isFailure(end)) return end;
-  const geometry = runGeometry(run);
+  const axisRun = shiftedBranchRun(env, start.startSideways);
+  if (isFailure(axisRun)) return axisRun;
+  const axisEnv = axisRun === run ? env : { ...env, run: axisRun };
+  const geometry = runGeometry(axisRun);
   if (isFailure(geometry)) return geometry;
-  const chosen = chooseTurns(env, geometry.points, geometry.dirs);
+  const chosen = chooseTurns(axisEnv, geometry.points, geometry.dirs);
   if (isFailure(chosen)) return chosen;
-  const ctx = layoutRun({ env, start, end, dnStart, dnEnd, od: pipe.od, geometry, chosen });
+  const ctx = layoutRun({ env: axisEnv, start, end, dnStart, dnEnd, od: pipe.od, geometry, chosen });
   if (isFailure(ctx)) return ctx;
   addStartParts(ctx);
   for (let leg = 0; leg < geometry.lengths.length; leg++) {

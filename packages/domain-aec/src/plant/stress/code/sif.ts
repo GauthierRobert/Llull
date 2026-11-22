@@ -26,6 +26,8 @@ export interface SifInput {
   readonly wallMm: number;
   readonly bendRadiusMm?: number | undefined;
   readonly padMm?: number | undefined;
+  /** Bend / elbow only: ends of the bend that are flanged (0, 1 or 2); the code correction factor C1 = h^(1/6) / h^(1/3) multiplies k and i (B31.3 <= 2018 App. D, B31.1 Table D-1 note). */
+  readonly flangedEnds?: 0 | 1 | 2 | undefined;
 }
 
 export interface SifValues {
@@ -75,20 +77,26 @@ export function computeSif(set: RuleSet, input: SifInput): SifValues | SifRefusa
           path: 'bendRadiusMm',
         };
       const h = (wallMm * radius) / meanRadius ** 2;
-      const raw = [1.65 / h, 0.9 / power(h), 0.75 / power(h)];
+      const flanged = input.flangedEnds === undefined ? 0 : input.flangedEnds;
+      const c1 = flanged === 0 ? 1 : pow(h, flanged === 1 ? 1 / 6 : 1 / 3);
+      const raw = [(c1 * 1.65) / h, (c1 * 0.9) / power(h), (c1 * 0.75) / power(h)];
       const clamped =
         h > 1 ? `h = ${h.toFixed(3)} > 1` : raw.some((value) => value < 1) ? 'a factor was raised to its floor of 1.0' : undefined;
-      const ii = atLeastOne(0.9 / power(h));
-      const io = set.code === 'B31.1' ? ii : atLeastOne(0.75 / power(h));
+      const ii = atLeastOne((c1 * 0.9) / power(h));
+      const io = set.code === 'B31.1' ? ii : atLeastOne((c1 * 0.75) / power(h));
       return {
         h,
-        k: atLeastOne(1.65 / h),
+        k: atLeastOne((c1 * 1.65) / h),
         ii,
         io,
-        ruleRow: 'SIF-BEND',
-        grade: 'A',
+        ruleRow: flanged === 0 ? 'SIF-BEND' : 'SIF-BEND-FLANGED',
+        grade: flanged === 0 ? 'A' : 'B',
         ...(clamped === undefined ? {} : { clamped }),
-        formula: 'h = T R1 / r2^2; k = 1.65 / h; ii = 0.9 / h^(2/3); io = 0.75 / h^(2/3) (B31.1: i = 0.9 / h^(2/3) for both); each >= 1',
+        formula:
+          'h = T R1 / r2^2; k = 1.65 / h; ii = 0.9 / h^(2/3); io = 0.75 / h^(2/3) (B31.1: i = 0.9 / h^(2/3) for both); each >= 1' +
+          (flanged === 0
+            ? ''
+            : `; flanged ends ${flanged}: k and i are multiplied by C1 = h^(${flanged === 1 ? '1/6' : '1/3'}) (h unchanged), then each >= 1`),
       };
     }
     case 'unreinforced_tee':

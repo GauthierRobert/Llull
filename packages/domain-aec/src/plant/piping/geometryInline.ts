@@ -9,6 +9,7 @@ import type { Entity, RevolutionEntity } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, RoutedPart } from '@aec/plant/types';
 import { add3, len3, scale3, sub3 } from '@lib/vec3';
+import { spectacleLayout, type SpectacleDisc } from './spectacleLayout';
 import { operatorBodies, type OperatorKind } from './operator';
 import {
   axisOf,
@@ -152,6 +153,40 @@ function blindEntities(part: RoutedPart, line: PipeLine): Entity[] {
   return [cylinder(part, line, FLANGE_LAYER_ID, 'Blind flange', part.centre, mating.direction, thickness, od / 2)];
 }
 
+/**
+ * A spectacle blind: the disc in the line on the pipe axis (the solid disc when closed, the open ring when open) and the spare disc `webLength` away toward the up side
+ * (`spectacleLayout`); a ring is drawn hollow with the pipe outside diameter as its bore (the row gives none: schematic), the solid disc full.
+ */
+function spectacleEntities(part: RoutedPart, line: PipeLine): Entity[] {
+  const layout = spectacleLayout(part);
+  if (layout === null) return [];
+  const disc = (shape: SpectacleDisc, id: string): RevolutionEntity => {
+    const [outer, inner] = [shape.diameter / 2, shape.ring ? layout.boreDiameter / 2 : 0];
+    const profile: Section = [
+      [inner, 0],
+      [outer, 0],
+      [outer, layout.thickness],
+      [inner, layout.thickness],
+    ];
+    const label = shape.ring ? 'Spectacle ring' : 'Spectacle disc';
+    const frame = { position: shape.centreStart, rotation: rotationToward(layout.axis) };
+    return { ...entityOf(part, line, FLANGE_LAYER_ID, label, frame, profile, 2 * Math.PI, RADIAL_SEGMENTS), id };
+  };
+  return [disc(layout.inLine, part.id), disc(layout.spare, `${part.id}/spare`)];
+}
+
+/** A coupling or union: a cylinder over the row length between the two faces, at the larger of the row `bodyOd` and the pipe outside diameter. */
+function straightEntities(part: RoutedPart, line: PipeLine): Entity[] {
+  if (part.typeKey !== 'coupling' && part.typeKey !== 'union') return [];
+  const frame = axisOf(part.ports);
+  const od = part.dims['outsideDiameter'];
+  if (frame === null || od === undefined) return [];
+  const label = part.typeKey === 'union' ? 'Union' : 'Coupling';
+  return [
+    cylinder(part, line, FITTING_LAYER_ID, label, frame.origin, frame.axis, frame.length, Math.max(part.dims['bodyOd'] ?? od, od) / 2),
+  ];
+}
+
 const singleEntity = (part: RoutedPart, line: PipeLine): Entity[] => {
   const entity = partEntity(part, line);
   return entity === null ? [] : [entity];
@@ -168,6 +203,8 @@ export function partEntities(part: RoutedPart, line: PipeLine): Entity[] {
       return teeEntities(part, line);
     case 'olet':
       return oletEntities(part, line);
+    case 'inline':
+      return part.typeKey === 'spectacleBlind' ? spectacleEntities(part, line) : straightEntities(part, line);
     case 'cap':
       return capEntities(part, line);
     case 'flange':

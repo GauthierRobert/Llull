@@ -12,22 +12,23 @@ import { powInt } from '@lib/powInt';
  * @affects creates 1 equipment element (plant template 'exchanger') plus derived revolutions / boxes on layer Q-EQPM tagged element:<id>
  * @invariant size / shape / weight of the element are re-derived from `plant` in the same command; ids are step-scoped (L8); the frame origin is the middle of
  *   the outside overall length on the tube axis; shell stations count from the front end of the shell; a tube wall from the BWG table is unverified
- * @failure duplicate tag, invalid TEMA type (EQP_TEMA_INVALID, path temaType.<i>), K / X / D (EQP_TEMA_UNSUPPORTED), tubes that do not fit the shell, thickness
- *   <= allowance, support not suiting a horizontal exchanger -> coded refusal with the param path
+ * @failure duplicate tag, invalid TEMA type (EQP_TEMA_INVALID, path temaType.<i>), kettle vertical or with a fixed rear (EQP_EXCHANGER_UNSUPPORTED), front D without channel + cover thickness, K without kettle, tubes that do not fit the shell, thickness
+ *   <= allowance, support not suiting the orientation -> coded refusal with the param path
  */
 export const addHeatExchanger = defineCommand({
   name: 'add_heat_exchanger',
   description:
     'Create a parametric shell-and-tube heat exchanger (equipment element with a tag) from a TEMA designation: temaType is exactly three letters, front head ' +
-    '(A, B, C, N) + shell (E, F, G, H, J) + rear head (L, M, N fixed tubesheet; P, S, T, U, W removable bundle), e.g. BEM, AES, AEU. D, K and X are ' +
-    'valid TEMA letters that are not modelled (EQP_TEMA_UNSUPPORTED). Horizontal only. Dimensions are INSIDE diameters in document units: shellInsideDiameter ' +
+    '(A, B, C, D, N) + shell (E, F, G, H, J, K, X) + rear head (L, M, N fixed tubesheet; P, S, T, U, W removable bundle), e.g. BEM, AES, AEU. D, K and X are ' +
+    'modelled from caller dimensions only (no TEMA tables): D = high-pressure closure, a flat cover whose frontChannel.thickness and frontChannel.coverThickness you give; K = kettle, needs kettle { enlargedInsideDiameter, enlargedLength, transitionLength, enlargedThickness?, weirHeight, weirStation?, weirThickness? } (restricted cylinder - cone - enlarged cylinder; the weir is data only unless weirStation + weirThickness are given: then a plate across the enlarged shell with weight and liquid volume to the weir, EQP_WEIR_OUT_OF_RANGE outside the enlarged length), horizontal and removable-bundle rear only; X = cross flow, geometry of E (check_equipment expects shell nozzles 180 deg apart). ' +
+    'orientation horizontal (default, saddles / none) or vertical (front head at the bottom, skirt / legs / lugs / none). Unsupported combinations are refused with EQP_EXCHANGER_UNSUPPORTED. Dimensions are INSIDE diameters in document units: shellInsideDiameter ' +
     '(channels and bonnets share it), shellThickness (nominal, corrosion allowance included), tubes { outsideDiameter, wallThickness OR bwg, count, length ' +
     '(between the outer tubesheet faces), passes, pitch (default 1.25 x OD), layoutAngleDeg (30, 45, 60, 90) }, tubesheetThickness, frontChannel { length, ' +
-    'thickness } and, for L / M / N rears, rearChannel. A bonnet (front B, rear M) is a channel + 2:1 head, A / C / N / L / N are a channel + flat cover; a ' +
+    'thickness, coverThickness } and, for L / M / N rears, rearChannel. A bonnet (front B, rear M) is a channel + 2:1 head, A / C / N / L / N are a channel + flat cover; a ' +
     'U or floating rear closes the shell with a 2:1 shell cover (floating head, U-bend, baffles, tie rods and pass partitions are not modelled). ' +
-    'support: saddles { stations from the front end of the shell, width, axisElevation } or none. design { shellSide, tubeSide } carry pressure, temperature, ' +
+    'support: horizontal saddles { stations from the front end of the shell, width, axisElevation } or none; vertical skirt { height } / legs { count, height } / lugs { count, lugHeight, lugWidth, lugProjection, lugThickness, lugBasePlateThickness, lugElevation } / none { baseElevation } (height = elevation of the bottom tangent line, the outer end of the front channel). design { shellSide, tubeSide } carry pressure, temperature, ' +
     'material, allowable stress and joint efficiency (never defaulted) and the fluid specific gravity. The frame origin is the middle of the outside overall ' +
-    'length on the tube axis; the legacy size / shape / weight are re-derived so clash checks and floor loads keep working. Next: add_nozzle with ' +
+    'length on the tube axis (vertical: plan location on the axis, z from the support); the legacy size / shape / weight are re-derived so clash checks and floor loads keep working. Next: add_nozzle with ' +
     'location { on: "shell", station, orientationDeg } or { on: "channel", channel, station, orientationDeg } (ports "<tag>:<mark>"), vessel_volume for the ' +
     'shell-side and tube-side volumes, equipment_weights, check_equipment. Returns elementId, tag, tema { front, shell, rear, fixedTubesheet, removableBundle }, ' +
     'bundlePullLength (removable bundles: tube length + 1 m, named default), shellLength, insideOverallLength, volumes, defaulted[], weightKg, angleConvention.',
@@ -53,7 +54,7 @@ export const addHeatExchanger = defineCommand({
       doc,
       context.building,
       element,
-      `add_heat_exchanger: ${element.mark} "${element.name}" (${element.id}) TEMA ${template.temaType} (${template.tema.fixedTubesheet ? 'fixed tubesheet' : 'removable bundle'}), shell ID ${template.shellInsideDiameter} x ${geometry.shellLength}, ` +
+      `add_heat_exchanger: ${element.mark} "${element.name}" (${element.id}) TEMA ${template.temaType} ${template.orientation} (${template.tema.fixedTubesheet ? 'fixed tubesheet' : 'removable bundle'}), shell ID ${template.shellInsideDiameter} x ${geometry.shellLength}, ` +
         `${template.tubes.count} tubes, shell side ${(volumes.shellSide * scale).toFixed(4)} m3, tube side ${(volumes.tubeSide * scale).toFixed(4)} m3, ${element.weight.toFixed(1)} kg operating` +
         `${built.defaulted.length > 0 ? `; defaults: ${built.defaulted.join(', ')}` : ''}.`,
       {

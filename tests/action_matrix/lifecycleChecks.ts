@@ -224,7 +224,16 @@ export function checkClear(doc: CadDocument, target: string): Findings {
     const cleared = execute(doc, 'clear_document', {}, activeContext).document;
     const loaded = deserializeDocument(serializeDocument(cleared));
     const blank = createEmptyDocument() as unknown as Record<string, unknown>;
-    const kept = new Set(['camera', 'units', 'displayPrecision', 'kernelSettings', 'nextStepNumber', 'layers', 'layerOrder']);
+    const kept = new Set([
+      'camera',
+      'units',
+      'displayPrecision',
+      'kernelSettings',
+      'siteContext',
+      'nextStepNumber',
+      'layers',
+      'layerOrder',
+    ]);
     const left = Object.entries(loaded as unknown as Record<string, unknown>)
       .filter(([key, value]) => !kept.has(key) && value !== undefined)
       .filter(([key, value]) => key !== 'featureHistory' || (value as { name: string }[]).some((step) => step.name !== 'clear_document'))

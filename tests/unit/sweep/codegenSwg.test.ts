@@ -338,6 +338,50 @@ describe('lofts', () => {
     expect(exported(loft.doc, 'freecad').text).toContain('Part.makeLoft(');
   });
 
+  it('a ruled polygon loft (ASC M5) passes its vertices so CadQuery / build123d build planar / ruled side faces; FreeCAD keeps the chains', () => {
+    const polygon = created(createEmptyDocument(), 'loft_sections', {
+      sections: [
+        {
+          section: [
+            [-2, -1],
+            [2, -1],
+            [2, 1],
+            [-2, 1],
+          ],
+          center: [0, 0, 0],
+        },
+        {
+          section: [
+            [-1, -1],
+            [1, -1],
+            [1, 1],
+            [-1, 1],
+          ],
+          center: [0, 0, 3],
+        },
+      ],
+      ruled: true,
+    });
+    for (const language of ['cadquery', 'build123d'] as const) {
+      const { text } = exported(polygon.doc, language);
+      expect(text).toMatch(/\], True, \[\[\(-?[\d.]+, -?[\d.]+, 0\), /);
+      expect(text).toContain('def _polygon_loft(polygons):');
+      expect(text).toContain('BRepFill.Face_s(');
+      expect(text).toContain('if polygons and ruled:');
+    }
+    const freecad = exported(polygon.doc, 'freecad').text;
+    expect(freecad).toContain('def _make_loft(label, sections, ruled, polygons=None):');
+    expect(freecad).not.toContain('BRepFill');
+    const rings = created(createEmptyDocument(), 'loft_sections', {
+      sections: [
+        { center: [0, 0, 0], radius: 1 },
+        { center: [0, 0, 4], radius: 2 },
+      ],
+      ruled: true,
+    });
+    expect(exported(rings.doc, 'cadquery').text).not.toMatch(/\], True, \[\[\(/);
+  });
+
   it('a smooth loft through three sections is ruled=False', () => {
     const smooth = created(createEmptyDocument(), 'loft_sections', {
       sections: [

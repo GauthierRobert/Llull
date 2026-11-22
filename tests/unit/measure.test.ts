@@ -127,7 +127,12 @@ describe('measure commands (read-only)', () => {
 
   it('measure_bounding_box: one entity, the selection, the whole document; empty docs fail', () => {
     const one = build(['add_box', { size: [4, 6, 8], position: [0, 0, 0] }]).doc;
-    expect(data(one, 'measure_bounding_box', { entityId: one.order[0] })).toEqual({ min: [-2, -3, -4], max: [2, 3, 4], size: [4, 6, 8] });
+    expect(data(one, 'measure_bounding_box', { entityId: one.order[0] })).toEqual({
+      min: [-2, -3, -4],
+      max: [2, 3, 4],
+      size: [4, 6, 8],
+      bounds: 'exact',
+    });
     const pair = build(['add_box', { size: [2, 2, 2], position: [0, 0, 0] }], ['add_box', { size: [2, 2, 2], position: [10, 0, 0] }]).doc;
     const all = data(pair, 'measure_bounding_box', {}) as unknown as Record<string, number[]>;
     expect([all['min']![0], all['max']![0], all['size']![0]]).toEqual([-1, 11, 12]);

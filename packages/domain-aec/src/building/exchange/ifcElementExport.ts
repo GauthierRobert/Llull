@@ -4,6 +4,7 @@ import { openingsOf, wallExtent, wallFrame } from '../geometry/wallGeometry';
 import type { WallExtent } from '../geometry/wallExtent';
 import { curvedBandBetween, curvedWallArc, curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
 import { type Context, extrusion, ifcReal, ifcString, placement, scaledPolygonProfile, rectangleProfile, shape } from './ifcStep';
+import { openingVoidSeed } from './ifcSeeds';
 
 /**
  * An exported product; `parts` are sub-elements aggregated under it (they get the same material, not a storey containment); `container`: the spatial
@@ -72,7 +73,7 @@ function exportOpening(
   const voidPlacement = placement(context, host.placement, mm(left), 0, mm(opening.sillHeight));
   const voidProfile = rectangleProfile(context, [mm(opening.width) / 2, 0], mm(opening.width), mm(wall.thickness) + 20);
   const voidRef = writer.add(
-    `IFCOPENINGELEMENT('${context.guid(`${opening.id}:void`)}',$,${ifcString(`${opening.mark} opening`)},$,$,${voidPlacement},${shape(context, [extrusion(context, voidProfile, mm(opening.height))])},$,.OPENING.)`,
+    `IFCOPENINGELEMENT('${context.guid(openingVoidSeed(opening.id))}',$,${ifcString(`${opening.mark} opening`)},$,$,${voidPlacement},${shape(context, [extrusion(context, voidProfile, mm(opening.height))])},$,.OPENING.)`,
   );
   writer.add(`IFCRELVOIDSELEMENT('${context.guid(`${opening.id}:voids`)}',$,$,$,${host.ref},${voidRef})`);
   const panelThickness = Math.min(mm(wall.thickness), opening.category === 'door' ? 40 : 24);

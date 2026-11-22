@@ -49,6 +49,11 @@ vi.mock('@ui/viewport/3d/plant/PlantBucketMesh', () => ({
     return null;
   },
 }));
+// PlantBatchRenderer reads the canvas renderer for impostor atlas capture; this suite renders outside a Canvas.
+vi.mock('@react-three/fiber', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@react-three/fiber')>();
+  return { ...actual, useThree: (select: (state: { gl: null }) => unknown): unknown => select({ gl: null }) };
+});
 vi.mock('@ui/viewport/3d/GridAnnotations3D', () => ({ GridAnnotations3D: (): null => null }));
 vi.mock('@ui/viewport/3d/preview/PreviewLayer', () => ({ PreviewLayer: (): null => null }));
 vi.mock('@ui/viewport/liveFx/LiveFxLayer', () => ({ LiveFxLayer: (): null => null }));

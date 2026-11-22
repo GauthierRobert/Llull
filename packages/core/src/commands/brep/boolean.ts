@@ -8,12 +8,14 @@ import { type CadDocument, type Entity, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import type { BooleanOp, ShapeRecipe } from '../../model/types';
+import type { GeometryKernel } from '../../geometry/kernel';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
-import { meshLeafTriangles, operandRecipe } from '../../geometry/operandRecipe';
-import { recipeOf } from '../../geometry/shapeRecipe';
+import { meshLeafTriangles } from '../../geometry/operandRecipe';
+import { instanceSolids, recipeOfPart } from '../../geometry/assemblyParts';
+import { MAX_BOOLEAN_TOOLS, recipeOf } from '../../geometry/shapeRecipe';
 import { KERNEL_MESH_LEAF_CAP } from '../kernelMeshGuard';
 import { noop } from '../noop';
 import { isTriangleOnly, meshBoolean } from './meshBoolean';
@@ -32,9 +34,6 @@ function enclosesNoVolume(positions: readonly number[], indices: readonly number
   const boxVolume = sx * sy * sz;
   return Math.abs(signedMeshVolume(positions, indices)) <= VANISHED_VOLUME_RATIO * boxVolume;
 }
-
-/** At most this many tool solids in one boolean (a plan step lists them; the kernel unions them as a balanced tree). */
-const MAX_TOOLS = 1000;
 
 /**
  * Union of `recipes` as a balanced tree: depth log2(n), so hundreds of patterned tools neither nest the recipe hundreds deep (a sequential
@@ -56,11 +55,41 @@ function booleanChainDepth(recipe: ShapeRecipe): number {
   return depth;
 }
 
+/** ` KRN_TIMEOUT: …` when the kernel stopped at its deadline (the refusal text names the stage reached), else ''. */
+function timeoutNote(refusal: string | null): string {
+  return refusal !== null && refusal.includes('KRN_TIMEOUT')
+    ? ` ${refusal.slice(refusal.indexOf('KRN_TIMEOUT'))} (the kernel stopped at its deadline; raise LLULL_OCC_TIMEOUT_MS or simplify).`
+    : '';
+}
+
+/** How a multi-tool recipe ran: one general fuse / cut, or `KRN_FUSE_FALLBACK` with the balanced tree; '' for a kernel without the report. */
+function fuseNote(kernel: GeometryKernel, recipe: ShapeRecipe): string {
+  const report = kernel.booleanReport?.(recipe) ?? null;
+  if (report === null) return '';
+  if (report.fallback === true)
+    return ` KRN_FUSE_FALLBACK: the general fuse of ${report.tools} tools was refused (${report.reason ?? 'invalid result'}); the balanced tree ran.`;
+  return ` (one general fuse of ${report.tools} tools)`;
+}
+
 /** `'b'` for one tool, `N tools ('b1', …)` for several (summaries). */
 function toolLabel(tools: readonly string[]): string {
   if (tools.length === 1) return `'${tools[0]}'`;
   const shown = tools.slice(0, 3).map((id) => `'${id}'`);
   return `${tools.length} tools (${shown.join(', ')}${tools.length > 3 ? ', …' : ''})`;
+}
+
+/** The solids an operand stands for: itself, or an instance's expanded solids (empty when it has none). */
+function solidsOf(doc: CadDocument, operand: Entity): Entity[] {
+  return operand.kind === 'instance' ? (instanceSolids(doc, operand, 0) ?? []) : [operand];
+}
+
+/** ` Component X now has no instances.` for every component the consumed instances leave without one. */
+function orphanedComponentNote(before: CadDocument, after: CadDocument, consumed: readonly Entity[]): string {
+  const left = new Set(Object.values(after.entities).flatMap((e) => (e.kind === 'instance' ? [e.componentId] : [])));
+  const orphans = [...new Set(consumed.flatMap((e) => (e.kind === 'instance' ? [e.componentId] : [])))].filter(
+    (id) => !left.has(id) && Object.hasOwn(before.components, id),
+  );
+  return orphans.map((id) => ` Component ${id} now has no instances (kept in the document).`).join('');
 }
 
 function runBoolean(
@@ -84,14 +113,29 @@ function runBoolean(
   const flat = ids.find((_, i) => !is3D(operands[i] as Entity));
   if (flat !== undefined) return noop(doc, `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`);
   const instanced = ids.find((_, i) => (operands[i] as Entity).kind === 'instance');
-  if (instanced !== undefined)
-    return noop(doc, `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`);
+  if (instanced !== undefined && engine === 'mesh')
+    return noop(
+      doc,
+      `${opName}: entity '${instanced}' is a component instance; the mesh engine needs solids (use engine "kernel" or explode_instance).`,
+    );
   const [entA, ...toolEntities] = operands as [Entity, ...Entity[]];
-  const scans = [entA, ...toolEntities].map((entity) => ({ id: entity.id, triangles: meshLeafTriangles(recipeOf(entity)) }));
+  const members = [entA, ...toolEntities].map((operand) => solidsOf(doc, operand));
+  const empty = members.findIndex((solids) => solids.length === 0);
+  if (empty >= 0)
+    return noop(doc, `${opName}: instance '${ids[empty]}' has no buildable solids (missing component, no 3D member or nesting too deep).`);
+  const scans = members.map((solids, i) => ({
+    id: ids[i] as string,
+    triangles: solids.reduce((sum, e) => sum + meshLeafTriangles(recipeOf(e)), 0),
+  }));
   const scanTotal = scans.reduce((sum, operand) => sum + operand.triangles, 0);
   const largest = scans.reduce((best, operand) => (operand.triangles > best.triangles ? operand : best));
   const bySize = engine === 'auto' && scanTotal > KERNEL_MESH_LEAF_CAP;
-  const viaMesh = engine === 'mesh' || bySize || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities]));
+  const viaMesh = engine === 'mesh' || bySize || (engine === 'auto' && isTriangleOnly(members.flat()));
+  if (viaMesh && instanced !== undefined)
+    return noop(
+      doc,
+      `${opName}: instance '${instanced}' is built on imported-mesh triangles that the mesh engine would combine, and it takes solids: run explode_instance first, or pass engine "kernel".`,
+    );
   if (viaMesh) {
     const context = ctx ?? currentContext();
     const result = meshBoolean(doc, opName, op, a, tools, context.meshProcessing ?? null, context.meshAssets);
@@ -104,14 +148,23 @@ function runBoolean(
   }
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(opName));
-  const toolRecipe = balancedUnion(toolEntities.map((tool) => operandRecipe(kernel, tool)));
-  const recipe: ShapeRecipe = { op: 'boolean', boolean: op, a: operandRecipe(kernel, entA), b: toolRecipe };
+  const recipes = [entA, ...toolEntities].map((operand) => recipeOfPart(doc, kernel, operand));
+  const [recipeA, ...toolRecipes] = recipes as ShapeRecipe[];
+  // several tools: `many` lets a kernel apply them in ONE General Fuse / Cut; `b` stays the balanced tree every other kernel (and the fallback) evaluates
+  const recipe: ShapeRecipe = {
+    op: 'boolean',
+    boolean: op,
+    a: recipeA as ShapeRecipe,
+    b: balancedUnion(toolRecipes),
+    ...(toolRecipes.length > 1 && op !== 'intersect' ? { many: toolRecipes.length } : {}),
+  };
   const result = evaluateRecipe(kernel, recipe);
   const b = toolLabel(tools);
   if (result === 'refused')
     return noop(
       doc,
       `${opName}: kernel returned null for operands '${a}' and ${b}. The geometry may be degenerate or unsupported.` +
+        timeoutNote(kernel.lastRefusal?.() ?? null) +
         (booleanChainDepth(recipe) > DEEP_RECIPE
           ? ` '${a}' is already the result of ${booleanChainDepth(recipe) - 1} nested booleans: cut patterned tools in one boolean with b as a list of ids.`
           : ''),
@@ -121,13 +174,17 @@ function runBoolean(
       doc,
       `${opName}: the result of '${a}' and ${b} has no usable mesh — it is empty (no volume remains, e.g. disjoint solids for an intersection) or its solid could not be meshed closed; operands kept.`,
     );
-  return commitKernelResult(
+  const committed = commitKernelResult(
     doc,
     kernel,
     result,
     [entA, ...toolEntities],
     (newId, triangles) => `${opName}: merged '${a}' and ${b} into mesh '${newId}' (${triangles} triangles). Operands consumed.`,
   );
+  return {
+    ...committed,
+    summary: committed.summary + orphanedComponentNote(doc, committed.document, [entA, ...toolEntities]) + fuseNote(kernel, recipe),
+  };
 }
 
 type BooleanEngine = 'auto' | 'kernel' | 'mesh';
@@ -137,7 +194,7 @@ const SOLID_OPERANDS_NOTE =
 
 /**
  * @affects removes entities a and b; creates 1 mesh entity (a ∪ b, a − b or a ∩ b)
- * @invariant both a and b must be 3D solids; subtract keeps a − b
+ * @invariant both a and b must be 3D solids or component instances (kernel path: an instance expands to its unioned solids); subtract keeps a − b
  * @invariant kernel-optional: triangle-only operands or operands built on more than KERNEL_MESH_LEAF_CAP imported-mesh triangles in total (engine "auto", decided from the operands alone so replay is host-independent) or engine "mesh" use ctx.meshProcessing and need no kernel; the kernel path refuses without one
  * @failure triangle-only operands without a mesh engine -> MESH_ENGINE_UNSUPPORTED
  * @failure missing id, 2D operand, same id, kernel absent, empty result or kernel failure -> no-op, affected:[]
@@ -154,15 +211,16 @@ export const booleanOperation = defineCommand({
     'Triangle-only operands (imported meshes, mesh results with no exact shape) are always combined by the mesh engine under engine "auto" (default; decided from the operands alone, so replay does not depend on the host): ' +
     'the result stays a plain mesh with guaranteed-manifold output and no polyhedral B-rep; engine "kernel" forces the B-rep kernel, engine "mesh" forces the ' +
     'mesh engine (refuses MESH_ENGINE_UNSUPPORTED without one; non-manifold operands refuse MESH_NON_MANIFOLD). ' +
+    'A component instance is a valid operand on the kernel path: it is expanded through its transform to its solids (unioned) at the kernel boundary, and consumed (its component stays, even with no instance left). An instance built on imported-mesh triangles that the mesh engine would combine under engine auto is refused by name (explode_instance first). ' +
     SOLID_OPERANDS_NOTE,
   params: z.object({
     op: z.enum(['union', 'subtract', 'intersect']).describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),
     a: z.string().describe('Id of the first 3D solid operand (the base solid for subtract).'),
     b: z
-      .union([z.string(), z.array(z.string()).min(1).max(MAX_TOOLS)])
+      .union([z.string(), z.array(z.string()).min(1).max(MAX_BOOLEAN_TOOLS)])
       .describe(
         'Id of the second 3D solid operand (the tool solid for subtract), or a list of tool ids for union / subtract: the tools are ' +
-          'unioned as a balanced tree and applied in ONE boolean — use a list for patterned cuts (coolant channels, bolt holes) instead ' +
+          'unioned (the exact kernel applies them in ONE general fuse / cut, others as a balanced tree) and applied in ONE boolean — use a list for patterned cuts (coolant channels, bolt holes) instead ' +
           'of hundreds of sequential booleans, which nest the recipe deeper each step and slow down quadratically.',
       ),
     engine: z

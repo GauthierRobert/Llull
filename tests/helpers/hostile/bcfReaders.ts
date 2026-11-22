@@ -30,6 +30,13 @@ const archive = (records: number): Uint8Array =>
     ...Array.from({ length: records }, (_, k) => topic(k)).flat(),
   ]);
 
+/** A well-formed IFC GlobalId (22 characters) that no document holds: distinct per `k`. */
+export const foreignGuid = (k: number): string => `Z${k.toString(36).toUpperCase().padStart(21, '0')}`;
+
+/** A VisualizationInfo whose Selection holds `components` (already XML). */
+export const viewpointWith = (components: readonly string[]): string =>
+  `${HEAD}<VisualizationInfo Guid="${guid(1)}"><Components><Selection>${components.join('')}</Selection></Components>${CAMERA}</VisualizationInfo>`;
+
 const bytesOf = (text: string): Uint8Array => enc(text);
 
 export const BCF_READERS: readonly HostileReader[] = [
@@ -100,5 +107,15 @@ export const BCF_READERS: readonly HostileReader[] = [
     read: (input) => execute(createEmptyDocument(), 'import_bcf_viewpoint', { visualizationInfo: asText(input), name: 'v' }),
     accepts: (result) => (result as { affected: string[] }).affected.length === 1,
     maxRecords: 1 << 14,
+    extra: [
+      {
+        name: 'a Component with a 1 MB IfcGuid',
+        input: () => viewpointWith([`<Component IfcGuid="${'A'.repeat(1_000_000)}"></Component>`]),
+      },
+      {
+        name: '20,000 distinct foreign IfcGuid values',
+        input: () => viewpointWith(Array.from({ length: 20_000 }, (_, k) => `<Component IfcGuid="${foreignGuid(k)}"></Component>`)),
+      },
+    ],
   },
 ];

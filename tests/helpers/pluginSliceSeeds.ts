@@ -18,6 +18,7 @@ import { blindRunSteps } from '../golden/pipingPlansBlind';
 import { cappedRunSteps } from '../golden/pipingPlansCap';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { recordedModel } from '../unit/plant/stress/m3Fixtures';
+import { scene as nozzleScene } from '../unit/plant/stress/nozzleFixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
 import { fixturePcf } from '../unit/plant/fabrication/fabricationFixtures';
 import { addBody, caseParams, metreDocument, ok } from '../unit/aero/cfd/fixtures';
@@ -145,7 +146,7 @@ function buildingWithPlatforms(): CadDocument {
     bearingBarDirection: [1, 0],
     railing: {},
   });
-  return run(deck.document, 'add_pipe_rack', {
+  const rack = run(deck.document, 'add_pipe_rack', {
     origin: [mm(60000), 0],
     direction: [1, 0],
     length: mm(6000),
@@ -156,6 +157,24 @@ function buildingWithPlatforms(): CadDocument {
     tierBeamProfile: 'IPE200',
     bracingBays: [1],
     bracingProfile: 'L100x10',
+  });
+  const winder = run(rack.document, 'add_winder_stair', {
+    start: [mm(30000), mm(-8000), 0],
+    rise: mm(3000),
+    riserMax: mm(180),
+    going: mm(280),
+    straightTreads: 3,
+    winders: 3,
+    turn: 'left',
+  });
+  return run(winder.document, 'add_spiral_stair', {
+    start: [mm(36000), mm(-8000), 0],
+    rise: mm(3000),
+    riserMax: mm(180),
+    outerRadius: mm(900),
+    treadAngle: Math.PI / 8,
+    turn: 'left',
+    columnProfile: 'CHS168.3x6.3',
   }).document;
 }
 
@@ -169,9 +188,50 @@ function buildingWithEquipment(): CadDocument {
   const withNozzles = (doc: CadDocument, tag: string, nozzles: readonly object[]): CadDocument =>
     nozzles.reduce<CadDocument>((next, nozzle) => run(next, 'add_nozzle', { equipment: tag, ...nozzle }), doc);
   let doc = run(buildingWithPlatforms(), 'add_vessel', { ...separatorParams, location: [0, 20000] });
-  doc = withNozzles(doc, 'V-101', separatorNozzles);
+  doc = withNozzles(doc, 'V-101', [
+    ...separatorNozzles,
+    {
+      mark: 'P1',
+      service: 'padded drain',
+      dn: 100,
+      rating: 'CL150',
+      facing: 'RF',
+      location: { on: 'shell', elevation: 800, orientationDeg: 90 },
+      projection: 1000,
+      pad: { outsideDiameter: 300, thickness: 12 },
+    },
+  ]);
   doc = run(doc, 'add_heat_exchanger', { ...bemParams, location: [15000, 20000] });
   doc = withNozzles(doc, 'E-301', bemNozzles);
+  const lugs = {
+    type: 'lugs',
+    count: 4,
+    lugHeight: 300,
+    lugWidth: 200,
+    lugProjection: 150,
+    lugThickness: 20,
+    lugBasePlateThickness: 25,
+    lugBoltHoleDiameter: 30,
+    lugElevation: 1000,
+    baseElevation: 2000,
+  };
+  doc = run(doc, 'add_vessel', { ...separatorParams, tag: 'V-102', location: [0, 30000], support: lugs });
+  doc = run(doc, 'add_heat_exchanger', {
+    ...bemParams,
+    tag: 'E-302',
+    temaType: 'AKU',
+    location: [15000, 30000],
+    rearChannel: undefined,
+    support: undefined,
+    kettle: {
+      enlargedInsideDiameter: 900,
+      enlargedLength: 2000,
+      transitionLength: 300,
+      weirHeight: 500,
+      weirStation: 400,
+      weirThickness: 12,
+    },
+  });
   doc = run(doc, 'add_storage_tank', { ...tankParams, location: [60000, 30000] });
   return run(doc, 'add_pump', { ...pumpParams, location: [30000, 20000] });
 }
@@ -197,6 +257,19 @@ function pipingSeedDocument(): CadDocument {
   });
   if (next.rejected === true) throw new Error(`pluginSliceSeeds: piping seed continuation refused: ${next.summary}`);
   return next.document;
+}
+
+/** The civil golden plan, then the terrain tint and a site ground elevation (the civil document extension's reconcile re-derives the tint). */
+function civilTintedDocument(): CadDocument {
+  const steps: GoldenAction[] = [
+    ...(plans['civil_site_terrain_road_drainage'] ?? []),
+    { command: 'set_civil_display', params: { terrainTint: 'dem2' } },
+    {
+      command: 'set_site_context',
+      params: { latitudeDeg: 48, longitudeDeg: 2, dateTime: '2026-06-21T12:00:00+02:00', groundElevation: 101 },
+    },
+  ];
+  return planDocument(steps, 'civil_site_terrain_road_drainage_tinted');
 }
 
 const planOf = (table: Record<string, GoldenAction[]>, name: string) => (): CadDocument => planDocument(table[name], name);
@@ -417,7 +490,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   civil: {
     roots: ['civil'],
-    build: planOf(plans, 'civil_site_terrain_road_drainage'),
+    build: civilTintedDocument,
     query: { name: 'describe_civil', params: constant({}) },
     mutate: { name: 'set_coordinate_system', params: constant({ name: 'Fuzz CRS' }) },
   },
@@ -437,6 +510,23 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     roots: ['plant.stress'],
     build: () => recordedModel().doc,
     query: { name: 'check_pipe_stress', params: (doc) => ({ modelId: first(doc.plant?.stress?.models) }) },
+    mutate: { name: 'update_stress_model', params: (doc) => ({ modelId: first(doc.plant?.stress?.models), name: 'Fuzz' }) },
+  },
+  // a nozzle limit (with frameX) and the hot modulus on a recorded model
+  'pipeStress#nozzle': {
+    roots: ['plant.stress'],
+    build: () => {
+      const s = nozzleScene(true, true);
+      return execute(s.doc, 'set_nozzle_load_limit', {
+        modelId: s.id,
+        portId: 'P-101:N2',
+        holderId: s.restraintId,
+        frameX: [1, 1, 0],
+        standard: 'user',
+        userLimits: { source: 'seed', resultantForce: 1e9 },
+      }).document;
+    },
+    query: { name: 'check_nozzle_loads', params: (doc) => ({ modelId: first(doc.plant?.stress?.models) }) },
     mutate: { name: 'update_stress_model', params: (doc) => ({ modelId: first(doc.plant?.stress?.models), name: 'Fuzz' }) },
   },
   'plant-data': {
@@ -1019,4 +1109,22 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
   },
   query: { name: 'check_motor_data', params: constant({ motor: 'm' }) },
   mutate: { name: 'set_motor_drive', params: constant({ motor: 'm', mode: 'voltage', volts: 5 }) },
+};
+
+/** The site context (`doc.siteContext`, plant 09 VIS FR-VIS-18): a core slice with no plugin row; pluginSliceFuzz.test.ts runs it like DYNAMICS_SEED. */
+export const SITE_CONTEXT_SEED: PluginSliceSeed = {
+  roots: ['siteContext'],
+  build: () => {
+    const result = execute(createEmptyDocument(), 'set_site_context', {
+      latitudeDeg: 48.2,
+      longitudeDeg: 16.37,
+      dateTime: '2026-06-21T14:30:00+02:00',
+      northAngleDeg: 30,
+      groundElevation: 170,
+    });
+    if (result.document.siteContext === undefined) throw new Error(`SITE_CONTEXT_SEED: ${result.summary}`);
+    return result.document;
+  },
+  query: { name: 'sun_position', params: constant({}) },
+  mutate: { name: 'set_site_context', params: constant({ latitudeDeg: 10, longitudeDeg: 20, dateTime: '2026-01-01T12:00:00Z' }) },
 };

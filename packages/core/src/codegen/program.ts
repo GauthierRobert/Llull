@@ -78,7 +78,13 @@ export type SweptBuild =
       readonly bore?: number;
     }
   /** Thru-sections loft of exact sections (ruled = straight between neighbours). */
-  | { readonly kind: 'loft'; readonly sections: readonly LoftSection[]; readonly ruled: boolean };
+  | {
+      readonly kind: 'loft';
+      readonly sections: readonly LoftSection[];
+      readonly ruled: boolean;
+      /** ASC M5 polygon loft: the section vertices (paired by index); the CadQuery / build123d helpers build planar / ruled side faces from them, as the native kernel does. */
+      readonly polygons?: readonly (readonly Vec3[])[];
+    };
 
 export type ShapeSpec =
   | { readonly kind: 'box'; readonly size: Term3 }

@@ -752,25 +752,25 @@ Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_clo
 
 ### 13.3 Validation status
 
-| VC                                                              | Status                                                                                    | Test                                                                                    |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 01–05 E57 inventory, CRC, empty, encodings, pose                | pass                                                                                      | `solver/crates/llull-cloud/tests/e57.rs`; 02, 03 also `server/tests/scanImport.test.ts` |
-| 06–08 LAS / LAZ inventory, LAZ ≡ LAS, header bounds             | pass                                                                                      | `tests/las.rs`                                                                          |
-| 09 large coordinates (bit-exact through the asset)              | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (TS reader)                        |
-| 10 octree / LOD invariants, identical bytes                     | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts`                                    |
-| 11 proprietary refusal                                          | pass                                                                                      | `server/tests/scanImport.test.ts`, `tests/e57.rs`                                       |
-| 12 nearest on the coloured cube                                 | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (registry command)                 |
-| 20a–c cylinders within the CRLB tolerances                      | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
-| 21 DN snap                                                      | pass                                                                                      | `tests/unit/scan/extraction.test.ts`, `server/tests/scanNative.test.ts`                 |
-| 22 ELB-A centreline trace (2 straights, bend R / angle / PI, r) | pass                                                                                      | `tests/trace.rs`, `server/tests/scanNative.test.ts`                                     |
-| 23                                                              | not built (V1)                                                                            | —                                                                                       |
-| 24 slice circle                                                 | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
-| 30 ICP-A                                                        | pass (own seeded 70 % / σ 0.2 mm draw; the pack's numpy draw is not reproducible in Rust) | `tests/registration.rs`                                                                 |
-| 31 TGT-A                                                        | pass                                                                                      | `tests/registration.rs`, `server/tests/scanNative.test.ts`                              |
-| 32 degenerate registrations                                     | pass                                                                                      | `tests/registration.rs`, `tests/unit/scan/registration.test.ts`                         |
-| 40–43 C2M-A, DEV-A, 64-facet bound, CLH-A                       | pass                                                                                      | `tests/compare.rs`, `server/tests/scanNative.test.ts`                                   |
-| 50–52 codes, unverified propagation, review flags               | pass                                                                                      | `tests/unit/scan/*.test.ts`                                                             |
-| 60 (a) reproducibility, (b) GPU clash, (c) GPU deviation        | pass (a re-scoped, decision 1)                                                            | `tests/*.rs`, `tests/gpu_parity.rs`, `server/tests/scanNative.test.ts`                  |
+| VC                                                                | Status                                                                                    | Test                                                                                    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 01–05 E57 inventory, CRC, empty, encodings, pose                  | pass                                                                                      | `solver/crates/llull-cloud/tests/e57.rs`; 02, 03 also `server/tests/scanImport.test.ts` |
+| 06–08 LAS / LAZ inventory, LAZ ≡ LAS, header bounds               | pass                                                                                      | `tests/las.rs`                                                                          |
+| 09 large coordinates (bit-exact through the asset)                | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (TS reader)                        |
+| 10 octree / LOD invariants, identical bytes                       | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts`                                    |
+| 11 proprietary refusal                                            | pass                                                                                      | `server/tests/scanImport.test.ts`, `tests/e57.rs`                                       |
+| 12 nearest on the coloured cube                                   | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (registry command)                 |
+| 20a–c cylinders within the CRLB tolerances                        | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
+| 21 DN snap                                                        | pass                                                                                      | `tests/unit/scan/extraction.test.ts`, `server/tests/scanNative.test.ts`                 |
+| 22 ELB-A centreline trace (2 straights, bend R / angle / PI, r)   | pass                                                                                      | `tests/trace.rs`, `server/tests/scanNative.test.ts`                                     |
+| 23 STL-A steel section (IPE 300 first, h / b ±3 mm, axis, centre) | pass                                                                                      | `tests/steel.rs` (pack file), `tests/unit/scan/steelFit.test.ts`                        |
+| 24 slice circle                                                   | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
+| 30 ICP-A                                                          | pass (own seeded 70 % / σ 0.2 mm draw; the pack's numpy draw is not reproducible in Rust) | `tests/registration.rs`                                                                 |
+| 31 TGT-A                                                          | pass                                                                                      | `tests/registration.rs`, `server/tests/scanNative.test.ts`                              |
+| 32 degenerate registrations                                       | pass                                                                                      | `tests/registration.rs`, `tests/unit/scan/registration.test.ts`                         |
+| 40–43 C2M-A, DEV-A, 64-facet bound, CLH-A                         | pass                                                                                      | `tests/compare.rs`, `server/tests/scanNative.test.ts`                                   |
+| 50–52 codes, unverified propagation, review flags                 | pass                                                                                      | `tests/unit/scan/*.test.ts`                                                             |
+| 60 (a) reproducibility, (b) GPU clash, (c) GPU deviation          | pass (a re-scoped, decision 1)                                                            | `tests/*.rs`, `tests/gpu_parity.rs`, `server/tests/scanNative.test.ts`                  |
 
 ### 13.4 Open questions (§11) decided
 
@@ -911,13 +911,71 @@ timestamps, so the same document and assets give the same archive bytes (tested)
   usage, byte-reproducible packing of two real clouds (CYL-A, CLH-A), unpack into an empty store with the files equal to the source store's, re-unpack ("already there"),
   a bit flip inside the archive, a corrupted block at pack time.
 
+### 13.11 Steel member fit (SCN-V1d, 2026-11-21)
+
+`fit_steel_member` (read-only, toolset `scan`; `scan/steelFitCommand.ts`) runs the native op `steel` (`llull-cloud/src/fit/steel.rs`). The catalogue stays in
+TypeScript: the command sends the outer outline of every profile of `families` (default IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L; FL / RD only when named) in
+metres, and Rust does the numerics. Axis: the largest-variance direction of the region (sign fixed), or `axisHint` (a finite vector, norm > 1e-9). No face-plane
+refinement of the axis is built: PCA only, so WITHOUT a hint the fit refuses `SCN_STEEL_AXIS_AMBIGUOUS` when the two largest variances are within 2x or the axial extent
+is under 3 x the larger in-plane extent (a stub: IPE 300 at 0.4 h, 1.3 h, HEA 300 at 1.1 h in `tests/steel.rs`). Section points are projected onto the plane through the centroid (stride subsample to 1 500
+points) and every outline is scored by RMS(min distance point to outline) with the outline centred on the 0.5 % / 99.5 % percentile box of the rotated points,
+over a roll search (coarse 5° on 300 points, golden section ±5° on all) for BOTH viewing directions (the unequal angle is chiral: the second direction reverses
+the axis, so every candidate carries `axisDirection`, `depthDirection`, `widthDirection` with width x depth = axis). A roll is tried only when the rotated extents are
+within 30 % of the outline's. h and b are the rotated extents of the best orientation. The command derives the `add_steel_member` roll from the depth direction with
+the sweep-frame convention (`shared/mesh.ts`) and returns `addSteelMember = { profile, start, end, roll, levelId? }`: `add_steel_member` reads z relative to its level, so the command takes `levelId` (default the active level,
+else the first; unknown: `SCN_PARAM_INVALID`) and subtracts that level's elevation (`axis` / `member` stay absolute; the test creates the member on a level at 3.6 m and compares position and frame). `tw` / `tf` are measured for I sections and `null` with a reason otherwise (§13.12). Refusals: < 30 points `SCN_FIT_TOO_FEW_POINTS`, section under 1 cm `SCN_FIT_NO_MODEL`, no outline within the
+extent gate `SCN_STEEL_NO_CANDIDATE`; warnings: `SCN_STEEL_NO_MATCH` (best score above the inlier band: built-up section) and `SCN_STEEL_LOW_COVERAGE` (under 80 % of the best
+outline's perimeter has scan points within the band: occluded / one-sided, h, b and centre are of the visible part, the fit is unverified; no translation refinement per roll is
+built). Job caps (`NATIVE_JOB_INPUT` naming the field): 512 outlines, 3 to 256 finite vertices per loop with a non-zero box, names of 64 characters, `maxCandidates` 1 to 100. The commit of a steel extraction and the `$fromStep` path of SC-SCN-05 are §13.12. VC-SCN-23 on the pack file STL-A: IPE 300 first, h / b within 3 mm, axis within 0.26° (asserted), centre within 3 mm.
+
+### 13.12 Steel as-built commit, face-plane axis, tw / tf (SCN-V2, 2026-11-21)
+
+**1. `commit_asbuilt_extraction` for steel members** (`scan/steelCommit.ts`, called from `extractionCommands.ts` after the common hash / cloud / stale / duplicate checks, so
+the pipe semantics and the human gate are unchanged). `fit_steel_member` now returns `data.extractions[0] = { profile, unverified, extraction }`; `extraction` is a hashed
+record of kind `steel_member` (`ExtractionRecord.kind: 'pipe' | 'steel_member'`) whose `fit` holds `profile, start, end, direction, length` (metres, document frame), `roll`
+(the `add_steel_member` roll), `depthDirection, widthDirection, hMm, bMm, twMm, tfMm, scoreMm`. The commit writes the extraction record into the document FIRST and then runs `add_steel_member` through `execute` with `asBuilt: { extractionId,
+unverified }`; `add_steel_member` refuses an `asBuilt.extractionId` that is not in `doc.scan.extractions` (the flag cannot be forged by hand; the record's `createdElementIds` are filled after). `add_pipe_run` keeps its unchecked `asBuilt` (Left) (new optional field on `add_steel_member` and `SteelMemberElement`, validated like the pipe's), z relative to `levelId` (default active level). New param `role`
+(default `column` when the axis is within 15 degrees of vertical, else `beam`). The record keeps `createdElementIds`; `accept_asbuilt_extraction` is unchanged (same ledger, same
+`SCN_HUMAN_GATE` for agents), and replay re-creates the member from the stored numbers without the cloud (TR-SCN-04).
+Designation rule (`normaliseDesignation`, also used by `findProfile`): upper-case, whitespace, hyphens and underscores removed, so "IPE 300", "ipe-300", "IPE_300" all map to
+`IPE300`. A designation that is still not in the catalogue is refused `SCN_STEEL_PROFILE_UNKNOWN` naming it, document unchanged. `$fromStep` of SC-SCN-05 resolves
+as `extractions.0.extraction` (the plan JSON is corrected from `extractions.0`; `tests/unit/scan/steelCommit.test.ts` walks that exact path). The `$fromStep` binding itself
+(TR-SCN-03, `build_project`) is still not in core: the plan stays DRAFT and an agent chains the two calls with `--json`.
+
+**2. Face-plane axis refinement and tw / tf** (native, `llull-cloud/src/fit/steel_faces.rs`; release build only, like the rest of `steel`). After the best placement the points are
+assigned to the faces (edges of the best outline longer than 20 mm) by nearest edge within a band of 5 % of the smaller section dimension (a band at the noise level truncates the points
+on the response of the plane being fitted: the axis then freezes short of the truth; the wide band keeps the passes contracting, asserted: 0.6 degree hint error -> within 0.2 degree). A plane is fitted
+per face (smallest eigenvector of its scatter, at least 30 points) and the axis is the direction least aligned with the plane normals (smallest eigenvector of the point-weighted sum of n nᵀ);
+at least two non-parallel faces are required. The section is re-projected on the refined axis and re-ranked, up to 8 passes, until the move is under 0.005 degree; a pass whose best
+profile changes or whose score is more than 2 % worse than the PRINCIPAL-axis fit (pass 0, not the previous pass) stops the loop. The 5 degree limit is on the TOTAL move from the principal (or hinted) axis and is checked BEFORE a pass is kept: past it the whole refinement is dropped, the principal axis and its candidates are returned and `axisRefinement` is `applied: false` with "... in total, over the 5 deg limit: kept the principal axis" (tests/steel.rs: a 0.45 m member with hints 2 to 5 degrees off is refined to within 0.3 degree of the truth, hints 6 and 8 degrees off keep the hint axis exactly, a 12 degree hint on a long member is SCN_STEEL_NO_CANDIDATE). Observed limit of the method: a 12 degree hint on the SHORT member still converges to a nearby local fit 2 degrees from the hint, inside the limit; the hint is the caller's responsibility. Result `axisRefinement { applied, deltaDeg (total), faces,
+facePoints, residual, reason }` (residual = RMS point-to-own-plane distance, metres). It also repairs a tilted `axisHint` (hint 0.6 degree off -> axis within 0.2 degree of the truth, `tests/steel.rs`); a hint
+so far off (12 degrees) that the section is not found is refused / not refined, never silently bent.
+tw / tf (I sections only: IPE, HEA, HEB outlines carry catalogue `tw`, `tf` into the job, which only place the sampling windows): the web faces are the medians of the points near x = +/- tw/2 over the
+central 70 % of the clear height, the flange faces the medians of the points near the outer and inner y of each flange over the middle 70 % of the outstand (fillets excluded). `measured` carries
+`twMm, tfMm, twResidualMm, tfResidualMm` (RMS scatter of the plate's points about its two face positions), `twCatalogueMm, tfCatalogueMm`. A plate is reported only when its two faces are at least 5 residuals apart and
+each has 20 points: otherwise `null` with `twTfReason` ("one-sided", "not separately resolved"). This matters: on the pack's STL-A (faces seen from +x / +z) the web is a single face, the naive gap of its two noise halves
+is 1.9 mm, and the guard refuses it; the flange (both faces seen) is measured 10.66 mm against 10.7 mm. Comparison with the catalogue: `SCN_STEEL_THICKNESS_MISMATCH` warns by profile and plate when
+|measured - catalogue| exceeds the fit's own inlier band (3 x noiseSigma, else 2.5 x median spacing; `threshold.value`). Justification: below that band the difference cannot be told from the face-position noise and the window
+truncation of the estimate, and it is the same band that already decides inliers and `SCN_STEEL_NO_MATCH`; no mill-tolerance table (EN 10034) is used, because the offline source set holds none (sources.md S16 lists only the nominal dimensions).
+The warning makes the extraction unverified (`fit quality: SCN_STEEL_THICKNESS_MISMATCH`), like `SCN_STEEL_LOW_COVERAGE`. Algorithm version string `<binary>/steel-2`.
+
+**3. End to end through the real binary** (`server/tests/scanNative.test.ts`, describe "scan steel member on llull-compute"; skipped by tool without `llull-compute`, found at `solver/target/{compute,release}`
+or `LLULL_COMPUTE`; build `cargo build --release -p llull-compute` in `solver/`; the `llull-cloud` crate is its library): (a) STL-A with the SC-SCN-05 region: IPE300 first, h / b within 3 mm, axis within 0.2 degree,
+refinement applied on >= 4 faces, web unresolved with its reason, flange 10.7 +/- 1.5 mm, no mismatch warning, then `commit_asbuilt_extraction` -> beam IPE300 with the section centre within 3 mm, replay-equal; (b) a generated two-sided IPE300
+with an 11 mm web (12 000 points, sigma 0.4 mm): tw 11 +/- 0.5 mm, tf 10.7 +/- 0.5 mm, exactly one `SCN_STEEL_THICKNESS_MISMATCH` naming "IPE300 web thickness tw".
+
+Tests: `llull-cloud/tests/steel.rs` (17: thickness with residual, thicker web, no tw/tf outline and bad pair refused, sparse web, tilted hint pulled back, far hint not refined, PCA axis within 0.1 degree, STL-A one-sided),
+`tests/unit/scan/steelCommit.test.ts` (thickness / refinement data, mismatch warning, non-I null, `$fromStep` path, "IPE 300" -> IPE300, level elevation, column / role, unknown profile by name, tamper, unverified, human gate, replay, purity).
+Native replies are validated by the command: a missing / non-positive / non-finite `threshold.value` is `NATIVE_PROTOCOL`; `tw` / `tf` need finite > 0 values, residual >= 0 and an integer sample count, else null with a "malformed" reason; `axisRefinement` is picked field by field (null when mistyped). `ExtractionRecord.fit` documents which steel fields are millimetres (`hMm, bMm, twMm, tfMm, scoreMm`) and which metres. `BY_NAME` of the catalogue is keyed by `normaliseDesignation` (a test pins that the normalised names are unique).
+Left: the same record-before-element guard for `add_pipe_run`; for UPN / C / hollow / angle sections tw / tf are `null` (the plate model is I only); `$fromStep` in `build_project`; batch extraction; COPC / E57 export (needs an independent reader, see §13.10); `llull pack --with-scans`; global registration.
+
 ### 13.10 Left (V1 remainder, 2026-11-04)
 
 - **COPC export** (§6): not built. The `laz` crate encodes, but a COPC file needs a LAZ 1.4 writer with one variable-size chunk per octree node, the `copc` info VLR and a
   hierarchy EVLR, and the only reader that would prove it valid (PDAL, copc-lib, QGIS) is not available offline; a writer checked only by our own reader could ship files
   other tools reject. It stays a V1 item for a session with a reference reader. **E57 export**: not built (the `e57` crate has a writer, but there is no host surface yet:
   an export tool, its CLI verb and a round trip through an independent reader are one task).
-- `fit_steel_member` (FR-SCN-15, VC-SCN-23), batch extraction (VC-SCN-22 / 23 in parallel over many seeds), global registration (several stations), `commit_slice_geometry`,
+- batch extraction (VC-SCN-22 / 23 in parallel over many seeds), global registration (several stations), `commit_slice_geometry`,
   `llull scan gc`, `$fromStep` plan binding, ZIP64 / streamed archives for packs above 1 GiB.
 
 ## 12. References

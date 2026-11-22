@@ -8,10 +8,10 @@ use llull_jsmath::{hypot, round};
 use rayon::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
-struct Point {
-    x: f64,
-    y: f64,
-    z: f64,
+pub(crate) struct Point {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
 /// Supersampled z-buffer: nearest z (float32, +inf empty) and the face index drawn (-1 empty). The GPU path fills the same buffers.
@@ -28,7 +28,7 @@ impl SceneBuffers {
 }
 
 /// `depthPlane`: z as an affine function of the screen position from the best-conditioned corner triple, or None (edge-on face).
-fn depth_plane(points: &[Point]) -> Option<impl Fn(f64, f64) -> f64> {
+pub(crate) fn depth_plane(points: &[Point]) -> Option<impl Fn(f64, f64) -> f64> {
     let a = *points.first()?;
     let mut best: Option<(f64, Point, Point)> = None;
     for i in 1..points.len() {
@@ -53,7 +53,8 @@ fn depth_plane(points: &[Point]) -> Option<impl Fn(f64, f64) -> f64> {
 }
 
 /// Even-odd scanline fill of `loops` with a depth test (strictly nearer wins).
-fn fill(buffers: &mut SceneBuffers, w: usize, h: usize, loops: &[Vec<Point>], face: i32) {
+/// `faces` may be empty (depth-only pass).
+fn fill(depth: &mut [f32], faces: &mut [i32], w: usize, h: usize, loops: &[Vec<Point>], face: i32) {
     let all: Vec<Point> = loops.iter().flatten().copied().collect();
     let Some(depth_at) = depth_plane(&all) else { return };
     let (mut top, mut bottom) = (f64::INFINITY, f64::NEG_INFINITY);
@@ -88,9 +89,11 @@ fn fill(buffers: &mut SceneBuffers, w: usize, h: usize, loops: &[Vec<Point>], fa
             while x <= xb {
                 let index = y as usize * w + x as usize;
                 let z = depth_at(x + 0.5, sy);
-                if z < f64::from(buffers.depth[index]) {
-                    buffers.depth[index] = z as f32;
-                    buffers.face[index] = face;
+                if z < f64::from(depth[index]) {
+                    depth[index] = z as f32;
+                    if !faces.is_empty() {
+                        faces[index] = face;
+                    }
                 }
                 x += 1.0;
             }
@@ -100,22 +103,35 @@ fn fill(buffers: &mut SceneBuffers, w: usize, h: usize, loops: &[Vec<Point>], fa
     }
 }
 
-/// The filled faces of `scene` in draw order (the stage the GPU path replaces).
-pub fn fill_all(scene: &Scene) -> SceneBuffers {
-    let (w, h) = scene.buffer_size();
-    let mut buffers = SceneBuffers::empty(scene);
+/// The loops of one fill record (face, first loop, loop count) as screen points.
+pub(crate) fn fill_loops(scene: &Scene, fill_record: &[f64]) -> Vec<Vec<Point>> {
     let point = |index: usize| Point { x: scene.points[index * 3], y: scene.points[index * 3 + 1], z: scene.points[index * 3 + 2] };
-    for fill_record in scene.fills.chunks_exact(3) {
-        let (first_loop, loop_count) = (fill_record[1] as usize, fill_record[2] as usize);
-        let loops: Vec<Vec<Point>> = (first_loop..first_loop + loop_count)
-            .map(|l| {
-                let (first, count) = (scene.loops[l * 2] as usize, scene.loops[l * 2 + 1] as usize);
-                (first..first + count).map(point).collect()
-            })
-            .collect();
-        fill(&mut buffers, w, h, &loops, fill_record[0] as i32);
-    }
-    buffers
+    let (first_loop, loop_count) = (fill_record[1] as usize, fill_record[2] as usize);
+    (first_loop..first_loop + loop_count)
+        .map(|l| {
+            let (first, count) = (scene.loops[l * 2] as usize, scene.loops[l * 2 + 1] as usize);
+            (first..first + count).map(point).collect()
+        })
+        .collect()
+}
+
+/// Rasterises fill record `index` into `buffers`.
+pub(crate) fn fill_record(scene: &Scene, buffers: &mut SceneBuffers, index: usize) {
+    let (w, h) = scene.buffer_size();
+    let record = &scene.fills[index * 3..index * 3 + 3];
+    fill(&mut buffers.depth, &mut buffers.face, w, h, &fill_loops(scene, record), record[0] as i32);
+}
+
+/// Rasterises fill record `index` into a depth buffer only (the Hi-Z occluder pass).
+pub(crate) fn fill_record_depth(scene: &Scene, depth: &mut [f32], index: usize) {
+    let (w, h) = scene.buffer_size();
+    let record = &scene.fills[index * 3..index * 3 + 3];
+    fill(depth, &mut [], w, h, &fill_loops(scene, record), record[0] as i32);
+}
+
+/// The filled faces of `scene` in draw order (the stage the GPU path replaces); Hi-Z culling on large scenes (`scene_hiz`).
+pub fn fill_all(scene: &Scene) -> SceneBuffers {
+    crate::scene_hiz::fill_all_with(scene, crate::scene_hiz::Hiz::Auto).0
 }
 
 /// Depth-tested strokes (2D sketches), in draw order, pulled toward the viewer by their bias.

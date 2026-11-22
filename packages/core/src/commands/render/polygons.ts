@@ -3,7 +3,7 @@
  * order) and stroked paths for 2D shapes (Z-up throughout).
  */
 
-import type { Entity, SplineEntity, Vec2, Vec3 } from '../../model/types';
+import type { Entity, MeshData, SplineEntity, Vec2, Vec3 } from '../../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
 import { ORIGIN, add3 } from '../../lib/vec3';
 import { curveDisplayPoints } from '../../geometry/nurbsCurve';
@@ -95,6 +95,18 @@ function tessellate2DSpline(e: SplineEntity): PreDepthPolygon[] {
   return [stroke(verts, e.color)];
 }
 
+/** `polygons` (one per mesh triangle, in order) recoloured with the mean of their three vertex colours (sRGB bytes). */
+function vertexColoured(mesh: MeshData, vertexColors: ReadonlyArray<number>, polygons: PreDepthPolygon[]): PreDepthPolygon[] {
+  const corners = mesh.indices.length > 0 ? mesh.indices : Array.from({ length: Math.floor(mesh.positions.length / 3) }, (_, i) => i);
+  return polygons.map((polygon, t) => {
+    const mean = (channel: number): string =>
+      Math.round([0, 1, 2].reduce((sum, k) => sum + (vertexColors[(corners[t * 3 + k] ?? 0) * 3 + channel] ?? 0), 0) / 3)
+        .toString(16)
+        .padStart(2, '0');
+    return corners.length > t * 3 + 2 ? { ...polygon, color: `#${mean(0)}${mean(1)}${mean(2)}` } : polygon;
+  });
+}
+
 /** Polygons of one entity; 3D solids carry their rotation, 2D shapes ignore it (plane orientation is out of scope). */
 export function tessellateEntity(e: Entity): PreDepthPolygon[] {
   const rotated = (faces: Vec3[][]): PreDepthPolygon[] => applyRotation(makePolygons(faces, e.color), e.position, e.rotation);
@@ -129,6 +141,8 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return rotated(revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position));
     case 'mesh': {
       const polygons = rotated(meshTriangles(e.mesh, e.position));
+      if (e.vertexColors !== undefined && e.vertexColors.length === e.mesh.positions.length)
+        return vertexColoured(e.mesh, e.vertexColors, polygons);
       if (e.faceColors === undefined) return polygons;
       const colors = faceColorTriangles(e.mesh, e.faceColors);
       return polygons.map((polygon, t) => ({ ...polygon, color: colors[t] ?? polygon.color }));

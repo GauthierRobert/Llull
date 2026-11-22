@@ -36,7 +36,7 @@ const fixityText = (startJoint: string | undefined, endJoint: string | undefined
 
 /**
  * @affects creates 1 steel member (exact section mesh on its role layer)
- * @failure unknown profile / role, zero length, unknown level -> no-op
+ * @failure unknown profile / role, zero length, unknown level, asBuilt naming an extraction that is not in doc.scan.extractions -> no-op
  */
 export const addSteelMember = defineCommand({
   name: 'add_steel_member',
@@ -69,10 +69,19 @@ export const addSteelMember = defineCommand({
       .describe(
         'Columns only: "pinned" (default; or the fixity of its base plate) or "fixed" (the foot restrains rotation in check_steel_members).',
       ),
+    asBuilt: z
+      .object({
+        extractionId: z.string().describe('Extraction record id in doc.scan.extractions.'),
+        unverified: z.boolean().describe('Whether the scan-derived geometry is unverified.'),
+      })
+      .optional()
+      .describe(
+        'Set by commit_asbuilt_extraction: marks the member as scan-derived (as-built). Do not set it by hand: the extraction record must already exist.',
+      ),
   }),
   run: (
     doc,
-    { profile, start, end, role = 'beam', roll = 0, levelId, material, note, startJoint, endJoint, baseFixity },
+    { profile, start, end, role = 'beam', roll = 0, levelId, material, note, startJoint, endJoint, baseFixity, asBuilt },
   ): CommandResult => {
     const from = toVec3(start);
     const to = toVec3(end);
@@ -81,6 +90,8 @@ export const addSteelMember = defineCommand({
     if (problem) return noop(doc, `add_steel_member failed: ${problem}.`);
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_steel_member failed: ${resolution.reason}.`);
+    if (asBuilt !== undefined && !(doc.scan !== undefined && Object.hasOwn(doc.scan.extractions, asBuilt.extractionId)))
+      return noop(doc, `add_steel_member failed: asBuilt.extractionId '${asBuilt.extractionId}' is not an extraction of this document.`);
     const memberTwin = findTwin(
       resolution.building,
       'member',
@@ -93,7 +104,7 @@ export const addSteelMember = defineCommand({
     );
     if (memberTwin) return noop(doc, duplicateSummary('add_steel_member', memberTwin, `a ${role} ${profile} between these points`));
     const added = appendMembers(resolution.building, resolution.level.id, [
-      { role, profile, start: from, end: to, roll, material, note, startJoint, endJoint, baseFixity },
+      { role, profile, start: from, end: to, roll, material, note, startJoint, endJoint, baseFixity, asBuilt },
     ]);
     if ('reason' in added) return noop(doc, `add_steel_member failed: ${added.reason}.`);
     const section = findProfile(profile) as SteelProfile;

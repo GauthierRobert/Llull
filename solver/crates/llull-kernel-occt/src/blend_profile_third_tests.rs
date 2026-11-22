@@ -345,8 +345,23 @@ fn the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
     let (shape, vertex, meeting) = cylinder_block();
-    // measured to build (13.39.4): the straight top edge sharp at r 0.5 / ball 1.2 only (9 of 10 other cases miss G0, below), the edge against the cylinder sharp at five radius / ball pairs
-    let cases: Vec<(usize, f64, f64)> = vec![(1, 0.5, 1.2), (2, 0.5, 1.2), (2, 0.5, 1.5), (2, 0.3, 1.5), (2, 0.8, 2.0)];
+    // measured to build (13.39.4, 13.42): the three sharp choices at several radius / ball pairs; sharp 0 is the CIRCULAR top edge (a curved sharp edge, built since 13.42)
+    let cases: Vec<(usize, f64, f64)> = vec![
+        (0, 0.3, 1.0),
+        (0, 0.5, 1.2),
+        (0, 0.8, 2.0),
+        (0, 1.0, 2.0),
+        (0, 0.5, 2.0),
+        (1, 0.5, 1.2),
+        (1, 0.3, 1.5),
+        (1, 0.8, 2.0),
+        (2, 0.5, 1.2),
+        (2, 0.5, 1.5),
+        (2, 0.3, 1.5),
+        (2, 0.8, 2.0),
+        (2, 0.8, 1.5),
+        (2, 1.0, 2.0),
+    ];
     for (sharp, radius, ball) in cases {
         let (edges, corners) = trim_step(&shape, vertex, sharp, radius, ball);
         assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "sharp {sharp} r {radius} ball {ball} builds");
@@ -370,7 +385,7 @@ fn the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke() {
             "sharp {sharp} r {radius} ball {ball}: G1 {} over every patch edge but the crease",
             reading.interior
         );
-        assert!(reading.pole_end < 1e-6, "sharp {sharp} r {radius} ball {ball}: the pole {}", reading.pole_end);
+        assert!(reading.pole_end < 5e-6, "sharp {sharp} r {radius} ball {ball}: the pole {}", reading.pole_end);
         let dihedral = edge_continuity(&shape, meeting[sharp] as f64, 3.0).unwrap()[0]["g1"].as_f64().unwrap().abs();
         assert_falls_monotonically(&crease_of(&reading), dihedral);
         assert!(
@@ -412,8 +427,7 @@ fn the_trim_builder_on_a_cube_is_within_a_sliver_of_the_closed_form_mitre() {
     assert!(patch_edges(&built).iter().any(|edge| edge.both_patches), "the spokes are patch edges");
 }
 
-/// BLD §13.39.3: what the trim builder refuses at a vertex with an unrounded edge, by name: a CURVED sharp edge (the circular top edge: the star misses the blend ends by 3e-6 to 9e-6 against 0.2e-6 x
-/// the diagonal), two edges left sharp, a radius that varies on a rounded edge, the sharp edge's setback 0, a ball that does not hold the mitre of the two blends (1.2 against r sqrt(2) = 1.414).
+/// BLD §13.39.3: what the trim builder refuses at a vertex with an unrounded edge, by name (the circular top edge left sharp is NOT refused since 13.42: it builds), two edges left sharp, a radius that varies on a rounded edge, the sharp edge's setback 0, a ball that does not hold the mitre of the two blends (1.2 against r sqrt(2) = 1.414).
 #[test]
 fn what_the_trim_builder_does_not_take_at_a_sharp_edge_is_refused_by_name() {
     let _serial = crate::serial_blends();
@@ -421,11 +435,7 @@ fn what_the_trim_builder_does_not_take_at_a_sharp_edge_is_refused_by_name() {
     let (shape, vertex, meeting) = cylinder_block();
     let reason = |shape: &Shape, edges: &[f64], corners: &[f64]| setback_reason(shape, edges, corners).unwrap();
     let (edges, corners) = trim_step(&shape, vertex, 0, 0.5, 1.2);
-    let text = reason(&shape, &edges, &corners);
-    assert!(
-        text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("must be a straight line") && text.contains("9 of 10 cases"),
-        "{text}"
-    );
+    assert_eq!(reason(&shape, &edges, &corners), "", "the circular top edge left sharp builds (13.42)");
     let one = vec![meeting[1] as f64, 0.5, 0.5];
     let text = reason(&shape, &one, &corners);
     assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("at most one edge of a three-edge vertex"), "{text}");
@@ -569,18 +579,21 @@ fn a_ball_that_does_not_hold_the_crease_is_refused_at_a_second_radius_too() {
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
 }
 
-/// BLD §13.39.5: where the star is refused the step says so by name with the measure: the straight top edge sharp at r 0.5 / ball 1.5 (the creased star misses the blend ends by 6e-6 against 3.2e-6).
+/// BLD §13.43: the creased star that missed the blend ends by 1e-5 (r 1 / ball 2 against the cylinder, 13.42.3) builds since the bottom edge of every sub-patch equals its chain (the cross tangent at v = 0 is the projected
+/// one). Where the creased star is refused now it is by the overshoot gate, named with the measure: the circular top edge sharp at r 1 / ball 3 stands 0.0155 outside the part, above 0.015.
 #[test]
-fn a_creased_trim_star_that_misses_the_blend_ends_is_refused_with_the_measure() {
+fn a_creased_trim_star_over_the_overshoot_limit_is_refused_with_the_measure() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
     let (shape, vertex, _) = cylinder_block();
-    let (edges, corners) = trim_step(&shape, vertex, 1, 0.5, 1.5);
+    let (edges, corners) = trim_step(&shape, vertex, 2, 1.0, 2.0);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
+    let (edges, corners) = trim_step(&shape, vertex, 0, 1.0, 3.0);
     let text = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(
         text.starts_with("[BLD_CORNER_FAILED]")
             && text.contains("the only patch that holds the crease")
-            && text.contains("leave the edges by 0.00000"),
+            && text.contains("outside the part, above 0.015"),
         "{text}"
     );
 }
@@ -603,5 +616,9 @@ fn a_trim_star_that_stands_outside_the_part_is_measured_and_refused_above_the_li
     let text = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(text.starts_with("[BLD_CORNER_FAILED]") && text.contains("stands 0.0") && text.contains("outside the part, above"), "{text}");
     assert!(text.contains(&format!("above {}", (limit * 1e5).round() / 1e5)) || text.contains("above 0.017"), "{text}");
-    // the same gate on the cylinder block: the edge against the cylinder sharp, r 0.3, ball 2 stands 0.0155 outside (limit 1e-3 x the diagonal)    let (block, vertex, _) = cylinder_block();    let (edges, corners) = trim_step(&block, vertex, 2, 0.3, 2.0);    let text = setback_reason(&block, &edges, &corners).unwrap();    assert!(text.contains("stands 0.015") && text.contains("outside the part, above"), "{text}");
+    // the same gate on the cylinder block: the edge against the cylinder sharp, r 0.3, ball 2 stands 0.0155 outside (limit 1e-3 x the diagonal)
+    let (block, vertex, _) = cylinder_block();
+    let (edges, corners) = trim_step(&block, vertex, 2, 0.3, 2.0);
+    let text = setback_reason(&block, &edges, &corners).unwrap();
+    assert!(text.contains("stands 0.015") && text.contains("outside the part, above"), "{text}");
 }

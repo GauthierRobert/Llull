@@ -63,6 +63,16 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
     }
     return undefined;
   };
+  const kettleOf = (template: Record<string, unknown>): void => {
+    (template['tema'] as Record<string, unknown>)['shell'] = 'K';
+    template['kettle'] = {
+      enlargedInsideDiameter: 900,
+      enlargedLength: 2000,
+      transitionLength: 300,
+      enlargedThickness: 10,
+      weirHeight: 500,
+    };
+  };
   const tubes = (template: Record<string, unknown>): Record<string, unknown> => template['tubes'] as Record<string, unknown>;
   const side = (template: Record<string, unknown>): Record<string, unknown> => template['design'] as Record<string, unknown>;
   const shell = (template: Record<string, unknown>): Record<string, unknown> => side(template)['shellSide'] as Record<string, unknown>;
@@ -92,6 +102,99 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
       (_p: Record<string, unknown>, t: Record<string, unknown>) =>
         (t['support'] = { type: 'skirt', height: 1, thickness: 1, baseRingWidth: 0 }),
       /saddles or none/,
+    ],
+    [
+      'exchanger with a bad orientation',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['orientation'] = 'diagonal'),
+      /orientation must be horizontal or vertical/,
+    ],
+    [
+      'vertical exchanger on saddles',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['orientation'] = 'vertical'),
+      /skirt, legs, lugs or none for a vertical exchanger/,
+    ],
+    [
+      'kettle record on a non-K shell',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['kettle'] = { enlargedInsideDiameter: 900 }),
+      /kettle is only for the shell letter K/,
+    ],
+    [
+      'K shell without a kettle record',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['tema'] as Record<string, unknown>)['shell'] = 'K'),
+      /kettle is required for the shell letter K/,
+    ],
+    [
+      'K shell whose enlarged cylinder is not larger',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['kettle'] as Record<string, unknown>)['enlargedInsideDiameter'] = 600;
+      },
+      /enlargedInsideDiameter must exceed shellInsideDiameter/,
+    ],
+    [
+      'K shell with a weir above the enlarged shell',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['kettle'] as Record<string, unknown>)['weirHeight'] = 900;
+      },
+      /weirHeight must be below/,
+    ],
+    [
+      'K shell whose enlarged length overruns the shell (restricted length negative)',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['kettle'] as Record<string, unknown>)['enlargedLength'] = 9000;
+      },
+      /leave no restricted cylinder/,
+    ],
+    [
+      'vertical K shell',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        t['orientation'] = 'vertical';
+      },
+      /kettle is horizontal only/,
+    ],
+    [
+      'K shell with a fixed-tubesheet rear',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        kettleOf(t);
+        (t['tema'] as Record<string, unknown>)['fixedTubesheet'] = true;
+      },
+      /removable-bundle rear/,
+    ],
+    [
+      'K shell with an incomplete kettle',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        (t['tema'] as Record<string, unknown>)['shell'] = 'K';
+        t['kettle'] = { enlargedInsideDiameter: 900 };
+      },
+      /kettle\.weirHeight must be a number > 0/,
+    ],
+    [
+      'K shell with a kettle that is not an object',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => {
+        (t['tema'] as Record<string, unknown>)['shell'] = 'K';
+        t['kettle'] = 3;
+      },
+      /kettle must be an object/,
+    ],
+    [
+      'channel with a bad cover thickness',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['frontChannel'] as Record<string, unknown>)['coverThickness'] = -1),
+      /coverThickness must be a number > 0/,
     ],
     [
       'fixed exchanger without a rear channel',

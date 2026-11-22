@@ -89,6 +89,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Give each line once (distinct lineId) and only give solutions with order: given (a solution is valid for one routing order).',
   RTE_AUTOROUTE_LINES_FAILED:
     'See data/detail.lines for the line that failed and why; route it alone with auto_route_pipe, widen gridMargin, lower clearance, raise maxAttempts, or set partial: true to keep the lines that routed.',
+  RTE_AUTOROUTE_BRANCH_UNREACHABLE:
+    'See data.branches for the branch and the add_branch refusal under it: move the branch point (at) onto a straight piece of the routed header, give legs / via / to so the branch leaves perpendicular, or route the header differently (its own settings, order given).',
   RTE_AUTOROUTE_SOLUTION_INVALID: 'Re-run llull auto_route on the current document, or drop solution to route with the TypeScript search.',
 };
 

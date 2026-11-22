@@ -157,8 +157,12 @@ function withPayload(entity: Entity, native: Record<string, unknown>): Entity {
   return { id, kind, layerId, color, position, rotation, native } as unknown as Entity;
 }
 
-/** Wire chains of a loft: its exact sections (Béziers + closing edge) when every one is expressible, else the Catmull-Rom ring curves. */
+/** Wire chains of a loft: its straight polygon edges, else its exact sections (Béziers + closing edge) when every one is expressible, else the Catmull-Rom ring curves. */
 function loftChains(entity: Extract<Entity, { kind: 'loft' }>): number[][] {
+  if (entity.polygon === true)
+    return entity.rings.map((ring) =>
+      encodeChain(ring.map((p, k): CurveSegment<Vec3> => ({ type: 'line', points: [p, ring[(k + 1) % ring.length] as Vec3] }))),
+    );
   const chains = entity.sections?.map(sectionChain);
   if (chains?.every((chain): chain is CurveSegment<Vec3>[] => chain !== null) === true) return chains.map(encodeChain);
   return entity.rings.map((ring) => encodeChain(ringCurves(ring)));
@@ -220,7 +224,13 @@ export function nativeLeaf(entity: Entity, wire: WireOptions = {}): Entity {
     }
     case 'loft': {
       const bsplines = wire.bsplineSections === true ? loftBsplines(entity) : null;
-      return withPayload(entity, { chains: loftChains(entity), ruled: entity.ruled, ...(bsplines === null ? {} : { bsplines }) });
+      const polygons = entity.polygon === true ? { polygons: entity.rings.map((ring) => ring.flatMap((p) => [...p])) } : {};
+      return withPayload(entity, {
+        chains: loftChains(entity),
+        ruled: entity.ruled,
+        ...polygons,
+        ...(bsplines === null ? {} : { bsplines }),
+      });
     }
     case 'sweep':
       return withPayload(entity, sweepPayload(entity, wire));

@@ -8,6 +8,13 @@ import { MM_PER_UNIT } from '@core/model/units';
 import type { CadDocument } from '@core/model/types';
 import { DesignError } from './errors';
 
+/** A param named in SI units (`throatDiameterM`, `spanM`: metres; `…Mm`: millimetres) takes length literals in that unit. */
+export function siLengthUnit(key: string): 'm' | 'mm' | null {
+  const last = key.split('.').pop() ?? '';
+  if (/[a-z]Mm$/.test(last)) return 'mm';
+  return /[a-z]M$/.test(last) ? 'm' : null;
+}
+
 type AngleUnit = 'deg' | 'rad';
 
 /** `<command>.<param path>` -> the angle unit that param takes (contract-tested: every entry names a real param). */

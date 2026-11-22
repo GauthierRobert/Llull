@@ -15,6 +15,8 @@ import { getFabrication, lineIdsInUse, withFabrication } from '../state';
  *   as route: no spec -> ISO_ROUTE_SPEC_MISSING; a line the plan cannot rebuild -> ISO_ROUTE_UNSUPPORTED / ISO_ROUTE_TOO_LARGE; an eccentric reducer whose end points are on one axis without eccentricFlat -> ISO_ROUTE_FLAT_MISSING, an eccentricFlat against the offset in the file -> ISO_PARAM_INVALID; supports without a level -> ISO_ROUTE_NO_LEVEL; any RTE refusal passes through with its own code and the document is unchanged;
  *   missing UNITS-BORE / UNITS-CO-ORDS -> ISO_PCF_UNITS_MISSING; unreadable point or record -> ISO_PCF_RECORD_INVALID (path "line N"); line id in use -> ISO_PCF_LINE_EXISTS; the document is unchanged
  */
+const VALVE_TYPES = ['valveGate', 'valveGlobe', 'valveCheck', 'valveBall', 'valveButterfly', 'valvePlug'] as const;
+
 export const importPcf = defineCommand({
   name: 'import_pcf',
   description:
@@ -65,12 +67,22 @@ export const importPcf = defineCommand({
         'as route: flat side ("top" = FOT, +Z; "bottom" = FOB, -Z) given to the REDUCER-ECCENTRIC records whose two END-POINTs lie on one axis. A file whose reducer ends are offset (an ISOGEN file) carries the side in that offset and needs no value (a value that disagrees is refused, ISO_PARAM_INVALID); without either the import is refused (ISO_ROUTE_FLAT_MISSING). The RTE refuses top / bottom on a vertical pipe.',
       ),
     valveType: z
-      .enum(['valveGate', 'valveGlobe', 'valveCheck', 'valveBall', 'valveButterfly', 'valvePlug'])
+      .enum(VALVE_TYPES)
       .optional()
-      .describe('as route: catalogue type given to every VALVE of the file (a PCF VALVE does not say which). Default valveGate.'),
+      .describe(
+        'as route: catalogue type given to every VALVE of the file without an entry in valveTypes (a PCF VALVE does not say which). Default valveGate.',
+      ),
+    valveTypes: z
+      .record(z.string(), z.enum(VALVE_TYPES))
+      .optional()
+      .describe(
+        'as route: catalogue type of individual valves, keyed by the COMPONENT-IDENTIFIER of the VALVE record in the file (e.g. { "V-101": "valveBall", "V-102": "valveCheck" }) or by the component id the route data reports (route.runs[].inline[].componentId: the UNIQUE-COMPONENT-IDENTIFIER, else "pcf:<line>:<position of the record>"); an identifier the file gives to two valves is refused; every other valve takes valveType. A key that is not a VALVE of the file is refused (ISO_PARAM_INVALID).',
+      ),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const routeOnly = (['spec', 'service', 'supports', 'valveType', 'eccentricFlat'] as const).filter((key) => params[key] !== undefined);
+    const routeOnly = (['spec', 'service', 'supports', 'valveType', 'valveTypes', 'eccentricFlat'] as const).filter(
+      (key) => params[key] !== undefined,
+    );
     if (params.as !== 'route' && routeOnly.length > 0)
       return refuseIso(doc, 'import_pcf', 'ISO_PARAM_INVALID', `${routeOnly.join(', ')} apply to as route only`, [], routeOnly.slice());
     const read = readPcf(params.text);
@@ -118,6 +130,7 @@ export const importPcf = defineCommand({
           service: params.service ?? 'PCF',
           supports: params.supports ?? true,
           valveType: params.valveType ?? 'valveGate',
+          valveTypes: params.valveTypes ?? {},
           eccentricFlat: params.eccentricFlat,
           base: data,
           warnings,

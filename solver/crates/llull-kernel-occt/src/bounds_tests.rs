@@ -245,3 +245,23 @@ fn a_narrow_spike_centred_between_two_probes_is_missed_with_a_measured_volume_er
     let error = (removed - expected) / expected;
     assert!((-0.0075..-0.0065).contains(&error), "measured relative error {error}");
 }
+
+/// ASC M5 (TR-ASC-15): `shape_bounds` is the tight box of the shape as placed, the same box `mass_properties` reports, without integrating anything.
+#[test]
+fn shape_bounds_is_the_tight_box_of_the_placed_shape() {
+    let sphere = crate::make_sphere(5.0).unwrap().unwrap();
+    let placed = crate::placed(&sphere, [0.3, 0.2, 0.1], [10.0, 20.0, 30.0], [0.0; 3]).unwrap().unwrap();
+    let found = crate::shape_bounds(&placed).unwrap().unwrap();
+    for (k, centre) in [10.0, 20.0, 30.0].iter().enumerate() {
+        assert!((found[k] - (centre - 5.0)).abs() < 1e-6 && (found[k + 3] - (centre + 5.0)).abs() < 1e-6, "axis {k}: {found:?}");
+    }
+    let block = make_box([0.0; 3], [10.0, 2.0, 2.0]).unwrap().unwrap();
+    let turned = crate::placed(&block, [0.0, 0.0, std::f64::consts::FRAC_PI_4], [0.0; 3], [0.0; 3]).unwrap().unwrap();
+    let box_found = crate::shape_bounds(&turned).unwrap().unwrap();
+    let mass = mass_properties(&turned).unwrap().bounds;
+    for k in 0..6 {
+        assert!((box_found[k] - mass[k]).abs() < 1e-9, "bounds {box_found:?} vs mass_properties {mass:?}");
+    }
+    let half = std::f64::consts::FRAC_1_SQRT_2;
+    assert!((box_found[3] - 10.0 * half).abs() < 1e-6 && (box_found[4] - (10.0 + 2.0) * half).abs() < 1e-6, "{box_found:?}");
+}

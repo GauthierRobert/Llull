@@ -23,8 +23,16 @@ import { sweepFrame } from '../../../shared/mesh';
 import { findProfile } from '../../../steel/profiles';
 import type { StairPlate } from '../stair/steelStairLayout';
 import { stairQuantities, treadThickness } from '../stair/steelStairMeasure';
+import { partSeed } from '../../../building/exchange/ifcSeeds';
 
 const STAIR_TYPES = ['.STRAIGHT_RUN_STAIR.', '.TWO_STRAIGHT_RUN_STAIR.'];
+
+/** Predefined type of a stair with exactly one turning landing; stairs with several landings and a turn stay user defined. */
+function turnType(stair: SteelStairElement): string | undefined {
+  const [only] = stair.landings;
+  if (stair.landings.length !== 1 || only?.turn === undefined) return undefined;
+  return only.turn.startsWith('half') ? '.HALF_TURN_STAIR.' : '.QUARTER_TURN_STAIR.';
+}
 
 /** One steel stair; null when the stringer section or the tread type left the catalogue. */
 export function exportSteelStair(context: Context, doc: CadDocument, stair: SteelStairElement, storeyPlacement: string): Exported | null {
@@ -39,11 +47,11 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
     extrusion(context, scaledPolygonProfile(context, plate.corners), mm(thickness), 0, 0, mm(plate.top - thickness));
   const parts: string[] = [];
   const section = steelProfileDef(context, profile);
-  layout.stringers.forEach((run, index) => {
+  [...layout.stringers, ...layout.knuckles].forEach((run, index) => {
     const [from, to] = [mm3(run.from), mm3(run.to)];
     const frame = sweepFrame(from, to, 0);
     if (frame === null) return;
-    const id = `${stair.id}:stringer-${index + 1}`;
+    const id = partSeed(stair.id, 'stringer', index + 1);
     const memberPlacement = framePlacement(context, storeyPlacement, from, frame.d, frame.u);
     const solid = extrusion(context, section, frame.length);
     parts.push(
@@ -53,7 +61,7 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
     );
   });
   layout.flights.forEach((flight, index) => {
-    const id = `${stair.id}:flight-${index + 1}`;
+    const id = partSeed(stair.id, 'flight', index + 1);
     const risers = flight.lastRiser - flight.firstRiser + 1;
     const treads = layout.treads.filter((_, position) => {
       const riser = layout.treadRisers[position] as number;
@@ -67,15 +75,16 @@ export function exportSteelStair(context: Context, doc: CadDocument, stair: Stee
     );
   });
   layout.landings.forEach((plate, index) => {
-    const id = `${stair.id}:landing-${index + 1}`;
+    const id = partSeed(stair.id, 'landing', index + 1);
     parts.push(
       writer.add(
         `IFCSLAB('${context.guid(id)}',$,${ifcString(`${stair.mark} landing ${index + 1}`)},$,$,${local},${shape(context, [plateSolid(plate)])},${ifcString(id)},.LANDING.)`,
       ),
     );
   });
-  const type = STAIR_TYPES[stair.landings.length] ?? '.USERDEFINED.';
-  const objectType = type === '.USERDEFINED.' ? ifcString('MULTI_FLIGHT_STRAIGHT_STAIR') : '$';
+  const turned = stair.landings.some((landing) => landing.turn !== undefined);
+  const type = turned ? (turnType(stair) ?? '.USERDEFINED.') : (STAIR_TYPES[stair.landings.length] ?? '.USERDEFINED.');
+  const objectType = type === '.USERDEFINED.' ? ifcString(turned ? 'MULTI_FLIGHT_TURNING_STAIR' : 'MULTI_FLIGHT_STRAIGHT_STAIR') : '$';
   const ref = writer.add(
     `IFCSTAIR('${context.guid(stair.id)}',$,${ifcString(stair.mark)},$,${objectType},${local},$,${ifcString(stair.id)},${type})`,
   );

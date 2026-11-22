@@ -5,6 +5,7 @@
  * @pure (with the reference stage)
  */
 
+import { siteLightOf } from './siteLight';
 import type { CadDocument, Vec3 } from '../../model/types';
 import { encodePng } from '../../lib/png';
 import { boundsCenter } from '../../geometry/bounds';
@@ -14,8 +15,10 @@ import { computeSceneSnapshot } from '../inspect/scene';
 import { rasterScenePixels } from './raster';
 import type { RasterScene } from '../../model/raster';
 import type { PixelStage, SurfaceShading } from './types';
+import type { RenderLight } from './camera';
 import { renderDocument } from './scene';
 import { viewpointView } from './viewSetup';
+import { skyBackdrop } from './skyRaster';
 
 export const FRAME_BACKGROUND = '#1a1a2e';
 
@@ -39,7 +42,13 @@ export interface FrameExtras {
   /** Receives the screen-space scene the pixel stage is about to draw and returns the scene to draw (overlays appended). */
   readonly augment?: (scene: RasterScene) => RasterScene;
   readonly colorOverrides?: Readonly<Record<string, string>>;
+  /** Static extent the site ground plane is fitted to in every frame (animation: the motion bounds); absent = each frame's own faces. */
+  readonly groundBounds?: { readonly min: Vec3; readonly max: Vec3 };
 }
+
+/** `light` with the ground plane fitted to `groundBounds` when given. */
+const frameLight = (light: RenderLight, groundBounds: FrameExtras['groundBounds']): RenderLight =>
+  groundBounds === undefined || light.shadows === undefined ? light : { ...light, shadows: { ...light.shadows, groundBounds } };
 
 /** Opaque RGBA (`width` × `height` × 4) of `doc` seen by `camera` over `background` (#rrggbb). */
 export function renderCameraRgba(
@@ -57,19 +66,27 @@ export function renderCameraRgba(
     drawn = pixels(extras.augment === undefined ? scene : extras.augment(scene));
     return new Uint8Array(drawn.length);
   };
+  const site = siteLightOf(doc);
+  const view = viewpointView(camera, width, height, center);
+  const { sky, ...lit } = site === null ? { sky: undefined } : frameLight(site.light, extras.groundBounds);
   renderDocument(doc, 'custom', width, height, {
-    view: viewpointView(camera, width, height, center),
+    view,
     caption: false,
     background: null,
     pixels: capture,
+    ...(site === null ? {} : { light: lit as RenderLight }),
     ...(extras.shading === undefined ? {} : { shading: extras.shading }),
     ...(extras.colorOverrides === undefined ? {} : { colorOverrides: extras.colorOverrides }),
   });
   const source: Uint8Array = drawn ?? new Uint8Array(width * height * 4);
   const out = new Uint8Array(width * height * 4);
+  const backdrop = sky === undefined ? null : skyBackdrop(sky, view.camera, width, height);
   for (let i = 0; i < width * height; i += 1) {
     const alpha = (source[i * 4 + 3] ?? 0) / 255;
-    for (let c = 0; c < 3; c += 1) out[i * 4 + c] = Math.round((source[i * 4 + c] ?? 0) * alpha + (background[c] ?? 0) * (1 - alpha));
+    for (let c = 0; c < 3; c += 1)
+      out[i * 4 + c] = Math.round(
+        (source[i * 4 + c] ?? 0) * alpha + (backdrop === null ? (background[c] ?? 0) : (backdrop[i * 3 + c] ?? 0)) * (1 - alpha),
+      );
     out[i * 4 + 3] = 255;
   }
   return out;

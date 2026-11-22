@@ -29,6 +29,10 @@ export interface RenderQualitySettings {
   edgeLines: boolean;
   /** Half-resolution GTAO ambient occlusion (a post-processing pass). */
   ambientOcclusion: boolean;
+  /** Cascaded shadow maps replace the single key-light map (High realism tier only). */
+  cascadedShadows: boolean;
+  /** Far repeated plant prototypes are drawn as octahedral billboards (off in Draft). */
+  impostors: boolean;
 }
 
 // Edges are what makes a shaded solid read as a CAD part (creases, silhouettes): on by default up to 200 entities. Ambient occlusion
@@ -44,6 +48,8 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     plantShadowMaxLod: 1,
     edgeLines: true,
     ambientOcclusion: true,
+    cascadedShadows: false,
+    impostors: true,
   },
   medium: {
     tier: 'medium',
@@ -55,6 +61,8 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     plantShadowMaxLod: 1,
     edgeLines: true,
     ambientOcclusion: false,
+    cascadedShadows: false,
+    impostors: true,
   },
   low: {
     tier: 'low',
@@ -66,13 +74,23 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     plantShadowMaxLod: 1,
     edgeLines: false,
     ambientOcclusion: false,
+    cascadedShadows: false,
+    impostors: true,
   },
 };
 
 /** Realism tiers sit on top of the quality tier: Standard keeps it, Draft drops every shadow, High forces the richest set whatever the scene size. */
 const REALISM_SETTINGS: Record<Exclude<RealismTier, 'standard'>, RenderQualitySettings> = {
-  draft: { ...QUALITY_SETTINGS.low, keyShadows: false, plantShadowMaxLod: -1, edgeLines: false, ambientOcclusion: false },
-  high: { ...QUALITY_SETTINGS.high, shadowRadius: 4, shadowMapSize: 4096, plantShadowMaxLod: 2, edgeLines: true, ambientOcclusion: true },
+  draft: { ...QUALITY_SETTINGS.low, keyShadows: false, plantShadowMaxLod: -1, edgeLines: false, ambientOcclusion: false, impostors: false },
+  high: {
+    ...QUALITY_SETTINGS.high,
+    shadowRadius: 4,
+    shadowMapSize: 4096,
+    plantShadowMaxLod: 2,
+    edgeLines: true,
+    ambientOcclusion: true,
+    cascadedShadows: true,
+  },
 };
 
 /** Final settings of a quality tier under a realism tier. Stable references (per tier pair). */

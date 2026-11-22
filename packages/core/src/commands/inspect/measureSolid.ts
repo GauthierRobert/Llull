@@ -2,6 +2,8 @@ import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
+import { kernelEntityBounds } from '../../geometry/kernelBounds';
+import type { BoundsSource } from '../../geometry/kernelBounds';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import type { Bounds } from '../../geometry/bounds';
 import { formatLength } from '../../model/units';
@@ -10,28 +12,35 @@ import { currentContext } from '../context';
 import { MASS_UNITS, type MassFailure, densityParam, measureTotal, missingEntityResult } from './massMeasure';
 import { analyze, volumeOnlyResult, weightedResult } from './massPropertiesReport';
 
-/** World bounds of e: a kernel result that keeps its B-rep recipe uses the kernel's exact bounds when it reports them (OCC). */
-function measuredBounds(doc: CadDocument, e: Entity, ctx: ExecutionContext | undefined): Bounds {
+/** Kinds whose closed-form world box is provably tight at any rotation: sphere, cylinder (half-axis·|n| + r·sqrt(1-n²) per axis) and box (its 8 corners). */
+const CLOSED_FORM_TIGHT: ReadonlySet<Entity['kind']> = new Set(['box', 'cylinder', 'sphere']);
+
+/** World bounds of e and their source: the kernel's tight box of the placed exact shape (TR-ASC-15), else the analytic estimate. */
+function measuredBounds(doc: CadDocument, e: Entity, ctx: ExecutionContext | undefined): { bounds: Bounds; source: BoundsSource } {
+  const kernel = (ctx ?? currentContext()).kernel;
+  const exact = kernelEntityBounds(e, kernel);
+  if (exact !== null) return { bounds: exact, source: 'exact' };
   if (e.kind === 'mesh' && e.brep !== undefined) {
-    const kernel = (ctx ?? currentContext()).kernel;
     const shape = kernel?.evaluate(recipeOf(e)) ?? null;
-    const exact = shape === null ? null : (kernel?.massProperties?.(shape) ?? null);
-    if (exact !== null) return { min: exact.bounds.min, max: exact.bounds.max };
+    const mass = shape === null ? null : (kernel?.massProperties?.(shape) ?? null);
+    if (mass !== null) return { bounds: { min: mass.bounds.min, max: mass.bounds.max }, source: 'exact' };
   }
-  return entityBoundsInDoc(doc, e);
+  return { bounds: entityBoundsInDoc(doc, e), source: CLOSED_FORM_TIGHT.has(e.kind) ? 'exact' : 'conservative' };
 }
 
 interface MeasureBoundingBoxData {
   min: Vec3;
   max: Vec3;
   size: Vec3;
+  /** 'exact': every measured entity is the kernel's tight box or a tight closed form (box, cylinder, sphere); 'conservative': at least one is an analytic / mesh / corner estimate (a superset). */
+  bounds: BoundsSource;
 }
 
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
- * @invariant data is { min: Vec3, max: Vec3, size: Vec3 }
+ * @invariant data is { min: Vec3, max: Vec3, size: Vec3, bounds: 'exact' | 'conservative' }
  * @failure missing entity id, empty document -> no-op, affected:[], no data
- * @invariant kernel-optional: a kernel result keeps exact bounds from the kernel when present, mesh bounds otherwise
+ * @invariant kernel-optional: a kernel-backed entity (curved or swept solid, kernel result) gets the kernel's tight box of the placed shape (data.bounds 'exact'); without a kernel, or for an entity with no exact shape, the analytic / corner estimate ('conservative', a superset)
  */
 export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
@@ -40,9 +49,9 @@ export const measureBoundingBox = defineCommand({
     'Compute the world-space axis-aligned bounding box (AABB) only; use mass_properties for mass, centroid and inertia. Three modes: (a) entityId — AABB of one entity; ' +
     '(b) useSelection:true — combined AABB of the current document selection; ' +
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
-    'Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d] }. Does not modify the document. ' +
+    "Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d], bounds:'exact'|'conservative' }. Does not modify the document. " +
     'Entity rotation and the sweep angle of a partly turned profile are applied (the AABB wraps the actual geometry). ' +
-    'A kernel result (mesh with its B-rep) under the exact OCC kernel uses the B-rep bounds, not the display triangles.',
+    "Under the exact OCC kernel a kernel result or an extruded, turned, swept or lofted solid, cone, torus, wedge or pyramid is measured on its exact shape as placed (the tight box, data.bounds 'exact'); a box, cylinder or sphere is always exact (its closed-form box is tight at any rotation); otherwise (no kernel, meshes, instances, 2D shapes, cone / torus / kernel kinds without a kernel) the box wraps the rotated geometry and may exceed it: data.bounds 'conservative' (also when any entity of a combined box is).",
   params: z.object({
     entityId: z.string().optional().describe('Id of the entity whose bounding box to compute. Takes precedence over useSelection.'),
     useSelection: z
@@ -55,31 +64,40 @@ export const measureBoundingBox = defineCommand({
   }),
   run: (doc, { entityId, useSelection }, ctx): CommandResult => {
     let bounds: Bounds | null = null;
+    let source: BoundsSource = 'exact';
+    const take = (e: Entity): void => {
+      const measured = measuredBounds(doc, e, ctx);
+      bounds = bounds ? mergeBounds(bounds, measured.bounds) : measured.bounds;
+      if (measured.source === 'conservative') source = 'conservative';
+    };
     if (entityId) {
       const e = doc.entities[entityId];
       if (!e) return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
-      bounds = measuredBounds(doc, e, ctx);
+      take(e);
     } else {
       const ids = useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
       for (const id of ids) {
         const e = doc.entities[id];
-        if (!e) continue;
-        const b = measuredBounds(doc, e, ctx);
-        bounds = bounds ? mergeBounds(bounds, b) : b;
+        if (e) take(e);
       }
-      if (!bounds) return noop(doc, 'measure_bounding_box: document is empty — no bounds to compute.');
     }
-    const size: Vec3 = [bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2]];
-    const data: MeasureBoundingBoxData = { min: bounds.min, max: bounds.max, size };
-    return report(
-      doc,
-      `Bounding box: min=${bounds.min.map((v) => formatLength(doc, v)).join(', ')}; ` +
-        `max=${bounds.max.map((v) => formatLength(doc, v)).join(', ')}; ` +
-        `size=${size.map((v) => formatLength(doc, v)).join(' × ')}.`,
-      data,
-    );
+    const found: Bounds | null = bounds;
+    if (!found) return noop(doc, 'measure_bounding_box: document is empty — no bounds to compute.');
+    return boundsReport(doc, found, source);
   },
 });
+
+function boundsReport(doc: CadDocument, bounds: Bounds, source: BoundsSource): CommandResult {
+  const size: Vec3 = [bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2]];
+  const data: MeasureBoundingBoxData = { min: bounds.min, max: bounds.max, size, bounds: source };
+  return report(
+    doc,
+    `Bounding box (${source}): min=${bounds.min.map((v) => formatLength(doc, v)).join(', ')}; ` +
+      `max=${bounds.max.map((v) => formatLength(doc, v)).join(', ')}; ` +
+      `size=${size.map((v) => formatLength(doc, v)).join(' × ')}.`,
+    data,
+  );
+}
 
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]

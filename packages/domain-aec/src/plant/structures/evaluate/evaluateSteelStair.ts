@@ -35,7 +35,11 @@ export function evaluateSteelStair(doc: CadDocument, stair: SteelStairElement, l
   add(
     'stringers',
     'Stair stringers',
-    mergeMeshes(layout.stringers.map((run) => sweepMesh(outer, holes, atLevel(level, run.from), atLevel(level, run.to), 0, factor))),
+    mergeMeshes(
+      [...layout.stringers, ...layout.knuckles].map((run) =>
+        sweepMesh(outer, holes, atLevel(level, run.from), atLevel(level, run.to), 0, factor),
+      ),
+    ),
     STAIR_COLOR,
   );
   add('treads', 'Stair treads', mergeMeshes(layout.treads.map(plateMesh)), TREAD_COLOR);

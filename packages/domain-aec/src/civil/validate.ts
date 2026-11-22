@@ -208,6 +208,8 @@ export function civilErrors(raw: unknown): string[] {
   const counters = raw['counters'];
   if (!isRecord(counters) || !Object.values(counters).every(isFiniteNumber)) return ['civil.counters must map prefixes to numbers'];
   const errors: string[] = crsErrors(raw['crs']);
+  if (raw['terrainTint'] !== undefined && raw['terrainTint'] !== 'none' && raw['terrainTint'] !== 'dem2')
+    errors.push('civil.terrainTint must be "none" or "dem2"');
   const ids = order as string[];
   if (new Set(ids).size !== ids.length) errors.push('civil.order lists an id twice');
   for (const id of ids) {

@@ -9,7 +9,12 @@ import { loftTriangles } from '@core/geometry/loft';
 import { sweepTriangles } from '@core/geometry/sweep';
 import { subdivisionTriangles } from '@core/geometry/subdivision';
 import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
-import { buildFaceColoredGeometry, buildMeshSolidGeometry, buildTriangleSoupGeometry } from './meshSolidGeometry';
+import {
+  buildFaceColoredGeometry,
+  buildMeshSolidGeometry,
+  buildTriangleSoupGeometry,
+  buildVertexColoredGeometry,
+} from './meshSolidGeometry';
 import { pointsKey, useStableByKey, useStableFields } from '../../useStableByKey';
 import { geometryFields } from './geometryFields';
 import {
@@ -101,14 +106,14 @@ function ExtrusionMesh({ entity, ...shell }: Props<'extrusion'>): React.ReactEle
 function MeshSolidMesh({ entity, ...shell }: Props<'mesh'>): React.ReactElement {
   const { mesh, faceColors } = entity;
   const baseColor = shell.pbrMaterial?.color ?? entity.color;
-  const geometry = useMemo(
-    () =>
-      faceColors === undefined || faceColors.length === 0
-        ? buildMeshSolidGeometry(mesh)
-        : buildFaceColoredGeometry(mesh, faceColors, baseColor),
-    [mesh, faceColors, baseColor],
-  );
-  const vertexColors = faceColors !== undefined && faceColors.length > 0;
+  const tint = entity.vertexColors?.length === mesh.positions.length ? entity.vertexColors : undefined;
+  const geometry = useMemo(() => {
+    if (tint !== undefined) return buildVertexColoredGeometry(mesh, tint);
+    return faceColors === undefined || faceColors.length === 0
+      ? buildMeshSolidGeometry(mesh)
+      : buildFaceColoredGeometry(mesh, faceColors, baseColor);
+  }, [mesh, faceColors, baseColor, tint]);
+  const vertexColors = tint !== undefined || (faceColors !== undefined && faceColors.length > 0);
   return <SolidMeshShell entity={entity} geometry={geometry} surface={surface(0.5, 0.15, 0.8)} vertexColors={vertexColors} {...shell} />;
 }
 

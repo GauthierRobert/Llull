@@ -8,7 +8,7 @@
 //!
 //! Every coordinate is metres in the DOCUMENT frame: each cloud's points are mapped by its `toDocument` affine transform before the op,
 //! so results need only a unit conversion. `result.json` holds the op's fields plus `device` and `deterministic`. Kinds: `register_targets`
-//! (clouds = [fixed, moving]), `icp` ([fixed, moving]), `fit`, `slice`, `extract_pipes` ([cloud]), `trace` ([cloud]; seedPoint + optional region, §5.6), `deviation`, `clash` ([cloud]).
+//! (clouds = [fixed, moving]), `icp` ([fixed, moving]), `fit`, `steel` ([cloud]; outlines + region, §5.7), `slice`, `extract_pipes` ([cloud]), `trace` ([cloud]; seedPoint + optional region, §5.6), `deviation`, `clash` ([cloud]).
 //! Errors: `SCN_*` codes of the op, `SCN_ASSET_MISSING`, `SCN_QUERY_LIMIT` (a region above `maxPoints`), `NATIVE_JOB_INPUT`.
 
 use crate::cloud::Vec3;
@@ -229,6 +229,16 @@ fn run_kind(job: &OpJob, warnings: &mut Vec<(String, String)>) -> CloudResult<Va
             let default_region = Region::Seed { point: seed, radius: settings.max_length };
             let points = clouds[0].points(&optional(p, "region", default_region)?, max_points)?;
             Ok(serde_json::to_value(trace(&points, &seed, &settings)?).unwrap_or(Value::Null))
+        }
+        "steel" => {
+            let clouds = open(&job.clouds, 1)?;
+            let region: Region = optional(p, "region", Region::All)?;
+            let outlines: Vec<fit::steel::Outline> = param(p, "outlines")?;
+            let axis_hint: Option<Vec3> = optional(p, "axisHint", None)?;
+            let max_candidates: usize = optional(p, "maxCandidates", 5)?;
+            let points = clouds[0].points(&region, max_points)?;
+            Ok(serde_json::to_value(fit::steel::fit(&points, &outlines, axis_hint, max_candidates, &fit_settings(p)?)?)
+                .unwrap_or(Value::Null))
         }
         "slice" => {
             let clouds = open(&job.clouds, 1)?;

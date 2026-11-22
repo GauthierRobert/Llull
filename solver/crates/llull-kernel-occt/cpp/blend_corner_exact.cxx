@@ -590,7 +590,8 @@ struct Patch {
     const Vec p_u = left * hu.p0 + right * hu.p1 + cross_left(v) * hu.d0 + cross_right(v) * hu.d1;
     // the bicubic corner patch
     const Vec corner_s[2][2] = {{Vec(gp_XYZ(a.at.XYZ())), centre}, {Vec(gp_XYZ(b.at.XYZ())), centre}};
-    const Vec corner_su[2][2] = {{a.leaving, origin}, {star.sides[k].tangent(1), origin}};
+    // the u-tangents at v = 0 are the ones cross_left / cross_right start from (projected on the support plane): the bottom edge then equals the chain at every u (13.43)
+    const Vec corner_su[2][2] = {{project(a.leaving, a.normal_left), origin}, {project(star.sides[k].tangent(1), b.normal_right), origin}};
     const Vec corner_sv[2][2] = {{a.spoke_tangent, star.arrival[k]}, {b.spoke_tangent, star.arrival[j]}};
     const Vec corner_suv[2][2] = {{suv00, theta}, {suv10, theta}};
     const double fu[2] = {hu.p0, hu.p1}, du[2] = {hu.d0, hu.d1}, fv[2] = {hv.p0, hv.p1}, dv[2] = {hv.d0, hv.d1};
@@ -1022,7 +1023,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     }
     // the steady-speed map of the pieces of a chain of several edges
     for (Piece &piece : chain.pieces) {
-      constexpr int kNodes = 128;
+      constexpr int kNodes = 1024;
       std::vector<double> speed(kNodes + 1), cumulative(kNodes + 1, 0.0);
       for (int i = 0; i <= kNodes; ++i) {
         speed[i] = star.raw[piece.edge].tangent(piece.a + (piece.b - piece.a) * i / kNodes).Magnitude();

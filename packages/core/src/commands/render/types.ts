@@ -1,8 +1,9 @@
 import type { Vec3 } from '../../model/types';
 import type { Bounds } from '../../geometry/bounds';
-import type { Camera, ViewName } from './camera';
+import type { Camera, RenderLight, ViewName } from './camera';
 import type { OverlayKind, OverlayStats } from '../../model/renderOverlay';
 import type { RasterScene } from '../../model/raster';
+import type { SunShadowReport } from './shadowTypes';
 
 /** The `data` payload of render_view. */
 export interface RenderViewData {
@@ -27,6 +28,21 @@ export interface RenderViewData {
   simplifiedEntityIds: string[];
   /** Entities not drawn at all because the budget was smaller than the number of entities. */
   skippedEntityIds: string[];
+  /** Filled polygons before the budget; present only when the budget reduced the picture (`drawnShare` = polygonCount / polygonTotal). */
+  polygonTotal?: number;
+  /** Reference renderer only (`renderer: 'reference'`, the default): digest of `svg` and the renderer version. Absent on a routed picture. */
+  svgSha256?: string;
+  rendererVersion?: string;
+  /** Which renderer drew the picture; `deterministic` is false for the native raster and the desktop viewport (a picture, not a reference). */
+  renderer?: 'reference' | 'native' | 'viewport';
+  deterministic?: boolean;
+  engine?: string;
+  /** Over the polygon budget (ASC M6b): where a plain request was drawn instead of the reference raster, the share of polygons drawn, the warning when nothing better was possible. */
+  routedTo?: 'viewport' | 'raster';
+  drawnShare?: number;
+  warnings?: { code: string; message: string }[];
+  /** Raster sun shadows: what the shadow pass did (absent without a site context, in vector mode or with the sun below the horizon). */
+  sunShadows?: SunShadowReport;
   /** Entities clipped by `cut` (empty without a cut). */
   cutEntityIds: string[];
   /** What the `overlay` kinds drew (04 DIR FR-DIR-40): entity ids and the counts of segments and dots in the SVG; absent without `overlay`. */
@@ -83,6 +99,8 @@ export interface RenderOptions {
   caption?: boolean;
   /** Explicit camera (a viewpoint or a perspective view) replacing the framed named view; `orthoHalf` sizes its frustum / scale. */
   view?: { readonly camera: Camera; readonly orthoHalf: number };
+  /** Key light replacing the default one (the site-context sun); absent = the default light. */
+  light?: RenderLight;
   /** Replaces the reference per-pixel stage of raster mode (a host's native raster, `ctx.raster`). */
   pixels?: PixelStage;
   /** Entity id -> material class surface (metalness, roughness): the entity's faces get the Blinn-Phong highlight in raster mode. */
@@ -126,3 +144,9 @@ export interface Polygon3D extends PreDepthPolygon {
   /** Camera-space depth of centroid (for painter's sort). */
   depth: number;
 }
+
+/** `data` of a render_view picture drawn by the desktop viewport (over budget, ASC M6b): the reference's polygon figures are renamed so they do not contradict `drawnShare` 1. */
+export type ViewportPictureData = Omit<
+  RenderViewData,
+  'polygonCount' | 'polygonBudget' | 'polygonTotal' | 'svgSha256' | 'rendererVersion'
+> & { referencePolygonCount: number; referencePolygonBudget: number; referencePolygonTotal?: number };

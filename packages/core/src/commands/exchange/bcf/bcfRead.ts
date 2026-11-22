@@ -4,6 +4,7 @@
  * through `readXml` (no DTD / entities). Never throws. Pure.
  */
 
+import { ignoredInMarkup } from './bcfIgnored';
 import { unzip } from '../../../lib/zipRead';
 import { readXml, xmlAttr, xmlChildren, xmlText, type XmlElement } from '../../../lib/xmlRead';
 import { BCF_XML_LIMITS, childText, parseVisualizationInfo, xmlChild, type BcfVisualization } from './bcfVisualizationRead';
@@ -46,6 +47,8 @@ export interface BcfTopicRead {
   readonly dueDate?: string;
   readonly viewpoints: readonly BcfViewpointRead[];
   readonly comments: readonly BcfCommentRead[];
+  /** Names of the markup elements / attributes present in the file that no import field holds (bcfIgnored.ts). */
+  readonly ignored: readonly string[];
 }
 
 export type BcfRead =
@@ -147,6 +150,7 @@ function topicOf(markup: XmlElement, files: ReadonlyMap<string, Uint8Array>, fol
     ...(dueDate === undefined || dueDate === '' ? {} : { dueDate }),
     viewpoints,
     comments: commentsOf(topic, markup),
+    ignored: [...ignoredInMarkup(markup, topic)],
   };
 }
 

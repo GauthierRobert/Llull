@@ -75,7 +75,10 @@ function buildTuple(shape: Swept, build: SweptBuild, key: string): string {
         `${pipeSection(build.section)}, ${optionalNumber(build.bore)})`
       );
     case 'loft':
-      return `("loft", ${subject}, [\n  ${build.sections.map(sectionTuple).join(',\n  ')},\n], ${flag(build.ruled)})`;
+      return (
+        `("loft", ${subject}, [\n  ${build.sections.map(sectionTuple).join(',\n  ')},\n], ${flag(build.ruled)}` +
+        `${build.polygons === undefined ? '' : `, [${build.polygons.map(points).join(', ')}]`})`
+      );
   }
 }
 

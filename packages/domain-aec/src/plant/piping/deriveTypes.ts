@@ -73,6 +73,8 @@ export interface DerivedInline {
   readonly stemDirection?: Vec3;
   /** Valves: the catalogue stem height (handwheel centre = centre + stem x height), mm, or null when the row has none. */
   readonly stemHeightMm: number | null;
+  /** Spectacle blinds: the state of the plate. */
+  readonly state?: 'open' | 'closed';
   /** Valves whose catalogue row describes an operator: its kind and envelope cylinders (handwheel disc, gear box, actuator), oriented by the stem direction. */
   readonly operator?: { readonly kind: OperatorKind; readonly bodies: readonly OperatorBody[] };
   /** Eccentric reducers: the flat side (unit vector from the axis, perpendicular to the leg), its label and the offset of the downstream axis (vector and length, mm). */

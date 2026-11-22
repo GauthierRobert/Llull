@@ -5,5 +5,5 @@ param fanR = 867.5
 use "fan.lld" as fan with tipR=fanR blades=36
 use "stage.lld" as hpc1 with x0=938 hubR=234 tipR=343 rotors=38 stators=44
 use "stage.lld" as hpc2 with x0=989.5 hubR=238 tipR=340 rotors=42 stators=48
-add_connection_group rotor kind="bolted" members=[fan.disk, fan.blades] reason="dovetail roots, retained by the spinner"
+add_connection_group rotor name="fan rotor" kind="bolted" members={ids: concat(fan.disk, fan.blades)} reason="dovetail roots, retained by the spinner"
 check max of=fan.blades path=2 expect ~= fanR ± 0.5%

@@ -1,10 +1,12 @@
 /**
  * UG-37 opening reinforcement of the shell and channel nozzles of an exchanger (plant 03 EQP-FU2). Each nozzle is judged as a nozzle in the wall of an
  * equivalent horizontal vessel (the shell against `design.shellSide`, a channel against `design.tubeSide`, the channel thickness for a channel), so the
- * area replacement is `vesselReinforcement` unchanged. Pure. Bonnets, flat covers, tubesheets and free nozzles are not covered.
+ * area replacement is `vesselReinforcement` unchanged. Pure. Bonnets, flat covers, tubesheets and free nozzles are not covered; a nozzle on the kettle cone is judged as a nozzle of the equivalent cylinder of the local inside diameter (named approximation, reported by `nozzle_reinforcement` in `data.approximations`).
  */
 
 import type { ExchangerSideDesign, ExchangerTemplate, NozzleRecord, PlantEquipmentData, VesselTemplate } from '../plantData';
+import { resolveExchanger } from '../geometry/exchangerFrame';
+import { shellWallAt } from '../geometry/exchangerShell';
 import { PLANT_EQUIPMENT_SCHEMA } from '../plantData';
 import { vesselReinforcement, type NozzleReinforcement, type ReinforcementOptions } from './reinforcement';
 
@@ -29,6 +31,7 @@ const asShellNozzle = (nozzle: NozzleRecord): NozzleRecord => ({ ...nozzle, loca
 
 function equivalentVessel(
   template: ExchangerTemplate,
+  insideDiameter: number,
   thickness: number,
   side: ExchangerSideDesign | undefined,
   nozzle: NozzleRecord,
@@ -37,8 +40,8 @@ function equivalentVessel(
   const vessel: VesselTemplate = {
     kind: 'vessel',
     orientation: 'horizontal',
-    insideDiameter: template.shellInsideDiameter,
-    tangentLength: template.shellInsideDiameter,
+    insideDiameter,
+    tangentLength: insideDiameter,
     heads: { first: head, second: head },
     shellThickness: thickness,
     headThickness: thickness,
@@ -65,6 +68,7 @@ export function exchangerReinforcement(
   options: ReinforcementOptions,
 ): ExchangerReinforcement {
   const sides: { shellSide?: SideBasis; tubeSide?: SideBasis } = {};
+  const geometry = resolveExchanger(template);
   const results = nozzles.map((nozzle): NozzleReinforcement => {
     const { location } = nozzle;
     if (location.on !== 'shell' && location.on !== 'channel')
@@ -82,13 +86,20 @@ export function exchangerReinforcement(
         `nozzles.${nozzle.mark}.location.channel`,
       );
     const sideName = location.on === 'shell' ? 'shellSide' : 'tubeSide';
-    const thickness =
+    const wall =
       location.on === 'shell'
-        ? template.shellThickness
-        : location.channel === 'front'
-          ? template.frontChannel.thickness
-          : (template.rearChannel?.thickness ?? template.shellThickness);
-    const run = vesselReinforcement(equivalentVessel(template, thickness, template.design?.[sideName], nozzle), options);
+        ? 'station' in location
+          ? shellWallAt(geometry.segments, geometry.shellFrom + location.station)
+          : { inside: template.shellInsideDiameter / 2, thickness: template.shellThickness }
+        : {
+            inside: template.shellInsideDiameter / 2,
+            thickness:
+              location.channel === 'front' ? template.frontChannel.thickness : (template.rearChannel?.thickness ?? template.shellThickness),
+          };
+    const run = vesselReinforcement(
+      equivalentVessel(template, 2 * wall.inside, wall.thickness, template.design?.[sideName], nozzle),
+      options,
+    );
     if ('refusal' in run)
       return notCovered(
         nozzle,

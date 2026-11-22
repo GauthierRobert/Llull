@@ -6,6 +6,7 @@
 import { z } from '@core/commands/schema';
 import { headSpecSchema, type HeadSpec } from '../model';
 import { resolveVessel } from '../geometry/vesselFrame';
+import { resolveLugs, type LugShell } from './lugParams';
 import type { SupportSpec, VesselDesignData, VesselTemplate } from '../plantData';
 
 export interface VesselIssue {
@@ -20,9 +21,10 @@ export const isVesselIssue = (value: object): value is VesselIssue => 'code' in 
 export const supportInputSchema = z
   .object({
     type: z
-      .enum(['skirt', 'legs', 'saddles', 'none'])
+      .enum(['skirt', 'legs', 'lugs', 'saddles', 'none'])
       .describe(
-        'skirt (vertical): needs height. legs (vertical): needs count >= 3 and height. saddles (horizontal): needs stations, width and axisElevation. ' +
+        'skirt (vertical): needs height. legs (vertical): needs count >= 3 and height. lugs (vertical, bracket lugs on the shell): needs count >= 2, lugHeight, lugWidth, ' +
+          'lugProjection, lugThickness, lugBasePlateThickness and lugElevation (no standard dimension is defaulted); baseElevation optional. saddles (horizontal): needs stations, width and axisElevation. ' +
           'none: needs nothing (baseElevation optional).',
       ),
     height: z
@@ -59,7 +61,32 @@ export const supportInputSchema = z
       .number()
       .min(0)
       .optional()
-      .describe('none: elevation of the lowest shell point (horizontal) or bottom tangent line (vertical) above the level. Default 0.'),
+      .describe(
+        'none / lugs: elevation of the lowest shell point (horizontal) or bottom tangent line (vertical) above the level. Default 0 (reported in defaulted).',
+      ),
+    lugHeight: z.number().positive().optional().describe('lugs: overall height of one lug, base plate included, document units.'),
+    lugWidth: z.number().positive().optional().describe('lugs: tangential width of the lug base plate, document units.'),
+    lugProjection: z
+      .number()
+      .positive()
+      .optional()
+      .describe('lugs: radial distance from the shell outside surface to the outer end of the lug, document units.'),
+    lugThickness: z.number().positive().optional().describe('lugs: thickness of the vertical web plate, document units.'),
+    lugBasePlateThickness: z
+      .number()
+      .positive()
+      .optional()
+      .describe('lugs: thickness of the horizontal base (bearing) plate at the bottom of the lug; must be below lugHeight.'),
+    lugBoltHoleDiameter: z
+      .number()
+      .positive()
+      .optional()
+      .describe('lugs: diameter of the bolt hole through the base plate (one hole per lug, subtracted from the weight). Omit for no hole.'),
+    lugElevation: z
+      .number()
+      .min(0)
+      .optional()
+      .describe('lugs: height of the bottom of the lugs above the bottom tangent line; the whole lug must lie on the shell.'),
   })
   .describe('Support of the vessel; only the fields of the chosen type are read.');
 
@@ -187,7 +214,12 @@ function pickHeads(input: VesselInput): { first: HeadSpec; second: HeadSpec } | 
   return { first, second };
 }
 
-export function resolveSupport(input: SupportInput, vessel: VesselInput, defaulted: string[]): SupportSpec | VesselIssue {
+export function resolveSupport(
+  input: SupportInput,
+  vessel: VesselInput,
+  defaulted: string[],
+  shell: LugShell = { from: 0, to: vessel.tangentLength, rootRadius: vessel.insideDiameter / 2 + vessel.shellThickness },
+): SupportSpec | VesselIssue {
   const outer = vessel.insideDiameter / 2 + vessel.shellThickness;
   const need = (name: string, value: unknown): VesselIssue | null =>
     value === undefined ? issue('EQP_SUPPORT_INVALID', `support.${name} is required for a ${input.type} support`, `support.${name}`) : null;
@@ -222,6 +254,8 @@ export function resolveSupport(input: SupportInput, vessel: VesselInput, default
         legWidth: input.legWidth ?? 0.1 * outer,
       };
     }
+    case 'lugs':
+      return wrongOrientation('vertical') ?? resolveLugs(input, shell, defaulted);
     case 'saddles': {
       const failure =
         wrongOrientation('horizontal') ??

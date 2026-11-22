@@ -1,7 +1,7 @@
 /** check_display (plant 09 VIS §4, TR-VIS-16): consistency of the colour profiles against the document; read-only. */
 
 import { findProfile } from '../../model/display';
-import { awaitsApproval, referencedProperties } from '../../geometry/colourRules';
+import { awaitsApproval, hasSchemeRules, referencedProperties, unapprovedHazardProfile } from '../../geometry/colourRules';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
@@ -29,7 +29,7 @@ export const checkDisplay = defineCommand({
   description:
     'Check the document colour profiles. Reports VIS_PROFILE_NOT_FOUND (error: the active profile is missing), VIS_COLOUR_UNMATCHED (warn: entities that carry a property the ' +
     'active profile tests but matched no rule; data ids list them), VIS_RULE_PROPERTY_UNKNOWN (warn: a rule tests a property no entity of the document has), and ' +
-    'VIS_SCHEME_REVIEW_REQUIRED (warn: the active profile is flagged reviewRequired: no qualified reviewer approved it). data { status: pass|warn|fail, issues[{ code, ' +
+    'VIS_SCHEME_REVIEW_REQUIRED (warn: the active profile is flagged reviewRequired: no qualified reviewer approved it), VIS_PROFILE_UNAPPROVED (warn: a profile that colours by service / fluid / hazard / contents, or carries pipe markers, has reviewRequired false and no approval matching its rules: the flag can be written by an agent, only approve_colour_profile proves a human did). data { status: pass|warn|fail, issues[{ code, ' +
     'severity, ids, paths, message, remediation }], counts }. Run it after building a profile and before relying on its colours. Read-only.',
   annotations: { readOnly: true },
   params: z.object({}),
@@ -88,6 +88,17 @@ export const checkDisplay = defineCommand({
             : `profile '${active.id}' is a scheme profile without a valid approval (reviewRequired was cleared without a signature, or its rules changed after it)`,
           remediation: 'a qualified reviewer approves the profile (approve_colour_profile) before the colours are used on a deliverable',
         });
+    }
+    for (const profile of Object.values(display.colourProfiles)) {
+      if (!unapprovedHazardProfile(profile) || hasSchemeRules(profile)) continue;
+      issues.push({
+        code: 'VIS_PROFILE_UNAPPROVED',
+        severity: 'warn',
+        ids: [],
+        paths: [`display.colourProfiles.${profile.id}`],
+        message: `profile '${profile.id}' colours by service / hazard (rule properties or pipe markers) with reviewRequired false and no approval: nothing shows a qualified reviewer approved it`,
+        remediation: 'define it with reviewRequired true and have a qualified reviewer approve it (approve_colour_profile)',
+      });
     }
     const status = issues.some((issue) => issue.severity === 'error') ? 'fail' : issues.length > 0 ? 'warn' : 'pass';
     const counts = { profiles: Object.keys(display.colourProfiles).length, issues: issues.length };

@@ -9,6 +9,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import { dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
+import { DEFAULT_ANGLE_TOLERANCE_DEG } from '../../piping/specLookup';
 import { outsideDiameterMm } from '../../../industrial/piping/pipeSizes';
 import type { NetworkComponent, NetworkPoint } from '../model';
 
@@ -78,3 +79,27 @@ export function eccentricStep(
 
 /** Corner of the stored axes after a leg that carries `shift`: the elbow centre minus the shift's component along the next leg (`next` is its unit direction). */
 export const storedCorner = (centre: Vec3, shift: Vec3, next: Vec3): Vec3 => sub3(centre, scale3(next, dot3(shift, next)));
+
+/**
+ * The part of a header `shift` perpendicular to the branch (`outlet` - `centre`, both in file co-ordinates) that the RTE moves the derived branch start by, or
+ * undefined when the shift is along the branch or within the default angle tolerance of it (same rule as `piping/branchShift.ts`, which uses the run's own tolerance).
+ */
+export function branchSideways(
+  shift: Vec3,
+  centre: Vec3,
+  outlet: Vec3,
+  toleranceDeg: number = DEFAULT_ANGLE_TOLERANCE_DEG,
+): Vec3 | undefined {
+  const size = len3(shift);
+  const direction = normalize3(sub3(outlet, centre));
+  if (!(size > 1e-9) || !(len3(direction) > 0)) return undefined;
+  const sideways = sub3(shift, scale3(direction, dot3(shift, direction)));
+  const angleDeg = (Math.acos(Math.min(1, Math.abs(dot3(shift, direction)) / size)) * 180) / Math.PI;
+  return len3(sideways) > Math.max(1e-3, 1e-6 * size) && angleDeg > toleranceDeg ? sideways : undefined;
+}
+
+/** The stored points of a branch run read off the file: the derived axis is moved by `sideways`, the start is stored; one leg moves its end, more legs the first corner. */
+export function storedBranchPoints(line: readonly Vec3[], sideways: Vec3 | undefined): Vec3[] {
+  if (sideways === undefined) return [...line];
+  return line.map((point, k) => (k === 1 ? sub3(point, sideways) : point));
+}

@@ -5,7 +5,8 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { CheckItem, CheckResult } from '@core/model/checkResult';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import { type CadDocument, createEmptyDocument } from '@core/model/types';
+import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
+import { MAX_PARTS } from '@core/commands/inspect/assemblyCheckRun';
 import { canonicalJson } from '@lib/canonicalJson';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 
@@ -190,12 +191,20 @@ describe('check_assembly scope, emptiness, budgets and references', () => {
 
   it('refuses over the part budget before evaluating anything', () => {
     const s = scene();
-    for (let k = 0; k < 501; k++) s.run('add_box', cube([k * 30, 0, 0], 10));
+    const seed = s.run('add_box', cube([0, 0, 0], 10));
+    const box = s.doc().entities[seed] as Entity;
+    const entities: Record<string, Entity> = {};
+    const order: string[] = [];
+    for (let k = 0; k < MAX_PARTS + 1; k++) {
+      entities[`b${k}`] = { ...box, id: `b${k}`, position: [k * 30, 0, 0] } as Entity;
+      order.push(`b${k}`);
+    }
+    const big: CadDocument = { ...s.doc(), entities, order };
     let evaluations = 0;
     const spy = wrapped({ evaluate: (recipe) => (evaluations++, kernel.evaluate(recipe)) });
-    const result = execute(s.doc(), 'check_assembly', {}, ctxOf(spy));
+    const result = execute(big, 'check_assembly', {}, ctxOf(spy));
     expect(result.rejected).toBe(true);
-    expect(result.error?.code).toBe('FPR_BUDGET_EXCEEDED');
+    expect(result.error?.code).toBe('CHECK_PART_LIMIT');
     expect(evaluations).toBe(0);
   }, 60_000);
 

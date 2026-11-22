@@ -152,20 +152,32 @@ describe('eccentric reducers in route mode', () => {
     expect(result.document).toBe(base);
   });
 
-  it('a tee downstream of the reducer on the same leg is refused with the tee named', () => {
-    const text =
-      HEADER +
-      record('PIPE', 1, ['0.0 0.0 0.0 150 BW', '1930.0 0.0 0.0 150 BW']) +
-      record('REDUCER-ECCENTRIC', 2, ['1930.0 0.0 0.0 150 BW', '2070.0 0.0 27.0 100 BW']) +
-      record(
-        'TEE',
-        3,
-        ['2070.0 0.0 27.0 100 BW', '2500.0 0.0 27.0 100 BW'],
-        '    CENTRE-POINT 2285.0 0.0 27.0\n    BRANCH1-POINT 2285.0 200.0 27.0 100 BW\n',
-      );
-    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
-    expect(result.error?.ids).toEqual(['pcf:E-1:3']);
-    expect(result.summary).toContain('eccentric reducer');
+  const teeFile = (branch: string): string =>
+    HEADER +
+    record('PIPE', 1, ['0.0 0.0 0.0 150 BW', '1930.0 0.0 0.0 150 BW']) +
+    record('REDUCER-ECCENTRIC', 2, ['1930.0 0.0 0.0 150 BW', '2070.0 0.0 27.0 100 BW']) +
+    record(
+      'TEE',
+      3,
+      ['2070.0 0.0 27.0 100 BW', '2500.0 0.0 27.0 100 BW'],
+      `    CENTRE-POINT 2285.0 0.0 27.0\n    BRANCH1-POINT ${branch} 100 BW\n`,
+    ) +
+    record('PIPE', 4, ['2500.0 0.0 27.0 100 BW', '3848.0 0.0 27.0 100 BW']) +
+    record('ELBOW', 5, ['3848.0 0.0 27.0 100 BW', '4000.0 0.0 179.0 100 BW'], '    CENTRE-POINT 4000.0 0.0 27.0\n    SKEY ELBW\n') +
+    record('PIPE', 6, ['4000.0 0.0 179.0 100 BW', '4000.0 0.0 1000.0 100 BW']);
+
+  it('a tee downstream of the reducer is rebuilt on the stored axis (branch along the offset); a branch across the offset is rebuilt with its run on the stored axis', () => {
+    const result = route(teeFile('2285.0 0.0 200.0') + record('PIPE', 7, ['2285.0 0.0 200.0 100 BW', '2285.0 0.0 1000.0 100 BW']));
+    expect(result.rejected).toBeUndefined();
+    expect(routeData(result).route.runs).toHaveLength(2);
+    const across = route(teeFile('2285.0 200.0 27.0') + record('PIPE', 7, ['2285.0 200.0 27.0 100 BW', '2285.0 1000.0 27.0 100 BW']));
+    expect(across.rejected).toBeUndefined();
+    expect(routeData(across).route.runs).toHaveLength(2);
+    const stored = Object.values(across.document.plant?.piping?.runs ?? {}).find(
+      (run) => run.start.point[1] === 0 && run.start.point[0] === 2285,
+    );
+    expect(stored?.start.point).toEqual([2285, 0, 0]);
+    expect(stored?.end.point).toEqual([2285, 1000, 0]);
   });
 
   it('is pure: the document passed in is not changed', () => {
@@ -307,14 +319,173 @@ describe('blind flanges in route mode', () => {
     expect(result.document).toBe(base);
   });
 
-  it('closures at both free ends (a two-point CAP at each end) are refused naming both components', () => {
+  it('closures at both free ends (a two-point CAP at each end) are refused when the spec has no cap row, document unchanged', () => {
     const text =
       HEADER +
       record('CAP', 1, ['0.0 0.0 0.0 100 BW', '64.0 0.0 0.0 100 BW']) +
       record('PIPE', 2, ['64.0 0.0 0.0 100 BW', '2000.0 0.0 0.0 100 BW']) +
       record('CAP', 3, ['2000.0 0.0 0.0 100 BW', '2064.0 0.0 0.0 100 BW']);
+    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'RTE_SPEC_NO_COMPONENT');
+    expect(result.document).toBe(base);
+  });
+});
+
+describe('a closure at the start of the main run (the line is closed at both ends)', () => {
+  const extras = extrasDocument();
+  const created = ok(extras, 'create_pipeline', { service: 'P', sequence: '3003', spec: 'CS150', dn: 100 });
+  const lineId = created.affected[0] as string;
+  const routed = ok(created.document, 'route_pipe', { lineId, from: { point: [0, 0, 0] }, legs: [{ direction: '+X', length: 3000 }] });
+  const runId = routed.affected[0];
+  const capped = ok(ok(routed.document, 'set_run_end_cap', { runId, end: 'start', cap: true }).document, 'set_run_end_cap', {
+    runId,
+    end: 'end',
+    cap: true,
+  });
+  const blinded = ok(ok(routed.document, 'set_run_end_cap', { runId, end: 'start', closure: 'blindFlange' }).document, 'set_run_end_cap', {
+    runId,
+    end: 'end',
+    closure: 'blindFlange',
+  });
+  const withTips = (text: string, mouth: string, tip: string, endType: string): string =>
+    text.replace(
+      new RegExp(`((?:CAP|FLANGE-BLIND)\\n(?: {4}.*\\n)*? {4}END-POINT ${mouth} 0.0 0.0 100 ${endType}\\n)`),
+      `$1    END-POINT ${tip} 0.0 0.0 100 ${endType}\n`,
+    );
+  const capsFile = withTips(withTips(exported(capped.document, lineId), '64.0', '0.0', 'BW'), '2936.0', '3000.0', 'BW');
+  const blindsFile = withTips(withTips(exported(blinded.document, lineId), '22.4', '0.0', 'FL'), '2977.6', '3000.0', 'FL');
+
+  it('caps: the run starts at the first cap closed end, both ends are capped, the pipe is as long as in the file (delta 0)', () => {
+    const result = route(capsFile, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const info = result.data as {
+      route: {
+        runs: Array<{ points: number[][]; capped: boolean; startClosure?: string; closure?: string }>;
+        comparison: { pipeLengthDeltaMm: number; countDelta: Record<string, number> };
+      };
+    };
+    expect(info.route.runs[0]).toMatchObject({ capped: true, startClosure: 'cap', closure: 'cap' });
+    expect(info.route.runs[0]?.points).toEqual([
+      [0, 0, 0],
+      [3000, 0, 0],
+    ]);
+    expect(info.route.comparison.pipeLengthDeltaMm).toBe(0);
+    expect(info.route.comparison.countDelta).toEqual({});
+    const run = Object.values(result.document.plant?.piping?.runs ?? {})[0] as unknown as {
+      start: { cap?: boolean };
+      end: { cap?: boolean };
+    };
+    expect([run.start.cap, run.end.cap]).toEqual([true, true]);
+  });
+
+  it('blind flanges: flange, gasket and blind are rebuilt at both ends from the spec, and export gives the same PCF (fixed point)', () => {
+    const result = route(blindsFile, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const info = result.data as {
+      route: { runs: Array<{ points: number[][]; startClosure?: string; closure?: string }>; comparison: { pipeLengthDeltaMm: number } };
+    };
+    expect(info.route.runs[0]).toMatchObject({ startClosure: 'blindFlange', closure: 'blindFlange' });
+    expect(info.route.runs[0]?.points).toEqual([
+      [0, 0, 0],
+      [3000, 0, 0],
+    ]);
+    expect(info.route.comparison.pipeLengthDeltaMm).toBe(0);
+    expect(bare(exported(result.document, (result.data as RouteData).lineId))).toBe(bare(exported(blinded.document, lineId)));
+  });
+
+  it('a closed start on a spec without cap rows is the RTE refusal, nothing changed', () => {
+    expectRefusal(base, 'import_pcf', { text: capsFile, as: 'route', spec: 'CS150' }, 'RTE_SPEC_NO_COMPONENT');
+  });
+});
+
+describe('a reducer inside a branch run', () => {
+  const created = ok(cs150Document(), 'create_pipeline', { service: 'P', sequence: '3003', spec: 'CS150', dn: 150 });
+  const lineId = created.affected[0] as string;
+  const header = ok(created.document, 'route_pipe', { lineId, from: { point: [0, 0, 0] }, legs: [{ direction: '+X', length: 6000 }] });
+  const branch = ok(header.document, 'add_branch', {
+    runId: header.affected[0],
+    at: { point: [3000, 0, 0] },
+    dn: 150,
+    legs: [{ direction: '+Y', length: 3000 }],
+  });
+  const withReducer = ok(branch.document, 'insert_inline_component', {
+    runId: branch.affected[0],
+    type: 'reducerConcentric',
+    dn2: 100,
+    at: { leg: 0, centreDistance: 1500 },
+  });
+  const original = exported(withReducer.document, lineId);
+
+  it('the branch is routed at the header size and the reducer inserted after it: same PCF (fixed point), branch reducer listed, pipe delta 0', () => {
+    const result = route(original);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const info = routeData(result);
+    expect(info.route.runs.map((run) => run.inline.map((item) => item.type))).toEqual([[], ['reducer']]);
+    expect(info.route.comparison.pipeLengthDeltaMm).toBe(0);
+    expect(info.route.comparison.countDelta).toEqual({});
+    expect(bare(exported(result.document, info.lineId))).toBe(bare(original));
+  });
+
+  it('a branch whose reduced end is a flanged port cannot be routed (add_branch takes the port size): refused naming the reducer, nothing changed', () => {
+    const text = original.replace(
+      /(PIPE\n(?: {4}.*\n)*? {4}END-POINT 3000.0 3000.0 0.0 100 BW\n)/,
+      '$1' + 'FLANGE\n    COMPONENT-IDENTIFIER 90\n    END-POINT 3000.0 3000.0 0.0 100 BW\n    END-POINT 3000.0 3076.0 0.0 100 FL\n',
+    );
+    expect(text).toContain('COMPONENT-IDENTIFIER 90');
     const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
-    expect(result.error?.ids).toEqual(['pcf:E-1:1', 'pcf:E-1:3']);
+    expect(result.summary).toContain('reduced size');
+    expect(result.document).toBe(base);
+  });
+});
+
+describe('an instrument with a tapping point', () => {
+  it('a welded INSTRUMENT with a BRANCH1-POINT is refused naming the instrument (the RTE cannot branch off a body), document unchanged', () => {
+    const text = hand100(
+      record('INSTRUMENT', 2, ['1000.0 0.0 0.0 100 BW', '1300.0 0.0 0.0 100 BW'], '    BRANCH1-POINT 1150.0 200.0 0.0 25 BW\n'),
+      '1300.0',
+    );
+    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
+    expect(result.summary).toContain('tapping point');
+    expect(result.error?.ids).toEqual(['pcf:E-1:2']);
+    expect(result.document).toBe(base);
+  });
+
+  it('the same instrument without the tapping point is rebuilt', () => {
+    const text = hand100(record('INSTRUMENT', 2, ['1000.0 0.0 0.0 100 BW', '1300.0 0.0 0.0 100 BW']), '1300.0');
+    expect(route(text).rejected).toBeUndefined();
+  });
+});
+
+describe('a reducer inside a branch run that ends in a cap', () => {
+  const extras = extrasDocument();
+  const created = ok(extras, 'create_pipeline', { service: 'P', sequence: '3005', spec: 'CS150', dn: 150 });
+  const lineId = created.affected[0] as string;
+  const header = ok(created.document, 'route_pipe', { lineId, from: { point: [0, 0, 0] }, legs: [{ direction: '+X', length: 6000 }] });
+  const branch = ok(header.document, 'add_branch', {
+    runId: header.affected[0],
+    at: { point: [3000, 0, 0] },
+    dn: 150,
+    legs: [{ direction: '+Y', length: 3000 }],
+  });
+  const reduced = ok(branch.document, 'insert_inline_component', {
+    runId: branch.affected[0],
+    type: 'reducerConcentric',
+    dn2: 100,
+    at: { leg: 0, centreDistance: 1500 },
+  });
+  const capped = ok(reduced.document, 'set_run_end_cap', { runId: branch.affected[0], end: 'end' });
+  const original = exported(capped.document, lineId);
+
+  it('the cap is placed after the reducer: export, import as route, export is a fixed point and the branch ends capped at the DN100 size', () => {
+    expect(original).toContain('CAP\n');
+    const result = route(original, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const info = routeData(result);
+    expect(info.route.runs.map((run) => [run.inline.map((item) => item.type), run.capped])).toEqual([
+      [[], false],
+      [['reducer'], true],
+    ]);
+    expect(info.route.comparison.pipeLengthDeltaMm).toBe(0);
+    expect(bare(exported(result.document, info.lineId))).toBe(bare(original));
   });
 });
 

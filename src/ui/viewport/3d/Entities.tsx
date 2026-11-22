@@ -16,6 +16,8 @@ import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
+import { ComponentInstancedRenderer } from './ComponentInstancedRenderer';
+import { NO_COMPONENT_BATCHES, planComponentBatches } from './componentInstancePlan';
 import { PlantBatchRenderer } from './plant/PlantBatchRenderer';
 import { usePlantCoverage } from './plant/usePlantCoverage';
 import { usePlantPlan } from './plant/usePlantPlan';
@@ -231,10 +233,24 @@ export function Entities(): React.ReactElement {
       ),
     [perEntityCandidates, animatedIds, materials, display, hasFinish, transitions, ghosted, tints],
   );
+  // Pattern members of a component: one InstancedMesh per child solid (tints and selection live in the colour buffer).
+  const componentPlan = useMemo(
+    () =>
+      perEntityCandidates.some((entity) => entity.kind === 'instance')
+        ? planComponentBatches(
+            perEntityCandidates,
+            document.components,
+            (instance) =>
+              !animatedIds.has(instance.id) && !hasFinish(instance) && !transitions.has(instance.id) && !ghosted.has(instance.id),
+          )
+        : NO_COMPONENT_BATCHES,
+    [perEntityCandidates, document.components, animatedIds, hasFinish, transitions, ghosted],
+  );
   const nonBatchableEntities = useMemo(
     () =>
       perEntityCandidates.filter(
         (entity) =>
+          !componentPlan.covered.has(entity.id) &&
           (!isBatchable(entity) ||
             animatedIds.has(entity.id) ||
             hasFinish(entity) ||
@@ -243,7 +259,7 @@ export function Entities(): React.ReactElement {
             tints.has(entity.id)) &&
           layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
-    [perEntityCandidates, animatedIds, layers, hasFinish, transitions, ghosted, tints],
+    [perEntityCandidates, componentPlan, animatedIds, layers, hasFinish, transitions, ghosted, tints],
   );
 
   // Memoized so a class-assigned entity keeps one PBR object (the memoized renderer does not re-render on a selection change).
@@ -257,6 +273,14 @@ export function Entities(): React.ReactElement {
       <GridAnnotations3D document={document} />
 
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
+
+      <ComponentInstancedRenderer
+        plan={componentPlan}
+        entities={entities}
+        materials={materials}
+        selectionSet={selectionSet}
+        onSelect={handleSelect}
+      />
 
       {plantPlan !== null && (
         <PlantBatchRenderer
@@ -272,15 +296,17 @@ export function Entities(): React.ReactElement {
 
       {/* Always wrapped (stable tree): a live transition must not remount the entity's geometry when it starts or ends. */}
       {nonBatchableEntities.map((entity) => (
-        <LiveTransitionGroup key={entity.id} entity={entity}>
-          <EntityRenderer
-            entity={entity}
-            selected={selectionSet.has(entity.id)}
-            onSelect={handleSelect}
-            components={entity.kind === 'instance' ? document.components : undefined}
-            pbrMaterial={pbrById.get(entity.id)}
-          />
-        </LiveTransitionGroup>
+        <group key={entity.id} userData={{ entityId: entity.id }}>
+          <LiveTransitionGroup entity={entity}>
+            <EntityRenderer
+              entity={entity}
+              selected={selectionSet.has(entity.id)}
+              onSelect={handleSelect}
+              components={entity.kind === 'instance' ? document.components : undefined}
+              pbrMaterial={pbrById.get(entity.id)}
+            />
+          </LiveTransitionGroup>
+        </group>
       ))}
 
       <LiveFxLayer renderGhost={renderGhost3D} />

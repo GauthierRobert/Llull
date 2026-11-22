@@ -3,22 +3,49 @@
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { appendAll } from '@lib/appendAll';
+import { lugFitProblem } from './geometry/lugs';
+import type { LugSupport } from './plantData';
+import { weirPositionProblem } from './geometry/kettleWeir';
 
 const SUPPORT_NUMBERS: ReadonlyMap<string, readonly string[]> = new Map([
   ['skirt', ['height', 'thickness', 'baseRingWidth']],
   ['legs', ['count', 'height', 'pitchDiameter', 'legWidth']],
+  ['lugs', ['count', 'lugHeight', 'lugWidth', 'lugProjection', 'lugThickness', 'lugBasePlateThickness', 'lugElevation', 'baseElevation']],
   ['saddles', ['width', 'axisElevation']],
   ['none', ['baseElevation']],
 ]);
 
-export function supportErrors(support: unknown, at: string): string[] {
+/** Lug dimensions must be > 0 (count an integer 2..MAX_LUGS) and the lug must be built and lie on the shell (the same `lugFitProblem` as the commands). */
+function lugErrors(support: Record<string, unknown>, at: string, fit: LugFit | null): string[] {
+  const dims = ['lugHeight', 'lugWidth', 'lugProjection', 'lugThickness', 'lugBasePlateThickness', 'lugElevation'] as const;
+  const errors = positive(support, dims.slice(0, 5), `${at}.support`);
+  if (!isFiniteNumber(support['lugElevation']) || (support['lugElevation'] as number) < 0)
+    errors.push(`${at}.support.lugElevation must be a number >= 0`);
+  if (!Number.isInteger(support['count']) || (support['count'] as number) < 2) errors.push(`${at}.support.count must be an integer >= 2`);
+  const hole = support['lugBoltHoleDiameter'];
+  if (hole !== undefined && !isPositiveNumber(hole)) errors.push(`${at}.support.lugBoltHoleDiameter must be a number > 0`);
+  if (errors.length > 0 || fit === null) return errors;
+  const problem = lugFitProblem(support as unknown as LugSupport, fit.shell, fit.rootRadius);
+  return problem === null ? [] : [`${at}.${problem.path}: ${problem.message}`];
+}
+
+/** Where lugs may stand: shell ends as heights above the bottom tangent line and the shell outside radius, null when the body itself is invalid. */
+export interface LugFit {
+  readonly shell: { readonly from: number; readonly to: number };
+  readonly rootRadius: number;
+}
+
+/** `fit` = the body the lugs hang on (null: its dimensions are invalid, reported elsewhere); `undefined` for a horizontal vessel, which takes no lugs. */
+export function supportErrors(support: unknown, at: string, fit?: LugFit | null): string[] {
   if (!isRecord(support) || typeof support['type'] !== 'string' || !SUPPORT_NUMBERS.has(support['type']))
-    return [`${at}.support.type must be skirt, legs, saddles or none`];
+    return [`${at}.support.type must be skirt, legs, lugs, saddles or none`];
   const errors = (SUPPORT_NUMBERS.get(support['type']) as readonly string[])
     .filter((name) => !isFiniteNumber(support[name]) || (support[name] as number) < 0)
     .map((name) => `${at}.support.${name} must be a number >= 0`);
   if (support['type'] === 'saddles' && !(Array.isArray(support['stations']) && support['stations'].every(isFiniteNumber)))
     errors.push(`${at}.support.stations must be an array of numbers`);
+  if (support['type'] === 'lugs')
+    appendAll(errors, fit === undefined ? [`${at}.support.type lugs hang on a vertical body only`] : lugErrors(support, at, fit));
   return errors;
 }
 
@@ -70,6 +97,66 @@ function exchangerDesignErrors(design: unknown, at: string): string[] {
   return errors;
 }
 
+/** The kettle record: present exactly for the shell letter K (horizontal, removable-bundle rear), dimensions > 0 and the same fit checks as the command. */
+function kettleErrors(template: Record<string, unknown>, at: string): string[] {
+  const { tema, kettle } = template;
+  const isKettle = isRecord(tema) && tema['shell'] === 'K';
+  if (kettle === undefined) return isKettle ? [`${at}.kettle is required for the shell letter K`] : [];
+  if (!isKettle) return [`${at}.kettle is only for the shell letter K`];
+  if (!isRecord(kettle)) return [`${at}.kettle must be an object`];
+  const errors = positive(
+    kettle,
+    ['enlargedInsideDiameter', 'enlargedLength', 'transitionLength', 'enlargedThickness', 'weirHeight'],
+    `${at}.kettle`,
+  );
+  if (template['orientation'] === 'vertical') errors.push(`${at}.orientation: a kettle is horizontal only`);
+  if (isRecord(tema) && tema['fixedTubesheet'] === true)
+    errors.push(`${at}.tema: a kettle takes a removable-bundle rear, not a fixed tubesheet`);
+  const { enlargedInsideDiameter: enlarged, weirHeight, enlargedLength, transitionLength } = kettle;
+  if (isPositiveNumber(enlarged) && isPositiveNumber(template['shellInsideDiameter']) && enlarged <= template['shellInsideDiameter'])
+    errors.push(`${at}.kettle.enlargedInsideDiameter must exceed shellInsideDiameter`);
+  if (isPositiveNumber(enlarged) && isPositiveNumber(weirHeight) && weirHeight >= enlarged)
+    errors.push(`${at}.kettle.weirHeight must be below enlargedInsideDiameter`);
+  const { weirStation, weirThickness } = kettle;
+  if ((weirStation === undefined) !== (weirThickness === undefined))
+    errors.push(`${at}.kettle.weirStation and weirThickness are given together or not at all`);
+  else if (weirStation !== undefined) {
+    appendAll(errors, positive(kettle, ['weirStation', 'weirThickness'], `${at}.kettle`));
+    if (isPositiveNumber(weirStation) && isPositiveNumber(weirThickness) && isPositiveNumber(enlargedLength)) {
+      const problem = weirPositionProblem(weirStation, weirThickness, enlargedLength);
+      if (problem !== null) errors.push(`${at}.kettle: ${problem}`);
+    }
+  }
+  const tubes = template['tubes'];
+  if (
+    isRecord(tubes) &&
+    isPositiveNumber(tubes['length']) &&
+    isPositiveNumber(template['tubesheetThickness']) &&
+    isPositiveNumber(enlargedLength) &&
+    isPositiveNumber(transitionLength) &&
+    tubes['length'] - template['tubesheetThickness'] - enlargedLength - transitionLength <= 0
+  )
+    errors.push(`${at}.kettle.enlargedLength + transitionLength leave no restricted cylinder in the shell`);
+  return errors;
+}
+
+/** Heights of the shell ends above the front tangent line and the shell outside radius of an exchanger record, or null when a field is invalid. */
+function exchangerLugFit(template: Record<string, unknown>): LugFit | null {
+  const { tubes, frontChannel, tema } = template;
+  if (!isRecord(tubes) || !isRecord(frontChannel) || !isRecord(tema)) return null;
+  const numbers = [
+    tubes['length'],
+    frontChannel['length'],
+    template['tubesheetThickness'],
+    template['shellInsideDiameter'],
+    template['shellThickness'],
+  ];
+  if (!numbers.every(isPositiveNumber)) return null;
+  const [length, channel, sheet, inside, wall] = numbers as number[] as [number, number, number, number, number];
+  const from = sheet + channel;
+  return { shell: { from, to: from + length - (tema['fixedTubesheet'] === true ? 2 : 1) * sheet }, rootRadius: inside / 2 + wall };
+}
+
 export function exchangerErrors(template: Record<string, unknown>, at: string): string[] {
   const errors = positive(template, ['shellInsideDiameter', 'shellThickness', 'tubesheetThickness'], at);
   if (typeof template['temaType'] !== 'string') errors.push(`${at}.temaType must be a string`);
@@ -112,12 +199,22 @@ export function exchangerErrors(template: Record<string, unknown>, at: string): 
     const channel = template[name];
     if (channel === undefined && !required) continue;
     if (!isRecord(channel)) errors.push(`${at}.${name} must be an object${required ? '' : ' or absent'}`);
-    else appendAll(errors, positive(channel, ['length', 'thickness'], `${at}.${name}`));
+    else {
+      appendAll(errors, positive(channel, ['length', 'thickness'], `${at}.${name}`));
+      if (channel['coverThickness'] !== undefined && !isPositiveNumber(channel['coverThickness']))
+        errors.push(`${at}.${name}.coverThickness must be a number > 0`);
+    }
   }
+  const orientation = template['orientation'];
+  if (orientation !== 'horizontal' && orientation !== 'vertical') errors.push(`${at}.orientation must be horizontal or vertical`);
   const support = template['support'];
-  if (isRecord(support) && support['type'] !== 'saddles' && support['type'] !== 'none')
-    errors.push(`${at}.support.type must be saddles or none`);
-  return [...errors, ...supportErrors(support, at)];
+  const allowed = orientation === 'vertical' ? ['skirt', 'legs', 'lugs', 'none'] : ['saddles', 'none'];
+  if (isRecord(support) && !allowed.includes(support['type'] as string))
+    errors.push(
+      `${at}.support.type must be ${allowed.slice(0, -1).join(', ')} or ${allowed[allowed.length - 1]} for a ${String(orientation)} exchanger`,
+    );
+  appendAll(errors, kettleErrors(template, at));
+  return [...errors, ...supportErrors(support, at, orientation === 'vertical' ? exchangerLugFit(template) : null)];
 }
 
 export function tankErrors(template: Record<string, unknown>, at: string): string[] {

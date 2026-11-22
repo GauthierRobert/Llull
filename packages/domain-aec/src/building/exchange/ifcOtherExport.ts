@@ -13,6 +13,7 @@ import {
   shape,
 } from './ifcStep';
 import type { Exported } from './ifcElementExport';
+import { slabVoidSeed } from './ifcSeeds';
 
 const SLAB_TYPE: Readonly<Record<SlabElement['role'], string>> = { floor: '.FLOOR.', roof: '.ROOF.', foundation: '.BASESLAB.' };
 
@@ -34,7 +35,7 @@ export function exportOther(
       (element.openings ?? []).forEach((opening, index) => {
         const voidProfile = scaledPolygonProfile(context, opening);
         const voidRef = writer.add(
-          `IFCOPENINGELEMENT('${context.guid(`${element.id}:void-${index}`)}',$,${ifcString(`${element.mark} opening ${index + 1}`)},$,$,${placement(context, local, 0, 0, 0)},${shape(context, [extrusion(context, voidProfile, mm(element.thickness) + 20, 0, 0, -10)])},$,.OPENING.)`,
+          `IFCOPENINGELEMENT('${context.guid(slabVoidSeed(element.id, index))}',$,${ifcString(`${element.mark} opening ${index + 1}`)},$,$,${placement(context, local, 0, 0, 0)},${shape(context, [extrusion(context, voidProfile, mm(element.thickness) + 20, 0, 0, -10)])},$,.OPENING.)`,
         );
         writer.add(`IFCRELVOIDSELEMENT('${context.guid(`${element.id}:voids-${index}`)}',$,$,$,${ref},${voidRef})`);
       });

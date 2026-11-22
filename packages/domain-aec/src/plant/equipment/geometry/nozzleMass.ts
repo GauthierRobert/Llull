@@ -4,11 +4,11 @@
  * deducted (named in the method). Flanges that are placeholders or unverified make the caller report it.
  */
 
-import type { NozzleRecord, TankTemplate } from '../plantData';
-import type { ExchangerGeometry } from './exchangerFrame';
+import type { EquipmentTemplate, NozzleRecord, TankTemplate } from '../plantData';
+import { resolveExchanger, shellOutsideRadiusAt, type ExchangerGeometry } from './exchangerFrame';
 import { thicknessAt } from './tankFrame';
 import type { MassPart } from './vesselMass';
-import { headSurfaceHeight, type VesselGeometry } from './vesselFrame';
+import { headSurfaceHeight, resolveVessel, type VesselGeometry } from './vesselFrame';
 import { powInt } from '@lib/powInt';
 
 const annulus = (outer: number, inner: number): number => Math.PI * (outer * outer - inner * inner);
@@ -40,11 +40,13 @@ export function neckMassParts(
     const bore = Math.max(0, outer - nozzle.neckWall);
     const neck = annulus(outer, bore) * Math.max(0, nozzle.projection - wallOf(nozzle) - nozzle.flange.thickness);
     const flange = annulus(nozzle.flange.outsideDiameter / 2, bore) * nozzle.flange.thickness;
+    const pad = nozzle.pad === undefined ? 0 : annulus(nozzle.pad.outsideDiameter / 2, outer) * nozzle.pad.thickness;
     return {
       part: `nozzle ${nozzle.mark}`,
-      kg: (neck + flange) * powInt(scale, 3) * density,
+      kg: (neck + flange + pad) * powInt(scale, 3) * density,
       method:
-        'neck annulus beyond the outside wall + flange as a bored disc (OD x thickness from the catalogue; hub and bolt holes ignored)',
+        'neck annulus beyond the outside wall + flange as a bored disc (OD x thickness from the catalogue; hub and bolt holes ignored)' +
+        (nozzle.pad === undefined ? '' : ' + reinforcing pad as a flat annulus (OD x thickness, curvature ignored)'),
     };
   });
 }
@@ -57,10 +59,11 @@ export const nozzleMassParts = (scale: number, geometry: VesselGeometry, nozzles
 export const exchangerWallOf =
   (geometry: ExchangerGeometry) =>
   (nozzle: NozzleRecord): number =>
-    nozzle.location.on === 'shell'
-      ? geometry.radius + geometry.shellThickness
+    nozzle.location.on === 'shell' && 'station' in nozzle.location
+      ? shellOutsideRadiusAt(geometry, nozzle.location.station)
       : nozzle.location.on === 'channel'
-        ? geometry.radius + (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).channelThickness
+        ? (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).radius +
+          (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).channelThickness
         : 0;
 
 /** Wall distance of a tank nozzle (shell by elevation: outside radius of the course at that elevation; roof / free: 0). */
@@ -70,3 +73,18 @@ export const tankWallOf =
     nozzle.location.on === 'shell' && 'elevation' in nozzle.location
       ? template.diameter / 2 + thicknessAt(template, nozzle.location.elevation)
       : 0;
+
+/** Distance from the projection origin to the outside of the wall at the nozzle on any template (0 for a free nozzle, a pump or a block, or a template that does not resolve). */
+export function outsideWallOf(template: EquipmentTemplate, nozzle: NozzleRecord): number {
+  if (template.kind === 'vessel') {
+    const geometry = resolveVessel(template);
+    return 'error' in geometry ? 0 : vesselWall(geometry, nozzle);
+  }
+  if (template.kind === 'exchanger') return exchangerWallOf(resolveExchanger(template))(nozzle);
+  if (template.kind === 'tank') return tankWallOf(template)(nozzle);
+  return 0;
+}
+
+/** Length of the neck between the outside of the wall and the flange: the room a reinforcing pad has. */
+export const neckLengthOf = (template: EquipmentTemplate, nozzle: NozzleRecord): number =>
+  nozzle.projection - outsideWallOf(template, nozzle) - nozzle.flange.thickness;

@@ -13,6 +13,17 @@ export const SCAN_REMEDIATION: Readonly<Record<string, string>> = {
   SCN_QUERY_LIMIT: 'Narrow the region or lower maxPoints and page.',
   SCN_FIT_TOO_FEW_POINTS: 'Enlarge the region (it must hold at least 30 points for a cylinder, 10 for a plane / sphere / circle).',
   SCN_FIT_NO_MODEL: 'Tighten the region around one object.',
+  SCN_STEEL_NO_MATCH:
+    'No catalogue section fits: widen `families`, give an axisHint for a short member, or model a built-up / non-catalogue section manually.',
+  SCN_STEEL_AXIS_AMBIGUOUS:
+    'The region is too short to tell the member axis from the section: pass axisHint (the member direction) or enlarge the region along the member.',
+  SCN_STEEL_NO_CANDIDATE:
+    'No catalogue outline has the section extents: widen `families`, check the region holds ONE member, or model it manually.',
+  SCN_STEEL_THICKNESS_MISMATCH:
+    'The measured web / flange thickness differs from the catalogue profile by more than the scan band: field-verify the section (a heavier or lighter profile of the same depth, or a plated member).',
+  SCN_STEEL_PROFILE_UNKNOWN:
+    'The extraction names a profile that is not in the llull catalogue (list_steel_profiles): model the member manually.',
+  SCN_STEEL_LOW_COVERAGE: 'Scan the missing faces or field-verify h, b and the centre of the member.',
   SCN_TRACE_SKEW: 'Possible offset or two-plane bend: seed the trace again on the next straight and trace it separately.',
   SCN_TRACE_BEND_RADIUS_UNMEASURED:
     'The bend has too few scanned surface points (or its radius sits on the search bound): field-measure the bend radius.',

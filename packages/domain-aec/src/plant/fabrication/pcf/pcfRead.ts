@@ -1,6 +1,6 @@
 /**
  * PCF reader (plant 05 ISO §5.1, §6.1): lexed lines to a `PcfLineData` in millimetres. Header units scale coordinates and bores (a missing unit is
- * refused, never assumed); `COMPONENT-IDENTIFIER` is dropped (the writer renumbers); `UNIQUE-COMPONENT-IDENTIFIER` is the component id; every
+ * refused, never assumed); `COMPONENT-IDENTIFIER` is kept as `identifier` (a name for the route import to address a component by; the writer still renumbers); `UNIQUE-COMPONENT-IDENTIFIER` is the component id; every
  * attribute and record the model does not know is kept (`extra`, `unknownRecords`) and written back verbatim. One pipeline per file.
  */
 
@@ -100,6 +100,7 @@ interface Scale {
 
 interface Builder {
   id: string | undefined;
+  identifier: string | undefined;
   ends: NetworkPoint[];
   centre: Vec3 | undefined;
   branch: NetworkPoint | undefined;
@@ -125,6 +126,7 @@ function component(
 ): NetworkComponent {
   const b: Builder = {
     id: undefined,
+    identifier: undefined,
     ends: [],
     centre: undefined,
     branch: undefined,
@@ -138,6 +140,8 @@ function component(
   for (const line of body) {
     switch (line.key) {
       case 'COMPONENT-IDENTIFIER':
+        single(b.identifier, line);
+        b.identifier = line.rest;
         break;
       case 'UNIQUE-COMPONENT-IDENTIFIER':
         single(b.id, line);
@@ -186,6 +190,7 @@ function component(
   return {
     id: b.id ?? `pcf:${lineId}:${position}`,
     type,
+    ...(b.identifier === undefined || b.identifier === '' ? {} : { identifier: b.identifier }),
     ends: b.ends,
     ...(b.centre === undefined ? {} : { centre: b.centre }),
     ...(b.branch === undefined ? {} : { branch: b.branch }),

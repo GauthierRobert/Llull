@@ -22,13 +22,16 @@ export interface ContactShadowPlane {
   readonly far: number;
 }
 
-export function computeContactShadowPlane(bounds: Bounds | null, renderOrigin: Vec3): ContactShadowPlane {
-  if (!bounds) return { position: [0, 0, -0.001], scale: DEFAULT_SCALE, far: DEFAULT_FAR };
+/** `groundElevation` (site context): the patch sits at that height instead of z = 0 / the scene's lowest point. */
+export function computeContactShadowPlane(bounds: Bounds | null, renderOrigin: Vec3, groundElevation?: number): ContactShadowPlane {
+  if (!bounds)
+    return { position: toRenderPosition([0, 0, (groundElevation ?? 0) - 0.001], renderOrigin), scale: DEFAULT_SCALE, far: DEFAULT_FAR };
   const extentX = bounds.max[0] - bounds.min[0];
   const extentY = bounds.max[1] - bounds.min[1];
   const scale = Math.max(Math.max(extentX, extentY) * FOOTPRINT_MARGIN, MIN_SCALE);
-  const height = bounds.max[2] - Math.min(bounds.min[2], 0);
-  const ground = Math.min(bounds.min[2], 0) - scale * 1e-3;
+  const base = groundElevation ?? Math.min(bounds.min[2], 0);
+  const height = bounds.max[2] - base;
+  const ground = base - scale * 1e-3;
   const [centreX, centreY] = boundsCenter(bounds);
   return { position: toRenderPosition([centreX, centreY, ground], renderOrigin), scale, far: Math.max(height * 1.5, scale * 0.25) };
 }

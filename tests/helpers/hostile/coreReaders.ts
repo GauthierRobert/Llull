@@ -8,10 +8,12 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { evaluateExpression } from '@lib/expression';
 import { compileExpression } from '@lib/expressionProgram';
+import { parseCpt } from '@lib/cpt';
 import { float64ToBase64 } from '@lib/float64Base64';
 import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
+import { pngHeader } from '@lib/pngHeader';
 import { parseUnit } from '@lib/quantity';
 import { parseIsoMetric, parseThreadDimensions } from '@lib/threadForm';
 import { parseBody } from '@plm/pdm/args';
@@ -69,6 +71,7 @@ function linearModelDocument(tamper: (form: Record<string, unknown>) => void): s
 import { firaBytes } from '../../unit/wrap/fixtures';
 import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
 import { variableTrueTypeWithMetrics } from '../../unit/wrap/variableTrueType';
+import { kernedDeviceFont } from '../../unit/wrap/kernedFont';
 import { aliasedStoreFont, gvarTupleFanFont, manyRangesFont, operatorFanFont, sharedSubrsFont } from '../../unit/wrap/hostileFonts';
 import { run as plmRun } from '../../unit/plm/scenarioRunner';
 import { inWork } from '../../unit/plm/fixtures';
@@ -120,6 +123,26 @@ const documentBuild = (records: number): string => {
   const ids = Array.from({ length: records }, (_, k) => `box-${k}`);
   const doc: CadDocument = { ...base, entities: Object.fromEntries(ids.map((id) => [id, { ...(boxEntity as Entity), id }])), order: ids };
   return serializeDocument(doc);
+};
+
+/** A saved document with one exact ruled polygon loft, its record changed by `tamper`: the hostile combinations of `polygon: true`. */
+const polygonLoftDocument = (tamper: (record: Record<string, unknown>) => void): string => {
+  const rect = (h: number): number[][] => [
+    [-h, -h],
+    [h, -h],
+    [h, h],
+    [-h, h],
+  ];
+  const made = execute(createEmptyDocument(), 'loft_sections', {
+    ruled: true,
+    sections: [
+      { section: rect(3), center: [0, 0, 0] },
+      { section: rect(1), center: [0, 0, 5] },
+    ],
+  });
+  const saved = JSON.parse(serializeDocument(made.document)) as { document: { entities: Record<string, Record<string, unknown>> } };
+  for (const record of Object.values(saved.document.entities)) tamper(record);
+  return JSON.stringify(saved);
 };
 
 /** A saved document holding one instance array (VIS1), with `tamper` applied to its parsed record: the hostile variants of the packed table. */
@@ -515,6 +538,28 @@ export const CORE_READERS: readonly HostileReader[] = [
     accepts: (result) => (result as { ok: boolean }).ok,
   },
   {
+    name: 'core: text_outline (GPOS pair kerning + GDEF 1.3 variation store at an instance)',
+    covers: ['core/src/lib/font/gpos.ts:gdefKerningDelta', 'text_outline'],
+    input: 'bytes',
+    build: () => kernedDeviceFont(),
+    extra: [
+      { name: 'the kerning device offset is 0xFFFF', input: () => kernedDeviceFont('deviceOffset') },
+      { name: 'the kerning device row is past the data subtable', input: () => kernedDeviceFont('innerRow') },
+      { name: 'the kerning device outer index is past the store', input: () => kernedDeviceFont('outerIndex') },
+    ],
+    skipLinear: 'a binary font container: its size is not a record count',
+    read: (input) => {
+      const imported = execute(createEmptyDocument(), 'import_font', { base64: toBase64(asBytes(input)), variation: { wght: 900 } });
+      const font = imported.affected[0];
+      if (font === undefined) return imported;
+      const text = execute(imported.document, 'add_text', { content: 'AB', position: [0, 0, 0], height: 7, font });
+      const id = text.affected[0];
+      return id === undefined ? text : execute(text.document, 'text_outline', { id });
+    },
+    accepts: (result) =>
+      (result as { rejected?: boolean; data?: unknown }).rejected === undefined && (result as { data?: unknown }).data !== undefined,
+  },
+  {
     name: 'core: parseFont (CFF with seac, an arithmetic operator and a charset)',
     covers: ['core/src/lib/font/cffEncoding.ts:readCharset'],
     input: 'bytes',
@@ -569,6 +614,20 @@ export const CORE_READERS: readonly HostileReader[] = [
     accepts: (result) => (result as { ok: boolean }).ok,
   },
   {
+    name: 'core: pngHeader (size of a PNG frame received from the renderer)',
+    covers: ['core/src/lib/pngHeader.ts:pngHeader'],
+    input: 'bytes',
+    build: (records) => Uint8Array.from([...png1x1(), ...new Array<number>(records * 8).fill(0)]),
+    read: (input) => pngHeader(asBytes(input)),
+    accepts: (result) => (result as { width: number } | null)?.width === 1,
+    extra: [
+      { name: 'signature only', input: () => Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]) },
+      { name: 'IHDR of the wrong length', input: () => Uint8Array.from([...png1x1().slice(0, 11), 99, ...png1x1().slice(12)]) },
+      { name: 'zero width', input: () => Uint8Array.from([...png1x1().slice(0, 16), 0, 0, 0, 0, ...png1x1().slice(20)]) },
+      { name: 'not a PNG', input: () => new Uint8Array(64).fill(255) },
+    ],
+  },
+  {
     name: 'core: parseMaterialLibrary (llull-material-library JSON)',
     covers: ['core/src/commands/materials/libraryFormat.ts:parseMaterialLibrary', 'import_material_library'],
     input: 'text',
@@ -598,6 +657,10 @@ export const CORE_READERS: readonly HostileReader[] = [
       },
       { name: 'instance array: table as a nested array', input: () => arrayDocument((record) => (record['transforms'] = [[[1]]])) },
       { name: 'instance array: component id __proto__', input: () => arrayDocument((record) => (record['componentId'] = '__proto__')) },
+      { name: 'polygon loft: ruled false', input: () => polygonLoftDocument((record) => (record['ruled'] = false)) },
+      { name: 'polygon loft: closed true', input: () => polygonLoftDocument((record) => (record['closed'] = true)) },
+      { name: 'polygon loft: with exact sections', input: () => polygonLoftDocument((record) => (record['sections'] = [])) },
+      { name: 'polygon loft: with exact faces', input: () => polygonLoftDocument((record) => (record['faces'] = [])) },
       {
         name: 'implicit body: material that is not in the document',
         input: () => implicitBodyDocument((body) => (body['materialId'] = 'ghost')),
@@ -647,5 +710,20 @@ export const CORE_READERS: readonly HostileReader[] = [
     build: (records) => repeated('', (k) => `box${k} fillet `, 'edge', records),
     read: (input) => [parseQuery(asText(input)), orRefusal(() => parseCommandResponse(parsedJson(asText(input)), 200))],
     accepts: () => true,
+  },
+  {
+    name: 'core: parseCpt (GMT colour palette table)',
+    covers: ['core/src/lib/cpt.ts:parseCpt'],
+    input: 'text',
+    build: (records) => repeated('# RANGE = 0/4900\n', (k) => `${k} ${k % 256}/0/0 ${k + 1} 0/${k % 256}/0\n`, 'B black\n', records),
+    read: (input) => parseCpt(asText(input)),
+    accepts: (result) => (result as { ok: boolean }).ok,
+    extra: [
+      { name: 'z beyond double range (1e309)', input: () => '0 0/0/0 1e309 1/1/1\n' },
+      { name: 'NaN z', input: () => 'NaN 0/0/0 1 1/1/1\n' },
+      { name: 'RANGE 1e309', input: () => '# RANGE = 0/1e309\n0 0/0/0 1 1/1/1\n' },
+      { name: 'RANGE NaN', input: () => '# RANGE = NaN/10\n0 0/0/0 1 1/1/1\n' },
+      { name: 'hinge header', input: () => '# HARD_HINGE\n# RANGE = -1/1\n-1 0/0/0 1 1/1/1\n' },
+    ],
   },
 ];

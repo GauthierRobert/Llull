@@ -18,6 +18,14 @@ describe('computeContactShadowPlane', () => {
     expect(plane.position[1]).toBeCloseTo(0);
     expect(plane.far).toBeGreaterThanOrEqual(3000);
   });
+  it('places the catcher at the site ground elevation, with or without geometry', () => {
+    const bounds = { min: [0, 0, 1] as [number, number, number], max: [10, 10, 5] as [number, number, number] };
+    const plane = computeContactShadowPlane(bounds, [0, 0, 0], 3);
+    expect(plane.position[2]).toBeCloseTo(3 - 0.02);
+    expect(plane.far).toBeGreaterThanOrEqual((5 - 3) * 1.5);
+    expect(computeContactShadowPlane(null, [0, 0, 0], 3).position).toEqual([0, 0, 3 - 0.001]);
+    expect(computeContactShadowPlane(bounds, [0, 0, 2], 3).position[2]).toBeCloseTo(3 - 0.02 - 2);
+  });
   it('drops to the lowest point when the scene dips below the ground', () => {
     const plane = computeContactShadowPlane({ min: [0, 0, -5], max: [10, 10, 5] }, [0, 0, 0]);
     expect(plane.position[2]).toBeLessThan(-5);

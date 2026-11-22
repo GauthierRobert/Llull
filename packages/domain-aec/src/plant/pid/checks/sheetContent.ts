@@ -3,6 +3,7 @@
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import type { PidModel, PidSheet } from '../model';
+import { symbolClassOf } from '../symbols/projectSymbol';
 
 /** SHA-256 of what a sheet shows: its identity fields, every item drawn on it in item order, the project symbols of the classes it uses and the acceptances of findings on its items (status, revision and the issue stamp are not part of it). */
 export function sheetContentSha256(pid: PidModel, sheet: PidSheet): string {
@@ -12,7 +13,7 @@ export function sheetContentSha256(pid: PidModel, sheet: PidSheet): string {
   });
   const onSheet = new Set<string>([sheet.id, ...items.map((item) => item.id)]);
   const symbols = Object.fromEntries(
-    [...new Set(items.map((item) => item.dexpiClass))].flatMap((cls) =>
+    [...new Set(items.map(symbolClassOf))].flatMap((cls) =>
       pid.symbols !== undefined && Object.hasOwn(pid.symbols, cls) ? [[cls, pid.symbols[cls]]] : [],
     ),
   );

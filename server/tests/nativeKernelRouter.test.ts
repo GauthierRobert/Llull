@@ -18,20 +18,24 @@ type Answer = (op: string, args: readonly unknown[]) => { result: unknown; error
 
 interface Harness {
   readonly router: KernelRouter;
-  readonly nativeCalls: { op: string; args: readonly unknown[] }[];
+  readonly nativeCalls: { op: string; args: readonly unknown[]; deadlineMs?: number }[];
 }
 
-function harness(answer: Answer, native: NativeInfo = NATIVE): Harness {
-  const nativeCalls: { op: string; args: readonly unknown[] }[] = [];
+function harness(answer: Answer, native: NativeInfo = NATIVE, deadlineMs?: number): Harness {
+  const nativeCalls: { op: string; args: readonly unknown[]; deadlineMs?: number }[] = [];
   const session: NativeKernelSession = {
-    request: (op, args) => {
-      nativeCalls.push({ op, args });
+    request: (op, args, deadline) => {
+      nativeCalls.push({ op, args, ...(deadline === undefined ? {} : { deadlineMs: deadline }) });
       return Promise.resolve(answer(op, args));
     },
     alive: () => true,
+    cancel: () => undefined,
     close: () => undefined,
   };
-  return { router: createKernelRouter({ native, session: () => session }), nativeCalls };
+  return {
+    router: createKernelRouter({ native, session: () => session, ...(deadlineMs === undefined ? {} : { deadlineMs }) }),
+    nativeCalls,
+  };
 }
 
 const cube = leaf(box([0, 0, 0], [1, 1, 1]));
@@ -42,6 +46,17 @@ describe('native kernel router', () => {
     expect((await h.router.route({ op: 'evaluate', args: [cube] })).result).toMatchObject({ key: expect.any(String) });
     expect(await h.router.route({ op: 'massProperties', args: [{ key: 'k' }] })).toEqual({ result: { volume: 1 } });
     expect(h.nativeCalls.map((call) => call.op)).toEqual(['evaluate', 'massProperties']);
+  });
+
+  it('gives every native request the remaining part of one call deadline, blob loads included', async () => {
+    const { router, nativeCalls } = harness(() => ({ result: null }), { ...NATIVE, ops: [...NATIVE.ops, 'loadBlob'] }, 4000);
+    await router.route({ op: 'loadBlob', args: ['a'.repeat(64), 'BREP'] });
+    await router.route({ op: 'evaluate', args: [cube] });
+    expect(nativeCalls.map((call) => call.op)).toEqual(['loadBlob', 'evaluate']);
+    for (const call of nativeCalls) {
+      expect(call.deadlineMs).toBeGreaterThan(0);
+      expect(call.deadlineMs).toBeLessThanOrEqual(4000);
+    }
   });
 
   it('decodes native meshes into plain arrays', async () => {
@@ -209,6 +224,7 @@ describe('native kernel router', () => {
           return Promise.resolve({ result: op === 'loadBlob' ? null : 'native' });
         },
         alive: () => index === live,
+        cancel: () => undefined,
         close: () => undefined,
       }),
     );

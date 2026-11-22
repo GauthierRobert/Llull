@@ -1,13 +1,13 @@
 /** `llull` CLI pure helpers: argv parsing, params sources, catalog views, file payload extraction. */
 
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import fs, { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import os, { tmpdir } from 'node:os';
 import path from 'node:path';
 import { booleanFlag, missingValueFlag, paramsSource, parseArgv, stringFlag } from '../src/cli/argv';
 import { describeCommand, listCatalog, searchCatalog, shortDescription, suggestNames, toolsetCounts } from '../src/cli/catalog';
 import { filesOfData, saveDataFiles, withoutPayloads, withSaveDefaults } from '../src/cli/saveFiles';
-import { imageDataUrl, resolveFileRefs } from '../src/cli/fileParams';
+import { imageDataUrl, resolveFileRefs, withModuleFiles } from '../src/cli/fileParams';
 import { listCommands } from '@core/commands/registry';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
 import { paramsLines } from '../src/cli/describeSchema';
@@ -94,6 +94,67 @@ describe('fileParams', () => {
   });
 });
 
+describe('saveDataFiles with module files', () => {
+  it('writes data.modules next to the design file, and withoutPayloads elides their text', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'lld-save-'));
+    const data = {
+      text: 'use "a/b.lld" as b',
+      fileName: 'top.lld',
+      modules: [
+        { path: 'a/b.lld', text: 'module b() {\n}\n' },
+        { path: '../evil.lld', text: 'x' },
+      ],
+    };
+    const saved = saveDataFiles(data, path.join(dir, 'top.lld'));
+    expect(saved.map((f) => path.relative(dir, f.path)).sort()).toEqual(['a/b.lld', 'evil.lld', 'top.lld']);
+    expect(readFileSync(path.join(dir, 'a', 'b.lld'), 'utf8')).toBe('module b() {\n}\n');
+    expect(JSON.stringify(withoutPayloads(data))).not.toContain('module b()');
+    expect(saveDataFiles({ text: 'x', modules: 'no' }, path.join(dir, 'solo.lld'))).toHaveLength(1);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('withModuleFiles', () => {
+  let dir: string;
+  let raw: { source: string };
+  let resolved: { source: string };
+  beforeAll(() => {
+    dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lld-modules-')));
+    fs.mkdirSync(path.join(dir, 'designs', 'sub'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'outside'));
+    const top =
+      'use "fan.lld" as f\nuse "./sub//stage.lld" as s\nuse "../secret.lld" as x\nuse "/etc/y.lld" as y\nuse "gone.lld" as g\nuse "link.lld" as l\nuse "big.lld" as b\n# use "commented.lld" as c\n';
+    fs.writeFileSync(path.join(dir, 'designs', 'top.lld'), top);
+    fs.writeFileSync(path.join(dir, 'designs', 'fan.lld'), 'module fan() {\n  use "sub/stage.lld" as inner\n}\n');
+    fs.writeFileSync(path.join(dir, 'designs', 'sub', 'stage.lld'), 'module stage() {\n}\n');
+    fs.writeFileSync(path.join(dir, 'outside', 'secret.lld'), 'module secret() {\n}\n');
+    fs.writeFileSync(path.join(dir, 'designs', 'big.lld'), 'x'.repeat(4 * 262_144 + 1));
+    fs.symlinkSync(path.join(dir, 'outside', 'secret.lld'), path.join(dir, 'designs', 'link.lld'));
+    raw = { source: `@text:${path.join(dir, 'designs', 'top.lld')}` };
+    resolved = { source: top };
+  });
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('adds the files its use lines name, transitively, skipping unsafe, symlinked-out, oversized and unreadable paths', () => {
+    const out = withModuleFiles('apply_design', raw, resolved) as { modules: Record<string, string> };
+    expect(Object.keys(out.modules).sort()).toEqual(['fan.lld', 'sub/stage.lld']);
+    expect(out.modules['sub/stage.lld']).toBe('module stage() {\n}\n');
+    expect(withModuleFiles('expand_design', raw, resolved)).toHaveProperty('modules');
+  });
+
+  it('leaves other commands, inline sources, explicit modules and file-less designs alone', () => {
+    expect(withModuleFiles('add_box', raw, resolved)).toBe(resolved);
+    expect(withModuleFiles('apply_design', { source: 'use "fan.lld" as f' }, resolved)).toBe(resolved);
+    expect(withModuleFiles('apply_design', null, resolved)).toBe(resolved);
+    expect(withModuleFiles('apply_design', raw, null)).toBeNull();
+    const explicit = { ...resolved, modules: { 'fan.lld': 'x' } };
+    expect(withModuleFiles('apply_design', raw, explicit)).toBe(explicit);
+    const plain = { source: 'add_box b size=[1,1,1]' };
+    expect(withModuleFiles('apply_design', raw, plain)).toBe(plain);
+    expect(withModuleFiles('apply_design', { source: '@text:/no/such/dir/x.lld' }, plain)).toBe(plain);
+  });
+});
+
 describe('catalog', () => {
   it('lists every registry command and exchange tool exactly once, filterable by toolset', () => {
     const all = listCatalog();
@@ -160,6 +221,15 @@ describe('saveFiles', () => {
     expect(readFileSync(path.join(root, 'robot', 'meshes', 'base.stl'), 'utf8')).toBe('S');
     const intoDir = saveDataFiles({ text: 'x', fileName: 'm.scad' }, `${root}/`);
     expect(intoDir[0]?.path).toBe(path.join(root, 'm.scad'));
+  });
+
+  it('writes data.image (capture_viewport) as the .png and strips it from the printed data', () => {
+    const root = dir();
+    const bytes = Buffer.from([137, 80, 78, 71, 1, 2, 3]);
+    const data = { image: bytes.toString('base64'), width: 1, height: 1, view: 'iso' };
+    const [saved] = saveDataFiles(data, path.join(root, 'cap', 'engine.png'));
+    expect(readFileSync(saved?.path ?? '')).toEqual(bytes);
+    expect(withoutPayloads(data)).toMatchObject({ image: expect.stringContaining('saved'), width: 1 });
   });
 
   it('rasterizes svg for a .png target and fails clearly without a payload', () => {

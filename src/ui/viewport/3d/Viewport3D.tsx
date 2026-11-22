@@ -30,7 +30,9 @@ import { NavigationController, WALKABLE_GROUP_NAME } from './navigation/Navigati
 import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
+import { SiteSky } from './SiteSky';
 import { CANVAS_DPR_RANGE, RenderRig } from './RenderRig';
+import { CaptureRig } from './capture/CaptureRig';
 import { MechanismOverlay } from './MechanismOverlay';
 import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
 import { AeroOverlay } from './aero/AeroOverlay';
@@ -144,6 +146,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         groundShadowOpacity={palette.groundShadowOpacity}
       />
 
+      <SiteSky />
+
       <Grid
         args={[40, 40]}
         cellSize={1}
@@ -156,7 +160,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         fadeStrength={1.5}
         position={[0, 0, 0]}
         rotation={GROUND_PLANE_ROTATION}
-        userData={{ noEdges: true }}
+        userData={{ noEdges: true, captureExclude: true }}
         infiniteGrid
       />
 
@@ -167,14 +171,17 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
           </PlantCameraProvider>
         </group>
         <PointClouds />
-        <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
-        <FeatureSessionLayer />
-        <CageEditLayer onDraggingChanged={onDraggingChanged} />
-        <FaceEditLayer />
-        <NurbsNetLayer />
-        <RemotePreviewLayer />
-        <FootprintPreviewLayer />
-        <MeasureBBoxWireframe />
+        {/* Editing helpers, not the model: a capture_viewport frame leaves them out (capture/frameMask.ts). */}
+        <group userData={{ captureExclude: true }}>
+          <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+          <FeatureSessionLayer />
+          <CageEditLayer onDraggingChanged={onDraggingChanged} />
+          <FaceEditLayer />
+          <NurbsNetLayer />
+          <RemotePreviewLayer />
+          <FootprintPreviewLayer />
+          <MeasureBBoxWireframe />
+        </group>
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
         <AeroOverlay />
@@ -197,6 +204,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
       <RenderRig />
+      <CaptureRig />
       {effects && <HighQualityEffects edges={edges} ambientOcclusion={ambientOcclusion} />}
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={effects ? 2 : 1}>

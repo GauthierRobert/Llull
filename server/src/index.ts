@@ -22,6 +22,7 @@ import { buildExchangeRouter } from './exchangeRoutes';
 import { getActiveKernelName, getKernelStatus } from './geometryKernel';
 import { getAutosaveStatus } from './liveDocument';
 import { buildLiveRouter } from './liveRoutes';
+import { buildViewportRouter } from './viewport/captureRoutes';
 import { buildRecoveryRouter } from './recoveryRoutes';
 import { buildPreviewRouter } from './previewRoutes';
 import { buildSigningRouter } from './plm/signingRoutes';
@@ -89,12 +90,14 @@ app.get(
 app.use(hostGuard);
 const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });
 // /import/dwg parses its own (much larger) body.
-app.use((req, res, next) => (req.path === '/import/dwg' ? next() : jsonBody(req, res, next)));
+// /viewport/frame/:id parses its own body (a 4096 x 4096 PNG is larger than the command limit).
+app.use((req, res, next) => (req.path === '/import/dwg' || req.path.startsWith('/viewport/frame/') ? next() : jsonBody(req, res, next)));
 
 const restLimiter = buildRestRateLimiter();
 const exchange = exchangeOptionsWithDwg();
 
 app.use(buildLiveRouter(restLimiter));
+app.use(buildViewportRouter(restLimiter));
 app.use(buildRecoveryRouter(restLimiter));
 app.use(buildPreviewRouter(restLimiter));
 app.use(buildSigningRouter(restLimiter));

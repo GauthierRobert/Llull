@@ -1,14 +1,17 @@
 /**
  * Centre of gravity of an exchanger, a tank or a pump (plant 03 EQP-FU2), equipment frame (origin = plan location at the level elevation, +Z up). The
  * same lumped-mass method as `vesselCog` over the mass parts of `exchangerMass` / `tankMass`; each part is a lump at the centroid of its solid.
- * Exchangers lie along X on the tube axis (elevation = datum); a tank is on the axis x = y = 0.
+ * Exchangers lie along X on the tube axis (elevation = datum) or, vertical, along Z (`axisPoint`); a tank is on the axis x = y = 0.
  */
 
-import type { Vec3 } from '@core/model/vectors';
 import type { ExchangerTemplate, PumpTemplate, TankTemplate } from '../plantData';
-import { resolveExchanger, type ExchangerEnd } from './exchangerFrame';
+import { axisPoint, resolveExchanger, type ExchangerEnd, type ExchangerGeometry } from './exchangerFrame';
+import { segmentFluidVolume, segmentInside, segmentMetal } from './exchangerShell';
 import { exchangerMass } from './exchangerMass';
+import type { ShellSegment } from './exchangerShell';
 import { headFillCentroid, headMetalCentroid } from './headCentroid';
+import { kettleWeir } from './kettleWeir';
+import { lugVolumes } from './lugs';
 import { pumpLayout } from './pumpLayout';
 import { courseBottoms, roofRise, tankBase, tankLiquidVolume } from './tankFrame';
 import { tankMass } from './tankMass';
@@ -25,22 +28,27 @@ type EndPart = 'Tubesheet' | 'Channel' | 'Cover' | 'Bonnet' | 'ShellCover';
 function endPartX(end: ExchangerEnd, radius: number, kind: EndPart): number {
   if (kind === 'Tubesheet') return (end.tubesheetFrom + end.tubesheetTo) / 2;
   if (kind === 'Channel') return (end.channelFrom + end.channelTo) / 2;
-  if (kind === 'Cover') return end.tangent + (end.sign * end.channelThickness) / 2;
+  if (kind === 'Cover') return end.tangent + (end.sign * end.coverThickness) / 2;
   return end.tangent + end.sign * headMetalCentroid(end.head, radius, end.channelThickness);
 }
 
 /** Liquid lumps of one end (channel bore + closure cavity). */
-function endLiquid(end: ExchangerEnd, radius: number, kgPerUnit3: number, name: string, z: number): CogPart[] {
+function endLiquid(end: ExchangerEnd, geometry: ExchangerGeometry, kgPerUnit3: number, name: string): CogPart[] {
+  const radius = end.radius;
   const lumps: CogPart[] = [];
   if (end.hasTubesheet)
     lumps.push({
       part: `liquid ${name} channel`,
       kg: Math.PI * radius * radius * end.channelLength * kgPerUnit3,
-      at: [(end.channelFrom + end.channelTo) / 2, 0, z],
+      at: axisPoint(geometry, (end.channelFrom + end.channelTo) / 2),
     });
   if (end.closure !== 'flat') {
     const cavity = headFillCentroid(end.head, radius, end.head.depth);
-    lumps.push({ part: `liquid ${name} closure`, kg: cavity.volume * kgPerUnit3, at: [end.tangent + end.sign * cavity.centroid, 0, z] });
+    lumps.push({
+      part: `liquid ${name} closure`,
+      kg: cavity.volume * kgPerUnit3,
+      at: axisPoint(geometry, end.tangent + end.sign * cavity.centroid),
+    });
   }
   return lumps;
 }
@@ -53,37 +61,51 @@ function endLiquid(end: ExchangerEnd, radius: number, kgPerUnit3: number, name: 
 export function exchangerCog(scale: number, template: ExchangerTemplate, nozzleLumps: readonly CogPart[]): VesselCog {
   const geometry = resolveExchanger(template);
   const mass = exchangerMass(scale, template, geometry);
-  const { radius, datum, shellFrom, shellTo } = geometry;
   const { tubes } = template;
-  const shellMid = (shellFrom + shellTo) / 2;
   const bundleMid = geometry.front.tubesheetFrom + tubes.length / 2;
+  const segmentOf = (name: string): ShellSegment | undefined => geometry.segments.find((segment) => segment.name === name);
   const xOf = (part: string): number => {
-    if (part === 'shell') return shellMid;
+    const segment = segmentOf(part);
+    if (segment !== undefined) return segmentMetal(segment).centroid;
     if (part === 'tubes') return bundleMid;
-    return endPartX(part.startsWith('front') ? geometry.front : geometry.rear, radius, part.replace(/^(front|rear)/, '') as EndPart);
+    const end = part.startsWith('front') ? geometry.front : geometry.rear;
+    return endPartX(end, end.radius, part.replace(/^(front|rear)/, '') as EndPart);
   };
-  const metal = mass.parts.map((part): CogPart => ({ part: part.part, kg: part.kg, at: [xOf(part.part), 0, datum] }));
+  const weir = kettleWeir(template, geometry);
+  const { support } = template;
+  const metal = mass.parts.map((part): CogPart => {
+    if (part.part === 'lugs' && support.type === 'lugs')
+      return { part: part.part, kg: part.kg, at: [0, 0, geometry.datum + support.lugElevation + lugVolumes(support).centreHeight] };
+    if (part.part === 'weir' && weir !== null) {
+      const at = axisPoint(geometry, (weir.xFront + weir.xRear) / 2);
+      return { part: part.part, kg: part.kg, at: [at[0], at[1], at[2] - weir.centroidBelowAxis] };
+    }
+    return { part: part.part, kg: part.kg, at: axisPoint(geometry, xOf(part.part)) };
+  });
   const empty = [...metal, ...nozzleLumps];
   const cubic = powInt(scale, 3);
   const bore = tubes.outsideDiameter - 2 * tubes.wallThickness;
   const tubesOutside = (tubes.count * Math.PI * tubes.outsideDiameter ** 2) / 4;
   const closedByCover = geometry.rear.closure === 'shell_cover';
   const shellSide = (kgPerUnit3: number): CogPart[] => [
-    {
-      part: 'liquid shell side',
-      kg: (Math.PI * radius * radius - tubesOutside) * geometry.shellLength * kgPerUnit3,
-      at: [shellMid, 0, datum] as Vec3,
-    },
-    ...(closedByCover ? endLiquid(geometry.rear, radius, kgPerUnit3, 'rear', datum) : []),
+    ...geometry.segments.map((segment): CogPart => {
+      const inside = segmentInside(segment);
+      return {
+        part: segment.name === 'shell' ? 'liquid shell side' : `liquid ${segment.name}`,
+        kg: segmentFluidVolume(segment, tubesOutside) * kgPerUnit3,
+        at: axisPoint(geometry, inside.centroid),
+      };
+    }),
+    ...(closedByCover ? endLiquid(geometry.rear, geometry, kgPerUnit3, 'rear') : []),
   ];
   const tubeSide = (kgPerUnit3: number): CogPart[] => [
     {
       part: 'liquid tubes',
       kg: ((tubes.count * Math.PI * bore * bore) / 4) * tubes.length * kgPerUnit3,
-      at: [bundleMid, 0, datum] as Vec3,
+      at: axisPoint(geometry, bundleMid),
     },
-    ...endLiquid(geometry.front, radius, kgPerUnit3, 'front', datum),
-    ...(closedByCover ? [] : endLiquid(geometry.rear, radius, kgPerUnit3, 'rear', datum)),
+    ...endLiquid(geometry.front, geometry, kgPerUnit3, 'front'),
+    ...(closedByCover ? [] : endLiquid(geometry.rear, geometry, kgPerUnit3, 'rear')),
   ];
   const water = TEST_WATER_KG_PER_M3 * cubic;
   const operating: CogPart[] = [
@@ -100,7 +122,7 @@ export function exchangerCog(scale: number, template: ExchangerTemplate, nozzleL
     approximations: [
       NOZZLE_APPROXIMATION,
       'tubes: one lump at the middle of the tube length; the U-bends and floating head of U / P / S / T / W rears are not modelled',
-      'baffles, tie rods, pass partitions, saddle plates and the weld metal are not modelled',
+      'baffles, tie rods, pass partitions, saddle plates, skirt / legs and the weld metal are not modelled (the kettle weir plate and bracket lugs are)',
     ],
   };
 }

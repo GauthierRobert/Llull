@@ -19,7 +19,8 @@ const LOFT_SPAN_STEPS = 8;
  * The section rings of a loft as the model reads them (one per section, no span interpolation): the polygons themselves when every exact face
  * is straight in u, else each ring's closed curve. Smoothing the corners of a polygon section would round a square into a bulging ring (+25 % across the edge midpoints).
  */
-export function loftSectionRings(loft: Pick<LoftEntity, 'rings' | 'faces'>): Vec3[][] {
+export function loftSectionRings(loft: Pick<LoftEntity, 'rings' | 'faces' | 'polygon'>): Vec3[][] {
+  if (loft.polygon === true) return loft.rings.map((ring) => [...ring]);
   const polygons = loft.faces !== undefined && loft.faces.length > 0 && loft.faces.every((face) => face.degreeU === 1);
   return loft.rings.map((ring) => (polygons ? [...ring] : sampleRing(ring)));
 }
@@ -27,7 +28,7 @@ export function loftSectionRings(loft: Pick<LoftEntity, 'rings' | 'faces'>): Vec
 /**
  * Dense rings of a loft (local coordinates). Section rings: see `loftSectionRings`.
  */
-export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 'faces'>): Vec3[][] {
+export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 'faces' | 'polygon'>): Vec3[][] {
   const sections = loftSectionRings(loft);
   const first = sections[0];
   if (loft.ruled || loft.closed === true || sections.length < 3 || first === undefined) return sections;
@@ -46,7 +47,10 @@ export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 
 }
 
 /** Closed, outward-wound triangles of a loft; `origin` is added to every vertex. */
-export function loftTriangles(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 'faces'>, origin: Vec3 = [0, 0, 0]): Triangle[] {
+export function loftTriangles(
+  loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 'faces' | 'polygon'>,
+  origin: Vec3 = [0, 0, 0],
+): Triangle[] {
   const rings = loftRings(loft).map((ring) => ring.map((p) => add3(p, origin)));
   if (loft.closed !== true) return skinTriangles(rings);
   // a closed loft has no end caps: the last ring joins the first

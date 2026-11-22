@@ -198,6 +198,12 @@ function loftProblem(v: Record<string, unknown>): string | null {
   const base = ringsProblem(v['rings'], 3, 2) ?? (typeof v['ruled'] === 'boolean' ? null : 'ruled must be a boolean');
   const faces = v['faces'];
   if (v['closed'] !== undefined && typeof v['closed'] !== 'boolean') return 'closed must be a boolean';
+  if (v['polygon'] !== undefined && v['polygon'] !== true) return 'polygon must be true when present';
+  if (v['polygon'] === true) {
+    if (v['ruled'] !== true) return 'polygon: true needs ruled: true';
+    if (v['faces'] !== undefined || v['sections'] !== undefined) return 'polygon: true excludes faces and sections';
+    if (v['closed'] === true) return 'polygon: true excludes closed: true';
+  }
   if (v['caps'] !== undefined && v['caps'] !== 0 && v['caps'] !== 1 && v['caps'] !== 2) return 'caps must be 0, 1 or 2';
   if (base === null && faces !== undefined) {
     if (!Array.isArray(faces) || faces.length < 1 || faces.length > 64) return 'faces must list 1..64 NURBS surfaces';
@@ -216,11 +222,14 @@ function loftProblem(v: Record<string, unknown>): string | null {
   return exactSectionsProblem(sections as NurbsCurveData[]);
 }
 
-/** Optional BaseEntity fields (`name`, `tags`, `materialId`, `patternSourceId`) must have their declared types, or null. */
+/** Optional BaseEntity fields (`name`, `tags`, `materialId`, `patternSourceId`, `fastener`) must have their declared types, or null. */
 function baseOptionalProblem(v: Record<string, unknown>): string | null {
   if (v['name'] !== undefined && typeof v['name'] !== 'string') return 'name must be a string';
   if (v['materialId'] !== undefined && typeof v['materialId'] !== 'string') return 'materialId must be a string';
   if (v['patternSourceId'] !== undefined && typeof v['patternSourceId'] !== 'string') return 'patternSourceId must be a string';
+  if (v['fastener'] !== undefined && v['fastener'] !== true) return 'fastener must be true when present';
+  if (v['fastener'] === true && v['kind'] !== 'instance' && !(SOLID_KINDS as readonly string[]).includes(String(v['kind'])))
+    return 'fastener applies to 3D solids and instances only';
   const tags = v['tags'];
   if (tags !== undefined && !(Array.isArray(tags) && tags.every((t) => typeof t === 'string'))) return 'tags must be an array of strings';
   return null;
@@ -355,6 +364,14 @@ function meshProblem(v: Record<string, unknown>): string | null {
     (!Array.isArray(faceColors) || !faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color'])))
   )
     return 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
+  const vertexColors = v['vertexColors'];
+  if (
+    vertexColors !== undefined &&
+    (!Array.isArray(vertexColors) ||
+      vertexColors.length !== positions.length ||
+      !vertexColors.every((c) => isFiniteNumber(c) && c >= 0 && c <= 255))
+  )
+    return 'vertexColors must be 3 numbers in [0, 255] per mesh vertex';
   const provenance = meshProvenanceProblem(v, indices.length / 3);
   if (provenance !== null) return provenance;
   const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { getCommand } from '@core/commands/registry';
 import type { CommandDefinition } from '@core/commands/types';
 import { parseDesign, type Pair } from '@design/parse';
-import { AnchorRef, bindCommand, ExprRef, NameRef, type BoundCommand } from '@design/schemaValue';
+import { AnchorRef, bindCommand, ExprRef, NameRef, ValueExprRef, type BoundCommand } from '@design/schemaValue';
 import { DesignError } from '@design/errors';
 import { convertUnits, lengthFactor } from '@design/units';
 
@@ -36,11 +36,15 @@ describe('bindCommand', () => {
   });
 
   it('enum members, string names, quoted text, booleans, dotted object keys', () => {
-    expect(bind('boolean c op=union a=base b=boss').params).toEqual({ op: 'union', a: new NameRef('base'), b: new NameRef('boss') });
+    expect(bind('boolean c op=union a=base b=boss').params).toEqual({
+      op: 'union',
+      a: new NameRef('base', false, 'boolean.a'),
+      b: new NameRef('boss', true, 'boolean.b'),
+    });
     expect(bind('add_box b size=[1,1,1] color="#ffffff"').params['color']).toBe('#ffffff');
     const hole = bind('add_hole h target=body face=base.top points=[[0,0]] hole.kind=simple hole.diameter=8mm extent.kind=through_all');
     expect(hole.params).toMatchObject({
-      target: new NameRef('body'),
+      target: new NameRef('body', false, 'add_hole.target'),
       face: new AnchorRef('base', 'top'),
       hole: { kind: 'simple', diameter: 8 },
       extent: { kind: 'through_all' },
@@ -76,8 +80,8 @@ describe('bindCommand', () => {
     expect(code(() => bind('set_units _ units=[1]'))).toBe('DESIGN_BAD_ENUM');
   });
 
-  it('JSON escape hatch passes a value through', () => {
-    expect(bind('add_hole h face={"near": [0, 0, 1]}').params['face']).toEqual({ near: [0, 0, 1] });
+  it('an object value is a value expression bound to the param schema', () => {
+    expect(bind('add_hole h face={"near": [0, 0, 1]}').params['face']).toBeInstanceOf(ValueExprRef);
   });
 });
 

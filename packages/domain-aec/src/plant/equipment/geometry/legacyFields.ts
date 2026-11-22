@@ -9,6 +9,7 @@ import { toMetres } from '@core/model/units';
 import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { PlantEquipmentData, VesselTemplate } from '../plantData';
 import { exchangerLegacy, pumpLegacy, tankLegacy, type LegacyFields } from './legacyOthers';
+import { lugPlanRadius } from './lugs';
 import { headApexHeight } from './vesselProfile';
 import { resolveVessel, skirtRadii, type VesselGeometry } from './vesselFrame';
 import { vesselMass } from './vesselMass';
@@ -22,7 +23,9 @@ function verticalExtent(template: VesselTemplate, geometry: VesselGeometry): { r
       ? skirtRadii(geometry, support.thickness).outer + support.baseRingWidth
       : support.type === 'legs'
         ? support.pitchDiameter / 2 + support.legWidth / 2
-        : 0;
+        : support.type === 'lugs'
+          ? lugPlanRadius(outer, support)
+          : 0;
   const top = geometry.datum + geometry.length + headApexHeight(geometry.second, geometry.radius, geometry.headThickness);
   return { radius: Math.max(outer, supportRadius), top };
 }

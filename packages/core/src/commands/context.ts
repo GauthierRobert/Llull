@@ -9,6 +9,7 @@
 import { getGeometryKernel } from '../geometry/kernel';
 import { getGeometryQueryEngine } from '../geometry/geometryQueries';
 import { getSpatialIndex } from '../geometry/spatialIndex';
+import { type PairCache, createPairCache } from '../geometry/assemblyCheck/pairCache';
 import { getMeshProcessingEngine } from '../geometry/mesh/engine';
 import { getFieldEngine } from '../geometry/field/engine';
 import { getPhysicsEngine } from '../dynamics/physicsEngine';
@@ -37,6 +38,7 @@ function getOrCreate<K extends object, V>(store: WeakMap<K, V>, key: K, create: 
 }
 
 const replayCaches = new WeakMap<object, ReplayCache>();
+const pairCaches = new WeakMap<object, PairCache>();
 const NO_KERNEL = {};
 
 /**
@@ -62,6 +64,7 @@ export function defaultContext(): ExecutionContext {
     registry: getCommand,
     projectDepth: 0,
     recipeDepth: 0,
+    pairCache: getOrCreate(pairCaches, kernel ?? NO_KERNEL, () => createPairCache()),
     replayCache: getOrCreate(replayCaches, kernel ?? NO_KERNEL, createReplayCache),
   };
 }

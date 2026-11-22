@@ -7,9 +7,10 @@
  * native code and this planner never write the document, and an atomic refusal leaves it as it was.
  */
 
-import type { FeaHost, FeaToolResult } from '@protocol/index';
+import { nativeLinesForwardedKeys, type FeaHost, type FeaToolResult } from '@protocol/index';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
+import { branchStructureError } from '@aec/index';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import type { NativeDeps } from './fatigueField';
@@ -75,6 +76,37 @@ function solutionOf(data: Json): Json {
   return { ...rest, lengthMm: centrelineToPiLengthMm };
 }
 
+interface LinesParams {
+  readonly lines: readonly Json[];
+  readonly common: Json;
+  readonly partial: boolean;
+  readonly attempts: number;
+  readonly window: number | undefined;
+}
+
+/** The validated request of `auto_route lines`, or the refusal naming the first bad field. */
+function readLinesParams(params: Readonly<Json>): LinesParams | FeaToolResult {
+  const lines = Array.isArray(params['lines']) ? params['lines'].filter(isRecord) : [];
+  if (lines.length === 0 || lines.length !== (params['lines'] as unknown[]).length)
+    return failure('RTE_AUTOROUTE_LINES_INVALID', 'lines must be a non-empty array of { lineId, from, to, ... }');
+  const ids = lines.map((line) => line['lineId']);
+  if (ids.some((id) => typeof id !== 'string') || new Set(ids).size !== ids.length)
+    return failure('RTE_AUTOROUTE_LINES_INVALID', 'every line needs its own string lineId');
+  const given = params['maxAttempts'];
+  if (given !== undefined && !(typeof given === 'number' && Number.isInteger(given) && given >= 1 && given <= 12))
+    return failure('RTE_AUTOROUTE_LINES_INVALID', 'maxAttempts must be an integer from 1 to 12');
+  const window = params['transactionTimeoutS'];
+  if (window !== undefined && !(typeof window === 'number' && Number.isFinite(window) && window >= 1))
+    return failure('RTE_AUTOROUTE_LINES_INVALID', 'transactionTimeoutS must be a number of seconds, at least 1');
+  return {
+    lines,
+    common: isRecord(params['common']) ? params['common'] : {},
+    partial: params['partial'] === true,
+    attempts: given ?? DEFAULT_ATTEMPTS,
+    window,
+  };
+}
+
 /**
  * @failure invalid `lines` -> RTE_AUTOROUTE_LINES_INVALID; a native transport error (missing binary, timeout) -> its NATIVE_* code at once; lines
  *   that cannot be routed in any tried order -> RTE_AUTOROUTE_LINES_FAILED (with partial: the lines that routed are kept)
@@ -86,21 +118,17 @@ export async function runAutoRouteLines(
   deps: NativeDeps,
   routeLine: SingleRoute,
 ): Promise<FeaToolResult> {
-  const lines = Array.isArray(params['lines']) ? params['lines'].filter(isRecord) : [];
-  if (lines.length === 0 || lines.length !== (params['lines'] as unknown[]).length)
-    return failure('RTE_AUTOROUTE_LINES_INVALID', 'lines must be a non-empty array of { lineId, from, to, ... }');
-  const ids = lines.map((line) => line['lineId']);
-  if (ids.some((id) => typeof id !== 'string') || new Set(ids).size !== ids.length)
-    return failure('RTE_AUTOROUTE_LINES_INVALID', 'every line needs its own string lineId');
-  const common = isRecord(params['common']) ? params['common'] : {};
-  const partial = params['partial'] === true;
-  const given = params['maxAttempts'];
-  if (given !== undefined && !(typeof given === 'number' && Number.isInteger(given) && given >= 1 && given <= 12))
-    return failure('RTE_AUTOROUTE_LINES_INVALID', 'maxAttempts must be an integer from 1 to 12');
-  const attempts = given ?? DEFAULT_ATTEMPTS;
-  const window = params['transactionTimeoutS'];
-  if (window !== undefined && !(typeof window === 'number' && Number.isFinite(window) && window >= 1))
-    return failure('RTE_AUTOROUTE_LINES_INVALID', 'transactionTimeoutS must be a number of seconds, at least 1');
+  const read = readLinesParams(params);
+  if ('isError' in read) return read;
+  const { lines, common, partial, attempts, window } = read;
+  const rawBranches = params['branches'];
+  if (Array.isArray(rawBranches)) {
+    const typed = rawBranches
+      .filter(isRecord)
+      .map((entry) => ({ lineId: String(entry['lineId']), headerLineId: String(entry['headerLineId']) }));
+    const bad = typed.length === rawBranches.length ? branchStructureError(lines as { lineId: string }[], typed) : undefined;
+    if (bad !== undefined) return failure('RTE_AUTOROUTE_LINES_INVALID', bad.message, [bad.lineId]);
+  }
   const deadline = Date.now() + 1000 * (window ?? DEFAULT_LINES_TIMEOUT_S);
   const base = host.getDoc();
   const lineById = new Map(lines.map((line) => [line['lineId'] as string, line]));
@@ -162,11 +190,13 @@ export async function runAutoRouteLines(
       ...line,
       ...(solutions.has(line['lineId'] as string) ? { solution: solutions.get(line['lineId'] as string) } : {}),
     })),
+    ...Object.fromEntries(nativeLinesForwardedKeys().flatMap((key) => (params[key] === undefined ? [] : [[key, params[key]]]))),
     common,
     order: 'given',
     sequence: best.planned.map((entry) => entry.line['lineId']),
-    // Always all-or-nothing over the planned lines: a document that changed during the plan is refused as a whole.
-    partial: false,
+    // All-or-nothing over the planned lines (a document that changed during the plan is refused as a whole), except that with branches the
+    // request's partial is kept: a branch that cannot be placed, or whose header failed natively, is reported as in process.
+    partial: params['branches'] !== undefined && partial,
   });
   return {
     summary: `${TOOL}: ${lines.length} line(s) planned with llull-compute route in ${passes.length} pass(es). ${committed.summary}`,

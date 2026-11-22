@@ -3,14 +3,14 @@
  * `industrial/clash/clashSources`. The bundle is pulled out of the front (stationary) end along the tube axis: the zone starts at the outer face of
  * the front tubesheet (the channel and cover are taken off first) and runs `bundlePullLength` (tube length + 1 m, the named default of `add_heat_exchanger`)
  * outward, as wide and as high as the shell. Anything that is not the exchanger itself and enters the zone is a `clearance` clash named by the exchanger.
- * @invariant pure, deterministic (element order); fixed-tubesheet exchangers (rear L, M, N) have no zone; units are the document units
+ * @invariant a vertical exchanger (front head at the bottom) has its bundle lifted out of the TOP: the zone starts at the rear end of the shell and runs `bundlePullLength` upward (named assumption, never through the floor); pure, deterministic (element order); fixed-tubesheet exchangers (rear L, M, N) have no zone; units are the document units
  */
 
 import type { CadDocument } from '@core/model/types';
 import { elementsOf, getBuilding } from '../../../building/model';
 import type { ExternalBody } from '../../../industrial/clash/clashSources';
 import { bundlePullLength } from '../commands/exchangerParams';
-import { resolveExchanger } from '../geometry/exchangerFrame';
+import { axisPoint, resolveExchanger } from '../geometry/exchangerFrame';
 import { directionToWorld, toWorld } from '../geometry/ports';
 
 export function bundlePullBodies(doc: CadDocument): ExternalBody[] {
@@ -23,14 +23,15 @@ export function bundlePullBodies(doc: CadDocument): ExternalBody[] {
     if (pull === null) return [];
     const geometry = resolveExchanger(template);
     const face = geometry.front.tubesheetFrom;
+    const vertical = geometry.vertical;
     return [
       {
         id: element.id,
         kind: 'clearance',
         box: {
-          center: toWorld(element, level, [face - pull / 2, 0, geometry.datum]),
+          center: toWorld(element, level, axisPoint(geometry, vertical ? geometry.shellTo + pull / 2 : face - pull / 2)),
           axes: [directionToWorld(element, [1, 0, 0]), directionToWorld(element, [0, 1, 0]), [0, 0, 1]],
-          half: [pull / 2, geometry.outerRadius, geometry.outerRadius],
+          half: vertical ? [geometry.outerRadius, geometry.outerRadius, pull / 2] : [pull / 2, geometry.outerRadius, geometry.outerRadius],
         },
         group: element.id,
         connectedTo: [element.id],

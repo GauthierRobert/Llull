@@ -1,7 +1,7 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
-import type { FaceGroup, MeshAssetRef, MeshSource } from './meshProvenance';
+import type { FaceGroup, MeshAssetRef, MeshSource, VertexTint } from './meshProvenance';
 import type { EdgeBlendNode, FaceBlendParams, FullRoundParams, JointRadius } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
@@ -20,7 +20,7 @@ import type { DrawingsModel } from './sheet';
 import type { PmiModel } from './pmi';
 import type { DynamicsModel } from './dynamics';
 import type { InstanceArray } from './instanceArray';
-import type { PrototypeModel } from './prototype';
+import type { EntityTags, PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
 import type { DisplayModel } from './display';
 import type { CurveSegment } from './curve';
@@ -39,7 +39,7 @@ import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
-import type { DimensionStyleFields } from './dimensionStyle';
+import type { DocumentSettingsFields } from './documentSettings';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -89,7 +89,7 @@ export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
 
 export type EntityKind = SolidKind | Shape2DKind | CurveKind | SheetKind | 'instance';
 
-export interface BaseEntity {
+export interface BaseEntity extends EntityTags {
   readonly id: EntityId;
   readonly kind: EntityKind;
   /** World-space origin (work-plane origin for 2D entities). */
@@ -147,7 +147,7 @@ export interface ExtrusionEntity extends BaseEntity {
  * @invariant `brep`, when present, is the exact construction tree the kernel tessellated into `mesh` (before `position`/`rotation`); a
  *   command that rewrites `mesh` must rewrite or drop `brep`
  */
-export interface MeshSolidEntity extends BaseEntity {
+export interface MeshSolidEntity extends BaseEntity, VertexTint {
   readonly kind: 'mesh';
   mesh: MeshData;
   /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */
@@ -635,7 +635,7 @@ export interface DriveRelation {
 }
 
 /** Document units default to 'mm'; every map/list below is initialized empty by createEmptyDocument. */
-export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields, DimensionStyleFields, DocumentExtensions {
+export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields, DocumentSettingsFields, DocumentExtensions {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
   order: EntityId[];
@@ -709,7 +709,7 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   composites?: import('./composites').CompositesModel;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: import('./sheetMetal').SheetMetalModel;
-  /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`), dimension styles (`DimensionStyleFields`) are inherited. */
+  /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`), dimension styles and the site context (`DocumentSettingsFields`) are inherited. */
 }
 
 export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode };
@@ -821,7 +821,11 @@ export interface EdgeRadius {
 export type ShapeRecipe =
   /** A solid entity as authored (primitive, profile solid, or a plain triangle mesh). */
   | { readonly op: 'solid'; readonly entity: Entity }
-  | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe }
+  /**
+   * `many` (union / subtract only): `b` is the balanced union of `many` tool recipes; a kernel with a multi-tool boolean applies the tools in ONE
+   * General Fuse / Cut, every other kernel evaluates `b` as written (ASC M1a).
+   */
+  | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe; readonly many?: number }
   | EdgeBlendNode<ShapeRecipe, EdgeRadius>
   /**
    * A rolling-ball blend between two face sets that need not share an edge (BLD M4): `facesA` / `facesB` are unique face indices of the source,

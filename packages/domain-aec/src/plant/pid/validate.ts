@@ -7,7 +7,7 @@ import { isRecord } from '@lib/isRecord';
 import { isReservedKey } from '@lib/reservedKey';
 import { PID_CONVENTIONS, PID_IMPORT_FORMATS, PID_PAPERS, PID_SHEET_STATUSES, PID_TAG_FORMAT_KINDS } from './model';
 import { tagPatternErrors } from './patternSafety';
-import { fitsBox, shapeProblems, SYMBOL_LIMITS, symbolFamilyOf, targetBox } from './symbols/projectSymbol';
+import { fitsBox, shapeProblems, SYMBOL_LIMITS, symbolAnchor, symbolFamilyOf, targetBox } from './symbols/projectSymbol';
 import type { Shape } from './symbols/shapes';
 import { itemErrors } from './validateItems';
 import { appendAll } from '@lib/appendAll';
@@ -103,7 +103,9 @@ function symbolErrors(raw: Record<string, unknown>): string[] {
   for (const [key, value] of Object.entries(symbols)) {
     const path = `plant.pid.symbols.${key}`;
     if (isReservedKey(key) || symbolFamilyOf(key) === null) {
-      errors.push(`${path}: the key must be an equipment or piping class of the library`);
+      errors.push(
+        `${path}: the key must be a class of the library (equipment, piping component, instrument bubble, actuator or off-page connector)`,
+      );
       continue;
     }
     if (!isRecord(value) || value['class'] !== key) {
@@ -117,7 +119,7 @@ function symbolErrors(raw: Record<string, unknown>): string[] {
       errors.push(`${path}.conventions must list ${PID_CONVENTIONS.join(' and / or ')}`);
     const problems = shapeProblems(value['shapes'], `${path}.shapes`);
     appendAll(errors, problems);
-    if (problems.length === 0 && !fitsBox(value['shapes'] as Shape[], targetBox(key)))
+    if (problems.length === 0 && !fitsBox(value['shapes'] as Shape[], targetBox(key), symbolAnchor(key)))
       errors.push(`${path}.shapes lie outside the box of the built-in ${key} symbol`);
   }
   return errors;

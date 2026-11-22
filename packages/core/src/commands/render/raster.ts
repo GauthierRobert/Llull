@@ -11,9 +11,10 @@
 import type { RasterScene } from '../../model/raster';
 import { encodePng } from '../../lib/png';
 import { uint8ArrayToBase64 } from '../../lib/base64';
-import type { Camera } from './camera';
+import type { Camera, RenderLight } from './camera';
 import type { PixelStage, Polygon3D } from './types';
 import { prepareRasterScene } from './rasterScene';
+import { overBackdrop, skyBackdrop } from './skyRaster';
 
 interface ScreenPoint {
   readonly x: number;
@@ -226,7 +227,10 @@ export function rasterLayer(
   height: number,
   sceneRadius: number,
   pixels: PixelStage = rasterScenePixels,
+  light?: RenderLight,
 ): string {
-  const scene = prepareRasterScene(polygons, cam, orthoHalf, width, height, sceneRadius);
-  return scene === null ? '' : rasterImageSvg(width, height, pixels(scene));
+  const scene = prepareRasterScene(polygons, cam, orthoHalf, width, height, sceneRadius, light);
+  if (scene === null) return '';
+  const drawn = pixels(scene);
+  return rasterImageSvg(width, height, light?.sky === undefined ? drawn : overBackdrop(drawn, skyBackdrop(light.sky, cam, width, height)));
 }

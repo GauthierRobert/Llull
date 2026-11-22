@@ -44,6 +44,8 @@ export interface NetworkComponent {
   /** The llull id (a routed part id, or `pcf:<line>:<n>` for a component read from a PCF without UNIQUE-COMPONENT-IDENTIFIER). */
   readonly id: string;
   readonly type: PcfComponentType;
+  /** COMPONENT-IDENTIFIER as the file wrote it (a name to address the component by; the writer renumbers, so it is not written back). */
+  readonly identifier?: string;
   /** 0..2 END-POINTs in file order (SUPPORT, OLET, BOLT: none). */
   readonly ends: readonly NetworkPoint[];
   readonly centre?: Vec3;

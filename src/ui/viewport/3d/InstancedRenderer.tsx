@@ -113,6 +113,7 @@ function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: Insta
   }, [displayMode, batch.entities, selectionSet, material]);
 
   if (count === 0) return null;
+  const instanceIds = batch.entities.map((entity) => entity.id);
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     if (isClippedAway(e.point)) return;
@@ -121,7 +122,17 @@ function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: Insta
     if (entityId) onSelect(entityId, isAdditiveSelect(e.nativeEvent));
   }
 
-  return <instancedMesh ref={meshRef} args={[geometry, material, capacity]} count={count} onClick={handleClick} castShadow receiveShadow />;
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[geometry, material, capacity]}
+      count={count}
+      userData={{ instanceIds: instanceIds }}
+      onClick={handleClick}
+      castShadow
+      receiveShadow
+    />
+  );
 }
 
 interface InstancedRendererProps {

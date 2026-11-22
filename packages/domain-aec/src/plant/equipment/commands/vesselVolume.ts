@@ -104,7 +104,7 @@ export const vesselVolume = defineCommand({
     'operating liquid: { levelAboveBottomTangent, liquidVolumeM3, percent, liquidMassKg }), method, assumptions, sources and unverified (true when ' +
     'a grade B/C head standard was used). Refusals: EQP_NOT_FOUND, EQP_NOT_PARAMETRIC, EQP_PARAM_INVALID, EQP_HEAD_INVALID, EQP_LEVEL_OUT_OF_RANGE, ' +
     'EQP_HEAD_NOT_COVERED (horizontal torispherical heads at a partial level, V1). `equipment` may also be an exchanger (shellSide.volumeM3, tubeSide.volumeM3, ' +
-    'insideOverallLengthMm, assumptions; `side` selects totalVolumeM3; levels are refused) or a tank from add_storage_tank (levels from the top of the bottom plate, ' +
+    'insideOverallLengthMm, assumptions; `side` selects totalVolumeM3; levels are refused; a kettle with a weir plate adds kettleWeir { liquidVolumeToWeirM3, segmentArea, liquidLength, note: bundle displacement not subtracted }) or a tank from add_storage_tank (levels from the top of the bottom plate, ' +
     'pi/4 D^2 h, operating = design liquid level). Does not modify the document.',
   annotations: { readOnly: true, idempotent: true },
   params: volumeParams,

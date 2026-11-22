@@ -7,7 +7,16 @@
 import { z } from '@core/commands/schema';
 import type { CadDocument, DocumentUnit } from '@core/model/types';
 import { parseTema } from '../codecheck/tema';
-import type { EquipmentTemplate, ExchangerSideDesign, ExchangerTemplate, NozzleRecord, PumpTemplate, TankTemplate } from '../plantData';
+import type {
+  EquipmentTemplate,
+  ExchangerChannel,
+  ExchangerKettle,
+  ExchangerSideDesign,
+  ExchangerTemplate,
+  NozzleRecord,
+  PumpTemplate,
+  TankTemplate,
+} from '../plantData';
 import { buildExchangerTemplate, channelSchema, exchangerShape, sideSchema, type ExchangerInput } from './exchangerParams';
 import { buildPumpTemplate, pumpShape, type PumpInput } from './pumpParams';
 import { buildTankTemplate, tankShape, type TankInput } from './tankParams';
@@ -16,15 +25,31 @@ import { isVesselIssue, type VesselIssue } from './vesselParams';
 export const exchangerPatchSchema = z
   .object({
     temaType: exchangerShape.temaType.optional(),
+    orientation: exchangerShape.orientation,
+    kettle: exchangerShape.kettle
+      .unwrap()
+      .partial()
+      .extend({
+        weirStation: z
+          .number()
+          .positive()
+          .nullable()
+          .optional()
+          .describe(
+            'Weir plate centre from the rear end of the shell (see add_heat_exchanger); null REMOVES the weir plate (weirStation and weirThickness are dropped, weirHeight stays as data).',
+          ),
+      })
+      .optional()
+      .describe('Kettle fields to change (TEMA K only); the others are kept.'),
     shellInsideDiameter: exchangerShape.shellInsideDiameter.optional(),
     shellThickness: exchangerShape.shellThickness.optional(),
     corrosionAllowance: exchangerShape.corrosionAllowance,
     tubes: exchangerShape.tubes.partial().optional().describe('Tube fields to change; the others are kept (give wallThickness OR bwg).'),
     tubesheetThickness: exchangerShape.tubesheetThickness.optional(),
-    frontChannel: channelSchema.partial().optional().describe('Front channel fields to change { length, thickness }.'),
+    frontChannel: channelSchema.partial().optional().describe('Front channel fields to change { length, thickness, coverThickness }.'),
     rearChannel: channelSchema.partial().optional().describe('Rear channel fields to change (fixed-tubesheet rears L, M, N only).'),
     support: exchangerShape.support.describe(
-      'New support; replaces the whole support (saddles { stations, width, axisElevation } or none).',
+      'New support; replaces the whole support (saddles { stations, width, axisElevation } or none; vertical: skirt, legs, lugs or none). Changing orientation needs a suiting support in the same patch.',
     ),
     design: z
       .object({
@@ -87,8 +112,10 @@ export interface Revision<T extends EquipmentTemplate> {
 }
 
 /** `value` without its undefined entries (a zod partial object carries explicit undefined). */
-const defined = <T extends object>(value: T | undefined | null): Partial<T> =>
-  Object.fromEntries(Object.entries(value ?? {}).filter(([, entry]) => entry !== undefined)) as Partial<T>;
+const defined = <T extends object>(value: T | undefined | null): { [K in keyof T]?: Exclude<T[K], undefined> } =>
+  Object.fromEntries(Object.entries(value ?? {}).filter(([, entry]) => entry !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
 
 /** Dotted paths (one and two levels) of the fields a patch sets. */
 function patchedPaths(patch: object): string[] {
@@ -109,6 +136,37 @@ function mergeDefaulted(old: readonly string[], built: readonly string[], patch:
 const sideOf = (old: ExchangerSideDesign | undefined, patch: Partial<ExchangerSideDesign> | undefined): ExchangerSideDesign | undefined =>
   old === undefined && patch === undefined ? undefined : { ...old, ...defined(patch) };
 
+const shellLetter = (temaType: string): string | undefined => {
+  const parsed = parseTema(temaType);
+  return 'tema' in parsed ? parsed.tema.shell : undefined;
+};
+
+/** A stored wall that was only a named default is dropped, so the builder derives it again from the revised shell wall. */
+function keptChannel(channel: ExchangerChannel, name: string, template: ExchangerTemplate): Partial<ExchangerChannel> {
+  if (!template.defaulted.includes(`${name}.thickness`)) return channel;
+  const { thickness: _derived, ...rest } = channel;
+  return rest;
+}
+
+function keptKettle(template: ExchangerTemplate): Partial<ExchangerKettle> {
+  const { kettle } = template;
+  if (kettle === undefined) return {};
+  if (!template.defaulted.includes('kettle.enlargedThickness')) return kettle;
+  const { enlargedThickness: _derived, ...rest } = kettle;
+  return rest;
+}
+
+/** The stored kettle with the patch on top; `weirStation: null` drops the weir plate (both of its fields). */
+function mergedKettle(template: ExchangerTemplate, patch: ExchangerPatch['kettle']): Partial<ExchangerKettle> {
+  const { weirStation, ...rest } = defined(patch);
+  const merged = { ...keptKettle(template), ...rest, ...(typeof weirStation === 'number' ? { weirStation } : {}) };
+  if (weirStation !== null) return merged;
+  const { weirStation: _station, weirThickness: _thickness, ...without } = merged;
+  return without;
+}
+
+const KETTLE_REQUIRED = ['enlargedInsideDiameter', 'enlargedLength', 'transitionLength', 'weirHeight'] as const;
+
 function exchangerInputOf(template: ExchangerTemplate, patch: ExchangerPatch): ExchangerInput {
   const { support, tubes, design } = template;
   const temaType = patch.temaType ?? template.temaType;
@@ -127,14 +185,28 @@ function exchangerInputOf(template: ExchangerTemplate, patch: ExchangerPatch): E
   const designPatch = patch.design;
   return {
     temaType,
-    orientation: 'horizontal',
+    orientation: patch.orientation ?? template.orientation,
+    ...(shellLetter(temaType) !== 'K' || (template.kettle === undefined && patch.kettle === undefined)
+      ? {}
+      : { kettle: mergedKettle(template, patch.kettle) }),
     shellInsideDiameter: patch.shellInsideDiameter ?? template.shellInsideDiameter,
     shellThickness: patch.shellThickness ?? template.shellThickness,
     corrosionAllowance: patch.corrosionAllowance ?? template.corrosionAllowance,
     tubes: { ...tubeBase, ...tubePatch },
     tubesheetThickness: patch.tubesheetThickness ?? template.tubesheetThickness,
-    frontChannel: { ...template.frontChannel, ...defined(patch.frontChannel) },
-    ...(fixed ? { rearChannel: { ...(template.rearChannel ?? template.frontChannel), ...defined(patch.rearChannel) } } : {}),
+    frontChannel: { ...keptChannel(template.frontChannel, 'frontChannel', template), ...defined(patch.frontChannel) },
+    ...(fixed
+      ? {
+          rearChannel: {
+            ...keptChannel(
+              template.rearChannel ?? template.frontChannel,
+              template.rearChannel === undefined ? 'frontChannel' : 'rearChannel',
+              template,
+            ),
+            ...defined(patch.rearChannel),
+          },
+        }
+      : {}),
     support: patch.support ?? (support.type === 'saddles' ? { ...support, stations: [...support.stations] } : support),
     ...(design === undefined && designPatch === undefined
       ? {}
@@ -158,7 +230,18 @@ export function reviseExchanger(
   nozzles: readonly NozzleRecord[],
   patch: ExchangerPatch,
 ): Revision<ExchangerTemplate> | VesselIssue {
-  const built = buildExchangerTemplate(exchangerInputOf(old, patch), units);
+  const input = exchangerInputOf(old, patch);
+  const parsedTema = parseTema(input.temaType);
+  if ('tema' in parsedTema && parsedTema.tema.shell === 'K' && !parsedTema.tema.fixedTubesheet && input.orientation !== 'vertical') {
+    const missing = KETTLE_REQUIRED.find((field) => input.kettle?.[field] === undefined);
+    if (missing !== undefined)
+      return {
+        code: 'EQP_PARAM_INVALID',
+        message: `a kettle shell (K) needs kettle.${missing}: give the whole kettle in the patch`,
+        path: `kettle.${missing}`,
+      };
+  }
+  const built = buildExchangerTemplate(input, units);
   if (isVesselIssue(built)) return built;
   const wallKept =
     patch.tubes === undefined ||
@@ -260,7 +343,12 @@ export function revisePump(
     if (next === undefined) return record;
     return record.dn === next.dn && record.rating === next.rating
       ? { ...record, location: next.location, projection: next.projection }
-      : { ...next, facing: record.facing, ...(record.service === undefined ? {} : { service: record.service }) };
+      : {
+          ...next,
+          facing: record.facing,
+          ...(record.service === undefined ? {} : { service: record.service }),
+          ...(record.kind === undefined ? {} : { kind: record.kind }),
+        };
   });
   return { template: { ...built.template, defaulted: mergeDefaulted(old.defaulted, built.defaulted, patch) }, nozzles: revised };
 }

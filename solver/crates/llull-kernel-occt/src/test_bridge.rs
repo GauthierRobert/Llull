@@ -15,6 +15,8 @@ mod ffi {
         fn refined_mass_flag(shape: &Shape) -> bool;
         /// Whether the per-face areas use the adaptive rule: refined and with a freeform face.
         fn adaptive_rule(shape: &Shape) -> bool;
+        /// The multi-tool boolean treats its result as invalid (the balanced-tree fallback runs).
+        fn set_many_fault(on: bool);
         /// The number of threads the corner fills of the next builds use (0: default).
         fn set_corner_threads(count: i32);
         /// The threads the last corner fill used.
@@ -75,6 +77,10 @@ pub fn boundary_angle(shape: &Shape, face: i32, drop_one: bool) -> f64 {
 
 pub fn span_cut_count(shape: &Shape) -> i32 {
     ffi::span_cut_count(crate::inner(shape).expect("a shape"))
+}
+
+pub fn set_many_fault(on: bool) {
+    ffi::set_many_fault(on);
 }
 
 pub fn set_corner_threads(count: i32) {

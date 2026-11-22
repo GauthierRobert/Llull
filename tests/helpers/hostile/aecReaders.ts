@@ -16,6 +16,9 @@ import { parseLineNumber } from '@aec/plant/piping/lineNumber';
 import { parseSpecFile } from '@aec/plant/spec/file';
 import { parseCrossingName } from '@aec/industrial/framing/gridFraming';
 import { parseRating } from '@aec/plant/equipment/geometry/nozzleHardware';
+import { exchangerErrors } from '@aec/plant/equipment/validateTemplates';
+import { apply } from '../commandAssertions';
+import { bemParams, mmDocument } from '../../unit/plant/equipment/equipmentFixtures';
 import { asText, orRefusal, repeated, type HostileReader } from './types';
 
 const DATA = path.resolve(__dirname, '../../../docs/plant');
@@ -111,7 +114,71 @@ const springScene = ((): { doc: CadDocument; id: string } => {
   return { doc: model.doc, id: model.id };
 })();
 
+const exchangerTemplate = (): Record<string, unknown> => {
+  const doc = apply(mmDocument(), 'add_heat_exchanger', {
+    ...bemParams,
+    temaType: 'AKU',
+    rearChannel: undefined,
+    support: undefined,
+    kettle: {
+      enlargedInsideDiameter: 900,
+      enlargedLength: 2000,
+      transitionLength: 300,
+      weirHeight: 500,
+      weirStation: 400,
+      weirThickness: 12,
+    },
+  });
+  const element = Object.values(doc.building?.elements ?? {}).find((entry) => entry.category === 'equipment');
+  return JSON.parse(JSON.stringify(element?.category === 'equipment' ? element.plant?.template : {})) as Record<string, unknown>;
+};
+
+const lugExchangerTemplate = (): Record<string, unknown> => {
+  const doc = apply(mmDocument(), 'add_heat_exchanger', {
+    ...bemParams,
+    orientation: 'vertical',
+    support: {
+      type: 'lugs',
+      count: 4,
+      lugHeight: 300,
+      lugWidth: 200,
+      lugProjection: 150,
+      lugThickness: 20,
+      lugBasePlateThickness: 25,
+      lugElevation: 400,
+    },
+  });
+  const element = Object.values(doc.building?.elements ?? {}).find((entry) => entry.category === 'equipment');
+  return JSON.parse(JSON.stringify(element?.category === 'equipment' ? element.plant?.template : {})) as Record<string, unknown>;
+};
+
 export const AEC_READERS: readonly HostileReader[] = [
+  {
+    name: 'plant: exchangerErrors (stored exchanger template of a loaded file)',
+    covers: ['domain-aec/src/plant/equipment/validateTemplates.ts:exchangerErrors'],
+    input: 'text',
+    build: (records) => JSON.stringify({ ...exchangerTemplate(), defaulted: Array.from({ length: records }, (_, k) => `name${k}`) }),
+    read: (input) => {
+      const parsed = parsedJson(asText(input));
+      return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? exchangerErrors(parsed as Record<string, unknown>, 'template')
+        : ['not an object'];
+    },
+    accepts: (result) => Array.isArray(result) && result.length === 0,
+  },
+  {
+    name: 'plant: exchangerErrors / supportErrors (stored lugs of a vertical exchanger, fit-checked at load)',
+    covers: ['domain-aec/src/plant/equipment/validateTemplates.ts:supportErrors'],
+    input: 'text',
+    build: (records) => JSON.stringify({ ...lugExchangerTemplate(), defaulted: Array.from({ length: records }, (_, k) => `name${k}`) }),
+    read: (input) => {
+      const parsed = parsedJson(asText(input));
+      return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? exchangerErrors(parsed as Record<string, unknown>, 'template')
+        : ['not an object'];
+    },
+    accepts: (result) => Array.isArray(result) && result.length === 0,
+  },
   {
     name: 'plant: readDexpi (DEXPI 1.3 Proteus and 2.0 XML)',
     covers: ['domain-aec/src/plant/pid/dexpi/proteusRead.ts:readDexpi'],

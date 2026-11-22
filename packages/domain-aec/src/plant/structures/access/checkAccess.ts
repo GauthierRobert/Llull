@@ -139,7 +139,12 @@ export const checkAccess = defineCommand({
     const skipped = (params.ids ?? []).filter((id) => !CHECKED_CATEGORIES.includes(building.elements[id]?.category ?? 'grid'));
 
     const rules: AccessRule[] = [
-      ...(stairs.length + steelStairs.length > 0 ? stairRules(params.rulesets) : []),
+      ...(stairs.length + steelStairs.length > 0
+        ? stairRules(
+            params.rulesets,
+            steelStairs.some((stair) => stair.landings.some((landing) => landing.turn !== undefined)),
+          )
+        : []),
       ...(steelStairs.length > 0 ? stairHeadroomRules(params.rulesets) : []),
       ...(railings.length > 0 ? railingRules(params.rulesets) : []),
       ...(ladders.length > 0 ? ladderRules(ladders, params.rulesets) : []),

@@ -8,9 +8,12 @@
 
 import type { Vec3 } from '../../model/types';
 import type { RasterScene } from '../../model/raster';
-import { type Camera, cameraBasis, makeProjector, projectPoint } from './camera';
+import { type Camera, type RenderLight, cameraBasis, makeProjector, projectPoint } from './camera';
 import type { Polygon3D, SurfaceShading } from './types';
 import { appendAll } from '../../lib/appendAll';
+import { GROUND_DROP, fillBounds, groundPlane, planShadows } from './sunShadows';
+import { shadowPieces } from './shadowReceivers';
+import type { ShadowMap } from './shadowTypes';
 
 const SUPERSAMPLE = 2;
 /** Above this many output pixels the render is not supersampled (memory and time stay bounded at 2000 × 2000). */
@@ -47,10 +50,10 @@ const tint = (metalness: number, albedo: number): number => 1 - metalness + (met
  * Blinn-Phong highlight of a face for a material class (spec 5.6): k_s (n.h)^s with k_s = 0.04 + 0.5 * metalness and
  * s = round(2 / roughness^2 - 2) clamped to [1, 256]. Square root and basic arithmetic only, so the number is identical on every platform.
  */
-function highlight(facing: Vec3, toEye: Vec3, shading: SurfaceShading): number {
-  const hx = LIGHT[0] + toEye[0];
-  const hy = LIGHT[1] + toEye[1];
-  const hz = LIGHT[2] + toEye[2];
+function highlight(facing: Vec3, toEye: Vec3, shading: SurfaceShading, toLight: Vec3): number {
+  const hx = toLight[0] + toEye[0];
+  const hy = toLight[1] + toEye[1];
+  const hz = toLight[2] + toEye[2];
   const length = Math.sqrt(hx * hx + hy * hy + hz * hz);
   if (!(length > 1e-12)) return 0;
   const nh = Math.max(0, (facing[0] * hx + facing[1] * hy + facing[2] * hz) / length);
@@ -68,6 +71,40 @@ function rgbOf(color: string): [number, number, number] {
   if (/^[0-9a-fA-F]{6}$/.test(hex)) return [0, 2, 4].map((i) => parseInt(hex.substring(i, i + 2), 16)) as [number, number, number];
   const rgb = /rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color);
   return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : [176, 176, 176];
+}
+
+/** The sun's shadow map (sun up, `light.shadows` set; the plan `renderDocument` already ran, else run here) and the ground plane (`groundElevation` set). */
+function sunPass(
+  light: RenderLight | undefined,
+  filled: readonly Polygon3D[],
+  sceneRadius: number,
+): { map: ShadowMap | null; ground: Polygon3D[] } {
+  const shadows = light?.shadows;
+  const bounds = shadows === undefined ? null : (shadows.groundBounds ?? fillBounds(filled));
+  if (shadows === undefined || bounds === null) return { map: null, ground: [] };
+  const toSun = light?.direction ?? null;
+  const plan = toSun === null ? null : (shadows.plan ?? planShadows(filled, toSun));
+  const ground = shadows.groundElevation === null ? null : groundPlane(bounds, shadows.groundElevation, sceneRadius * GROUND_DROP);
+  return { map: plan?.kind === 'map' ? plan.map : null, ground: ground === null ? [] : [ground] };
+}
+
+/** Lambert colour of a face (ambient only when `shadowed`) plus the Blinn-Phong highlight of its material class when `highlightOf` (the lit geometry) is given. */
+function faceColour(
+  base: readonly number[],
+  diffuse: number,
+  shadowed: boolean,
+  shading: SurfaceShading | undefined,
+  highlightOf: { facing: Vec3; view: Vec3; toLight: Vec3 } | null,
+): number[] {
+  const factor = shadowed ? AMBIENT : AMBIENT + (1 - AMBIENT) * diffuse;
+  const colour = base.map((channel) => channel * factor);
+  if (shading === undefined) return colour;
+  const spec =
+    highlightOf === null
+      ? 0
+      : highlight(highlightOf.facing, [-highlightOf.view[0], -highlightOf.view[1], -highlightOf.view[2]], shading, highlightOf.toLight);
+  const metal = unit(shading.metalness);
+  return colour.map((channel, k) => Math.min(255, channel + 255 * spec * tint(metal, base[k] ?? 0)));
 }
 
 type ScreenPoint = readonly [number, number, number];
@@ -145,9 +182,12 @@ export function prepareRasterScene(
   width: number,
   height: number,
   sceneRadius: number,
+  light?: RenderLight,
 ): RasterScene | null {
+  const toLight: Vec3 = light === undefined ? LIGHT : (light.direction ?? [0, 0, 0]);
   const filled = polygons.filter((p) => !p.stroke);
   if (polygons.length === 0) return null;
+  const sun = sunPass(light, filled, sceneRadius);
   const samples = supersampleFor(width, height);
   const [w, h] = [width * samples, height * samples];
   const projection =
@@ -168,7 +208,7 @@ export function prepareRasterScene(
       for (const point of loop) points.push(point[0], point[1], point[2]);
     }
   };
-  for (const polygon of filled) {
+  for (const polygon of sun.ground.length === 0 ? filled : [...sun.ground, ...filled]) {
     const ownerKey = polygon.owner ?? '';
     const owner = owners.get(ownerKey) ?? owners.size;
     owners.set(ownerKey, owner);
@@ -188,16 +228,14 @@ export function prepareRasterScene(
     const view = projection.viewAt(polygon.verts[0] ?? [0, 0, 0]);
     const facingAway = nx * view[0] + ny * view[1] + nz * view[2] > 0;
     const facing: Vec3 = facingAway ? [-nx, -ny, -nz] : polygon.normal;
-    const diffuse = Math.max(0, facing[0] * LIGHT[0] + facing[1] * LIGHT[1] + facing[2] * LIGHT[2]);
-    const factor = AMBIENT + (1 - AMBIENT) * diffuse;
-    const colour = [r * factor, g * factor, b * factor];
-    if (polygon.shading !== undefined) {
-      const spec = highlight(facing, [-view[0], -view[1], -view[2]], polygon.shading);
-      const metal = unit(polygon.shading.metalness);
-      const albedo = [r, g, b];
-      for (let k = 0; k < 3; k += 1) colour[k] = Math.min(255, (colour[k] ?? 0) + 255 * spec * tint(metal, albedo[k] ?? 0));
+    const diffuse = Math.max(0, facing[0] * toLight[0] + facing[1] * toLight[1] + facing[2] * toLight[2]);
+    const pieces =
+      sun.map === null || diffuse <= 0 ? [{ verts: polygon.verts, shadowed: false }] : shadowPieces(sun.map, polygon.verts, facing);
+    for (const piece of pieces) {
+      const lit = light?.direction === null || piece.shadowed ? 0 : 1;
+      const colour = faceColour([r, g, b], diffuse, piece.shadowed, polygon.shading, lit === 0 ? null : { facing, view, toLight });
+      addFill([projection.loop(piece.verts)], colour, facing, owner, 0);
     }
-    addFill([projection.loop(polygon.verts)], colour, facing, owner, 0);
   }
   const bias = sceneRadius * 0.002;
   for (const stroke of polygons.filter((p) => p.stroke)) {

@@ -7,6 +7,7 @@ import { MM_PER_UNIT, toMetres } from '@core/model/units';
 import type { EquipmentElement } from '@aec/building/types';
 import { getBuilding } from '../../../building/model';
 import { exchangerVolumes, resolveExchanger } from '../geometry/exchangerFrame';
+import { kettleWeir } from '../geometry/kettleWeir';
 import { tankLiquidVolume } from '../geometry/tankFrame';
 import { refuse } from '../model';
 import type { ExchangerTemplate, TankTemplate } from '../plantData';
@@ -47,10 +48,24 @@ function exchangerVolume(doc: CadDocument, element: EquipmentElement, template: 
     tubeSide: { volumeM3: volumes.tubeSide * cubic, method: 'N pi/4 di^2 Lt + channels pi/4 Ds^2 Lc + 2:1 bonnet heads pi Ds^3 / 24' },
   };
   const selected = request.side === undefined ? undefined : request.side === 'shell' ? fluidSides.shellSide : fluidSides.tubeSide;
+  const weir = kettleWeir(template, geometry);
   const data = {
     kind: 'exchanger',
     temaType: template.temaType,
     ...fluidSides,
+    ...(weir === null
+      ? {}
+      : {
+          kettleWeir: {
+            weirHeight: weir.height,
+            segmentArea: weir.area,
+            liquidLength: weir.liquidLength,
+            liquidVolumeToWeirM3: weir.liquidVolume * cubic,
+            method:
+              'circular segment of the enlarged inside radius up to weirHeight (R^2 acos((R - h) / R) - (R - h) sqrt(2 R h - h^2)) x enlarged-cylinder length between the cone and the front face of the weir plate',
+            note: 'bundle displacement not subtracted; the tube bundle is modelled to the shell end, so the plate cuts through it and the shell-side volume still subtracts tubes behind the weir; the cone and the overflow side behind the weir are not included',
+          },
+        }),
     ...(selected === undefined ? {} : { side: request.side, totalVolumeM3: selected.volumeM3 }),
     insideOverallLength: geometry.insideOverallLength,
     insideOverallLengthMm: geometry.insideOverallLength * mm,
@@ -66,7 +81,7 @@ function exchangerVolume(doc: CadDocument, element: EquipmentElement, template: 
   };
   return report(
     doc,
-    `vessel_volume: ${element.mark} TEMA ${template.temaType}: shell side ${fluidSides.shellSide.volumeM3.toPrecision(8)} m3, tube side ${fluidSides.tubeSide.volumeM3.toPrecision(8)} m3, inside overall length ${data.insideOverallLengthMm} mm.`,
+    `vessel_volume: ${element.mark} TEMA ${template.temaType}: shell side ${fluidSides.shellSide.volumeM3.toPrecision(8)} m3, tube side ${fluidSides.tubeSide.volumeM3.toPrecision(8)} m3, inside overall length ${data.insideOverallLengthMm} mm${weir === null ? '' : `, liquid up to the weir ${(weir.liquidVolume * cubic).toPrecision(8)} m3 (bundle displacement not subtracted)`}.`,
     data,
   );
 }

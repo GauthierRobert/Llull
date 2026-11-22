@@ -7,6 +7,11 @@ import { parseRecords } from '@lib/step21/records';
 import { summarizeStep21 } from '@lib/step21/summary';
 import { DesignError } from '@design/errors';
 import { parseDesign } from '@design/parse';
+import { buildValueExpr } from '@design/valueExpr';
+import { evaluateValue } from '@design/valueEval';
+import { coerceValue } from '@design/valueSchema';
+import { loadModules } from '@design/modules';
+import { runDesign } from '@design/run';
 import { parseSurvey } from '@aec/civil/survey/surveyParse';
 import { fakeIgesText } from '../fakeXdeKernel';
 import { asText, repeated, type HostileReader } from './types';
@@ -140,6 +145,44 @@ const readDesign = (text: string): unknown => {
   }
 };
 
+/** The `.lld` value pipeline of apply_design / check_design / expand_design (text -> tree -> value -> JSON), without a kernel. */
+const readValue = (text: string): unknown => {
+  try {
+    const expr = buildValueExpr(text, { units: 'mm', paramKey: null, line: 1 });
+    const host = { line: 1, vars: {}, parameters: { w: 2 }, functions: new Map(), alias: () => undefined };
+    return { value: coerceValue(evaluateValue(expr, host), {}, 'value', 1) };
+  } catch (error) {
+    if (error instanceof DesignError) return { refusal: error.message };
+    throw error;
+  }
+};
+
+const doubling = (levels: number): string =>
+  `let a0 = "xxxxxxxxxx" in ${Array.from({ length: levels }, (_, k) => `let a${k + 1} = a${k} + a${k} in `).join('')}len(a${levels})`;
+
+/** `{ source, files }` JSON through parse, module loading and a kernel-free run (add_box lines): a DesignError is the documented refusal. */
+const readModules = (text: string): unknown => {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== 'object' || parsed === null) return { refusal: 'not an object' };
+    const { source, files } = parsed as { source?: unknown; files?: unknown };
+    if (typeof source !== 'string' || typeof files !== 'object' || files === null) return { refusal: 'no source / files' };
+    const statements = parseDesign(source);
+    return runDesign(createEmptyDocument(), statements, undefined, undefined, loadModules(statements, files as Record<string, string>));
+  } catch (error) {
+    if (error instanceof DesignError || error instanceof SyntaxError) return { refusal: error.message };
+    throw error;
+  }
+};
+
+const BOX = 'module m() {\n  add_box b size=[1, 1, 1]\n  export b\n}\n';
+const moduleCase = (source: string, files: Record<string, string>): string => JSON.stringify({ source, files });
+const wide = (count: number): string =>
+  moduleCase(
+    Array.from({ length: count }, (_, k) => `use "w${k}.lld" as w${k}`).join('\n'),
+    Object.fromEntries(Array.from({ length: count }, (_, k) => [`w${k}.lld`, BOX])),
+  );
+
 const created = (result: unknown): boolean => (result as { affected: string[] }).affected.length > 0;
 
 export const EXCHANGE_READERS: readonly HostileReader[] = [
@@ -249,5 +292,112 @@ export const EXCHANGE_READERS: readonly HostileReader[] = [
     ],
     read: (input) => readDesign(asText(input)),
     accepts: (result) => Array.isArray(result),
+  },
+  {
+    name: 'design: value language (apply_design, check_design, expand_design)',
+    covers: [
+      'design-lang/src/valueExpr.ts:buildValueExpr',
+      'design-lang/src/valueEval.ts:evaluateValue',
+      'design-lang/src/valueSchema.ts:coerceValue',
+      'apply_design',
+      'check_design',
+      'expand_design',
+    ],
+    input: 'text',
+    build: (records) => `[for i in 0..<${records}: {k: i * w, s: "a" + "b"}]`,
+    nest: (depth) => `${'['.repeat(depth)}1${']'.repeat(depth)}`,
+    maxRecords: 1 << 12,
+    extra: [
+      { name: 'range-bodied comprehension', input: () => 'len([for i in 0..<3000: 0..<100000])' },
+      { name: 'zip bomb', input: () => '[for i in 0..<100000: zip(0..<100000, 0..<100000)][0][0]' },
+      { name: 'sum of a big list in a loop', input: () => 'let a = 0..<100000 in len([for i in 0..<20000: sum(a)])' },
+      { name: 'shared list repeated by coerce', input: () => 'let a = 0..<100000 in [for i in 0..<1000: a]' },
+      { name: 'string doubling', input: () => doubling(30) },
+      { name: 'flat operator chain', input: () => `1${'+1'.repeat(50_000)}` },
+      { name: 'flat index chain', input: () => `[[0]]${'[0]'.repeat(20_000)}` },
+      { name: 'reserved object key', input: () => '{__proto__: 1}' },
+      { name: 'duplicate object key', input: () => '{a: 1, a: 2}' },
+      { name: 'unknown names and calls', input: () => 'zzz(1, qqq.rrr[3])' },
+    ],
+    read: (input) => readValue(asText(input)),
+    accepts: (result) => Array.isArray((result as { value?: unknown }).value),
+  },
+  {
+    name: 'design: run budget (nested loops, near-limit values; apply_design)',
+    covers: [],
+    input: 'text',
+    build: (records) => `for i in 0..${Math.min(records, 60) - 1} {\n  add_box b{i} size=[1, 1, 1]\n}\n`,
+    maxRecords: 60,
+    extra: [
+      {
+        name: 'nested empty loops',
+        input: () => 'for a in 0..999 {\n for b in 0..999 {\n for c in 0..999 {\n for d in 0..999 {\n }\n }\n }\n}\n',
+      },
+      {
+        name: 'many near-limit values',
+        input: () => Array.from({ length: 40 }, (_, k) => `add_box b${k} size=[len([for i in 0..<9000: sum(0..<90)]), 1, 1]`).join('\n'),
+      },
+    ],
+    read: (input) => {
+      try {
+        const statements = parseDesign(asText(input));
+        return runDesign(createEmptyDocument(), statements);
+      } catch (error) {
+        if (error instanceof DesignError) return { refusal: error.message };
+        throw error;
+      }
+    },
+    accepts: (result) => typeof (result as { commands?: number }).commands === 'number',
+  },
+  {
+    name: 'design: modules (loadModules, use ... as ..., apply_design)',
+    covers: ['design-lang/src/modules.ts:loadModules', 'design-lang/src/run.ts:runDesign'],
+    input: 'text',
+    build: (records) => wide(Math.min(records, 60)),
+    maxRecords: 1 << 8,
+    extra: [
+      {
+        name: 'import cycle',
+        input: () =>
+          moduleCase('use "a.lld" as a', {
+            'a.lld': 'module a() {\n  use "b.lld" as b\n}\n',
+            'b.lld': 'module b() {\n  use "a.lld" as a\n}\n',
+          }),
+      },
+      {
+        name: 'depth 9 chain',
+        input: () =>
+          moduleCase(
+            'use "m0.lld" as x',
+            Object.fromEntries(Array.from({ length: 10 }, (_, k) => [`m${k}.lld`, `module m${k}() {\n  use "m${k + 1}.lld" as x\n}\n`])),
+          ),
+      },
+      { name: '65 files', input: () => wide(65) },
+      { name: '300 KB module', input: () => moduleCase('use "big.lld" as b', { 'big.lld': `module big() {\n}\n${'#'.repeat(300_000)}` }) },
+      {
+        name: 'multibyte module over the byte limit',
+        input: () => moduleCase('use "big.lld" as b', { 'big.lld': `module big() {\n}\n# ${'é'.repeat(140_000)}` }),
+      },
+      { name: 'NUL path', input: () => moduleCase('use "a\\u0000.lld" as a', {}) },
+      { name: 'backslash path', input: () => moduleCase('use "a\\\\b.lld" as a', {}) },
+      { name: 'drive-letter path', input: () => moduleCase('use "C:/x.lld" as a', {}) },
+      {
+        name: 'diamond ladder (2^20 instances)',
+        input: () =>
+          moduleCase(
+            'use "d0.lld" as d',
+            Object.fromEntries(
+              Array.from({ length: 21 }, (_, k) => [
+                `d${k}.lld`,
+                k === 20 ? BOX : `module d${k}() {\n  use "d${k + 1}.lld" as l\n  use "d${k + 1}.lld" as r\n}\n`,
+              ]),
+            ),
+          ),
+      },
+      { name: 'many unclosed modules', input: () => moduleCase('use "u.lld" as u', { 'u.lld': 'module u() {\n'.repeat(5000) }) },
+      { name: 'not JSON', input: () => 'use' },
+    ],
+    read: (input) => readModules(asText(input)),
+    accepts: (result) => typeof (result as { commands?: number }).commands === 'number',
   },
 ];

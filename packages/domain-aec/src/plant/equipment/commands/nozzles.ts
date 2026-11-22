@@ -103,7 +103,16 @@ export const addNozzle = defineCommand({
     const record = nozzleRecord(
       doc,
       mark,
-      { dn, rating: params.rating, facing: params.facing ?? 'RF', projection: params.projection, location, service: params.service },
+      {
+        dn,
+        rating: params.rating,
+        facing: params.facing ?? 'RF',
+        projection: params.projection,
+        location,
+        service: params.service,
+        kind: params.kind,
+        pad: params.pad,
+      },
       defaulted,
     );
     if (isNozzleIssue(record)) return refuseIssue(doc, 'add_nozzle', record, [element.id]);
@@ -138,8 +147,11 @@ export const updateNozzle = defineCommand({
     mark: z.string().min(1).describe('Mark of the nozzle to change.'),
     angleConvention: angleConventionParam,
     ...nozzleFields,
+    removePad: z.boolean().optional().describe('true removes the reinforcing pad (cannot be combined with pad).'),
   }),
   run: (doc, params): CommandResult => {
+    if (params.removePad === true && params.pad !== undefined)
+      return refuse(doc, 'update_nozzle', 'EQP_PARAM_INVALID', 'give pad OR removePad, not both', [], ['removePad']);
     const target = targetOf(doc, 'update_nozzle', params.equipment);
     if (!isTarget(target)) return target;
     const { element, building } = target;
@@ -148,11 +160,21 @@ export const updateNozzle = defineCommand({
     if (current === undefined)
       return refuse(doc, 'update_nozzle', 'EQP_NOZZLE_NOT_FOUND', `${element.mark} has no nozzle ${params.mark}`, [element.id], ['mark']);
     const convention: AngleConvention = params.angleConvention ?? 'north_cw';
-    const changes = ['service', 'dn', 'nps', 'rating', 'facing', 'location', 'projection'].filter(
-      (name) => params[name as keyof typeof params] !== undefined,
-    );
+    // removePad only counts when it is true and there is a pad to remove: false, or on a padless nozzle, changes nothing.
+    const changes = ['service', 'kind', 'pad', 'dn', 'nps', 'rating', 'facing', 'location', 'projection']
+      .filter((name) => params[name as keyof typeof params] !== undefined)
+      .concat(params.removePad === true && current.pad !== undefined ? ['removePad'] : []);
     if (changes.length === 0)
-      return refuse(doc, 'update_nozzle', 'EQP_PARAM_INVALID', 'give at least one field to change', [element.id], []);
+      return refuse(
+        doc,
+        'update_nozzle',
+        'EQP_PARAM_INVALID',
+        params.removePad === undefined
+          ? 'give at least one field to change'
+          : 'nothing to change: removePad needs true and a nozzle that has a pad',
+        [element.id],
+        params.removePad === undefined ? [] : ['removePad'],
+      );
     const dn = params.dn === undefined && params.nps === undefined ? current.dn : resolveDn(params.dn, params.nps);
     if (typeof dn !== 'number') return refuseIssue(doc, 'update_nozzle', dn, [element.id]);
     const location = params.location === undefined ? current.location : parseLocation(params.location, convention);
@@ -168,6 +190,8 @@ export const updateNozzle = defineCommand({
         projection: params.projection ?? current.projection,
         location,
         service: params.service ?? current.service,
+        kind: params.kind ?? current.kind,
+        pad: params.removePad === true ? undefined : (params.pad ?? current.pad),
       },
       defaulted,
     );

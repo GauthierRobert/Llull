@@ -58,8 +58,12 @@ function componentData(run: PipeRun, derivation: RunDerivation, component: Inlin
 function commitComponent(doc: CadDocument, command: string, next: PipeRun, component: InlineComponent, verb: string): CommandResult {
   const result = rederive(withRuns(doc, [next]), [next.id]);
   if (!result.ok) {
+    // A branch run that can no longer follow the shifted axis keeps its own code (detail.sideways); other branch collisions read as the component not fitting.
+    const cascaded = result.detail?.['sideways'] !== undefined;
     const code =
-      result.code === 'RTE_BRANCH_ON_FITTING' || result.code === 'RTE_SEGMENT_TOO_SHORT' ? 'RTE_INLINE_DOES_NOT_FIT' : result.code;
+      !cascaded && (result.code === 'RTE_BRANCH_ON_FITTING' || result.code === 'RTE_SEGMENT_TOO_SHORT')
+        ? 'RTE_INLINE_DOES_NOT_FIT'
+        : result.code;
     return refuseDerivation(doc, command, result, next.id, code);
   }
   const derivation = result.derivations[next.id] as RunDerivation;
@@ -107,7 +111,7 @@ export const insertInlineComponent = defineCommand({
     'into each end; a reducer (and a swage) occupies its end-to-end length and the run continues at dn2 downstream; a coupling or union occupies the row length (no dn2) and joins the pipe by the spec connection rule of its end type (socket weld takes the pipe socketDepth - socket gap into each end). Couplings, unions and swages need a spec row from an imported catalogue (RTE_SPEC_NO_COMPONENT otherwise). A flangedJoint is flange - gasket - flange from the spec flange set at the run size (one gasket, one bolt set; it occupies gasket + 2 x flange hub of the leg centred on the position; nothing else to give). An instrument (needs lengthMm, the face-to-face length of the body, project data not a spec row; endType FL default = a flange set from the spec on each face as a flanged valve, BW = butt welded) is listed as not from the catalogue (unverified, catalogue key <spec>/INSTRUMENT/<dn>) and exported as PCF INSTRUMENT. An eccentric reducer (reducerEccentric) needs flat ("top" = flat on top, +Z; ' +
     '"bottom", -Z; horizontal or sloped pipes) or flatDirection (any side, needed on vertical pipes): the outer surfaces of the two pipes line up on the flat side, so the smaller ' +
     'axis sits (OD big - OD small) / 2 toward it; the leg after the reducer must take that offset up along its own axis (turn the flat to it; within the angle tolerance the residual is ' +
-    'a RTE_ECCENTRIC_OFFSET warning), else RTE_ECCENTRIC_OFFSET; a branch downstream of it on the same leg is refused. ' +
+    'a RTE_ECCENTRIC_OFFSET warning), else RTE_ECCENTRIC_OFFSET; a branch downstream of it on the same leg sits on the shifted axis (the tee / olet and the branch run follow the offset); only a branch whose direction is not along the offset is refused (RTE_BRANCH_ON_FITTING). ' +
     'at: { leg, centreDistance } (leg index of route_pipe data.legs, distance of the centre from the leg start, mm) or { point: [x, y, z] } on the ' +
     'centreline. Valves: stemDirection points to the handwheel (default up, or +X on a vertical pipe); data.handwheelCentre = centre + stem x ' +
     'catalogue stemHeight (0 when the row has none, stemHeightFromCatalogue false); data.operator = { kind handwheel | gear | actuator, bodies [{ id, kind, from, axis, lengthMm, radiusMm }] } is the operator envelope ' +

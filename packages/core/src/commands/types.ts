@@ -8,6 +8,7 @@ import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { GeometryQueryEngine } from '../geometry/geometryQueries';
 import type { SpatialIndexPort } from '../geometry/spatialIndex';
+import type { PairCache } from '../geometry/assemblyCheck/pairCache';
 import type { MeshProcessingEngine } from '../geometry/mesh/engineTypes';
 import type { FieldEngine } from '../geometry/field/engineTypes';
 import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
@@ -15,6 +16,7 @@ import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { CfdResultPort } from '../model/cfdResult';
 import type { MaterialLibrary } from '../model/materialLibrary';
 import type { RasterPort } from '../model/raster';
+import type { ViewportCapturePort } from '../model/viewportCapture';
 import type { MediaPort } from '../model/media';
 import type { EntityPropertyReader } from '../model/entityProperties';
 import type { FontProvider } from '../geometry/fontPort';
@@ -282,6 +284,8 @@ export interface ExecutionContext {
   readonly geometryQueries?: GeometryQueryEngine | null;
   /** Instance-BVH builder (plant 09 VIS-M8e; `render_stats`, `check_clashes` broad phase); null/absent = the TypeScript build. */
   readonly spatialIndex?: SpatialIndexPort | null;
+  /** Pair-result cache of `check_assembly` (08 ASC TR-ASC-10), owned by the host so it survives across runs; null/absent = a resolveMemo, else the run's own reuse only. */
+  readonly pairCache?: PairCache | null;
   /** Extra mesh-processing engine (Manifold, native; 07 MSH TR-MSH-02); null/absent = the built-in TypeScript engine alone (ops it lacks refuse with MESH_ENGINE_UNSUPPORTED). */
   readonly meshProcessing?: MeshProcessingEngine | null;
   /** Implicit-field engine (tape evaluation, interval-pruned meshing, measures; 05 IMP TR-IMP-02); null/absent = the built-in TypeScript engine. */
@@ -300,6 +304,8 @@ export interface ExecutionContext {
   readonly libraries?: MaterialLibraryProvider | null;
   /** Native offscreen raster (`renderer: 'native'`, plant 09 VIS-M9 / RS-5); null/absent = NATIVE_TOOL_MISSING. */
   readonly raster?: RasterPort | null;
+  /** The open desktop viewport (`capture_viewport`, ASC M6a); null/absent = VIEWPORT_UNAVAILABLE. */
+  readonly viewportCapture?: ViewportCapturePort | null;
   /** Native video encoder (`render_animation` format gif / mp4, PHY-22 MOV-M2); null/absent = NATIVE_TOOL_MISSING (use apng). */
   readonly media?: MediaPort | null;
   /** Property bag of an entity through the installed plugins' providers (plant 09 VIS $3.4); absent = core keys only. */

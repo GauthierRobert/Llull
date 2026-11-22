@@ -4,6 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
+import { applyStairFlightLoads, type StairFlightLoadReport } from './steelStairFlightLoads';
 import { applyAreaLoads, type EquipmentLoadReport, type FloorLoadReport } from './steelAreaLoads';
 import { applyLineLoads, type LineRunReport } from './steelLineLoads';
 import { checkBeam } from './steelBeamChecks';
@@ -20,6 +21,8 @@ interface SteelCheckParams {
   readonly floorDeadLoad: number;
   /** kN/m² imposed on floor slabs outside equipment footprints. */
   readonly imposedLoad: number;
+  /** Imposed load of steel-stair landings, kN/m², with its cited source; absent = landings are not loaded. */
+  readonly stairLandingLoad?: { readonly imposedKPa: number; readonly source: string } | undefined;
   /** kg/m³ of pipe contents. */
   readonly pipeContentDensity: number;
   /** kg/m of cable tray with cables. */
@@ -37,6 +40,8 @@ interface SteelStructureAnalysis {
   readonly rows: MemberRow[];
   readonly floors: FloorLoadReport[];
   readonly equipment: EquipmentLoadReport[];
+  /** Flights of steel stairs carried to the beams under their stringer ends (only with stairLandingLoad). */
+  readonly stairFlights: StairFlightLoadReport[];
   readonly lines: LineRunReport[];
   readonly storeys: StoreyReport[];
   /** Moment frames (rigid beam-to-column joints) analysed as 2D frames. */
@@ -54,6 +59,7 @@ export function analyseSteelStructure(doc: CadDocument, params: SteelCheckParams
   const braces = bars.filter((bar) => bar.kind === 'brace');
   const beams = bars.filter((bar) => bar.kind === 'beam').map(createBeamLoads);
   const area = applyAreaLoads(units, beams, params);
+  const flights = applyStairFlightLoads(units, beams, params.stairLandingLoad);
   const lines = applyLineLoads(units, beams, params, bars);
   const framing = analyseFraming(beams, columns);
   for (const [columnId, node] of lines.columnNodes) {
@@ -82,10 +88,11 @@ export function analyseSteelStructure(doc: CadDocument, params: SteelCheckParams
     rows,
     floors: area.floors,
     equipment: area.equipment,
+    stairFlights: flights.flights,
     lines: lines.runs,
     storeys: bracing.storeys,
     frames: frames.reports,
-    warnings: [...area.warnings, ...lines.warnings, ...framing.warnings, ...frames.warnings, ...bracing.warnings],
+    warnings: [...area.warnings, ...flights.warnings, ...lines.warnings, ...framing.warnings, ...frames.warnings, ...bracing.warnings],
     massKg,
   };
 }

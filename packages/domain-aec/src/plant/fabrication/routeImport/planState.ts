@@ -1,8 +1,9 @@
 /** The state of one route-plan walk (visited components, welds, gaskets, branch seeds) and the lookups over the component network. */
 
 import type { Vec3 } from '@core/model/vectors';
-import { distance3 } from '@lib/vec3';
+import { add3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
+import { branchSideways } from './eccentric';
 import type { NetworkComponent, NetworkPoint } from '../model';
 import type { PlannedInline } from './inlineBody';
 import type { PlanOptions, PlannedCap, PlannedPort, PlannedWeld, RouteRefusal, Seed } from './planTypes';
@@ -33,7 +34,13 @@ export interface Walk {
   end: Vec3;
   /** Offset of the actual axis from the stored one (an eccentric reducer upstream on this leg). */
   shift: Vec3;
+  /** Per point of `points` (parallel; entry 0 unused): the offsets in force on the segment that ends there, the one it started with and one per eccentric reducer on it. */
+  readonly shifts: Vec3[][];
+  /** The offsets of the leg being walked (becomes `shifts[k]` when the leg's end point is pushed). */
+  legShifts: Vec3[];
   cap: PlannedCap | undefined;
+  /** The closure at the start of the main run (its walk begins on the pipe side of it). */
+  startCap: (PlannedCap & { readonly tip: Vec3 }) | undefined;
 }
 
 /** What one component did to the walk: refused, or moved on past its exit (`advance`), or already moved `end` / `key` itself (`again`). */
@@ -46,8 +53,6 @@ export const refuse = (code: RouteRefusal['code'], message: string, ids: readonl
   ids,
 });
 export const midpoint = (a: Vec3, b: Vec3): Vec3 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-export const dedupe = (points: readonly Vec3[]): Vec3[] =>
-  points.filter((point, k) => k === 0 || distance3(point, points[k - 1] as Vec3) > 1e-6);
 
 export function createState(components: readonly NetworkComponent[], options: PlanOptions): PlanState {
   const index = new Map<string, number[]>();
@@ -81,7 +86,25 @@ export function arrive(s: PlanState, key: string): void {
   }
 }
 
-export function addBranch(s: PlanState, parent: string, centre: Vec3, outlet: NetworkPoint): void {
+export function addBranch(s: PlanState, parent: string, centre: Vec3, outlet: NetworkPoint, shift: Vec3 = [0, 0, 0]): void {
   s.branches += 1;
-  s.seeds.push({ key: `branch-${s.branches}`, start: centre, startKey: nodeKey(outlet.xyz), dn: outlet.boreMm, parent });
+  const sideways = branchSideways(shift, add3(centre, shift), outlet.xyz, s.options.angleToleranceDeg);
+  s.seeds.push({
+    key: `branch-${s.branches}`,
+    start: centre,
+    startKey: nodeKey(outlet.xyz),
+    dn: outlet.boreMm,
+    parent,
+    ...(sideways === undefined ? {} : { sideways }),
+  });
+}
+
+/** The refusal of an INSTRUMENT with a tapping point (BRANCH1-POINT), or undefined: the RTE cannot branch off an instrument body. */
+export function tappingRefusal(component: NetworkComponent): RouteRefusal | undefined {
+  if (component.type !== 'INSTRUMENT' || component.branch === undefined) return undefined;
+  return refuse(
+    'ISO_ROUTE_UNSUPPORTED',
+    `instrument ${component.id} has a tapping point (BRANCH1-POINT): the RTE cannot branch off an instrument body, so the take-off line cannot be rebuilt (route mode takes an instrument with two end points only)`,
+    [component.id],
+  );
 }

@@ -2,6 +2,7 @@ import type { StairElement, StairShape } from '@aec/building/types';
 import { type StairBlock, blockCorners, stairBlocks, stairFlights } from '../geometry/stairGeometry';
 import { type Context, extrusion, ifcReal, ifcString, scaledPolygonProfile, shape } from './ifcStep';
 import type { Exported } from './ifcElementExport';
+import { landingSeed, partSeed } from './ifcSeeds';
 
 const STAIR_TYPE: Readonly<Record<StairShape, string>> = {
   straight: '.STRAIGHT_RUN_STAIR.',
@@ -40,8 +41,8 @@ export function exportStair(context: Context, stair: StairElement, local: string
       steps.map((block) => blockSolid(context, block)),
     );
     return writer.add(
-      `IFCSTAIRFLIGHT('${context.guid(`${stair.id}:flight-${index + 1}`)}',$,${ifcString(`${stair.mark} flight ${index + 1}`)},$,$,${local},${body},` +
-        `${ifcString(`${stair.id}:flight-${index + 1}`)},${flight.risers},${Math.max(flight.risers - 1, 0)},${ifcReal(context.mm(stair.riserHeight))},` +
+      `IFCSTAIRFLIGHT('${context.guid(partSeed(stair.id, 'flight', index + 1))}',$,${ifcString(`${stair.mark} flight ${index + 1}`)},$,$,${local},${body},` +
+        `${ifcString(partSeed(stair.id, 'flight', index + 1))},${flight.risers},${Math.max(flight.risers - 1, 0)},${ifcReal(context.mm(stair.riserHeight))},` +
         `${ifcReal(context.mm(stair.treadDepth))},.STRAIGHT.)`,
     );
   });
@@ -50,7 +51,7 @@ export function exportStair(context: Context, stair: StairElement, local: string
     const body = shape(context, [blockSolid(context, landing)]);
     parts.push(
       writer.add(
-        `IFCSLAB('${context.guid(`${stair.id}:landing`)}',$,${ifcString(`${stair.mark} landing`)},$,$,${local},${body},${ifcString(`${stair.id}:landing`)},.LANDING.)`,
+        `IFCSLAB('${context.guid(landingSeed(stair.id))}',$,${ifcString(`${stair.mark} landing`)},$,$,${local},${body},${ifcString(landingSeed(stair.id))},.LANDING.)`,
       ),
     );
   }

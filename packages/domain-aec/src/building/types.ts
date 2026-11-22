@@ -34,6 +34,7 @@ export type BimCategory =
   | 'railing'
   | 'ladder'
   | 'steelStair'
+  | 'radialStair'
   | 'assembly';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
@@ -213,6 +214,8 @@ export interface SteelMemberElement extends LevelElementBase {
   baseFixity?: BaseFixity;
   /** The platform assembly that generated this member (06 STA M6): read-only, edited through the assembly. */
   assemblyId?: string;
+  /** Set when the member was committed from a point-cloud extraction (plant 10 `commit_asbuilt_extraction`): scan-derived geometry. */
+  asBuilt?: { readonly extractionId: string; readonly unverified: boolean };
 }
 
 /** A concrete pad footing; its TOP sits at level elevation + `topOffset` (usually negative). */
@@ -483,7 +486,12 @@ export type SteelStairTread = { kind: 'grating'; gratingType: string } | { kind:
 export interface SteelStairLanding {
   afterRiser: number;
   length: number;
+  /** Turn of the stair at this landing (06 STA §13.12): quarter = 90 degrees, half = 180 degrees (the next flight returns beside this one); absent = straight. */
+  turn?: SteelStairTurn;
 }
+
+export const STEEL_STAIR_TURNS = ['quarter_left', 'quarter_right', 'half_left', 'half_right'] as const;
+export type SteelStairTurn = (typeof STEEL_STAIR_TURNS)[number];
 
 /**
  * A steel stringer stair (06 STA M5): `riserCount` equal risers of `riserHeight`, treads of depth `going`, landings, two stringers outside the
@@ -504,6 +512,45 @@ export interface SteelStairElement extends LevelElementBase {
   tread: SteelStairTread;
   landings: SteelStairLanding[];
   arrivalSurfaceId?: string;
+}
+
+export const RADIAL_STAIR_FORMS = ['winder', 'spiral'] as const;
+export type RadialStairForm = (typeof RADIAL_STAIR_FORMS)[number];
+
+/** A tread: plan corners in document units (absolute plan) and the top height above the level. */
+export interface RadialStairPlate {
+  corners: Vec2[];
+  top: number;
+}
+
+/** A section run (winder stringer, or the centre column of a spiral), level-relative z, document units. */
+export interface RadialStairRun {
+  from: Vec3;
+  to: Vec3;
+}
+
+/**
+ * A winder stair (a quarter turn whose corner is wedge treads) or a spiral stair (sector treads round a centre column) (06 STA §13.15). The
+ * resolved geometry is stored: `plates` (every tread, riser i tops at i x riserHeight) and `runs` (sections of `profile`), so the element needs
+ * no regeneration; `turn` is the direction of travel seen from above going up.
+ */
+export interface RadialStairElement extends LevelElementBase {
+  readonly category: 'radialStair';
+  form: RadialStairForm;
+  start: Vec3;
+  angle: number;
+  rise: number;
+  /** Walking width: the stair width of a winder, outer radius - column radius of a spiral. */
+  width: number;
+  riserCount: number;
+  riserHeight: number;
+  turn: 'left' | 'right';
+  profile: string;
+  tread: SteelStairTread;
+  plates: RadialStairPlate[];
+  runs: RadialStairRun[];
+  /** Spiral only: the exact sector of every tread (radii in document units, angle in radians), for areas the chord polygons of `plates` underestimate. */
+  sector?: { innerRadius: number; outerRadius: number; treadAngle: number };
 }
 
 /** Generated assemblies (06 STA M6 platforms, M7 pipe racks). */
@@ -546,6 +593,7 @@ export type BuildingElement =
   | RailingElement
   | LadderElement
   | SteelStairElement
+  | RadialStairElement
   | AssemblyElement;
 
 export interface BuildingModel {

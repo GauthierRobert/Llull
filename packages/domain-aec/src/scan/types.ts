@@ -60,11 +60,15 @@ export type RegionSpec =
 
 export interface ExtractionRecord {
   readonly id: string;
-  readonly kind: 'pipe';
+  readonly kind: 'pipe' | 'steel_member';
   readonly cloudId: string;
   readonly assetKey: string;
   readonly region: RegionSpec;
-  /** Cylinder fit in metres, document frame (axis point / direction, radius, ends, quality). */
+  /**
+   * Pipe: cylinder fit in metres, document frame (axis point / direction, radius, ends, quality).
+   * Steel member: start, end, direction, length, depthDirection, widthDirection and roll are metres / unit vectors / radians in the document frame;
+   * profile is the designation as measured; hMm, bMm, twMm, tfMm and scoreMm are MILLIMETRES (twMm / tfMm null when not resolved).
+   */
   readonly fit: Readonly<Record<string, unknown>>;
   readonly snapped?: {
     readonly table: 'en10220';

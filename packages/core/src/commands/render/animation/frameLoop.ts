@@ -72,6 +72,7 @@ export function renderAllFrames(input: FrameLoopInput): FrameLoopOutput {
       input.pixels ?? rasterScenePixels,
       {
         augment: (scene) => appendOverlay(scene, primitives),
+        groundBounds: input.bounds,
         ...(input.shading === undefined ? {} : { shading: input.shading }),
         ...(input.colorOverrides === undefined ? {} : { colorOverrides: input.colorOverrides }),
       },

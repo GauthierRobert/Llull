@@ -54,6 +54,8 @@ export function extractionHash(extraction: Omit<PendingExtraction, 'extractionHa
 
 const UNVERIFIED_CODES: ReadonlySet<string> = new Set([
   'SCN_FIT_LOW_COVERAGE',
+  'SCN_STEEL_LOW_COVERAGE',
+  'SCN_STEEL_THICKNESS_MISMATCH',
   'SCN_FIT_HIGH_RMS',
   'SCN_TRACE_SKEW',
   'SCN_TRACE_BEND_RADIUS_UNMEASURED',
@@ -78,9 +80,10 @@ export function pendingExtraction(
   snapped: DnSnap | undefined,
   reasons: readonly string[],
   provenance: PendingExtraction['provenance'],
+  kind: ExtractionRecord['kind'] = 'pipe',
 ): PendingExtraction {
   const content = {
-    kind: 'pipe' as const,
+    kind,
     cloudId: cloud.id,
     assetKey: cloud.assetKey,
     region,

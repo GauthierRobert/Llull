@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { buildFaceColoredGeometry, buildMeshSolidGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
+import { buildFaceColoredGeometry, buildMeshSolidGeometry, buildVertexColoredGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
 
 /** Unit cube with 8 SHARED vertices, 12 outward-facing triangles. */
 const CUBE = {
@@ -33,5 +33,23 @@ describe('buildFaceColoredGeometry (set_face_color)', () => {
     const redCorners = Array.from({ length: colors.count }, (_, i) => i).filter((i) => colors.getX(i) === red.r && colors.getZ(i) === 0);
     expect(redCorners).toHaveLength(6);
     for (const i of redCorners) expect(positions.getZ(i)).toBe(1);
+  });
+});
+
+describe('buildVertexColoredGeometry (terrain tint, MeshSolidEntity.vertexColors)', () => {
+  it('gives every corner its vertex colour (sRGB bytes converted to the working colour space) and keeps the positions', () => {
+    const bytes = [0, 97, 71, 232, 215, 125, 255, 255, 255, 0, 0, 0, 16, 122, 47, 161, 67, 0, 100, 50, 25, 110, 109, 108];
+    const geometry = buildVertexColoredGeometry(CUBE, bytes);
+    const colors = geometry.getAttribute('color');
+    const positions = geometry.getAttribute('position');
+    expect(colors.count).toBe(36);
+    const expected = new THREE.Color().setRGB(232 / 255, 215 / 255, 125 / 255, THREE.SRGBColorSpace);
+    const corner = Array.from({ length: 36 }, (_, i) => i).find(
+      (i) => positions.getX(i) === 1 && positions.getY(i) === 0 && positions.getZ(i) === 0,
+    );
+    expect(corner).toBeDefined();
+    expect(colors.getX(corner as number)).toBeCloseTo(expected.r, 6);
+    expect(colors.getY(corner as number)).toBeCloseTo(expected.g, 6);
+    expect(colors.getZ(corner as number)).toBeCloseTo(expected.b, 6);
   });
 });

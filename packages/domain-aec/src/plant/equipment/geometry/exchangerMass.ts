@@ -1,12 +1,15 @@
 /**
  * Mass of an exchanger (plant 03 EQP §5.3): shell and channel annuli, exact offset-solid bonnets and shell cover, flat covers and tubesheets as
  * gross discs minus the tube holes, tube metal over the full tube length, and the fluid volumes of both sides. One source for `equipment_weights`
- * and the legacy `weight` field. Floating head, floating tubesheet, U-bends, baffles, tie rods, pass partitions and saddles are not modelled.
+ * and the legacy `weight` field. Floating head, floating tubesheet, U-bends, baffles, tie rods, pass partitions, saddles and skirt / legs are not modelled; the kettle weir plate and bracket lugs are.
  */
 
 import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { ExchangerTemplate } from '../plantData';
 import { exchangerVolumes, type ExchangerEnd, type ExchangerGeometry } from './exchangerFrame';
+import { segmentMetal } from './exchangerShell';
+import { kettleWeir } from './kettleWeir';
+import { lugVolumes } from './lugs';
 import { headMetalVolume } from './headOffset';
 import { TEST_WATER_KG_PER_M3, type MassPart } from './vesselMass';
 import { powInt } from '@lib/powInt';
@@ -29,6 +32,33 @@ export interface ExchangerMass {
 }
 
 const annulus = (outer: number, inner: number): number => Math.PI * (outer * outer - inner * inner);
+
+const weirPart = (template: ExchangerTemplate, geometry: ExchangerGeometry, kg: (volume: number) => number): MassPart[] => {
+  const weir = kettleWeir(template, geometry);
+  return weir === null
+    ? []
+    : [
+        {
+          part: 'weir',
+          kg: kg(weir.volume),
+          method: 'circular segment of the enlarged inside radius up to weirHeight x weirThickness x density',
+        },
+      ];
+};
+
+const lugPart = (template: ExchangerTemplate, kg: (volume: number) => number): MassPart[] => {
+  const { support } = template;
+  return support.type === 'lugs'
+    ? [
+        {
+          part: 'lugs',
+          kg: kg(support.count * lugVolumes(support).volume),
+          method:
+            'count x (web t x projection x (height - base plate) + (width x projection - bolt hole) x base plate thickness) x density',
+        },
+      ]
+    : [];
+};
 
 /** @param scale metres per document unit */
 export function exchangerMass(scale: number, template: ExchangerTemplate, geometry: ExchangerGeometry): ExchangerMass {
@@ -53,24 +83,29 @@ export function exchangerMass(scale: number, template: ExchangerTemplate, geomet
     }
     const closure =
       end.closure === 'flat'
-        ? { part: `${name}Cover`, method: 'flat cover: disc of the outside radius (as drawn) x channel thickness x density' }
+        ? { part: `${name}Cover`, method: 'flat cover: disc of the outside radius (as drawn) x cover thickness x density' }
         : {
             part: end.closure === 'bonnet' ? `${name}Bonnet` : `${name}ShellCover`,
             method: 'exact solid between the inside profile and its outward offset by t, closed by the tangent plane',
           };
     const metal =
       end.closure === 'flat'
-        ? Math.PI * (radius + end.channelThickness) ** 2 * end.channelThickness
-        : headMetalVolume(end.head, radius, end.channelThickness);
+        ? Math.PI * (end.radius + end.channelThickness) ** 2 * end.coverThickness
+        : headMetalVolume(end.head, end.radius, end.channelThickness);
     parts.push({ ...closure, kg: kg(metal) });
     return parts;
   };
   const parts: MassPart[] = [
-    {
-      part: 'shell',
-      kg: kg(annulus(radius + shellThickness, radius) * geometry.shellLength),
-      method: 'pi ((R + t)^2 - R^2) x shell length x density',
-    },
+    ...geometry.segments.map(
+      (segment): MassPart => ({
+        part: segment.name,
+        kg: kg(segmentMetal(segment).volume),
+        method:
+          segment.name === 'kettleTransition'
+            ? 'frustum of the outside radii minus the inside frustum (wall measured radially) x density'
+            : 'pi ((R + t)^2 - R^2) x segment length x density',
+      }),
+    ),
     ...endParts(geometry.front, 'front'),
     ...endParts(geometry.rear, 'rear'),
     {
@@ -80,6 +115,8 @@ export function exchangerMass(scale: number, template: ExchangerTemplate, geomet
       ),
       method: 'count x pi/4 (OD^2 - ID^2) x tube length x density',
     },
+    ...weirPart(template, geometry, kg),
+    ...lugPart(template, kg),
   ];
   const emptyKg = parts.reduce((sum, part) => sum + part.kg, 0);
   const volumes = exchangerVolumes(template, geometry);

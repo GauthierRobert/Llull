@@ -8,7 +8,7 @@
  */
 
 import type { CadDocument, RevolutionEntity, Vec3 } from '@core/model/types';
-import type { PartPort, RoutedPart } from '@aec/plant/types';
+import type { PartPort, PipeLine, RoutedPart } from '@aec/plant/types';
 import { applyEulerXYZ } from '@lib/eulerRotation';
 import { len3, sub3 } from '@lib/vec3';
 import type { PortState } from './ifcPorts';
@@ -125,6 +125,12 @@ const VALVE_TYPE: Readonly<Record<string, string>> = {
   valveCheck: '.CHECKVALVE.',
 };
 
+/** The revolution entities of `part` an IFC product is written from: none -> `export_ifc` writes no product for the part (counted as bodiless). */
+export function productRevolutions(part: RoutedPart, line: PipeLine): RevolutionEntity[] {
+  if (classOf(part) === null) return [];
+  return partEntities(part, line).flatMap((entity) => (entity.kind === 'revolution' ? [entity] : []));
+}
+
 /** The IFC entity and predefined type of a part, or null for a part without a product. */
 function classOf(part: RoutedPart): { entity: 'IFCPIPESEGMENT' | 'IFCPIPEFITTING' | 'IFCVALVE'; type: string } | null {
   switch (part.kind) {
@@ -142,6 +148,9 @@ function classOf(part: RoutedPart): { entity: 'IFCPIPESEGMENT' | 'IFCPIPEFITTING
       return { entity: 'IFCPIPEFITTING', type: '.CONNECTOR.' };
     case 'cap':
       return { entity: 'IFCPIPEFITTING', type: '.OBSTRUCTION.' };
+    case 'inline':
+      if (part.typeKey === 'spectacleBlind') return { entity: 'IFCPIPEFITTING', type: '.OBSTRUCTION.' };
+      return part.typeKey === 'coupling' || part.typeKey === 'union' ? { entity: 'IFCPIPEFITTING', type: '.CONNECTOR.' } : null;
     case 'valve':
       return { entity: 'IFCVALVE', type: VALVE_TYPE[part.typeKey] ?? '.NOTDEFINED.' };
     default:
@@ -320,7 +329,7 @@ export function exportPipingProducts(
     if (line === undefined) continue;
     for (const part of derivation.parts) {
       const kind = classOf(part);
-      const solids = partEntities(part, line).flatMap((entity) => (entity.kind === 'revolution' ? [solidOf(context, entity)] : []));
+      const solids = productRevolutions(part, line).map((entity) => solidOf(context, entity));
       if (kind === null || solids.length === 0) {
         bodiless += 1;
         continue;

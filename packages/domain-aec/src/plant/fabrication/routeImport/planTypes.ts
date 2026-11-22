@@ -25,6 +25,8 @@ export interface PlannedRun {
    * END-POINTs, a FLANGE-BLIND's outer face).
    */
   readonly cap?: { readonly kind: 'cap' | 'blindFlange'; readonly mouth: Vec3; readonly tip?: Vec3 };
+  /** The main run STARTS closed: the closure's closed end is the free first end of the file (`tip`), the run begins there; `mouth` is where the pipe side begins. */
+  readonly startCap?: { readonly kind: 'cap' | 'blindFlange'; readonly mouth: Vec3; readonly tip: Vec3 };
   /** The run this one branches off (absent for the main run). */
   readonly parent?: string;
   readonly consumed: readonly string[];
@@ -66,6 +68,8 @@ export interface RouteRefusal {
 export interface PlanOptions {
   /** Flat side of the eccentric reducers whose END-POINTs lie on one axis (the file does not say). */
   readonly eccentricFlat?: FlatSide | undefined;
+  /** Elbow-angle tolerance of the spec (degrees): a branch offset within it of the branch direction is not carried sideways (as `withBranchShifts`); absent = the RTE default. */
+  readonly angleToleranceDeg?: number | undefined;
 }
 
 export interface Seed {
@@ -75,6 +79,8 @@ export interface Seed {
   readonly startKey: string;
   readonly dn: number;
   readonly parent?: string;
+  /** Branch off a shifted header axis: the part of the header offset perpendicular to the branch (file points of the branch are on the shifted axis). */
+  readonly sideways?: Vec3;
 }
 
 export type PlannedCap = NonNullable<PlannedRun['cap']>;

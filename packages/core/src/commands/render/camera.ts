@@ -1,5 +1,6 @@
 import type { Vec3 } from '../../model/types';
 import { sub3, dot3, cross3, normalize3 } from '../../lib/vec3';
+import type { ShadowPlan } from './shadowTypes';
 
 export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso' | 'custom';
 
@@ -80,9 +81,30 @@ export function makeProjector(cam: Camera, orthoHalf: number, width: number, hei
 const LIGHT_DIR: Vec3 = normalize3([0.6, -0.8, 1.0]);
 const AMBIENT = 0.35;
 
-/** Lambert-shade `baseColor` (`#rrggbb`) for a face with unit `normal`; returns `rgb(r,g,b)`. */
-export function shade(normal: Vec3, baseColor: string): string {
-  const diff = Math.max(0, dot3(normal, LIGHT_DIR));
+/** `RenderLight.sky`: the unit direction toward the sun (Z-up, also when it is below the horizon: the model's own night output); see `skyRaster.ts`. */
+export interface SkyLight {
+  readonly sunDirection: Vec3;
+}
+
+/** Key light override of a render (site-context sun): `direction` is the unit vector toward the light in model axes; null = sky light only (sun below the horizon). */
+export interface RenderLight {
+  readonly direction: Vec3 | null;
+  /** Present = the raster background (pixels no face covers) shows the Preetham sky of this sun. */
+  readonly sky?: SkyLight;
+  /** Present = raster sun shadows (when the sun is up) and the ground plane at `groundElevation` (null = none); see `sunShadows.ts`. */
+  readonly shadows?: {
+    readonly groundElevation: number | null;
+    /** World AABB the ground plane is fitted to (a static document extent across the frames of an animation); absent = the drawn faces' own bounds. */
+    readonly groundBounds?: { readonly min: Vec3; readonly max: Vec3 };
+    /** The shadow pass already run for these polygons (`planShadows`); absent = the raster stage runs it. */
+    readonly plan?: ShadowPlan;
+  };
+}
+
+/** Lambert-shade `baseColor` (`#rrggbb`) for a face with unit `normal`; returns `rgb(r,g,b)`. Default light unless `light` overrides it. */
+export function shade(normal: Vec3, baseColor: string, light?: RenderLight): string {
+  const toLight = light === undefined ? LIGHT_DIR : light.direction;
+  const diff = toLight === null ? 0 : Math.max(0, dot3(normal, toLight));
   const factor = AMBIENT + (1 - AMBIENT) * diff;
   const hex = baseColor.replace('#', '');
   const [r, g, b] = [0, 2, 4].map((i) => Math.min(255, Math.round(parseInt(hex.substring(i, i + 2), 16) * factor)));

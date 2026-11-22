@@ -21,6 +21,7 @@ const component = z.object({
   centre: vec3.optional(),
   coords: vec3.optional(),
   skey: z.string().optional(),
+  identifier: z.string().optional(),
   itemCode: z.string().optional(),
   description: z.string().optional(),
   weight: z.number().optional(),

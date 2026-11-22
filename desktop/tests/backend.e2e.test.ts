@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { encodePng } from '@lib/png';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { nativeBinaryPath, nativeInstallHint } from '@server/native/nativeBinary';
@@ -130,6 +131,48 @@ describe('desktop backend', () => {
     await runCli('undo', '--app');
     expect(await session.hasUnsavedChanges()).toBe(true);
   });
+
+  it('capture_viewport --app: the renderer (here a fake client on the real /viewport/stream) answers, the CLI saves the PNG (VC-ASC-22)', async () => {
+    const png = Buffer.from(encodePng(320, 200, new Uint8Array(320 * 200 * 4)));
+    const headers = { Authorization: `Bearer ${token}` };
+    const ticket = (await (await fetch(`${backend.url}/live/ticket`, { method: 'POST', headers })).json()) as { ticket: string };
+    const stream = new AbortController();
+    const response = await fetch(`${backend.url}/viewport/stream?ticket=${encodeURIComponent(ticket.ticket)}`, { signal: stream.signal });
+    expect(response.status).toBe(200);
+    const seen: { request: { width: number; height: number; view: string } }[] = [];
+    void (async () => {
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+        buffer += decoder.decode(chunk, { stream: true });
+        for (let end = buffer.indexOf('\n\n'); end >= 0; end = buffer.indexOf('\n\n')) {
+          const frame = buffer.slice(0, end);
+          buffer = buffer.slice(end + 2);
+          const data = frame.split('\n').find((line) => line.startsWith('data: '));
+          if (!frame.includes('event: capture') || data === undefined) continue;
+          const event = JSON.parse(data.slice(6)) as { id: string; request: { width: number; height: number; view: string } };
+          seen.push(event);
+          await fetch(`${backend.url}/viewport/frame/${event.id}`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ png: png.toString('base64'), width: event.request.width, height: event.request.height }),
+          });
+        }
+      }
+    })().catch(() => undefined);
+    try {
+      const target = path.join(work, 'capture', 'engine.png');
+      const out = await runCli('capture_viewport', 'view=front', 'width=320', 'height=200', '--save', target, '--app', '--json');
+      expect(JSON.parse(out.stdout)).toMatchObject({ data: { width: 320, height: 200, view: 'front' } });
+      expect(readFileSync(target)).toEqual(png);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.request).toMatchObject({ width: 320, height: 200, view: 'front' });
+    } finally {
+      stream.abort();
+    }
+    const unavailable = await runCli('capture_viewport', '--app', '--json').catch((error: { stdout?: string }) => error);
+    expect(JSON.stringify(unavailable)).toContain('VIEWPORT_UNAVAILABLE');
+  }, 120_000);
 
   it('rejects an unreadable file and Save without a path', async () => {
     const broken = path.join(work, 'broken.llull');

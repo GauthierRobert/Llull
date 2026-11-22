@@ -1,13 +1,14 @@
 /** Evaluates survey point groups (point markers) and surfaces (TIN mesh, minor / major contours and major-contour elevation labels). */
 
-import type { Entity, Vec2 } from '@core/model/types';
+import type { Entity, MeshData, MeshSolidEntity, Vec2 } from '@core/model/types';
 import type { PointGroupObject, SurfaceObject } from '@aec/civil/types';
 import { clipPolylineOutside, footprintBoxes, surfaceFootprint, trimmedTinMesh } from '../earthworks/tinTrim';
+import { terrainVertexColours } from './terrainPalette';
 import { civilMesh, civilPoint, civilPolyline, civilText } from '../entities';
 import { contourLevels, tinBounds, traceContour, type Tin } from './tin';
 import { surfaceTin } from './surfaceTin';
 import { labelHeight, type CivilContext } from '../context';
-import { toMetres } from '@core/model/units';
+import { MM_PER_UNIT, toMetres } from '@core/model/units';
 import { readableAngle } from '@lib/angle';
 
 /** Above this many points a group is kept as data only (no per-point markers). */
@@ -43,12 +44,22 @@ export function drawnInterval(tin: Tin, interval: number): number {
   return levels <= MAX_CONTOUR_LEVELS ? interval : interval * Math.ceil(levels / MAX_CONTOUR_LEVELS);
 }
 
+/** The TIN mesh entity; per-vertex `dem2` colours (height above the site ground) only when the civil model opts in (`set_civil_display`). */
+function tinEntity(context: CivilContext, surface: SurfaceObject, mesh: MeshData): MeshSolidEntity {
+  const entity = civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', mesh);
+  const tint = context.civil.terrainTint;
+  if (tint === undefined || tint === 'none') return entity;
+  const site = context.doc.siteContext;
+  const ground = site?.groundElevation === undefined ? 0 : site.groundElevation;
+  return { ...entity, vertexColors: terrainVertexColours(mesh.positions, tint, ground, MM_PER_UNIT[context.doc.units] / 1000) };
+}
+
 export function evaluateSurface(context: CivilContext, surface: SurfaceObject): Entity[] {
   const tin = surfaceTin(context.civil, surface);
   if (tin.triangles.length === 0) return [];
   const footprint = surfaceFootprint(context.civil, surface);
   const cutters = footprintBoxes(footprint);
-  const entities: Entity[] = [civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', trimmedTinMesh(tin, footprint))];
+  const entities: Entity[] = [tinEntity(context, surface, trimmedTinMesh(tin, footprint))];
   const height = labelHeight(context.doc);
   let lines = 0;
   const interval = drawnInterval(tin, surface.contourInterval);

@@ -15,7 +15,7 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { derivedEntityIds, documentExtensions, onPluginInstalled } from '@core/plugins/host';
 import { driveMutations, hasRoot, NON_JSON_KINDS, sampleMutations, type SliceMutation } from '../../helpers/sliceMutations';
-import { DYNAMICS_SEED, SLICE_SEEDS, type PluginSliceSeed } from '../../helpers/pluginSliceSeeds';
+import { DYNAMICS_SEED, SITE_CONTEXT_SEED, SLICE_SEEDS, type PluginSliceSeed } from '../../helpers/pluginSliceSeeds';
 
 const CASES_PER_PLUGIN = Number(process.env['FUZZ_CASES'] ?? 36);
 const CASE_BUDGET_MS = 3_000;
@@ -144,5 +144,16 @@ describe('core dynamics slice (datasheet motors, profiles, drives) under hostile
     const mutations = [...driveMutations(raw), ...sampleMutations(raw, DYNAMICS_SEED.roots, 'dynamics', CASES_PER_PLUGIN)];
     expect(mutations.length).toBeGreaterThan(20);
     expect(mutations.flatMap((mutation) => runMutation('dynamics', DYNAMICS_SEED, raw, mutation))).toEqual([]);
+  });
+});
+
+describe('core site context slice under hostile files', () => {
+  it('keeps load_document total over sampled mutations', { timeout: 120_000 }, () => {
+    const document = SITE_CONTEXT_SEED.build();
+    const raw = (JSON.parse(serializeDocument(document)) as { document: Record<string, unknown> }).document;
+    expect(execute(createEmptyDocument(), 'load_document', { json: serializeDocument(document) }).summary).toMatch(/^Loaded document/);
+    const mutations = sampleMutations(raw, SITE_CONTEXT_SEED.roots, 'siteContext', CASES_PER_PLUGIN);
+    expect(mutations.length).toBeGreaterThan(5);
+    expect(mutations.flatMap((mutation) => runMutation('siteContext', SITE_CONTEXT_SEED, raw, mutation))).toEqual([]);
   });
 });

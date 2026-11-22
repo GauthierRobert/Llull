@@ -29,6 +29,9 @@ function nozzleRow(nozzle: NozzleRecord, port: Obj | undefined, mm: number): Obj
     flange: toMillimetres(nozzle.flange, mm),
     positionMm: Array.isArray(position) ? position.map((value: number) => millimetres(value, mm)) : null,
     direction: port?.['direction'] ?? null,
+    ...(nozzle.pad === undefined
+      ? {}
+      : { pad: { outsideDiameterMm: millimetres(nozzle.pad.outsideDiameter, mm), thicknessMm: millimetres(nozzle.pad.thickness, mm) } }),
   };
 }
 

@@ -45,6 +45,7 @@ export {
 } from './civil/types';
 
 // plant: piping plugin
+export { branchStructureError } from './plant/piping/autoRoute/branchRequests';
 export { pipingPlugin } from './plant/piping/plugin';
 export { pipingFabricationPlugin } from './plant/fabrication/plugin';
 export { pipingCatalogPlugin } from './plant/catalog/plugin';

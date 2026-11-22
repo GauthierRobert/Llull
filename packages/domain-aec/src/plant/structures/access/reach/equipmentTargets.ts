@@ -6,7 +6,7 @@ import { elementsOf, getBuilding } from '@aec/building/model';
 import { equipmentPorts } from '../../../equipment/geometry/ports';
 import type { ReachTarget } from './valveTargets';
 
-/** A manway is a nozzle whose service contains the word "manway" or "manways" (case-insensitive, not inside a longer word, not after "non-" / "non "); the equipment model has no manway kind yet. */
+/** A manway is a nozzle whose service contains the word "manway" or "manways" (case-insensitive, not inside a longer word, not after "non-" / "non "); used only for a nozzle record without a `kind` (legacy). A record with `kind` is never judged by its service: `manway` is a manway, `nozzle` is not. */
 const MANWAY = /(?<![a-z])(?<!non[-\s])manways?(?![a-z])/i;
 
 /** `nozzles` = every nozzle that is not a manway (kind `equipment_nozzle`); `manways` = the nozzles whose service names a manway (kind `manway`). Points in millimetres. */
@@ -15,7 +15,7 @@ export function equipmentTargets(doc: CadDocument, kinds: ReadonlySet<'nozzles' 
   const targets: ReachTarget[] = [];
   for (const element of elementsOf(getBuilding(doc), 'equipment')) {
     for (const port of equipmentPorts(doc, element)) {
-      const manway = port.service !== undefined && MANWAY.test(port.service);
+      const manway = port.kind === undefined ? port.service !== undefined && MANWAY.test(port.service) : port.kind === 'manway';
       if (!kinds.has(manway ? 'manways' : 'nozzles')) continue;
       targets.push({
         tag: port.id,

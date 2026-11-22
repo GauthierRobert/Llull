@@ -16,6 +16,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'runFlight', // domain-dynamics flight/flightRun: the flight model's mass properties through a kernel
   'prepareVehicle', // domain-dynamics flight/flightRun: the same vehicle set-up (trim, linearisation) through a kernel
   'prepareVehicle', // domain-dynamics flight/flightRun: the same vehicle set-up (trim, linearisation) through a kernel
+  'kernelEntityBounds', // geometry/kernelBounds: the kernel's tight box of a placed entity (measure_bounding_box is kernelOptional)
   'exactLeafVolume',
   'massProvenance',
   'buildSimulationModel', // domain-dynamics: body mass properties through a kernel
@@ -28,6 +29,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'evaluateRecipe',
   'operandRecipe',
   'collectParts', // geometry/assemblyParts
+  'recipeOfPart', // geometry/assemblyParts: an instance's solids as one recipe (boolean operands)
   'kernelContacts', // domain-cae corrosion/exactContacts: AABB contacts resolved through the kernel distance
   'openSolid', // geometry/pmiFeatures
   'createSolidLookup', // pmi/refresh
@@ -94,6 +96,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'sideFaces',
   'spineStations',
   'unionRecipe',
+  'withFrames',
   // helpers that take the ExecutionContext and read ctx.kernel
   'runFaceBlend',
   'runFaceOp',

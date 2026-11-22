@@ -8,6 +8,7 @@ import type { EquipmentElement } from '@aec/building/types';
 import type { HeadSpec } from '../model';
 import type { ExchangerEnd } from '../geometry/exchangerFrame';
 import { resolveExchanger } from '../geometry/exchangerFrame';
+import { LUGS_NOT_CHECKED } from '../geometry/lugs';
 import type { ExchangerSideDesign, ExchangerTemplate, PlantEquipmentData, VesselTemplate } from '../plantData';
 import { PLANT_EQUIPMENT_SCHEMA } from '../plantData';
 import { asmeThickness, type CodeFinding } from './asme';
@@ -24,7 +25,8 @@ export const EXCHANGER_REVIEW_REASON =
 const NOT_CHECKED = [
   'tubesheet thickness (TEMA RCB) and tube-to-tubesheet joints',
   'tubes (external pressure, tube-side vs shell-side differential)',
-  'flat covers (UG-34)',
+  'flat covers (UG-34), including the thick cover of front head D',
+  'kettle transition cone (UG-33 / Appendix 1-5), nozzles on the kettle cone (equivalent cylinder) and kettle weir',
   'floating head, U-bends, expansion joints, differential thermal expansion',
   'nozzle reinforcement (UG-37) and nozzle loads',
   'saddle loads and nozzles over a saddle',
@@ -43,6 +45,7 @@ interface Piece {
 function pieceOf(
   template: ExchangerTemplate,
   side: ExchangerSideDesign | undefined,
+  insideDiameter: number,
   piece: { name: string; thicknessPath: string; headName: string | null; headPath: string },
   length: number,
   thickness: number,
@@ -51,7 +54,7 @@ function pieceOf(
   const vessel: VesselTemplate = {
     kind: 'vessel',
     orientation: 'horizontal',
-    insideDiameter: template.shellInsideDiameter,
+    insideDiameter,
     tangentLength: length,
     heads: { first: head, second: head },
     shellThickness: thickness,
@@ -73,6 +76,7 @@ const channelPiece = (template: ExchangerTemplate, end: ExchangerEnd, name: 'fro
   return pieceOf(
     template,
     template.design?.tubeSide,
+    template.shellInsideDiameter,
     {
       name: channelName,
       thicknessPath: `${channelName}.thickness`,
@@ -149,20 +153,45 @@ export function checkExchanger(element: EquipmentElement, mmPerUnit: number): El
   if (plant === undefined || plant.template.kind !== 'exchanger') return { issues: [], reviewRequired: false };
   const { template } = plant;
   const geometry = resolveExchanger(template);
+  const { kettle } = template;
+  const coverOnShell = geometry.rear.closure === 'shell_cover';
+  const length = (name: string): number => {
+    const segment = geometry.segments.find((candidate) => candidate.name === name);
+    return segment === undefined ? 0 : segment.to - segment.from;
+  };
   const shellPieces: Piece[] = [
     pieceOf(
       template,
       template.design?.shellSide,
+      template.shellInsideDiameter,
       {
         name: 'shell',
         thicknessPath: 'shellThickness',
-        headName: geometry.rear.closure === 'shell_cover' ? 'shellCover' : null,
+        headName: coverOnShell && kettle === undefined ? 'shellCover' : null,
         headPath: 'shellThickness',
       },
-      geometry.shellLength,
+      kettle === undefined ? geometry.shellLength : length('shell'),
       template.shellThickness,
       ELLIPSOIDAL,
     ),
+    ...(kettle === undefined
+      ? []
+      : [
+          pieceOf(
+            template,
+            template.design?.shellSide,
+            kettle.enlargedInsideDiameter,
+            {
+              name: 'kettleShell',
+              thicknessPath: 'kettle.enlargedThickness',
+              headName: coverOnShell ? 'shellCover' : null,
+              headPath: 'kettle.enlargedThickness',
+            },
+            length('kettleShell'),
+            kettle.enlargedThickness,
+            ELLIPSOIDAL,
+          ),
+        ]),
   ];
   const tubePieces = [
     channelPiece(template, geometry.front, 'front', 'frontChannel'),
@@ -171,6 +200,14 @@ export function checkExchanger(element: EquipmentElement, mmPerUnit: number): El
   const shell = judge('shellSide', template.design?.shellSide !== undefined, shellPieces, mmPerUnit);
   const tube = judge('tubeSide', template.design?.tubeSide !== undefined, tubePieces, mmPerUnit);
   const found: Found[] = [...shell, ...tube];
+  if (kettle !== undefined && template.defaulted.includes('kettle.enlargedThickness'))
+    found.push(
+      warning(
+        'EQP_DESIGN_DATA_MISSING',
+        `kettle.enlargedThickness was not given: the shell thickness ${template.shellThickness} was assumed`,
+        'kettle.enlargedThickness',
+      ),
+    );
   for (const name of ['frontChannel', 'rearChannel'])
     if (template.defaulted.includes(`${name}.thickness`))
       found.push(
@@ -180,8 +217,25 @@ export function checkExchanger(element: EquipmentElement, mmPerUnit: number): El
           `${name}.thickness`,
         ),
       );
+  if (template.tema.shell === 'X') {
+    const angles = plant.nozzles.flatMap((nozzle) => (nozzle.location.on === 'shell' ? [nozzle.location.orientationDeg] : []));
+    const opposite = angles.some((a, i) => angles.some((b, j) => i < j && Math.abs(((((a - b) % 360) + 360) % 360) - 180) < 1e-6));
+    if (!opposite)
+      found.push(
+        warning(
+          'EQP_X_SHELL_NOZZLES',
+          'TEMA X (cross flow) takes the shell fluid across the bundle from one side to the opposite side: no pair of shell nozzles 180 deg apart (add_nozzle on the shell)',
+          'nozzles',
+        ),
+      );
+  }
   if (template.tubes.wallUnverified)
     found.push(warning('EQP_TABLE_UNVERIFIED', `tube wall from a grade B table row (${template.tubes.wallSource})`, 'tubes.wallThickness'));
   appendAll(found, nozzleFindings(template, plant.nozzles));
-  return { issues: issuesOf(element, found), reviewRequired: true, reviewReason: EXCHANGER_REVIEW_REASON, notChecked: NOT_CHECKED };
+  return {
+    issues: issuesOf(element, found),
+    reviewRequired: true,
+    reviewReason: EXCHANGER_REVIEW_REASON,
+    notChecked: template.support.type === 'lugs' ? [...NOT_CHECKED, LUGS_NOT_CHECKED] : NOT_CHECKED,
+  };
 }

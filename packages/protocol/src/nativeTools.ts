@@ -29,6 +29,10 @@ const TIMEOUT_MAX_S = 86400;
 /** Bounds of the inflow lattice Mach number of `cfd_solve` (the job refuses outside (0, 0.3]). */
 const LATTICE_MACH_MIN = 1e-6;
 const LATTICE_MACH_MAX = 0.3;
+/** Fields of `auto_route_lines` the native planner computes itself and so does not take. */
+const NATIVE_DECIDED: readonly string[] = ['order', 'sequence'];
+/** What the native planner sets itself on the commit of `auto_route` with lines. */
+const COMMIT_OWN: readonly string[] = ['lines', 'order', 'sequence', 'partial'];
 const EMPTY_SCHEMA: ParamsSchema = { type: 'object', properties: {}, required: [] };
 
 /** Wall-clock limit parameter: zod has no bounds in `ParamSpec`, so `minimum` / `maximum` are added after derivation. */
@@ -207,11 +211,17 @@ function autoRouteSchema(): ParamsSchema {
   const budget = schema.properties['maxExpansions'];
   if (budget !== undefined) Object.assign(budget, { minimum: 1, maximum: 20_000_000 });
   const several = getCommand('auto_route_lines')?.paramsSchema.properties ?? {};
+  // Every field of auto_route_lines the single-line schema lacks, except the ones the native planner decides itself (order, sequence).
   const own = Object.fromEntries(
-    ['lines', 'common', 'partial', 'maxAttempts'].flatMap((key) => (several[key] === undefined ? [] : [[key, several[key]]])),
+    Object.entries(several).filter(([key]) => schema.properties[key] === undefined && !NATIVE_DECIDED.includes(key)),
   );
   // The tool takes one of two forms (the schema format has no oneOf): lineId + from + to, or lines. Neither set is required on its own; the description says which.
   return { ...schema, properties: { ...schema.properties, ...own }, required: [] };
+}
+
+/** Fields of `auto_route_lines` the native planner forwards unchanged into its commit (derived from the command schema: new fields flow through). */
+export function nativeLinesForwardedKeys(): readonly string[] {
+  return Object.keys(getCommand('auto_route_lines')?.paramsSchema.properties ?? {}).filter((key) => !COMMIT_OWN.includes(key));
 }
 
 const autoRoute = (): ToolDefinition => ({

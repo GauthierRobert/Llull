@@ -11,6 +11,7 @@ import { makeProjector } from './camera';
 import { MAX_POLYGONS, applyBudget, type EntityPolygons } from './budget';
 import { cutEntityPolygons, unitPlanes } from './clip';
 import { splitForDepth } from './depthSplit';
+import { withSunPlan } from './sunShadows';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import { orderedEntities } from '../entity/entityOps';
 
@@ -38,9 +39,9 @@ function withMaterialColor(doc: CadDocument, e: Entity): Entity {
 
 /** `e` drawn flat in `color` (a mesh's per-face colours are dropped). */
 function withColorOverride(e: Entity, color: string): Entity {
-  if (!('faceColors' in e)) return { ...e, color };
-  const { faceColors: _faceColors, ...rest } = e;
-  return { ...rest, color };
+  if (!('faceColors' in e) && !('vertexColors' in e)) return { ...e, color };
+  const { faceColors: _faceColors, vertexColors: _vertexColors, ...rest } = e as Entity & { faceColors?: unknown; vertexColors?: unknown };
+  return { ...rest, color } as Entity;
 }
 
 /** Z-up orthographic SVG render of every entity in `doc.order`. @pure */
@@ -105,7 +106,21 @@ export function renderDocument(
   const underlays = drawables.filter((d): d is ImageEntity => d.kind === 'image');
   const rasterSettings = raster ? { radius, ...(options.pixels !== undefined ? { pixels: options.pixels } : {}) } : null;
   const caption = options.caption !== false;
-  const svg = buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount, background, rasterSettings, caption);
+  const sun = raster ? withSunPlan(options.light, polygons) : { light: options.light, report: undefined };
+  const svg = buildSvg(
+    polygons,
+    underlays,
+    cam,
+    orthoHalf,
+    width,
+    height,
+    view,
+    snapshot.entityCount,
+    background,
+    rasterSettings,
+    caption,
+    sun.light,
+  );
   return {
     view,
     width,
@@ -118,7 +133,9 @@ export function renderDocument(
     polygonBudget: raster ? Math.max(budget, RASTER_BUDGET) : budget,
     simplifiedEntityIds: fitted.simplifiedEntityIds,
     skippedEntityIds: fitted.skippedEntityIds,
+    ...(fitted.simplifiedEntityIds.length + fitted.skippedEntityIds.length > 0 ? { polygonTotal: fitted.totalPolygons } : {}),
     cutEntityIds,
+    ...(sun.report === undefined ? {} : { sunShadows: sun.report }),
     svg: perspective
       ? svg
       : appendAnnotationText(svg, doc, drawables, makeProjector(cam, orthoHalf, width, height), worldPerPx, background),

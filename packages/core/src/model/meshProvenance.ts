@@ -54,3 +54,8 @@ export interface MeshAssetRef {
   /** Bounds of the asset positions (document units, entity-local frame). */
   readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] };
 }
+
+/** Per-vertex display colours of a mesh solid (terrain tint): sRGB bytes, r, g, b for each vertex of `mesh.positions`, drawn over `color`; ignored unless 3 per vertex. */
+export interface VertexTint {
+  vertexColors?: ReadonlyArray<number>;
+}

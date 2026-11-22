@@ -7,23 +7,23 @@ Companion of [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md). Laws: `.claude/rules/arch
 
 What exists and is reused:
 
-| Area | Where | What it gives this gap | Limit |
-| ---- | ----- | ---------------------- | ----- |
-| Pipe model | `packages/core/src/model/building.ts` `PipeElement` (`category: 'pipe'`, `points: Vec3[]`, `diameter`, `service`, `material`, `line?`, `dn?`, `from?`, `to?`) | line number, DN, route centreline | a polyline with "bends at every interior point"; no fittings, flanges, welds, spec, SKEY, item code; z relative to the level |
-| Pipe command | `packages/domain-aec/src/industrial/equipment/equipment.ts` `add_pipe_run` | creates the line; DN → OD from `industrial/piping/pipeSizes.ts` (EN 10220 / B36.10, DN15–400) | no spec; no branch / tee; refuses duplicate routes |
-| Supports | `industrial/piping/pipeSupports.ts` … `add_pipe_support`, `PipeSupportElement` (shoe / guide / anchor / hanger, `at` point, mark PS) | supports to show on isos and write as PCF `SUPPORT` | — |
-| Piping checks | `check_pipe_supports`, `pipe_hydraulics` | — | no fabrication checks |
-| Line list / takeoff | `building/quantities/takeoff.ts` `building_schedule` (kind `pipe`), takeoff `pipe length by service and diameter` | pipe length cross-check (VC-ISO-08) | no fittings / bolts |
-| Plan / elevation drawings | `building/drawings/planDrawing.ts`, `planIndustrial.ts` (pipes on the plan with service), `planSupports.ts` (support symbols), `elevation.ts` (`export_elevation_sheet`, hidden-line, sections), `sheet.ts` (`export_plan_sheet`) | base of the piping GA (FR-ISO-15) | single-line pipes, no line label / elevations / flow arrows |
-| Part sheets | `packages/core/src/model/sheet.ts` (`DrawingsModel`, `DrawingSheet`, `DrawingView` with `direction: 'iso'`), `commands/drawings/*` (`create_sheet`, `create_drawing_view`, `add_section_view`, `export_sheet_svg`) | title block, paper sizes, ISO 216 frames | the `iso` view is a hidden-line projection of solids, to scale; no piping symbols, no not-to-scale layout |
-| Iso frame | `packages/core/src/geometry/viewDirections.ts` `AXES.iso` (right = (1,1,0)/√2, viewer at (+X, −Y, +Z)) | true isometric: +X → −30°, +Y (north) → +30°, +Z → 90°, scale √(2/3) (derived in `validation/data/pcf_reference_parse.py`) | — |
-| SVG painter | `packages/core/src/geometry/drawingSvg.ts` (`DrawingPainter`, `svgText`, `paperDimension`) | iso sheet painting | — |
-| DXF writer | `packages/core/src/lib/dxfWriter.ts`, `domain-aec/src/building/exchange/dxfWriter.ts` (`export_building_dxf`) | iso DXF | — |
-| Fabrication export | `industrial/fabrication/ncExport.ts` `export_nc_files` (DSTV NC1, one file per distinct piece, `data.files[]` with `content`, grouped quantities) | pattern for `export_pcf` (files[], determinism, `confirmExportControlled` + `exportRefusal`) | steel only |
-| Clash | `industrial/clash/clash.ts` `check_clashes` | — | — |
-| CLI file I/O | `server/src/cli/saveFiles.ts` (`--save` writes `data.files[]`, text keys incl. `content`, `svg`, `dxf`), `server/src/cli/exchange.ts` `FILE_PARAMS` (`file=` → content param) | PCF / SVG out; PCF in needs one `FILE_PARAMS` row (`import_pcf: { key: 'text', encoding: 'utf8' }`) | — |
-| MCP toolset | `packages/mcp/src/toolsets.ts`: toolset `piping` = `PIPING_TOOLS` filtered from the `building` plugin | this gap's commands join `piping` | the getter must also take the new plugin's commands |
-| Errors | `CommandResult.error` `{ code, ids, paths, remediation }`, `codedRejection`, `report` in `packages/core/src/commands/noop.ts` (AF-11 / AF-14 plumbing) | stable `ISO_*` codes | — |
+| Area                      | Where                                                                                                                                                                                                                             | What it gives this gap                                                                                                     | Limit                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Pipe model                | `packages/core/src/model/building.ts` `PipeElement` (`category: 'pipe'`, `points: Vec3[]`, `diameter`, `service`, `material`, `line?`, `dn?`, `from?`, `to?`)                                                                     | line number, DN, route centreline                                                                                          | a polyline with "bends at every interior point"; no fittings, flanges, welds, spec, SKEY, item code; z relative to the level |
+| Pipe command              | `packages/domain-aec/src/industrial/equipment/equipment.ts` `add_pipe_run`                                                                                                                                                        | creates the line; DN → OD from `industrial/piping/pipeSizes.ts` (EN 10220 / B36.10, DN15–400)                              | no spec; no branch / tee; refuses duplicate routes                                                                           |
+| Supports                  | `industrial/piping/pipeSupports.ts` … `add_pipe_support`, `PipeSupportElement` (shoe / guide / anchor / hanger, `at` point, mark PS)                                                                                              | supports to show on isos and write as PCF `SUPPORT`                                                                        | —                                                                                                                            |
+| Piping checks             | `check_pipe_supports`, `pipe_hydraulics`                                                                                                                                                                                          | —                                                                                                                          | no fabrication checks                                                                                                        |
+| Line list / takeoff       | `building/quantities/takeoff.ts` `building_schedule` (kind `pipe`), takeoff `pipe length by service and diameter`                                                                                                                 | pipe length cross-check (VC-ISO-08)                                                                                        | no fittings / bolts                                                                                                          |
+| Plan / elevation drawings | `building/drawings/planDrawing.ts`, `planIndustrial.ts` (pipes on the plan with service), `planSupports.ts` (support symbols), `elevation.ts` (`export_elevation_sheet`, hidden-line, sections), `sheet.ts` (`export_plan_sheet`) | base of the piping GA (FR-ISO-15)                                                                                          | single-line pipes, no line label / elevations / flow arrows                                                                  |
+| Part sheets               | `packages/core/src/model/sheet.ts` (`DrawingsModel`, `DrawingSheet`, `DrawingView` with `direction: 'iso'`), `commands/drawings/*` (`create_sheet`, `create_drawing_view`, `add_section_view`, `export_sheet_svg`)                | title block, paper sizes, ISO 216 frames                                                                                   | the `iso` view is a hidden-line projection of solids, to scale; no piping symbols, no not-to-scale layout                    |
+| Iso frame                 | `packages/core/src/geometry/viewDirections.ts` `AXES.iso` (right = (1,1,0)/√2, viewer at (+X, −Y, +Z))                                                                                                                            | true isometric: +X → −30°, +Y (north) → +30°, +Z → 90°, scale √(2/3) (derived in `validation/data/pcf_reference_parse.py`) | —                                                                                                                            |
+| SVG painter               | `packages/core/src/geometry/drawingSvg.ts` (`DrawingPainter`, `svgText`, `paperDimension`)                                                                                                                                        | iso sheet painting                                                                                                         | —                                                                                                                            |
+| DXF writer                | `packages/core/src/lib/dxfWriter.ts`, `domain-aec/src/building/exchange/dxfWriter.ts` (`export_building_dxf`)                                                                                                                     | iso DXF                                                                                                                    | —                                                                                                                            |
+| Fabrication export        | `industrial/fabrication/ncExport.ts` `export_nc_files` (DSTV NC1, one file per distinct piece, `data.files[]` with `content`, grouped quantities)                                                                                 | pattern for `export_pcf` (files[], determinism, `confirmExportControlled` + `exportRefusal`)                               | steel only                                                                                                                   |
+| Clash                     | `industrial/clash/clash.ts` `check_clashes`                                                                                                                                                                                       | —                                                                                                                          | —                                                                                                                            |
+| CLI file I/O              | `server/src/cli/saveFiles.ts` (`--save` writes `data.files[]`, text keys incl. `content`, `svg`, `dxf`), `server/src/cli/exchange.ts` `FILE_PARAMS` (`file=` → content param)                                                     | PCF / SVG out; PCF in needs one `FILE_PARAMS` row (`import_pcf: { key: 'text', encoding: 'utf8' }`)                        | —                                                                                                                            |
+| MCP toolset               | `packages/mcp/src/toolsets.ts`: toolset `piping` = `PIPING_TOOLS` filtered from the `building` plugin                                                                                                                             | this gap's commands join `piping`                                                                                          | the getter must also take the new plugin's commands                                                                          |
+| Errors                    | `CommandResult.error` `{ code, ids, paths, remediation }`, `codedRejection`, `report` in `packages/core/src/commands/noop.ts` (AF-11 / AF-14 plumbing)                                                                            | stable `ISO_*` codes                                                                                                       | —                                                                                                                            |
 
 What does **not** exist: any PCF code, weld / spool / cut-piece / bolt-set concept, piping BOM, isometric symbol
 library, not-to-scale layout, pipe annotation on plans, a fabrication check. `grep -ri "pcf\|spool\|isogen" packages`
@@ -86,60 +86,78 @@ ISO can ship before RTE using the legacy and PCF inputs.
 
 ### 2.1 Technical requirements
 
-| Id | Pri | Requirement | FR | AF | VC |
-| -- | --- | ----------- | -- | -- | -- |
-| TR-ISO-01 | MUST | PCF lexer / reader for the §6.1 subset with unit scaling, `extra` preservation and coded syntax refusals with line paths (§5.1) | FR-ISO-01, 17 | AF-04, AF-11 | VC-ISO-01, 02 |
-| TR-ISO-02 | MUST | Canonical PCF writer, one file per line, byte-deterministic, equal to the reference writer on the fixture (§5.2) | FR-ISO-02, 03, 18 | AF-12, AF-13 | VC-ISO-03, 17 |
-| TR-ISO-03 | MUST | `PipingNetwork` read port over RTE components, legacy `PipeElement` (derived fittings, flagged) and imported PCF lines (§3, §5.3) | FR-ISO-03, 04 | AF-32 | VC-ISO-04 |
-| TR-ISO-04 | MUST | Connectivity graph with 0.1 mm node keys, 1 mm disconnection guard, flow order (§5.4) | FR-ISO-06, 16 | AF-20 | VC-ISO-05, 16 |
-| TR-ISO-05 | MUST | Spool union-find over shop joints, limits from user rules with source, deterministic `autoBreak` (§5.5) | FR-ISO-05 | AF-30, AF-31 | VC-ISO-06 |
-| TR-ISO-06 | MUST | Weld detection and persistent numbering: highest + 1, orphaned numbers never reused, explicit renumber (§5.4) | FR-ISO-06, 07 | AF-13 | VC-ISO-05, 14 |
-| TR-ISO-07 | MUST | Cut list with explicit gap / allowance (no silent default), short-piece check (§5.6) | FR-ISO-08 | AF-31, AF-35 | VC-ISO-07 |
-| TR-ISO-08 | MUST | BOM per line / spool / sheet with bolting and gaskets from PSC tables, `unverified` propagation, sum identities (§5.7) | FR-ISO-09 | AF-10, AF-32 | VC-ISO-08, 09 |
-| TR-ISO-09 | MUST | True isometric projection identical to `viewDirections.ts` iso frame; north arrow up-right / up-left (§5.8) | FR-ISO-10 | AF-21 | VC-ISO-10 |
-| TR-ISO-10 | MUST | Not-to-scale layout with collision handling, symbols by SKEY family, centreline string dimensions, elevations and coordinates; every label listed in `data` with its 3D value (§5.8, §5.9) | FR-ISO-11, 12 | AF-21, AF-22 | VC-ISO-11 |
-| TR-ISO-11 | MUST | Slope detection and annotation (ratio / percent / degrees, fall arrow) (§5.9) | FR-ISO-13 | AF-21 | VC-ISO-12 |
-| TR-ISO-12 | SHOULD | Sheet split at welds / flanges with continuation marks and stored sheet assignment (§5.10) | FR-ISO-14 | AF-13 | VC-ISO-13 |
-| TR-ISO-13 | SHOULD | Piping GA annotation layer on the existing plan / elevation drawings (§5.11) | FR-ISO-15 | AF-22 | VC-ISO-15 |
-| TR-ISO-14 | MUST | `check_isometric` rule table with stable codes and remediation (§5.12, §7) | FR-ISO-16, 17 | AF-11, AF-20, AF-30 | VC-ISO-02, 16 |
-| TR-ISO-15 | MUST | Determinism of every output (sorted iteration, fixed number formats, no clock) | FR-ISO-18 | AF-13 | VC-ISO-17 |
-| TR-ISO-16 | SHOULD | Performance budgets of §8 | FR-ISO-14 | AF-40 | VC-ISO-18 |
-| TR-ISO-17 | MUST | `issue_isometric` human gate (09 PLM signature), `reviewRequired: true` on every unissued iso, "NOT FOR CONSTRUCTION" stamp | FR-ISO-19 | AF-33, AF-34, AF-34a | VC-ISO-19 |
+| Id        | Pri    | Requirement                                                                                                                                                                                | FR                | AF                   | VC            |
+| --------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- | -------------------- | ------------- |
+| TR-ISO-01 | MUST   | PCF lexer / reader for the §6.1 subset with unit scaling, `extra` preservation and coded syntax refusals with line paths (§5.1)                                                            | FR-ISO-01, 17     | AF-04, AF-11         | VC-ISO-01, 02 |
+| TR-ISO-02 | MUST   | Canonical PCF writer, one file per line, byte-deterministic, equal to the reference writer on the fixture (§5.2)                                                                           | FR-ISO-02, 03, 18 | AF-12, AF-13         | VC-ISO-03, 17 |
+| TR-ISO-03 | MUST   | `PipingNetwork` read port over RTE components, legacy `PipeElement` (derived fittings, flagged) and imported PCF lines (§3, §5.3)                                                          | FR-ISO-03, 04     | AF-32                | VC-ISO-04     |
+| TR-ISO-04 | MUST   | Connectivity graph with 0.1 mm node keys, 1 mm disconnection guard, flow order (§5.4)                                                                                                      | FR-ISO-06, 16     | AF-20                | VC-ISO-05, 16 |
+| TR-ISO-05 | MUST   | Spool union-find over shop joints, limits from user rules with source, deterministic `autoBreak` (§5.5)                                                                                    | FR-ISO-05         | AF-30, AF-31         | VC-ISO-06     |
+| TR-ISO-06 | MUST   | Weld detection and persistent numbering: highest + 1, orphaned numbers never reused, explicit renumber (§5.4)                                                                              | FR-ISO-06, 07     | AF-13                | VC-ISO-05, 14 |
+| TR-ISO-07 | MUST   | Cut list with explicit gap / allowance (no silent default), short-piece check (§5.6)                                                                                                       | FR-ISO-08         | AF-31, AF-35         | VC-ISO-07     |
+| TR-ISO-08 | MUST   | BOM per line / spool / sheet with bolting and gaskets from PSC tables, `unverified` propagation, sum identities (§5.7)                                                                     | FR-ISO-09         | AF-10, AF-32         | VC-ISO-08, 09 |
+| TR-ISO-09 | MUST   | True isometric projection identical to `viewDirections.ts` iso frame; north arrow up-right / up-left (§5.8)                                                                                | FR-ISO-10         | AF-21                | VC-ISO-10     |
+| TR-ISO-10 | MUST   | Not-to-scale layout with collision handling, symbols by SKEY family, centreline string dimensions, elevations and coordinates; every label listed in `data` with its 3D value (§5.8, §5.9) | FR-ISO-11, 12     | AF-21, AF-22         | VC-ISO-11     |
+| TR-ISO-11 | MUST   | Slope detection and annotation (ratio / percent / degrees, fall arrow) (§5.9)                                                                                                              | FR-ISO-13         | AF-21                | VC-ISO-12     |
+| TR-ISO-12 | SHOULD | Sheet split at welds / flanges with continuation marks and stored sheet assignment (§5.10)                                                                                                 | FR-ISO-14         | AF-13                | VC-ISO-13     |
+| TR-ISO-13 | SHOULD | Piping GA annotation layer on the existing plan / elevation drawings (§5.11)                                                                                                               | FR-ISO-15         | AF-22                | VC-ISO-15     |
+| TR-ISO-14 | MUST   | `check_isometric` rule table with stable codes and remediation (§5.12, §7)                                                                                                                 | FR-ISO-16, 17     | AF-11, AF-20, AF-30  | VC-ISO-02, 16 |
+| TR-ISO-15 | MUST   | Determinism of every output (sorted iteration, fixed number formats, no clock)                                                                                                             | FR-ISO-18         | AF-13                | VC-ISO-17     |
+| TR-ISO-16 | SHOULD | Performance budgets of §8                                                                                                                                                                  | FR-ISO-14         | AF-40                | VC-ISO-18     |
+| TR-ISO-17 | MUST   | `issue_isometric` human gate (09 PLM signature), `reviewRequired: true` on every unissued iso, "NOT FOR CONSTRUCTION" stamp                                                                | FR-ISO-19         | AF-33, AF-34, AF-34a | VC-ISO-19     |
 
 ## 3. Data model
 
 ```ts
 /** Read port: what every ISO algorithm consumes, whatever the source. Coordinates are world mm (z absolute). */
 export interface PipingNetwork {
-  readonly lineId: string;                       // line number, e.g. "L-101"
-  readonly attributes: LineAttributes;           // spec, insulation, painting, revision, area, project, slope rule
+  readonly lineId: string; // line number, e.g. "L-101"
+  readonly attributes: LineAttributes; // spec, insulation, painting, revision, area, project, slope rule
   readonly components: readonly NetworkComponent[]; // in flow order from the line start
   readonly source: 'route' | 'legacy' | 'pcf';
-  readonly warnings: readonly IsoIssue[];        // e.g. ISO_LEGACY_FITTINGS_DERIVED
+  readonly warnings: readonly IsoIssue[]; // e.g. ISO_LEGACY_FITTINGS_DERIVED
 }
 
 export type PcfComponentType =
-  | 'PIPE' | 'ELBOW' | 'BEND' | 'TEE' | 'OLET' | 'REDUCER-CONCENTRIC' | 'REDUCER-ECCENTRIC' | 'FLANGE' | 'FLANGE-BLIND'
-  | 'GASKET' | 'BOLT' | 'VALVE' | 'CAP' | 'WELD' | 'SUPPORT' | 'INSTRUMENT';
+  | 'PIPE'
+  | 'ELBOW'
+  | 'BEND'
+  | 'TEE'
+  | 'OLET'
+  | 'REDUCER-CONCENTRIC'
+  | 'REDUCER-ECCENTRIC'
+  | 'FLANGE'
+  | 'FLANGE-BLIND'
+  | 'GASKET'
+  | 'BOLT'
+  | 'VALVE'
+  | 'CAP'
+  | 'WELD'
+  | 'SUPPORT'
+  | 'INSTRUMENT';
 
-export type EndType = 'BW' | 'SW' | 'FL' | 'CP' | 'SC' | 'PL';   // validation/data/pcf_keywords.json endConnectionCodes
+export type EndType = 'BW' | 'SW' | 'FL' | 'CP' | 'SC' | 'PL'; // validation/data/pcf_keywords.json endConnectionCodes
 
-export interface NetworkPoint { readonly xyz: Vec3; readonly boreMm: number; readonly endType?: EndType }
+export interface NetworkPoint {
+  readonly xyz: Vec3;
+  readonly boreMm: number;
+  readonly endType?: EndType;
+}
 
 export interface NetworkComponent {
-  readonly id: string;                           // stable llull id (route component id or `pcf:<line>:<n>`)
+  readonly id: string; // stable llull id (route component id or `pcf:<line>:<n>`)
   readonly type: PcfComponentType;
-  readonly ends: readonly NetworkPoint[];        // 0..2 (SUPPORT: 0)
+  readonly ends: readonly NetworkPoint[]; // 0..2 (SUPPORT: 0)
   readonly centre?: Vec3;
-  readonly branch?: NetworkPoint;                // BRANCH1-POINT
-  readonly coords?: Vec3;                        // SUPPORT CO-ORDS
-  readonly skey?: string;                        // 4 chars; absent only for PIPE
+  readonly branch?: NetworkPoint; // BRANCH1-POINT
+  readonly coords?: Vec3; // SUPPORT CO-ORDS
+  readonly skey?: string; // 4 chars; absent only for PIPE
   readonly itemCode?: string;
   readonly category?: 'fabrication' | 'erection' | 'offshore';
-  readonly weldKind?: 'shop' | 'site' | 'field_fit';  // WELD only (WW / WS / WF)
-  readonly weight?: number;                      // as written, in the file's UNITS-WEIGHT
-  readonly derived?: true;                       // legacy-derived fitting
-  readonly unverified?: true;                    // catalogue row not verified (AF-32, from PSC)
+  readonly weldKind?: 'shop' | 'site' | 'field_fit'; // WELD only (WW / WS / WF)
+  readonly weight?: number; // as written, in the file's UNITS-WEIGHT
+  readonly derived?: true; // legacy-derived fitting
+  readonly unverified?: true; // catalogue row not verified (AF-32, from PSC)
   readonly extra?: Readonly<Record<string, string>>; // unknown PCF attributes, written back verbatim
 }
 
@@ -151,42 +169,52 @@ export interface NetworkComponent {
 export interface FabricationModel {
   readonly version: 1;
   readonly rules?: FabricationRules;
-  readonly welds: Readonly<Record<string, WeldRecord>>;        // keyed by joint key (line + rounded xyz + component ids)
+  readonly welds: Readonly<Record<string, WeldRecord>>; // keyed by joint key (line + rounded xyz + component ids)
   readonly highestWeldNumber: Readonly<Record<string, number>>; // per line (PCF HIGHEST-WELD-NUMBER)
   readonly spools: Readonly<Record<string, SpoolRecord>>;
   readonly isometrics: Readonly<Record<string, IsoDefinition>>; // per line
-  readonly pcfLines: Readonly<Record<string, PcfLine>>;        // imported lines not (yet) converted to RTE components
-  readonly issues: Readonly<Record<string, IsoIssueRecord>>;    // human-gated issue stamps
+  readonly pcfLines: Readonly<Record<string, PcfLine>>; // imported lines not (yet) converted to RTE components
+  readonly issues: Readonly<Record<string, IsoIssueRecord>>; // human-gated issue stamps
 }
 
 export interface FabricationRules {
-  readonly weldGapMm?: Quantity;                 // { value, source, defaulted? } (AF-31)
+  readonly weldGapMm?: Quantity; // { value, source, defaulted? } (AF-31)
   readonly fieldFitAllowanceMm?: Quantity;
-  readonly maxSpool?: { readonly lengthMm?: number; readonly boxMm?: Vec3; readonly weightKg?: number; readonly pieces?: number; readonly source: string };
+  readonly maxSpool?: {
+    readonly lengthMm?: number;
+    readonly boxMm?: Vec3;
+    readonly weightKg?: number;
+    readonly pieces?: number;
+    readonly source: string;
+  };
   readonly minCutPieceMm?: Quantity;
-  readonly weldPrefix?: { readonly fabrication?: string; readonly erection?: string };   // PCF WELD-PREFIX-*
-  readonly spoolPrefix?: string;                 // PCF SPOOL-PREFIX
+  readonly weldPrefix?: { readonly fabrication?: string; readonly erection?: string }; // PCF WELD-PREFIX-*
+  readonly spoolPrefix?: string; // PCF SPOOL-PREFIX
 }
 
 export interface WeldRecord {
-  readonly number: string;                       // "W7" (prefix + n)
+  readonly number: string; // "W7" (prefix + n)
   readonly n: number;
   readonly lineId: string;
   readonly kind: 'shop' | 'site' | 'field_fit';
   readonly joint: { readonly xyz: Vec3; readonly componentIds: readonly string[]; readonly boreMm: number; readonly endType: EndType };
   readonly spoolId?: string;
-  readonly status: 'active' | 'orphaned';        // joint disappeared after an edit: kept, never reused
+  readonly status: 'active' | 'orphaned'; // joint disappeared after an edit: kept, never reused
 }
 
-export interface SpoolRecord { readonly name: string; readonly lineId: string; readonly componentIds: readonly string[] }
+export interface SpoolRecord {
+  readonly name: string;
+  readonly lineId: string;
+  readonly componentIds: readonly string[];
+}
 
 export interface IsoDefinition {
   readonly lineId: string;
   readonly style: 'check' | 'final' | 'spool' | 'stress';
-  readonly paper: PaperSize;                     // from @core/model/sheet
+  readonly paper: PaperSize; // from @core/model/sheet
   readonly maxPipePiecesPerSheet?: number;
   readonly northArrow: 'up_right' | 'up_left';
-  readonly sheetAssignment: Readonly<Record<string, number>>;   // componentId -> sheet index (stability, FR-ISO-14)
+  readonly sheetAssignment: Readonly<Record<string, number>>; // componentId -> sheet index (stability, FR-ISO-14)
 }
 ```
 
@@ -201,24 +229,24 @@ All names snake_case; every command carries `@affects / @invariant / @failure` t
 `annotations: { readOnly: true, idempotent: true }`. Export commands take `confirmExportControlled` and call
 `exportRefusal` like `export_nc_files`.
 
-| Name | Kind | Params (sketch) | data | Failure codes |
-| ---- | ---- | --------------- | ---- | ------------- |
-| `import_pcf` | mutating (query when `preview`) | `text` (PCF content; CLI `file=`), `preview?`, `lineIdOverride?`, `levelId?`, `as: 'route' \| 'pcf_line'` (default `route` when RTE is installed) | `{ lineId, units, componentCount, countsByType, totalPipeLengthMm, pipeLengthsMm[], bom[], unknownRecords[], warnings[] }` | `ISO_PCF_HEADER`, `ISO_PCF_TAB`, `ISO_PCF_LINE_TOO_LONG`, `ISO_PCF_UNITS_MISSING`, `ISO_PCF_RECORD_INVALID`, `ISO_PCF_LINE_EXISTS` |
-| `export_pcf` | query (export) | `lineIds?` (default all), `units: 'mm' \| 'inch'`, `includeMaterials?` (true), `strictSkey?` (false), `includeSupports?` (M5), `confirmExportControlled` | `{ files: [{ name: "<line>.pcf", content, sha256, componentCount }], count }` | `ISO_LINE_NOT_FOUND`, `ISO_NO_PIPING`, `ISO_SKEY_MISSING` (refuses unless `allowMissingSkey`) |
-| `add_field_weld` | mutating | `lineId`, `at` (point on a pipe, doc units), `type: 'site' \| 'field_fit'` | `{ weldId, splitPipeIds }` | `ISO_WELD_NOT_ON_PIPE`, `ISO_WELD_TOO_CLOSE` (< min cut piece from a joint) |
-| `set_weld_type` | mutating | `weldId \| at`, `type: 'shop' \| 'site' \| 'field_fit'` | `{ weldId, previous }` | `ISO_WELD_NOT_FOUND` |
-| `number_welds` | mutating | `lineId \| lineIds`, `renumber?: false` (true = explicit full renumber, reported) | `{ assigned[], kept[], orphaned[], highest }` | `ISO_LINE_NOT_FOUND` |
-| `weld_list` | query | `lineId`, `spoolId?` | `{ welds: [{ number, kind, at, componentIds, boreMm, endType, spool }] }` | `ISO_LINE_NOT_FOUND`, `ISO_WELDS_UNNUMBERED` (warning) |
-| `set_fabrication_rules` | mutating | `weldGapMm?`, `fieldFitAllowanceMm?`, `maxSpoolLengthMm?`, `maxSpoolWidthMm?`, `maxSpoolHeightMm?`, `maxSpoolWeightKg?`, `maxSpoolPieces?`, `minCutPieceMm?`, prefixes, `source` (required string) | `{ rules }` | `ISO_PARAM_INVALID` |
-| `split_spools` | mutating | `lineId`, `breakAt: ('field_welds' \| 'flanged_joints' \| 'line_ends')[]`, `autoBreak?: false` (insert field welds to meet limits) | `{ spools: [{ name, componentIds, lengthMm, boxMm, weightKg }], insertedWelds[] }` | `ISO_SPOOL_TOO_LARGE` (no autoBreak), `ISO_LINE_NOT_FOUND` |
-| `spool_list` | query | `lineId?` | `{ spools[] }` | — |
-| `cut_list` | query | `lineId`, `spoolId?`, `weldGapMm?`, `fieldFitAllowanceMm?` (else rules; else refused) | `{ pieces: [{ piece, spool, componentId, boreMm, itemCode, centrelineLengthMm, cutLengthMm, adjustments[] }], totalMm, provenance }` | `ISO_GAP_UNDEFINED`, `ISO_CUT_LENGTH_SHORT` |
-| `piping_bom` | query | `scope: 'line' \| 'spool' \| 'sheet' \| 'document'`, `lineId?`, `spoolId?`, `sheet?`, `includeBolting?`, `matingFlanges?: 'assume_in_scope' \| 'this_side_only'` | `{ rows: [{ itemCode, type, description, quantity, unit, unverified? }], bolting: { joints, gaskets, studBolts, diameter }, provenance }` | `ISO_ITEM_CODE_MISSING` (warning row) |
-| `define_isometric` | mutating | `lineId`, `style`, `paper`, `maxPipePiecesPerSheet?`, `splitAt: 'weld' \| 'flange'`, `northArrow?` | `{ isoId }` | `ISO_LINE_NOT_FOUND` |
-| `export_isometric` | query (export) | `lineId`, `style?`, `paper?`, `formats: ('svg' \| 'dxf')[]`, `tables?`, `spoolId?` (spool iso), `confirmExportControlled` | `{ files[], sheets: [{ index, svg?, dxf?, sha256, componentIds, continuation: { previous?, next? } }], projection: { axes }, northArrow, dimensions[], annotations[], dimensionMismatches, tables, reviewRequired: true }` | `ISO_LINE_NOT_FOUND`, `ISO_DISCONNECTED`, `ISO_SHEET_OVERFLOW` (warning) |
-| `export_piping_ga` | query (export) | `view: 'plan' \| 'section'`, `levelId?`, `direction?`, `cutAt?`, `paper`, `scale`, `doubleLineFromDn?`, `annotate[]`, `confirmExportControlled` | `{ files[], labels[], arrows[] }` | `ISO_NO_PIPING`, building plan codes |
-| `check_isometric` | query (check) | `lineId?` (default all lines) | `{ ok, issues: [{ code, severity, ids, paths, remediation }], counts }` | — (issues, not refusals) |
-| `issue_isometric` | mutating (human gate) | `lineId`, `revision`, `purpose: 'for_construction' \| 'for_fabrication'`, `signatureId` | `{ issueId }` | `ISO_HUMAN_GATE`, `ISO_CHECK_FAILED` |
+| Name                    | Kind                            | Params (sketch)                                                                                                                                                                                    | data                                                                                                                                                                                                                       | Failure codes                                                                                                                      |
+| ----------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `import_pcf`            | mutating (query when `preview`) | `text` (PCF content; CLI `file=`), `preview?`, `lineIdOverride?`, `levelId?`, `as: 'route' \| 'pcf_line'` (default `route` when RTE is installed)                                                  | `{ lineId, units, componentCount, countsByType, totalPipeLengthMm, pipeLengthsMm[], bom[], unknownRecords[], warnings[] }`                                                                                                 | `ISO_PCF_HEADER`, `ISO_PCF_TAB`, `ISO_PCF_LINE_TOO_LONG`, `ISO_PCF_UNITS_MISSING`, `ISO_PCF_RECORD_INVALID`, `ISO_PCF_LINE_EXISTS` |
+| `export_pcf`            | query (export)                  | `lineIds?` (default all), `units: 'mm' \| 'inch'`, `includeMaterials?` (true), `strictSkey?` (false), `includeSupports?` (M5), `confirmExportControlled`                                           | `{ files: [{ name: "<line>.pcf", content, sha256, componentCount }], count }`                                                                                                                                              | `ISO_LINE_NOT_FOUND`, `ISO_NO_PIPING`, `ISO_SKEY_MISSING` (refuses unless `allowMissingSkey`)                                      |
+| `add_field_weld`        | mutating                        | `lineId`, `at` (point on a pipe, doc units), `type: 'site' \| 'field_fit'`                                                                                                                         | `{ weldId, splitPipeIds }`                                                                                                                                                                                                 | `ISO_WELD_NOT_ON_PIPE`, `ISO_WELD_TOO_CLOSE` (< min cut piece from a joint)                                                        |
+| `set_weld_type`         | mutating                        | `weldId \| at`, `type: 'shop' \| 'site' \| 'field_fit'`                                                                                                                                            | `{ weldId, previous }`                                                                                                                                                                                                     | `ISO_WELD_NOT_FOUND`                                                                                                               |
+| `number_welds`          | mutating                        | `lineId \| lineIds`, `renumber?: false` (true = explicit full renumber, reported)                                                                                                                  | `{ assigned[], kept[], orphaned[], highest }`                                                                                                                                                                              | `ISO_LINE_NOT_FOUND`                                                                                                               |
+| `weld_list`             | query                           | `lineId`, `spoolId?`                                                                                                                                                                               | `{ welds: [{ number, kind, at, componentIds, boreMm, endType, spool }] }`                                                                                                                                                  | `ISO_LINE_NOT_FOUND`, `ISO_WELDS_UNNUMBERED` (warning)                                                                             |
+| `set_fabrication_rules` | mutating                        | `weldGapMm?`, `fieldFitAllowanceMm?`, `maxSpoolLengthMm?`, `maxSpoolWidthMm?`, `maxSpoolHeightMm?`, `maxSpoolWeightKg?`, `maxSpoolPieces?`, `minCutPieceMm?`, prefixes, `source` (required string) | `{ rules }`                                                                                                                                                                                                                | `ISO_PARAM_INVALID`                                                                                                                |
+| `split_spools`          | mutating                        | `lineId`, `breakAt: ('field_welds' \| 'flanged_joints' \| 'line_ends')[]`, `autoBreak?: false` (insert field welds to meet limits)                                                                 | `{ spools: [{ name, componentIds, lengthMm, boxMm, weightKg }], insertedWelds[] }`                                                                                                                                         | `ISO_SPOOL_TOO_LARGE` (no autoBreak), `ISO_LINE_NOT_FOUND`                                                                         |
+| `spool_list`            | query                           | `lineId?`                                                                                                                                                                                          | `{ spools[] }`                                                                                                                                                                                                             | —                                                                                                                                  |
+| `cut_list`              | query                           | `lineId`, `spoolId?`, `weldGapMm?`, `fieldFitAllowanceMm?` (else rules; else refused)                                                                                                              | `{ pieces: [{ piece, spool, componentId, boreMm, itemCode, centrelineLengthMm, cutLengthMm, adjustments[] }], totalMm, provenance }`                                                                                       | `ISO_GAP_UNDEFINED`, `ISO_CUT_LENGTH_SHORT`                                                                                        |
+| `piping_bom`            | query                           | `scope: 'line' \| 'spool' \| 'sheet' \| 'document'`, `lineId?`, `spoolId?`, `sheet?`, `includeBolting?`, `matingFlanges?: 'assume_in_scope' \| 'this_side_only'`                                   | `{ rows: [{ itemCode, type, description, quantity, unit, unverified? }], bolting: { joints, gaskets, studBolts, diameter }, provenance }`                                                                                  | `ISO_ITEM_CODE_MISSING` (warning row)                                                                                              |
+| `define_isometric`      | mutating                        | `lineId`, `style`, `paper`, `maxPipePiecesPerSheet?`, `splitAt: 'weld' \| 'flange'`, `northArrow?`                                                                                                 | `{ isoId }`                                                                                                                                                                                                                | `ISO_LINE_NOT_FOUND`                                                                                                               |
+| `export_isometric`      | query (export)                  | `lineId`, `style?`, `paper?`, `formats: ('svg' \| 'dxf')[]`, `tables?`, `spoolId?` (spool iso), `confirmExportControlled`                                                                          | `{ files[], sheets: [{ index, svg?, dxf?, sha256, componentIds, continuation: { previous?, next? } }], projection: { axes }, northArrow, dimensions[], annotations[], dimensionMismatches, tables, reviewRequired: true }` | `ISO_LINE_NOT_FOUND`, `ISO_DISCONNECTED`, `ISO_SHEET_OVERFLOW` (warning)                                                           |
+| `export_piping_ga`      | query (export)                  | `view: 'plan' \| 'section'`, `levelId?`, `direction?`, `cutAt?`, `paper`, `scale`, `doubleLineFromDn?`, `annotate[]`, `confirmExportControlled`                                                    | `{ files[], labels[], arrows[] }`                                                                                                                                                                                          | `ISO_NO_PIPING`, building plan codes                                                                                               |
+| `check_isometric`       | query (check)                   | `lineId?` (default all lines)                                                                                                                                                                      | `{ ok, issues: [{ code, severity, ids, paths, remediation }], counts }`                                                                                                                                                    | — (issues, not refusals)                                                                                                           |
+| `issue_isometric`       | mutating (human gate)           | `lineId`, `revision`, `purpose: 'for_construction' \| 'for_fabrication'`, `signatureId`                                                                                                            | `{ issueId }`                                                                                                                                                                                                              | `ISO_HUMAN_GATE`, `ISO_CHECK_FAILED`                                                                                               |
 
 Composition (L10): `import_pcf` with `as: 'route'` calls the RTE commands (`add_pipe_run` with spec, branch, flange,
 valve placement) through `execute`, so the resulting document is identical to one routed by hand; with `as:
@@ -333,7 +361,7 @@ stock-length nesting (first-fit decreasing on 6 m / 12 m random lengths given by
 
 - Projection: plant axes map to sheet directions east = (cos −30°, sin −30°), north = (cos 30°, sin 30°), up = (0, 1)
   — identical to `viewDirections.ts AXES.iso` (scale dropped because the drawing is not to scale). `northArrow:
-  'up_left'` rotates plant directions by +90° about +Z before projection, so north projects at 150° (up-left) and east
+'up_left'` rotates plant directions by +90° about +Z before projection, so north projects at 150° (up-left) and east
   at +30°; the arrow is always drawn along the projected north. Inter-axis angle 120°, true-iso scale √(2/3) is reported for reference
   [S18][S19].
 - Graph: maximal straight runs between nodes (elbows, tees, ends, direction changes); each run has a direction class
@@ -424,78 +452,78 @@ REDUCER-CONCENTRIC / -ECCENTRIC, FLANGE, FLANGE-BLIND, GASKET, BOLT, VALVE, CAP,
 - UI: sheet browser lists generated isos (SVG view); a weld / BOM row click selects the component; check results
   panel; approval dialog calling `issue_isometric` with the reviewer's signature (09 PLM).
 
-| Code | Raised by | Meaning | Remediation |
-| ---- | --------- | ------- | ----------- |
-| `ISO_PCF_HEADER` | import_pcf | first line is not `ISOGEN-FILES …` | "export the PCF again from the source tool; the first line must be ISOGEN-FILES" |
-| `ISO_PCF_TAB` | import_pcf | TAB character at `line N` | "replace TABs with spaces (PCF forbids TAB)" |
-| `ISO_PCF_LINE_TOO_LONG` | import_pcf | line N > 1024 characters | "shorten the attribute on line N" |
-| `ISO_PCF_UNITS_MISSING` | import_pcf | UNITS-BORE or UNITS-CO-ORDS absent | "add UNITS-CO-ORDS MM / INCH to the header" |
-| `ISO_PCF_RECORD_INVALID` | import_pcf | point record with missing / non-numeric values at line N | "fix the END-POINT on line N: x y z bore [end type]" |
-| `ISO_PCF_LINE_EXISTS` | import_pcf | a line with this reference already exists | "pass lineIdOverride or delete the line first" |
-| `ISO_LINE_NOT_FOUND` | all line commands | unknown line id | "list lines with building_schedule kind=pipe" |
-| `ISO_NO_PIPING` | export_pcf, export_piping_ga | the document has no piping | "route a line with add_pipe_run or import_pcf" |
-| `ISO_SKEY_MISSING` | export_pcf, check | a non-pipe component has no SKEY | "set the spec item's skey (01 PSC) or drop strictSkey" |
-| `ISO_ITEM_CODE_MISSING` | piping_bom, check | component without item code | "assign the spec item (01 PSC)" |
-| `ISO_DISCONNECTED` | check, export_isometric | two connection points within 1 mm that do not coincide, or a component not reachable from the line start | "reconnect the component (02 RTE) — ids listed" |
-| `ISO_OPEN_END` | check | a line end with no terminal component and no equipment / tie-in reference | "add an end flange, cap or set from / to" |
-| `ISO_LEGACY_FITTINGS_DERIVED` | check, all queries (warning) | elbows derived from a polyline pipe | "re-route with the spec (02 RTE) to place real fittings" |
-| `ISO_SEGMENT_TOO_SHORT` | legacy network | adjacent elbows overlap | "lengthen the segment or use a bend" |
-| `ISO_WELD_NOT_ON_PIPE` | add_field_weld | `at` is not on a pipe centreline (tolerance 1 mm) | "pick a point on a pipe of the line" |
-| `ISO_WELD_TOO_CLOSE` | add_field_weld | the new weld leaves a piece shorter than `minCutPieceMm` | "move the weld" |
-| `ISO_WELD_NOT_FOUND` | set_weld_type | unknown weld | "list welds with weld_list" |
-| `ISO_WELDS_UNNUMBERED` | weld_list, check (warning; error for style final) | joints without a stored number | "run number_welds" |
-| `ISO_GAP_UNDEFINED` | cut_list | no weld gap given and no rule | "pass weldGapMm or set_fabrication_rules weldGapMm=… source=…" |
-| `ISO_CUT_LENGTH_SHORT` | cut_list, check | a cut piece below `minCutPieceMm` | "move the weld or merge the pieces" |
-| `ISO_SPOOL_TOO_LARGE` / `ISO_SPOOL_TOO_HEAVY` | split_spools, check | a spool exceeds the user's limit | "add a field weld (add_field_weld) or split_spools autoBreak=true" |
-| `ISO_DIMENSION_MISMATCH` | export_isometric, check | a string does not close to its overall (guard) | "report a bug with the plan" |
-| `ISO_SHEET_OVERFLOW` | export_isometric (warning) | layout could not fit without split | "define_isometric maxPipePiecesPerSheet=…" |
-| `ISO_SLOPE_BELOW_MIN` | check | a run falls less than the line's required slope | "re-route with the slope (02 RTE)" |
-| `ISO_UNVERIFIED_CATALOGUE` | check (warning, not hideable) | a catalogue row used is `unverified` (01 PSC) | "verify the spec rows (01 PSC) before issue" |
-| `ISO_PARAM_INVALID` | all | out-of-range parameter | per param |
-| `ISO_CHECK_FAILED` | issue_isometric | check_isometric has errors | "fix the listed issues first" |
-| `ISO_HUMAN_GATE` | issue_isometric | caller is an agent / no human signature | "ask the reviewer to issue the iso in the desktop app" |
+| Code                                          | Raised by                                         | Meaning                                                                                                  | Remediation                                                                      |
+| --------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `ISO_PCF_HEADER`                              | import_pcf                                        | first line is not `ISOGEN-FILES …`                                                                       | "export the PCF again from the source tool; the first line must be ISOGEN-FILES" |
+| `ISO_PCF_TAB`                                 | import_pcf                                        | TAB character at `line N`                                                                                | "replace TABs with spaces (PCF forbids TAB)"                                     |
+| `ISO_PCF_LINE_TOO_LONG`                       | import_pcf                                        | line N > 1024 characters                                                                                 | "shorten the attribute on line N"                                                |
+| `ISO_PCF_UNITS_MISSING`                       | import_pcf                                        | UNITS-BORE or UNITS-CO-ORDS absent                                                                       | "add UNITS-CO-ORDS MM / INCH to the header"                                      |
+| `ISO_PCF_RECORD_INVALID`                      | import_pcf                                        | point record with missing / non-numeric values at line N                                                 | "fix the END-POINT on line N: x y z bore [end type]"                             |
+| `ISO_PCF_LINE_EXISTS`                         | import_pcf                                        | a line with this reference already exists                                                                | "pass lineIdOverride or delete the line first"                                   |
+| `ISO_LINE_NOT_FOUND`                          | all line commands                                 | unknown line id                                                                                          | "list lines with building_schedule kind=pipe"                                    |
+| `ISO_NO_PIPING`                               | export_pcf, export_piping_ga                      | the document has no piping                                                                               | "route a line with add_pipe_run or import_pcf"                                   |
+| `ISO_SKEY_MISSING`                            | export_pcf, check                                 | a non-pipe component has no SKEY                                                                         | "set the spec item's skey (01 PSC) or drop strictSkey"                           |
+| `ISO_ITEM_CODE_MISSING`                       | piping_bom, check                                 | component without item code                                                                              | "assign the spec item (01 PSC)"                                                  |
+| `ISO_DISCONNECTED`                            | check, export_isometric                           | two connection points within 1 mm that do not coincide, or a component not reachable from the line start | "reconnect the component (02 RTE) — ids listed"                                  |
+| `ISO_OPEN_END`                                | check                                             | a line end with no terminal component and no equipment / tie-in reference                                | "add an end flange, cap or set from / to"                                        |
+| `ISO_LEGACY_FITTINGS_DERIVED`                 | check, all queries (warning)                      | elbows derived from a polyline pipe                                                                      | "re-route with the spec (02 RTE) to place real fittings"                         |
+| `ISO_SEGMENT_TOO_SHORT`                       | legacy network                                    | adjacent elbows overlap                                                                                  | "lengthen the segment or use a bend"                                             |
+| `ISO_WELD_NOT_ON_PIPE`                        | add_field_weld                                    | `at` is not on a pipe centreline (tolerance 1 mm)                                                        | "pick a point on a pipe of the line"                                             |
+| `ISO_WELD_TOO_CLOSE`                          | add_field_weld                                    | the new weld leaves a piece shorter than `minCutPieceMm`                                                 | "move the weld"                                                                  |
+| `ISO_WELD_NOT_FOUND`                          | set_weld_type                                     | unknown weld                                                                                             | "list welds with weld_list"                                                      |
+| `ISO_WELDS_UNNUMBERED`                        | weld_list, check (warning; error for style final) | joints without a stored number                                                                           | "run number_welds"                                                               |
+| `ISO_GAP_UNDEFINED`                           | cut_list                                          | no weld gap given and no rule                                                                            | "pass weldGapMm or set_fabrication_rules weldGapMm=… source=…"                   |
+| `ISO_CUT_LENGTH_SHORT`                        | cut_list, check                                   | a cut piece below `minCutPieceMm`                                                                        | "move the weld or merge the pieces"                                              |
+| `ISO_SPOOL_TOO_LARGE` / `ISO_SPOOL_TOO_HEAVY` | split_spools, check                               | a spool exceeds the user's limit                                                                         | "add a field weld (add_field_weld) or split_spools autoBreak=true"               |
+| `ISO_DIMENSION_MISMATCH`                      | export_isometric, check                           | a string does not close to its overall (guard)                                                           | "report a bug with the plan"                                                     |
+| `ISO_SHEET_OVERFLOW`                          | export_isometric (warning)                        | layout could not fit without split                                                                       | "define_isometric maxPipePiecesPerSheet=…"                                       |
+| `ISO_SLOPE_BELOW_MIN`                         | check                                             | a run falls less than the line's required slope                                                          | "re-route with the slope (02 RTE)"                                               |
+| `ISO_UNVERIFIED_CATALOGUE`                    | check (warning, not hideable)                     | a catalogue row used is `unverified` (01 PSC)                                                            | "verify the spec rows (01 PSC) before issue"                                     |
+| `ISO_PARAM_INVALID`                           | all                                               | out-of-range parameter                                                                                   | per param                                                                        |
+| `ISO_CHECK_FAILED`                            | issue_isometric                                   | check_isometric has errors                                                                               | "fix the listed issues first"                                                    |
+| `ISO_HUMAN_GATE`                              | issue_isometric                                   | caller is an agent / no human signature                                                                  | "ask the reviewer to issue the iso in the desktop app"                           |
 
 ## 8. Performance and robustness budgets
 
-| Operation | Size | Budget (reference desktop, node 22) |
-| --------- | ---- | ----------------------------------- |
-| `import_pcf` preview | 1000 components | < 100 ms |
-| `export_pcf` | 1000 components | < 200 ms, output ≤ 200 kB (120 kB could not hold: 130 bytes per two-point record; §13.6) |
-| welds + spools + cut list | 1000 components | < 50 ms |
-| `export_isometric` SVG | 100 components, 1 sheet | < 500 ms |
-| `export_isometric` SVG | 1000 components, auto split | < 2 s (VC-ISO-18 measured 1.07 s, §13.6) |
-| `check_isometric` | whole document, 500 lines | < 1 s |
+| Operation                 | Size                        | Budget (reference desktop, node 22)                                                      |
+| ------------------------- | --------------------------- | ---------------------------------------------------------------------------------------- |
+| `import_pcf` preview      | 1000 components             | < 100 ms                                                                                 |
+| `export_pcf`              | 1000 components             | < 200 ms, output ≤ 200 kB (120 kB could not hold: 130 bytes per two-point record; §13.6) |
+| welds + spools + cut list | 1000 components             | < 50 ms                                                                                  |
+| `export_isometric` SVG    | 100 components, 1 sheet     | < 500 ms                                                                                 |
+| `export_isometric` SVG    | 1000 components, auto split | < 2 s (VC-ISO-18 measured 1.07 s, §13.6)                                                 |
+| `check_isometric`         | whole document, 500 lines   | < 1 s                                                                                    |
 
 Robustness: PCF input capped at 16 MB and 200 000 lines (`ISO_PCF_TOO_LARGE`); coordinates must be finite;
 layout iterations bounded (no infinite collision loops); all outputs deterministic (sorted maps, fixed number format).
 
 ## 9. Test strategy (mapped to VCs)
 
-| Level | File | VCs |
-| ----- | ---- | --- |
-| Unit, PCF | `tests/unit/plant/fabrication/pcfRead.test.ts`, `pcfRoundTrip.test.ts` (fixture + mutated variants) | VC-ISO-01, 02, 03 |
-| Unit, fabrication | `welds.test.ts`, `spools.test.ts`, `cutList.test.ts`, `bom.test.ts` against `iso-01-L101-dn100.expected.json` | VC-ISO-05, 06, 07, 08, 09, 14 |
-| Unit, drawing | `isoProjection.test.ts`, `isoDimensions.test.ts`, `isoSlope.test.ts`, `isoSheets.test.ts`, `pipingGa.test.ts` (assert `data`, not SVG pixels) | VC-ISO-10, 11, 12, 13, 15 |
-| Unit, check | `checkIsometric.test.ts` (hand-built broken networks) | VC-ISO-16 |
-| Unit, styles / skew / gate | `isoStyles.test.ts`, `isoSkew.test.ts`, `issueIsometric.test.ts`; CSV and revision delta in `welds.test.ts` / `isoSheets.test.ts` | VC-ISO-19..23 |
-| Purity / contract | `is pure` per mutating command; tool-schema snapshot; `DocumentExtension` validation of the slice | all mutating |
-| Scenario | `server/tests/packReplay05.test.ts` runs `validation/plans/*.json` through `build_project` (`unbuilt` plans skipped until their commands exist) | VC-ISO-04, 13, 17 |
-| Golden | `tests/golden/__snapshots__/plant_iso_l101.{svg,dxf,pcf}` (reference plan; file snapshots, §13.6) | VC-ISO-17 |
-| Quality gate | 1000-component synthetic line timing | VC-ISO-18 |
-| Reference cross-check | CI step runs `python3 -I validation/data/pcf_reference_parse.py` and diffs with the `.expected.json` (guards the reference itself) | VC-ISO-01..08 |
+| Level                      | File                                                                                                                                            | VCs                           |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Unit, PCF                  | `tests/unit/plant/fabrication/pcfRead.test.ts`, `pcfRoundTrip.test.ts` (fixture + mutated variants)                                             | VC-ISO-01, 02, 03             |
+| Unit, fabrication          | `welds.test.ts`, `spools.test.ts`, `cutList.test.ts`, `bom.test.ts` against `iso-01-L101-dn100.expected.json`                                   | VC-ISO-05, 06, 07, 08, 09, 14 |
+| Unit, drawing              | `isoProjection.test.ts`, `isoDimensions.test.ts`, `isoSlope.test.ts`, `isoSheets.test.ts`, `pipingGa.test.ts` (assert `data`, not SVG pixels)   | VC-ISO-10, 11, 12, 13, 15     |
+| Unit, check                | `checkIsometric.test.ts` (hand-built broken networks)                                                                                           | VC-ISO-16                     |
+| Unit, styles / skew / gate | `isoStyles.test.ts`, `isoSkew.test.ts`, `issueIsometric.test.ts`; CSV and revision delta in `welds.test.ts` / `isoSheets.test.ts`               | VC-ISO-19..23                 |
+| Purity / contract          | `is pure` per mutating command; tool-schema snapshot; `DocumentExtension` validation of the slice                                               | all mutating                  |
+| Scenario                   | `server/tests/packReplay05.test.ts` runs `validation/plans/*.json` through `build_project` (`unbuilt` plans skipped until their commands exist) | VC-ISO-04, 13, 17             |
+| Golden                     | `tests/golden/__snapshots__/plant_iso_l101.{svg,dxf,pcf}` (reference plan; file snapshots, §13.6)                                               | VC-ISO-17                     |
+| Quality gate               | 1000-component synthetic line timing                                                                                                            | VC-ISO-18                     |
+| Reference cross-check      | CI step runs `python3 -I validation/data/pcf_reference_parse.py` and diffs with the `.expected.json` (guards the reference itself)              | VC-ISO-01..08                 |
 
 Coverage gate 90/85/90/90 applies (`packages/domain-aec/src/**`).
 
 ## 10. Delivery plan
 
-| Milestone | Content | Depends on | Effort |
-| --------- | ------- | ---------- | ------ |
-| ISO-M1 | **Built 2026-10-25 (§13).** network port + legacy network; PCF lexer / reader / writer; `import_pcf` (preview + `pcf_line`), `export_pcf`; codes; VC-ISO-01..03 | PSC bend radius rule (fallback: 1.5 × NPS LR90 from the B16.9 table) | 5 d |
-| ISO-M2 | **Built 2026-10-31 (§13.2).** welds + persistent numbering, `add_field_weld`, `set_weld_type`, spools, `set_fabrication_rules`, cut list, BOM with bolting; VC-ISO-05..09, 14 | PSC flange / bolt tables | 5 d |
-| ISO-M3 | **Built 2026-10-31 (§13.3).** iso graph, projection, not-to-scale layout, symbols, dimensions, elevations, slope, tables, SVG / DXF, single sheet; `check_isometric`; VC-ISO-10..12, 16, 17 | — | 8 d |
-| ISO-M4 | **Built 2026-10-31 (§13.4); `compareToIssue` and revision clouds stay M6.** sheet split + continuation + stability, spool isos, `define_isometric`, `issue_isometric` (human gate) | 09 PLM signatures (aerospace) | 4 d |
-| ISO-M5 | **Built 2026-11-02 (§13.5).** `import_pcf as=route` via RTE; supports in PCF / iso; skew boxes; piping GA (`export_piping_ga`); VC-ISO-04, 13, 15, 21 | 02 RTE | 5 d |
-| ISO-M6 | **Built 2026-11-04 (§13.6) except the ISOGEN conformance check of the fixture (OQ-ISO-01, licensed tool).** performance (VC-ISO-18), CSV weld map, revision clouds (`compareToIssue`), golden, open ends, stock nesting, stud length | licensed tool access (conformance only) | 3 d |
+| Milestone | Content                                                                                                                                                                                                                              | Depends on                                                           | Effort |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------ |
+| ISO-M1    | **Built 2026-10-25 (§13).** network port + legacy network; PCF lexer / reader / writer; `import_pcf` (preview + `pcf_line`), `export_pcf`; codes; VC-ISO-01..03                                                                      | PSC bend radius rule (fallback: 1.5 × NPS LR90 from the B16.9 table) | 5 d    |
+| ISO-M2    | **Built 2026-10-31 (§13.2).** welds + persistent numbering, `add_field_weld`, `set_weld_type`, spools, `set_fabrication_rules`, cut list, BOM with bolting; VC-ISO-05..09, 14                                                        | PSC flange / bolt tables                                             | 5 d    |
+| ISO-M3    | **Built 2026-10-31 (§13.3).** iso graph, projection, not-to-scale layout, symbols, dimensions, elevations, slope, tables, SVG / DXF, single sheet; `check_isometric`; VC-ISO-10..12, 16, 17                                          | —                                                                    | 8 d    |
+| ISO-M4    | **Built 2026-10-31 (§13.4); `compareToIssue` and revision clouds stay M6.** sheet split + continuation + stability, spool isos, `define_isometric`, `issue_isometric` (human gate)                                                   | 09 PLM signatures (aerospace)                                        | 4 d    |
+| ISO-M5    | **Built 2026-11-02 (§13.5).** `import_pcf as=route` via RTE; supports in PCF / iso; skew boxes; piping GA (`export_piping_ga`); VC-ISO-04, 13, 15, 21                                                                                | 02 RTE                                                               | 5 d    |
+| ISO-M6    | **Built 2026-11-04 (§13.6) except the ISOGEN conformance check of the fixture (OQ-ISO-01, licensed tool).** performance (VC-ISO-18), CSV weld map, revision clouds (`compareToIssue`), golden, open ends, stock nesting, stud length | licensed tool access (conformance only)                              | 3 d    |
 
 Total ≈ 30 developer-days. Cross-gap: `07-pipe-stress-flexibility` consumes `export_pcf` (COMPONENT-ATTRIBUTE map)
 and the stress iso style; `08-plant-data-reports-interop` consumes the BOM and weld list; `09-plant-visualization-review`
@@ -550,16 +578,16 @@ Rn = source Sn in [validation/sources.md](validation/sources.md) (graded table, 
 
 Plugin `piping-fabrication` (toolset `piping`), folder `packages/domain-aec/src/plant/fabrication/`, installed after `piping` in `installDefaultPlugins()`.
 
-| File | Content |
-| ---- | ------- |
-| `model.ts` | the read port `PipingNetwork` / `NetworkComponent` / `NetworkPoint` (§3, mm), `IsoIssue`, and the stored form `PcfLineData` (plain JSON: header, pipeline attributes, components, MATERIALS, unknown records) and `FabricationModel` |
-| `pcf/pcfLexer.ts`, `pcf/pcfRead.ts` | lines + limits (TAB, 1024, header, 16 MB / 200000 lines) then records; units scaling; `extra` / `unknownRecords` kept; coded refusals with `line N` |
-| `pcf/pcfWrite.ts` | canonical writer (§5.2), mm (1 decimal) or inch (4 decimals) |
-| `pcf/pcfMap.ts` | `networkOf` (data to network, MATERIALS descriptions joined), `dataOfNetwork`, `summarise` (counts, pipe lengths, BOM), `missingSkeyIds` |
-| `routeNetwork.ts` | routed line (the derived parts of its runs) to network: the 02 RTE writer of its §13.10, moved here with unchanged output bytes |
-| `legacyNetwork.ts` | building `PipeElement` lines to a network with derived elbows (§5.3) |
-| `commands/` | `import_pcf`, `export_pcf`, `delete_pcf_line` |
-| `validate.ts`, `plugin.ts`, `catalog.ts`, `state.ts`, `codes.ts` | slice validation (`DocumentExtension`), registration, `getFabrication` / `lineIdsInUse`, `ISO_*` remediation table |
+| File                                                             | Content                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model.ts`                                                       | the read port `PipingNetwork` / `NetworkComponent` / `NetworkPoint` (§3, mm), `IsoIssue`, and the stored form `PcfLineData` (plain JSON: header, pipeline attributes, components, MATERIALS, unknown records) and `FabricationModel` |
+| `pcf/pcfLexer.ts`, `pcf/pcfRead.ts`                              | lines + limits (TAB, 1024, header, 16 MB / 200000 lines) then records; units scaling; `extra` / `unknownRecords` kept; coded refusals with `line N`                                                                                  |
+| `pcf/pcfWrite.ts`                                                | canonical writer (§5.2), mm (1 decimal) or inch (4 decimals)                                                                                                                                                                         |
+| `pcf/pcfMap.ts`                                                  | `networkOf` (data to network, MATERIALS descriptions joined), `dataOfNetwork`, `summarise` (counts, pipe lengths, BOM), `missingSkeyIds`                                                                                             |
+| `routeNetwork.ts`                                                | routed line (the derived parts of its runs) to network: the 02 RTE writer of its §13.10, moved here with unchanged output bytes                                                                                                      |
+| `legacyNetwork.ts`                                               | building `PipeElement` lines to a network with derived elbows (§5.3)                                                                                                                                                                 |
+| `commands/`                                                      | `import_pcf`, `export_pcf`, `delete_pcf_line`                                                                                                                                                                                        |
+| `validate.ts`, `plugin.ts`, `catalog.ts`, `state.ts`, `codes.ts` | slice validation (`DocumentExtension`), registration, `getFabrication` / `lineIdsInUse`, `ISO_*` remediation table                                                                                                                   |
 
 Slice: `doc.plant.fabrication?: FabricationModel = { version: 1, pcfLines }` (plant README D2: a sub-record of `doc.plant`, type in the plugin, not in core;
 the core file `model/fabrication.ts` of §3 was not needed). `pcfLines[lineId]` is a `PcfLineData` in mm. Later milestones add welds, spools and isometric definitions.
@@ -567,8 +595,8 @@ the core file `model/fabrication.ts` of §3 was not needed). `pcfLines[lineId]` 
 **How `export_pcf` evolved.** The 02 RTE V1 part 2 command (`piping/commands/exportPcf.ts` + `piping/pcf.ts`) was moved, not duplicated: the part-to-record mapping is now
 `routeNetwork.ts` (route line to `PipingNetwork`), the text is produced by the one canonical writer `pcf/pcfWrite.ts`, and the command lives in the 05 plugin. For routed lines the output is
 byte-identical to before (both golden files `tests/golden/__snapshots__/piping_pcf_*.pcf` unchanged). It gained: the two other line sources (imported lines are written back from their stored
-data, legacy pipes through the legacy network), `units: 'mm' | 'inch'`, `includeMaterials`, `strictSkey`, per-file `source` and `warnings`, and the ISO codes in place of RTE_UNKNOWN_LINE / RTE_NO_RUNS
-(`ISO_LINE_NOT_FOUND`, `ISO_NO_PIPING`; the `RTE_*` code of a run that no longer derives is still returned as is). `data.files[]` keeps every key it had.
+data, legacy pipes through the legacy network), `units: 'mm' | 'inch'`, `includeMaterials`, `strictSkey`, per-file `source` and `warnings`, and the ISO codes in place of RTE*UNKNOWN_LINE / RTE_NO_RUNS
+(`ISO_LINE_NOT_FOUND`, `ISO_NO_PIPING`; the `RTE*\*`code of a run that no longer derives is still returned as is).`data.files[]` keeps every key it had.
 
 **Deviations from §4 (all decided, see below).** `import_pcf`: `as` has the single value `pcf_line` (routed components arrive with M5); `levelId` is not taken (PCF coordinates are world, z is absolute);
 the data adds `units` (the declared ones), `withoutItemCode`, `stored`. `export_pcf`: `strictSkey` replaces `allowMissingSkey` (inverted default); `includeSupports` waits for M5 (supports and welds are not written).
@@ -584,7 +612,7 @@ units are chosen by the writer, `ISOGEN-FILES`, `UNITS-WEIGHT` and `UNITS-WEIGHT
 **Writer attribute order** (a refinement of §5.2 "stored order"): `COMPONENT-IDENTIFIER`, `UNIQUE-COMPONENT-IDENTIFIER` (llull ids only), `END-POINT`s, `CENTRE-POINT`, `BRANCH1-POINT`, `CO-ORDS`,
 the unknown attributes in stored order, `SKEY`, the category flag, `ITEM-CODE`, `WEIGHT`. This reproduces the reference writer on the fixture (sha256 `56d1b90a...`, VC-ISO-03) and the 02 RTE output
 (UNIQUE-COMPONENT-IDENTIFIER right after the identifier, SPINDLE-DIRECTION before SKEY). A file that orders SKEY / ITEM-CODE differently is normalised, not preserved. Pipeline attributes are written in
-the fixed order PIPING-SPEC, INSULATION-SPEC, TRACING-SPEC, PAINTING-SPEC, PROJECT-IDENTIFIER, AREA, REVISION, DATE-DMY, SPOOL-PREFIX, WELD-PREFIX-*, HIGHEST-*, then the others in stored order.
+the fixed order PIPING-SPEC, INSULATION-SPEC, TRACING-SPEC, PAINTING-SPEC, PROJECT-IDENTIFIER, AREA, REVISION, DATE-DMY, SPOOL-PREFIX, WELD-PREFIX-_, HIGHEST-_, then the others in stored order.
 
 **Legacy network as built.** Elbows at every interior vertex whose turn is at least 0.5 degree (a smaller turn is straight pipe, the vertex is ignored). A turn within 1 degree of 90 / 45 is an ELBOW
 (SKEY ELBW, flagged `derived`) with the centre-to-end of the bundled B16.9 long-radius catalogue (`resolveCatalogRow` elbow90 / elbow45 LR; DN100: 152.4 and 63.5 mm: the PSC table value, not the 152 rounding of the
@@ -617,14 +645,14 @@ use the RTE graph). Routed components from a PCF and supports in the PCF (M5). T
 Nine commands in the plugin `piping-fabrication` (toolset `piping`): `add_field_weld`, `set_weld_type`, `number_welds`, `weld_list`, `set_fabrication_rules`, `split_spools`, `spool_list`, `cut_list`, `piping_bom`.
 All read a line through one function, `lineNetwork.ts loadLine`: routed line, imported PCF line or legacy pipe line (the M1 network port), with the stored field welds applied.
 
-| File | Content |
-| ---- | ------- |
-| `fieldWelds.ts` | `splitComponents`: a stored field weld splits the PIPE it lies on (1 mm tolerance) into `<pipeId>.s1`, `.s2` with a WELD (SKEY WS / WF, ERECTION-ITEM) between; a weld on no pipe is stale and ignored (`ISO_FIELD_WELD_STALE`) |
-| `joints.ts` | connection nodes keyed at 0.1 mm, iterative depth-first walk from the line start (run before branch), joint classes shop / site / field_fit / bolted / other, terminals |
-| `welds.ts` | numbering plan: match stored welds to joints (same position and components, else position, else components), new = highest + 1, vanished = orphaned, `renumber` |
-| `spools.ts` | union-find spools, names `<line or spoolPrefix>-SP<nn>`, metrics, limit violations, `suggestSplit` for autoBreak |
-| `cutList.ts`, `bom.ts` | cut pieces; BOM rows and bolting (ASME B16.5 table of the bundled catalogue) |
-| `analysis.ts` | one line read + graph + numbering plan + spools: what the commands call |
+| File                   | Content                                                                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fieldWelds.ts`        | `splitComponents`: a stored field weld splits the PIPE it lies on (1 mm tolerance) into `<pipeId>.s1`, `.s2` with a WELD (SKEY WS / WF, ERECTION-ITEM) between; a weld on no pipe is stale and ignored (`ISO_FIELD_WELD_STALE`) |
+| `joints.ts`            | connection nodes keyed at 0.1 mm, iterative depth-first walk from the line start (run before branch), joint classes shop / site / field_fit / bolted / other, terminals                                                         |
+| `welds.ts`             | numbering plan: match stored welds to joints (same position and components, else position, else components), new = highest + 1, vanished = orphaned, `renumber`                                                                 |
+| `spools.ts`            | union-find spools, names `<line or spoolPrefix>-SP<nn>`, metrics, limit violations, `suggestSplit` for autoBreak                                                                                                                |
+| `cutList.ts`, `bom.ts` | cut pieces; BOM rows and bolting (ASME B16.5 table of the bundled catalogue)                                                                                                                                                    |
+| `analysis.ts`          | one line read + graph + numbering plan + spools: what the commands call                                                                                                                                                         |
 
 Slice `doc.plant.fabrication` gained optional `rules`, `fieldWelds`, `welds` (key `<lineId>#<n>`), `highestWeldNumber`, `spoolBreaks`; `validate.ts` checks them (key = id, number unique per line). `delete_pcf_line` also removes the line's field welds, weld numbers and spool breaks. `export_pcf` writes the field welds as WELD records for all three line sources (its description lost "welds and spools are not written yet": a changed sentence of an existing tool).
 
@@ -649,15 +677,15 @@ Slice `doc.plant.fabrication` gained optional `rules`, `fieldWelds`, `welds` (ke
 
 Two commands in the plugin `piping-fabrication` (toolset `piping`): `export_isometric` (query / export, one sheet, SVG and / or DXF) and `check_isometric` (query). Both read a line through `analysis.ts analyseLine` (M2), so routed, imported and legacy lines draw alike.
 
-| File | Content |
-| ---- | ------- |
-| `iso/isoProjection.ts` | east -30 / north +30 / up 90 degrees (the `viewDirections.ts` iso frame, tested against it), `up_left` (plant turned +90 degrees), depth for crossings |
-| `iso/isoGraph.ts` | components to segments (an elbow, bend or tee through its centre point; an elbow without centre through the L corner), depth-first walk (run before branch), maximal straight runs, direction classes `+E .. -U | slope | skew` |
-| `iso/isoDimensions.ts` | string + overall dimension per run (3D distances, label = value rounded to 0.1 mm), `EL`, `E .. N ..`, slope (`SLOPE 1:n` or percent, degrees, fall direction) |
-| `iso/isoLayout.ts` | `l = clamp(k ln(1 + L / 200), 9, 110)` paper mm, k by bisection to fit, crossing passes (at most 12), uniform shrink + `overflow` below 70 % |
-| `iso/isoSymbols.ts`, `iso/isoLabels.ts` | symbols by family and joint class; dimension lines; label placement on the first candidate that meets no box / line |
+| File                                                      | Content                                                                                                                                                                                                                                 |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ----- |
+| `iso/isoProjection.ts`                                    | east -30 / north +30 / up 90 degrees (the `viewDirections.ts` iso frame, tested against it), `up_left` (plant turned +90 degrees), depth for crossings                                                                                  |
+| `iso/isoGraph.ts`                                         | components to segments (an elbow, bend or tee through its centre point; an elbow without centre through the L corner), depth-first walk (run before branch), maximal straight runs, direction classes `+E .. -U                         | slope | skew` |
+| `iso/isoDimensions.ts`                                    | string + overall dimension per run (3D distances, label = value rounded to 0.1 mm), `EL`, `E .. N ..`, slope (`SLOPE 1:n` or percent, degrees, fall direction)                                                                          |
+| `iso/isoLayout.ts`                                        | `l = clamp(k ln(1 + L / 200), 9, 110)` paper mm, k by bisection to fit, crossing passes (at most 12), uniform shrink + `overflow` below 70 %                                                                                            |
+| `iso/isoSymbols.ts`, `iso/isoLabels.ts`                   | symbols by family and joint class; dimension lines; label placement on the first candidate that meets no box / line                                                                                                                     |
 | `iso/isoTables.ts`, `iso/isoSheet.ts`, `iso/isoRender.ts` | bom / cut_list / weld_list / spool_list as text tables; sheet assembly (frame, title block, north arrow, NOT FOR CONSTRUCTION); primitives printed as SVG and DXF R12 (layers `ISO-PIPE`, `-SYMB`, `-DIM`, `-TEXT`, `-TABLE`, `-FRAME`) |
-| `check.ts` | the rule table below |
+| `check.ts`                                                | the rule table below                                                                                                                                                                                                                    |
 
 **`check_isometric` rules** (code, severity): `ISO_DISCONNECTED` error (components not reachable from the line start; two connection points under 1 mm apart with different 0.1 mm keys), `ISO_OPEN_END` warning,
 `ISO_SKEY_MISSING` error, `ISO_ITEM_CODE_MISSING` warning, `ISO_WELDS_UNNUMBERED` warning (error with `style: final`), `ISO_SPOOL_TOO_LARGE` / `ISO_SPOOL_TOO_HEAVY` error (ids = spool names), `ISO_CUT_LENGTH_SHORT` error (only when a weld gap is stored),
@@ -687,12 +715,12 @@ still blocked: `add_end_flange` (sc-iso-02), `define_isometric` (sc-iso-05), `ex
 
 Two new commands in `piping-fabrication` (toolset `piping`): `define_isometric` (mutating) and `issue_isometric` (mutating, human gate). Changed existing tools: `export_isometric` (several sheets, style `spool`, `spoolId`, the stored definition applies, issue stamp; description and the `style`, `paper`, `tables`, `northArrow` param texts), `piping_bom` (scope `sheet`, param `sheet`; description and `scope` text), `delete_pcf_line` (also removes the definition and issue stamps), `check_isometric` (rules below, description unchanged).
 
-| File | Content |
-| ---- | ------- |
-| `iso/isoSheets.ts` | `planSheets`: component-to-sheet assignment (budget mode or spool mode), continuation joints, `continuationOf`, `definedPlan` |
-| `issues.ts` | `basisOf` (SHA-256 of the line components and numbered weld joints), `issueState` (latest stamp; current when the basis still matches) |
-| `commands/defineIsometric.ts`, `commands/issueIsometric.ts` | the two commands |
-| `iso/isoSheet.ts`, `isoTables.ts`, `isoGraph.ts` | take a sheet scope: graph of the sheet's components, tables of its components, continuation marks, "n OF m", issue stamp |
+| File                                                        | Content                                                                                                                                |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `iso/isoSheets.ts`                                          | `planSheets`: component-to-sheet assignment (budget mode or spool mode), continuation joints, `continuationOf`, `definedPlan`          |
+| `issues.ts`                                                 | `basisOf` (SHA-256 of the line components and numbered weld joints), `issueState` (latest stamp; current when the basis still matches) |
+| `commands/defineIsometric.ts`, `commands/issueIsometric.ts` | the two commands                                                                                                                       |
+| `iso/isoSheet.ts`, `isoTables.ts`, `isoGraph.ts`            | take a sheet scope: graph of the sheet's components, tables of its components, continuation marks, "n OF m", issue stamp               |
 
 Slice `doc.plant.fabrication` gained optional `isometrics` (by line id: style, paper, `maxPipePiecesPerSheet`, `splitAt`, `northArrow`, `sheetAssignment`) and `issues` (by id `iso-issue-<step>.<k>`: line, revision, purpose, signer, signatureId, `basisSha256`); `validate.ts` checks them.
 
@@ -727,14 +755,14 @@ Slice `doc.plant.fabrication` gained optional `isometrics` (by line id: style, p
 
 One new command in `piping-fabrication` (toolset `piping`): `export_piping_ga`. Changed tools: `import_pcf` (param `as` gains `route`; new params `spec`, `service`, `supports`, `valveType`), `export_pcf` (param `includeSupports`; data `files[].supports`), `export_isometric` (skew boxes and support marks; annotations `skew`, `skew_leg`, `support`; `data.supports`), `missingSkeyIds` (a SUPPORT never needs a key). Nothing else in `plant/piping` was edited: routing is reached only through `execute`, supports through `add_pipe_support`.
 
-| File | Content |
-| ---- | ------- |
-| `routeImport/plan.ts` | `planRoute`: the imported components to runs (main run + one per tee / olet), points of intersection (elbow and bend centre points), inline valves and reducers, flanged ends as ports, field welds, supports; refuses what it cannot rebuild with the components named |
-| `routeImport/compose.ts` | executes the plan with `add_tie_in_point`, `create_pipeline`, `route_pipe`, `add_branch`, `insert_inline_component`, `add_field_weld`, `add_pipe_support`, all through `execute` (the nested commands join the import's step, so ids are step-scoped and replay re-mints them); the first refusal of any step is the import's refusal with that step's own code, document unchanged |
-| `routeImport/importRoute.ts` | the `as route` branch of `import_pcf`: spec, plan, level check, compose, comparison with the file, data |
-| `supports.ts` | `lineSupports` (document `pipeSupport` elements of a routed or legacy line, or the SUPPORT components of an imported one), `insertSupports` (SUPPORT records after the pipe they lie on), `placeableType` |
-| `iso/isoSkew.ts`, `iso/isoSupports.ts` | skew boxes and support marks of the isometric sheet |
-| `ga/pipingGa.ts`, `commands/exportPipingGa.ts` | the orthographic piping GA |
+| File                                           | Content                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routeImport/plan.ts`                          | `planRoute`: the imported components to runs (main run + one per tee / olet), points of intersection (elbow and bend centre points), inline valves and reducers, flanged ends as ports, field welds, supports; refuses what it cannot rebuild with the components named                                                                                                             |
+| `routeImport/compose.ts`                       | executes the plan with `add_tie_in_point`, `create_pipeline`, `route_pipe`, `add_branch`, `insert_inline_component`, `add_field_weld`, `add_pipe_support`, all through `execute` (the nested commands join the import's step, so ids are step-scoped and replay re-mints them); the first refusal of any step is the import's refusal with that step's own code, document unchanged |
+| `routeImport/importRoute.ts`                   | the `as route` branch of `import_pcf`: spec, plan, level check, compose, comparison with the file, data                                                                                                                                                                                                                                                                             |
+| `supports.ts`                                  | `lineSupports` (document `pipeSupport` elements of a routed or legacy line, or the SUPPORT components of an imported one), `insertSupports` (SUPPORT records after the pipe they lie on), `placeableType`                                                                                                                                                                           |
+| `iso/isoSkew.ts`, `iso/isoSupports.ts`         | skew boxes and support marks of the isometric sheet                                                                                                                                                                                                                                                                                                                                 |
+| `ga/pipingGa.ts`, `commands/exportPipingGa.ts` | the orthographic piping GA                                                                                                                                                                                                                                                                                                                                                          |
 
 **`import_pcf as route`.** The file's centreline is rebuilt with the spec: a flanged end (a flange, or a gasket and flange, entered by its flanged face at a free end) becomes a tie-in port (`add_tie_in_point`, end type FL, tag `<line>-PCF-<run>-S|E`, left in the document like any port) so the spec places the flange set; elbow and bend centre points are the points of intersection (an elbow without centre takes the corner of the L through its end points); a tee or an olet starts a branch run (`add_branch` at the fitting centre; the spec's branch table decides the fitting, so an olet in the file can come back a tee); a concentric reducer and a valve become inline components of the main run (`route_pipe inline`), of a branch (`insert_inline_component`; a reducer in a branch is refused); a flange - gasket - valve - gasket - flange set is one inline valve; site and field-fit WELD records become `add_field_weld`; SUPPORT records become `add_pipe_support` (one call each, type from `SUPPORT-TYPE`, shoe when absent); shop welds are derived by the routing. `data.lineId` is the routed line id (the id every later command takes), `data.lineNumber` the PIPELINE-REFERENCE, `data.route` lists runs, ports, welds, supports, what the spec rebuilt, the attributes and unknown records not carried over, and `comparison`.
 
@@ -758,12 +786,12 @@ Decisions (owner delegated: long-term quality over the cheap path; no backward c
 
 No new command. Changed tools: `export_isometric` (params `compareToIssue`, `revision`; data `comparison`), `weld_list` (param `format`), `cut_list` (params `stockLengthsMm`, `kerfMm`; data `nesting`), `piping_bom` (param `gasketThicknessMm`; bolt groups gain `stud`), `export_pcf` (`openEnds` for imported and legacy lines), `create_pipeline` and `add_pipe_run` (imported line numbers), `issue_isometric` (one extra slice write). The ISOGEN conformance check of the fixture (OQ-ISO-01) still needs a licensed tool and is not done.
 
-| File | Content |
-| ---- | ------- |
-| `compareIssue.ts` | `snapshotOf` (compact image of a line: fingerprint + position per component, numbered welds, dimension strings, BOM rows), `deltaOf` (added / removed / changed per kind, BOM quantities) |
-| `iso/isoRevision.ts` | `revisionMarks`: scalloped revision cloud around each changed or new component and weld of a sheet (overlapping clouds merge), delta triangle with the revision label at its top right |
-| `stockNesting.ts` | `nestPieces`: first-fit decreasing into stock bars |
-| `joints.ts` | `networkOpenEnds` |
+| File                 | Content                                                                                                                                                                                   |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compareIssue.ts`    | `snapshotOf` (compact image of a line: fingerprint + position per component, numbered welds, dimension strings, BOM rows), `deltaOf` (added / removed / changed per kind, BOM quantities) |
+| `iso/isoRevision.ts` | `revisionMarks`: scalloped revision cloud around each changed or new component and weld of a sheet (overlapping clouds merge), delta triangle with the revision label at its top right    |
+| `stockNesting.ts`    | `nestPieces`: first-fit decreasing into stock bars                                                                                                                                        |
+| `joints.ts`          | `networkOpenEnds`                                                                                                                                                                         |
 
 **compareToIssue (VC-ISO-23).** An issue stamp keeps only a hash, so `issue_isometric` now also stores `snapshotOf(analysis)` in `doc.plant.fabrication.issueSnapshots[issueId]` (validated on load; removed with its issue by `delete_pcf_line`; undo removes it with the issue; a replayed issue recomputes it from the same content, so it equals the original). `export_isometric compareToIssue` diffs the current line against the LAST issue of the line (stale or current): components by id (fingerprint = first 16 hex of the SHA-256 of the canonical component), welds by number (kind and position), dimension strings by `axis@start` (overall and end), BOM rows by item code (quantity). New and changed components and welds are circled on every sheet that draws them (layer `ISO-REV`, red in SVG, colour 1 in DXF; annotations `kind: revision` with `componentIds`, `welds`, `sheet`); removed components cannot be drawn and are counted in the legend (`REVISION CLOUDS: CHANGES SINCE REV A (n ON THIS SHEET, m REMOVED)`) and listed in `data.comparison.delta`. The delta triangle carries `revision` (default `*`: the next revision label is the human's to choose). An unchanged line gives `comparison.unchanged true` and no cloud. Deterministic. Refusals: `ISO_ISSUE_NOT_FOUND` (no issue), `ISO_ISSUE_SNAPSHOT_MISSING` (an issue stored before snapshots: issue anew), `ISO_PARAM_INVALID` (`revision` without `compareToIssue`). A field weld splitting a pipe shows as one removed and two added pipes, the new weld and the field-weld component (W14 on the fixture); BOM and dimensions do not change in that case, as they should not.
 
@@ -789,12 +817,12 @@ No new command. Changed tools: `export_isometric` (params `compareToIssue`, `rev
 
 Changed tools: `import_pcf` (param `eccentricFlat`, code `ISO_ROUTE_FLAT_MISSING`; data `route.runs[]` gains `eccentric` on an inline reducer, `capped` / `closure`), `insert_inline_component` and `route_pipe inline` (types `flangedJoint`, `instrument`; params `lengthMm`, `endType`), `set_run_end_cap` (param `closure` `cap | blindFlange`). No new command. New slice fields (persisted, validated on load, in the piping slice-fuzz seed): `RunEnd.blind: true`, `InlineComponent.lengthMm` / `endType` (instruments only). `ISO_ROUTE_UNSUPPORTED` no longer names a cap, blind flange, instrument or eccentric reducer: route mode now refuses only a flanged instrument not between two flanges, a flange joined to something that is neither a flange, a valve nor an instrument, a tee downstream of an eccentric reducer on the same leg, and a line whose every free end is a closure.
 
-| File | Content |
-| ---- | ------- |
-| `routeImport/eccentric.ts` | `eccentricStep` (offset and flat side of one reducer), `storedCorner` (the corner after a leg that carries an offset) |
-| `routeImport/inlineBody.ts` | `PlannedInline`, `bodyOf` (valve or instrument body: centre, spindle, face-to-face length, ends) |
-| `piping/routeFlangedInline.ts` | `flangedJointSlot`, `instrumentSlot` (RTE parts) |
-| `piping/routeEnds.ts` | `blindSetup` / `blindParts` (a blind-flanged run end) |
+| File                           | Content                                                                                                               |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `routeImport/eccentric.ts`     | `eccentricStep` (offset and flat side of one reducer), `storedCorner` (the corner after a leg that carries an offset) |
+| `routeImport/inlineBody.ts`    | `PlannedInline`, `bodyOf` (valve or instrument body: centre, spindle, face-to-face length, ends)                      |
+| `piping/routeFlangedInline.ts` | `flangedJointSlot`, `instrumentSlot` (RTE parts)                                                                      |
+| `piping/routeEnds.ts`          | `blindSetup` / `blindParts` (a blind-flanged run end)                                                                 |
 
 **Eccentric reducers.** The RTE keeps the points of intersection on the axis UPSTREAM of an eccentric reducer and takes the offset up in the next turn (02 §13.4), so the plan carries the offset `D = e x flat`, `e = (OD big - OD small) / 2` (hand calculation: NPS 6 -> 4, e = (168.3 - 114.3) / 2 = 27 mm): a valve or reducer downstream of it on the same leg is planned at its centre minus the carried offset, and the corner after the leg at the elbow centre minus the component of the offset along the next leg (`C - (D . u_next) u_next`: elbow centre (4000, 0, 27), next leg +Z, stored corner (4000, 0, 0)). **The flat side is measured, not read:** a file written by ISOGEN, llull or CAD carries the offset in the two END-POINTs of the reducer, which gives the flat side (a reducer: toward the smaller axis; an expander: away from it, so DN100 -> DN150 flat on top puts the axis 27 mm below). Only when both END-POINTs lie on one axis the file does not say, and the new param `eccentricFlat` (`top` | `bottom`) is required (`ISO_ROUTE_FLAT_MISSING` otherwise, reducer named); it is never a default. A value that disagrees with a measured offset is `ISO_PARAM_INVALID` (the file wins, the conflict is not silently resolved); `top` / `bottom` on a vertical pipe is the RTE's `RTE_ECCENTRIC_INVALID`, an offset the next leg cannot take up (a reducer with no turn after it) `RTE_ECCENTRIC_OFFSET`, both passed through. Round trips (export, `as route`, export) of a FOT reducer 150 -> 100 before a riser, an expander and a reducer with a valve downstream on the same leg are fixed points (pipe 4529 mm, delta 0). The heading of a run comes from its stored axis, else the dominant coordinate axis of the reducer.
 
@@ -810,6 +838,48 @@ Changed tools: `import_pcf` (param `eccentricFlat`, code `ISO_ROUTE_FLAT_MISSING
 
 **Tests.** `importRouteFittings.test.ts` (eccentric: offset carried, fixed point, expander, valve downstream, FLAT_MISSING, explicit sides, conflict, vertical, last leg, tee downstream, pure; caps: closed end beyond the joint, fixed point, two-point cap, no cap row, branch cap; blind: fixed point, no gasket, two-point blind, walk from the other end, no blind row, both ends closed; joint and instrument: round trips, no-gasket pair, BW instrument, refusals), `importRouteHostile.test.ts` (17 hostile files x two specs, plus preview), `blindRunEnd.test.ts`, `flangedInline.test.ts` (RTE: hand-checked positions, takeoff, PCF, refusals, load validation), golden plan `piping_blind_joint_instrument` (PCF exported), piping slice-fuzz seed with a blind end, a joint and an instrument, tool-schema snapshot, `docs/FEATURES.md`.
 
-**Open.** A closure at the START of the main run when the line has another closed end (the walk would start at a closure); a reducer in a branch run (RTE `add_branch` takes the branch size of its port); a branch (tee / olet) downstream of an eccentric reducer on the same leg (the RTE refuses it too); a PCF INSTRUMENT with a branch (tapping) point; the matching of a PCF valve type to the catalogue (`valveType` still names one type for every valve); the instrument as a PSC catalogue type (above); the B16.5 Table 8 reading (above).
+**Open.** A closure at the START of the main run when the line has another closed end (the walk would start at a closure); a reducer in a branch run (RTE `add_branch` takes the branch size of its port); a branch (tee / olet) downstream of an eccentric reducer on the same leg (built, §13.9); a PCF INSTRUMENT with a branch (tapping) point (stays refused, §13.9); the matching of a PCF valve type to the catalogue (`valveType` still names one type for every valve); the instrument as a PSC catalogue type (above); the B16.5 Table 8 reading (above).
 
 **Review follow-ups (2026-11-07).** (1) The measured offset of an eccentric reducer must equal (OD big - OD small) / 2 of the tabulated ODs within 1.5 mm, else `ISO_PARAM_INVALID` naming the reducer (6 x 4 with 40 mm instead of 27 is refused). (2) An INSTRUMENT with SW / THD ends is `ISO_ROUTE_UNSUPPORTED` (only BW, or FL between flange sets, are rebuilt); `bodyOf` takes its END-POINTs as arguments. (3) New warning `ISO_ROUTE_GASKET_ADDED` (ids of the flanges / bodies / blind drawn against each other without a gasket: the spec adds its own). (4) A cap or blind right after an elbow, or on a last piece shorter than the closure, no longer fails in pass 1: on `RTE_SEGMENT_TOO_SHORT` the plan is probed with the closed end 2000 mm beyond the joint to learn the spec length, then composed at the exact place (test: CAP right after an LR elbow). (5) Tests: delete of a blind-ended run leaves no entity, replay_history equality of the blind closure.
+
+### 13.8 ISO-M6d (2026-11-21): closed start, reducer in a branch, per-valve `valveType`, instrument tapping refusal
+
+Changed tool: `import_pcf` (new param `valveTypes`; data `route.runs[]` gains `startClosure`, `inline[]` valves gain `valveType`). No new command, no slice change.
+
+- **Closure at the start of the main run.** When every free end of the line is a closure (a CAP or FLANGE-BLIND with two END-POINTs: the free one is the closed end), the main run now starts at one of them (an open end is still preferred, the closure at the other end then ends the run). `planWalk.startClosure` reads the closure at the first end: a CAP (its other END-POINT is the mouth) or a blind flange with its gasket and the flange behind it (consumed; the spec rebuilds the set), the walk begins on the pipe side, `PlannedRun.startCap` carries kind, mouth and tip, `compose` runs `set_run_end_cap end start closure cap | blindFlange` after the end closure, the run starts at the closed end. Hand check (CS150 DN100, caps 64): 3000 mm run capped at both ends, pipe 2872 in the file and in the routed line, delta 0; blinds both ends: fixed point of export -> import -> export. Still refused: a closure with a single END-POINT at both ends (no free end to start from; the cap length would have to be learnt at the start as at the end), a blind at the start without the flange set behind it (names the blind), a spec without cap / blind rows (`RTE_SPEC_NO_COMPONENT`, document unchanged).
+- **Reducer inside a branch run.** The blanket refusal is gone: the RTE already inserts a reducer into a branch run after `add_branch` (`insert_inline_component`), so a branch run with a concentric / eccentric reducer is routed at the header size and the reducer placed afterwards (fixed point, delta 0, test header DN150 -> branch DN150 -> reducer 150x100). What stays refused (`ISO_ROUTE_UNSUPPORTED`, reducer named): a branch with a reducer that ends at a flanged port of the reduced size, because `add_branch` takes the branch size of its end port.
+- **Per-valve `valveType`.** New `valveTypes` `{ <id>: <catalogue type> }`, keyed by the COMPONENT-IDENTIFIER of the VALVE record or the full `pcf:<line>:<id>` id the route data reports; valves without an entry take `valveType` (default `valveGate`); a key that is not a VALVE of the file is `ISO_PARAM_INVALID` naming it; `route.runs[].inline[].valveType` reports what was used. The type is NOT read from the SKEY: `skey_catalogue.json` has no confirmed valve SKEY (OQ-ISO-02), so nothing is guessed.
+- **PCF INSTRUMENT with a tapping point.** A file's INSTRUMENT with a BRANCH1-POINT is now refused by name (`ISO_ROUTE_UNSUPPORTED`, "tapping point", the instrument id) instead of leaving its take-off pipe to a generic "not connected" refusal: the RTE cannot branch off an instrument body.
+- **Left.** A tee / olet downstream of an eccentric reducer on the same leg (RTE `RTE_BRANCH_ON_FITTING`, ISO refusal): the branch run would have to start on the shifted axis, and when the branch direction is not parallel to the offset the stored polyline of the branch no longer is its axis; a design decision for 02 (`legShifts` / `routeBranch`), not changed here. The instrument as a PSC catalogue type (01 change) and the B16.5 Table 8 reading stay open (§13.7).
+- **Tests.** `importRouteFittings.test.ts` (closed start: caps, blinds fixed point, refusal without cap rows; reducer in a branch: fixed point and the flanged-port refusal; instrument tapping refusal), `importRouteEdges.test.ts` (`valveTypes`: bare / full id, default, RTE refusal of an unheld type, unknown key, route-only param), tool-schema snapshot.
+
+### 13.9 ISO-M6e (2026-11-21): branch on the shifted axis of an eccentric reducer, stress attributes in `export_pcf`, instrument tapping stays refused
+
+Changed tools: `export_pcf` (new param `stressModelId`, data `stressAttributes`), `add_branch` / `route_pipe` / every derivation of a header run (02 RTE: a tee or olet downstream of an eccentric reducer is now derived). No new command, no slice change.
+
+- **Tee / olet downstream of an eccentric reducer.** The refusal `RTE_BRANCH_ON_FITTING` ("branch downstream of an eccentric reducer", `legShifts.ts`) is gone; the 02 design decision (the branch axis lies on the shifted leg) is built in `piping/branchShift.ts`: every `BranchFit` has a `shift` = the sum of the offsets of the eccentric reducers upstream of the branch point on its leg. The tee centre and its three ports (the tee slot is built on the shifted axis by the leg walk), the olet / stub-in centre, base and outlet, and `DerivedBranch.position` use it, so the PCF TEE / OLET `CENTRE-POINT`, `END-POINT`s and `BRANCH1-POINT` carry the shifted co-ordinates and the isometric (which reads the same parts) draws the branch on the shifted centreline. The branch run keeps its stored first point on the stored axis; its first pipe starts at `branchStart + shift . direction` (`branchStartSetup`), so the pipe meets the outlet face. Hand check (CS150, NPS 6 OD 168.3 -> NPS 4 OD 114.3, flat on top): e = (168.3 - 114.3) / 2 = 27, tee at 3000 on the leg: `CENTRE-POINT 3000.0 0.0 27.0`, both run `END-POINT`s z 27.0, the DN100 branch pipe starts at the outlet z (27 + M); reducer 6x4 flat top at 1500 plus expander 4x6 flat bottom at 2500 on a DN150 header: offsets 27 + 27, weldolet at 4000: `CENTRE-POINT 4000.0 0.0 54.0`, outlet 54 + 84.15 (header outside radius). A branch whose direction is not along the reducer offset (a horizontal branch off a flat-on-top reducer) is built too (§13.11, 2026-11-21); a branch before the reducer is unchanged (test: z 0).
+- **PCF INSTRUMENT with a tapping point: stays a named refusal.** `validation/data/pcf_keywords.json` lists INSTRUMENT with `END-POINT x2` only (source S3, grade B); no source in `validation/sources.md` defines a tapping / branch point for INSTRUMENT (BRANCH1-POINT belongs to TEE and OLET). Writing one would invent a keyword, so `import_pcf` keeps `ISO_ROUTE_UNSUPPORTED` naming the tapping point (§13.8) and `export_pcf` writes no tapping.
+- **Stress attributes in the PCF (07 PST-FU2).** `export_pcf` with `stressModelId` writes the model's present COMPONENT-ATTRIBUTE1..10 (the slots of `pipe_stress_pcf_attributes`, now shared through `stress/commands/pcfAttributeSlots.ts`: 1 design pressure, 2 max temperature, 4 wall, 5 / 6 insulation, 7 corrosion allowance, 9 fluid density, 10 hydro pressure; units are llull's, not converted by `units`) on the pipe-borne components (PIPE, ELBOW, BEND, TEE, OLET, REDUCER, FLANGE, FLANGE-BLIND, VALVE, CAP, INSTRUMENT) of the routed lines (run-scoped model) and legacy lines (pipe-scoped model) the model covers; other lines are written unchanged and listed in `data.stressAttributes.notCovered` (`covered` lists the others; `null` without the param). An imported PCF line is never changed (it is written back from its stored data). An unknown model or one without operating conditions is `ISO_PARAM_INVALID` (`stressModelId`). The attributes go out as ordinary component attributes, so `import_pcf` keeps them verbatim and a round trip writes the same file (test). Support-type attributes are not written (OQ-ISO-01 open).
+- **Left.** The instrument as a PSC catalogue type (01 change) and the owner B16.5 Table 8 check (§13.7); a branch perpendicular to a reducer offset (above); COMPONENT-ATTRIBUTE3 (material name) and 8 (weight), which the stress model does not hold model-wide; a unit conversion of the attribute values (the map states none, grade C).
+- **Tests.** `tests/unit/plant/fabrication/eccentricBranchPcf.test.ts` (tee and olet co-ordinates against the hand offsets, branch pipe on the outlet face, perpendicular refusal, branch before the reducer, pure), `tests/unit/plant/stress/pcfAttributesExport.test.ts` (covered / not covered lines, default off, round trip, refusals, routed line, pure), tool-schema snapshot.
+
+### 13.10 ISO-M6e follow-up (2026-11-21): olet downstream of an eccentric reducer re-imports as a route
+
+`routeImport/plan.ts` `branchOlets` matched an olet centre on the stored polyline, and an olet downstream of an eccentric reducer sits on the shifted axis. The walk now keeps every offset it carried along the run (`Walk.shifts`, starting with zero, one entry per eccentric reducer) and the olet is matched on `centre - shift` for any of them (the same rule as `teeStep`, which adds the branch at the file centre minus `w.shift`); the branch is added at that stored point. Test: `eccentricBranchPcf.test.ts` (DN150 header, reducer 6x4 flat top + expander 4x6 flat bottom, weldolet at 4000, `CENTRE-POINT 4000.0 0.0 54.0`: export -> `import_pcf as route` -> export is the same file). Left: the INSTRUMENT tapping (above), unchanged; the perpendicular branch is built (§13.11).
+
+Review round (2026-11-21): the olet is matched per segment against the offsets in force on that leg (`Walk.shifts[k]`: the starting offset and one per eccentric reducer on the leg, parallel to `points`), so a small offset cannot match another segment. Test: olets at 1000 (0), 4000 (+54) and on the riser, and a tee at 2000 (+27; CS150 has only an equal tee on a DN100 header), same record set after the round trip.
+
+### 13.11 ISO-M6f (2026-11-21): horizontal branch off an eccentric reducer round-trips; spectacle blind in `export_pcf`
+
+Changed tools: `export_pcf` (a spectacle blind is listed in `skipped`), `import_pcf as route` (a tee / olet off the shifted axis of an eccentric reducer whose branch is perpendicular to the offset). No new command, no slice change.
+
+- **Perpendicular branch.** The RTE derives such a branch on the shifted axis (02 §13.19): the TEE CENTRE-POINT and END-POINTs carry z + 27 and the branch pipe runs on the shifted axis too. On import `routeImport/eccentric.ts` `branchSideways` takes the part of the header offset in force at the branch (`Walk.shift` for a tee, the matched `Walk.shifts` entry for an olet) perpendicular to the branch (file outlet minus file centre; same rule as the RTE, with the default 1 degree angle tolerance: a spec with another tolerance can differ only for a nearly parallel offset), and `Seed.sideways` carries it; `storedBranchPoints` then un-shifts the branch run read from the file (one leg: its end; more legs: the first corner), the start stays the stored centre. Export -> `import_pcf as route` -> export of a CS150 DN150 header with a 6x4 flat-top reducer and a DN100 tee with a -Y branch is the same file (`eccentricBranchSideways.test.ts`); the earlier refusal test in `importRouteFittings.test.ts` now asserts the stored run (start [2285, 0, 0], end [2285, 1000, 0]).
+- **Spectacle blind.** `pcf_keywords.json` has no spectacle keyword and FLANGE-BLIND has one END-POINT (a closed end, not a plate between flanges), so an inline or open spectacle blind is not written as a blind flange (it would re-import as a closed end and lose the second gasket): `routeNetwork.typeOf` skips it with the reason naming the state, `files[].skipped` lists it, the flanges and gaskets around it are written. `import_pcf as route` therefore never produces one. Left: a PCF spectacle record if a confirmed keyword is ever added to `pcf_keywords.json`; the INSTRUMENT tapping stays refused (§13.9).
+- **Tests.** `eccentricBranchSideways.test.ts` (PCF round trip), `spectacleBlind.test.ts` (skipped, flanges and gaskets written).
+
+Review round (2026-11-21), as built:
+
+- **Closed run-end spectacle blind -> FLANGE-BLIND.** A closed spectacle blind closing a run end is a closure like a blind flange, so it is written as FLANGE-BLIND (one END-POINT at the mating face) and re-imports as a blind-flange closure (the plate then is a `flangeBlind` row: the import needs one in the spec; the state and the second disc are lost, as the PCF cannot carry them). An open run-end one and every inline one are skipped.
+- **Inline spectacle blind and `import_pcf as route`.** The file has flange, gasket, [no plate], gasket, flange: two gaskets 20 mm apart between two flanges, which the route import does not know (a flanged joint has one gasket and no gap), so the route import refuses the file by name (test: `spectacleBlind.test.ts`). Bridging the gap would invent a plate the file does not carry; left.
+- **BOM / weight.** The bill of material and the spool weights are read from the PCF components, so a skipped plate is missing from them: `export_pcf` warns `ISO_SPECTACLE_NOT_IN_PCF` (ids, "the spool weight is a lower bound"); `piping_takeoff counts.spectacleBlind` has it.
+- **Import angle tolerance.** `import_pcf as route` passes the spec's elbow-angle tolerance (`PlanOptions.angleToleranceDeg`, read with `createSpecLookup`) to `branchSideways`, as `withBranchShifts` uses the run's / spec's value, instead of the fixed 1 degree. Test: a 2 degree spec, a branch 1.5 degrees off the offset (flat header, hand-connected file because the RTE writes the dropped 0.7 mm residual as a gap): the stored branch end is the file end. A sloped header (1.5 degrees) cannot be imported at all within the PCF rounding (the stored branch point is then 0.01 mm off the centreline `locateOnRun` accepts): left.

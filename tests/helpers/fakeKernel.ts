@@ -10,7 +10,7 @@ import {
   type StepOccurrence,
   type TessellationOptions,
 } from '@core/geometry/kernel';
-import type { MeshData } from '@core/model/types';
+import type { MeshData, Vec3 } from '@core/model/types';
 import type { BooleanOp, ShapeRecipe } from '@core/model/types';
 import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
 import type { Entity } from '@core/model/types';
@@ -43,6 +43,8 @@ export interface FakeKernelSpec {
   readonly tessellate?: (native: FakeShape, options: TessellationOptions | undefined) => MeshData;
   /** The kernel builds meshes at the deflections it is given (the native kernel); default false (Manifold). */
   readonly honoursTessellationOptions?: boolean;
+  /** Tight box the kernel answers for every shape (`shapeBounds`; null = refuses; absent: the kernel has no such port). */
+  readonly shapeBounds?: { readonly min: Vec3; readonly max: Vec3 } | null;
   /** Recipe ops this kernel lacks entirely (Manifold: fillet, chamfer, shell). */
   readonly unsupported?: ReadonlyArray<ShapeRecipe['op']>;
 }
@@ -97,6 +99,7 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
     ...(spec.assemblyStep === undefined
       ? {}
       : { exportStepAssembly: (occurrences: readonly StepOccurrence<FakeShape>[]) => spec.assemblyStep?.(occurrences) ?? null }),
+    ...(spec.shapeBounds === undefined ? {} : { shapeBounds: () => spec.shapeBounds ?? null }),
     release: () => undefined,
   });
   return Object.assign(kernel, { calls });

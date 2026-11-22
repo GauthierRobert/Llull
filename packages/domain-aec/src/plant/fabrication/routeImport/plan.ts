@@ -10,10 +10,10 @@ import type { Vec3 } from '@core/model/vectors';
 import { distance3, normalize3, sub3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
 import type { NetworkComponent, NetworkPoint } from '../model';
-import { ZERO } from './eccentric';
-import { addBranch, arrive, createState, dedupe, free, refuse, take, type PlanState, type Walk } from './planState';
+import { storedBranchPoints, ZERO } from './eccentric';
+import { addBranch, arrive, comp, createState, free, refuse, take, type PlanState, type Walk } from './planState';
 import type { PlanOptions, PlannedRun, PlannedSupport, RoutePlan, RouteRefusal, Seed } from './planTypes';
-import { startFlangeSet, walkRun } from './planWalk';
+import { startClosure, startFlangeSet, walkRun } from './planWalk';
 
 export type { PlannedPort, PlannedRun, RoutePlan } from './planTypes';
 
@@ -34,36 +34,48 @@ function onSegment(point: Vec3, a: Vec3, b: Vec3): boolean {
   return along >= -1 && along <= length + 1 && Math.abs(distance3(point, a) ** 2 - along ** 2) <= 1;
 }
 
-/** The free end the main run starts from: not the closed end of a cap or blind (the run is walked from the other end, which the closure then ends). */
+/** The free end the main run starts from: an open end when there is one (the closure at the other end then ends the run), else a closed end (the closure starts the run). */
 function pickStart(s: PlanState): NetworkPoint | RouteRefusal {
   const structural = s.components.filter((component) => !['WELD', 'BOLT', 'SUPPORT', 'OLET'].includes(component.type));
   const freeEnds = structural
     .flatMap((component) => component.ends.map((end) => ({ component, end })))
     .filter(({ end }) => free(s, nodeKey(end.xyz)).length === 1);
   const closureEnd = ({ component }: (typeof freeEnds)[number]): boolean => component.type === 'CAP' || component.type === 'FLANGE-BLIND';
+  // An open end is preferred (the walk then ends at the closure); when every free end is a closure the main run starts at one (closed start, the other end closes it).
   const startPick = freeEnds.find((entry) => !closureEnd(entry)) ?? freeEnds[0];
   const startEnd = startPick?.end;
-  if (startPick !== undefined && closureEnd(startPick))
-    return refuse(
-      'ISO_ROUTE_UNSUPPORTED',
-      'every free end of the line is the closed end of a cap or a blind flange: route mode closes one end of a run (the walk starts at the other)',
-      freeEnds.map(({ component }) => component.id),
-    );
   if (startEnd === undefined)
     return refuse('ISO_ROUTE_UNSUPPORTED', 'the line has no free end to start from (a closed loop, or no pipe component)', []);
   return startEnd;
 }
 
-/** An olet whose centre is on this run's centreline branches off it. */
-function branchOlets(s: PlanState, seed: Seed, line: readonly Vec3[], olets: readonly OletCandidate[], pending: Set<number>): void {
+/** An olet whose centre, less an offset in force on a segment of this run (an eccentric reducer upstream on that leg), is on that segment of the centreline branches off it at that stored point. */
+function branchOlets(
+  s: PlanState,
+  seed: Seed,
+  line: readonly Vec3[],
+  shifts: readonly (readonly Vec3[])[],
+  olets: readonly OletCandidate[],
+  pending: Set<number>,
+): void {
   for (const { component, i } of olets) {
     if (!pending.has(i) || component.branch === undefined) continue;
     const centre = component.centre ?? component.branch.xyz;
-    if (!line.some((p, k) => k > 0 && onSegment(centre, line[k - 1] as Vec3, p))) continue;
+    const stored = line
+      .flatMap((p, k) =>
+        k === 0 ? [] : (shifts[k] ?? []).map((shift) => ({ shift, point: sub3(centre, shift), a: line[k - 1] as Vec3, b: p })),
+      )
+      .find((candidate) => onSegment(candidate.point, candidate.a, candidate.b));
+    if (stored === undefined) continue;
     pending.delete(i);
     take(s, i);
-    addBranch(s, seed.key, centre, component.branch);
+    addBranch(s, seed.key, stored.point, component.branch, stored.shift);
   }
+}
+
+/** The CAP or FLANGE-BLIND whose closed end is the free node `key` (the main run starts closed), if any. */
+function startClosureOf(s: PlanState, key: string): number | undefined {
+  return free(s, key).find((i) => comp(s, i).type === 'CAP' || comp(s, i).type === 'FLANGE-BLIND');
 }
 
 function walkSeed(
@@ -84,31 +96,45 @@ function walkSeed(
     key: seed.startKey,
     end: seed.start,
     shift: ZERO,
+    shifts: [[]],
+    legShifts: [ZERO],
     cap: undefined,
+    startCap: undefined,
   };
   if (seed.parent === undefined) {
-    const refused = startFlangeSet(s, w, startEnd);
+    const closure = startClosureOf(s, seed.startKey);
+    const refused = closure === undefined ? startFlangeSet(s, w, startEnd) : startClosure(s, w, startEnd, closure);
     if (refused !== undefined) return refused;
   }
   const walked = walkRun(s, w);
   if (walked !== undefined) return walked;
   arrive(s, w.key);
   w.points.push(w.cap?.tip ?? sub3(w.end, w.shift));
-  const line = dedupe(w.points);
+  w.shifts.push(w.legShifts);
+  const kept = w.points.flatMap((point, k) => (k === 0 || distance3(point, w.points[k - 1] as Vec3) > 1e-6 ? [k] : []));
+  const line = kept.map((k) => w.points[k] as Vec3);
   if (line.length < 2)
     return refuse('ISO_ROUTE_UNSUPPORTED', `run ${seed.key} has no length (it starts and ends at one point)`, w.consumed);
   runs.push({
     key: seed.key,
     dn: seed.dn,
-    points: line,
+    points: storedBranchPoints(line, seed.sideways),
     ...(w.startPort === undefined ? {} : { startPort: w.startPort }),
     ...(w.endPort === undefined ? {} : { endPort: w.endPort }),
     ...(w.cap === undefined ? {} : { cap: w.cap }),
+    ...(w.startCap === undefined ? {} : { startCap: w.startCap }),
     inline: w.inline,
     ...(seed.parent === undefined ? {} : { parent: seed.parent }),
     consumed: w.consumed,
   });
-  branchOlets(s, seed, line, olets, pending);
+  branchOlets(
+    s,
+    seed,
+    line,
+    kept.map((k) => w.shifts[k] as Vec3[]),
+    olets,
+    pending,
+  );
   return undefined;
 }
 

@@ -8,7 +8,8 @@ import type { DocumentUnit } from '@core/model/types';
 import { fromMm, MM_PER_UNIT } from '@core/model/units';
 import { parseTema } from '../codecheck/tema';
 import { tubeWallRow, TUBE_WALL_SOURCE } from '../data/temaTables';
-import type { ExchangerChannel, ExchangerSideDesign, ExchangerTemplate, TubeBundle } from '../plantData';
+import type { ExchangerChannel, ExchangerKettle, ExchangerSideDesign, ExchangerTemplate, TemaDesignation, TubeBundle } from '../plantData';
+import { weirPositionProblem } from '../geometry/kettleWeir';
 import { designInputSchema, isVesselIssue, resolveSupport, supportInputSchema, type VesselIssue } from './vesselParams';
 
 export const channelSchema = z.object({
@@ -21,7 +22,14 @@ export const channelSchema = z.object({
     .positive()
     .optional()
     .describe(
-      'Channel wall thickness, nominal, corrosion allowance included. Default: the shell thickness (a named default that check_equipment warns about).',
+      'Channel wall thickness, nominal, corrosion allowance included. Default: the shell thickness (a named default that check_equipment warns about). Required for front head D.',
+    ),
+  coverThickness: z
+    .number()
+    .positive()
+    .optional()
+    .describe(
+      'Flat cover thickness (heads A, C, N, L, N and D; not for a bonnet B / M). Default: the channel thickness. Required for front head D, whose closure is thicker than the channel and has no tabulated dimensions here.',
     ),
 });
 
@@ -46,13 +54,63 @@ export const exchangerShape = {
     .min(1)
     .max(16)
     .describe(
-      'TEMA designation, exactly three letters: front head A | B | C | N, shell E | F | G | H | J, rear head L | M | N (fixed tubesheet) or P | S | T | U | W ' +
-        '(removable bundle), e.g. BEM, AES, AEU. D, K and X are valid TEMA letters that are not modelled (EQP_TEMA_UNSUPPORTED).',
+      'TEMA designation, exactly three letters: front head A | B | C | D | N, shell E | F | G | H | J | K | X, rear head L | M | N (fixed tubesheet) or P | S | T | U | W ' +
+        '(removable bundle), e.g. BEM, AES, AEU, DXU, AKU. D = high-pressure closure (needs frontChannel.thickness and coverThickness), K = kettle (needs kettle {...}, ' +
+        'horizontal, removable-bundle rear only), X = cross flow (geometry of E; check_equipment wants two opposite shell nozzles). Unsupported combinations: EQP_EXCHANGER_UNSUPPORTED.',
     ),
   orientation: z
-    .literal('horizontal')
+    .enum(['horizontal', 'vertical'])
     .optional()
-    .describe('Only horizontal exchangers are built (axis along the equipment X). Default horizontal.'),
+    .describe(
+      'horizontal (default): tube axis along the equipment X, support saddles or none. vertical: tube axis along Z, FRONT HEAD AT THE BOTTOM, support skirt, legs, lugs or none; ' +
+        'support.height (skirt / legs) or support.baseElevation (none / lugs) is the elevation of the bottom tangent line, the outer end of the front channel. Not for the kettle (K).',
+    ),
+  kettle: z
+    .object({
+      enlargedInsideDiameter: z
+        .number()
+        .positive()
+        .describe('Inside diameter of the enlarged cylinder over the bundle; must exceed shellInsideDiameter, document units.'),
+      enlargedLength: z
+        .number()
+        .positive()
+        .describe('Length of the enlarged cylinder, measured back from the rear end of the shell, document units.'),
+      transitionLength: z
+        .number()
+        .positive()
+        .describe(
+          'Axial length of the cone from shellInsideDiameter to enlargedInsideDiameter, document units. The restricted cylinder keeps the rest of the shell, which must stay > 0.',
+        ),
+      enlargedThickness: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Wall of the cone and the enlarged cylinder (and of the rear shell cover). Default: shellThickness (a named default that check_equipment warns about).',
+        ),
+      weirHeight: z
+        .number()
+        .positive()
+        .describe(
+          'Overflow weir height above the lowest inside point of the enlarged shell, document units; must be below enlargedInsideDiameter. With weirStation + weirThickness the weir is a plate across the enlarged shell (mesh, weight, liquid volume to the weir); without them it is data only.',
+        ),
+      weirStation: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Axial station of the weir plate CENTRE measured from the REAR END of the shell toward the front, document units (a floating / U rear has no rear tubesheet; this is where its face would be). Give it with weirThickness. The plate must lie inside the enlarged length (weirStation - weirThickness / 2 >= 0 and weirStation + weirThickness / 2 <= enlargedLength), else EQP_WEIR_OUT_OF_RANGE.',
+        ),
+      weirThickness: z
+        .number()
+        .positive()
+        .optional()
+        .describe('Thickness of the weir plate, document units; a caller input, never defaulted. Give it with weirStation.'),
+    })
+    .optional()
+    .describe(
+      'TEMA K (kettle) only, required for it: restricted cylinder at the tubesheet, cone, enlarged cylinder over the bundle, weir. All dimensions are caller inputs.',
+    ),
   shellInsideDiameter: z
     .number()
     .positive()
@@ -112,7 +170,9 @@ export const exchangerShape = {
     ),
   support: supportInputSchema
     .optional()
-    .describe('Saddles { stations from the front end of the shell, width, axisElevation } or none. Default none on the level.'),
+    .describe(
+      'Horizontal: saddles { stations from the front end of the shell, width, axisElevation } or none. Vertical: skirt { height, thickness?, baseRingWidth? }, legs { count >= 3, height, pitchDiameter?, legWidth? } or none { baseElevation }. lugs { count >= 2, lugHeight, lugWidth, lugProjection, lugThickness, lugBasePlateThickness, lugElevation above the bottom tangent line, lugBoltHoleDiameter?, baseElevation? } (bracket lugs on the shell; every dimension required, EQP_SUPPORT_INVALID when missing or off the shell). Default none on the level.',
+    ),
   design: z
     .object({
       shellSide: sideSchema.optional(),
@@ -179,9 +239,84 @@ function tubeBundle(input: ExchangerInput['tubes'], units: DocumentUnit, default
 const sideOf = (side: z.infer<typeof sideSchema> | undefined): ExchangerSideDesign | undefined =>
   side === undefined ? undefined : { ...side };
 
+const unsupportedIssue = (message: string, path: string): VesselIssue => issue('EQP_EXCHANGER_UNSUPPORTED', message, path);
+
+/** The named refusal of a TEMA combination llull does not build, or null. */
+function unsupportedCombination(input: ExchangerInput, tema: TemaDesignation, vertical: boolean): VesselIssue | null {
+  if (tema.shell === 'K') {
+    if (vertical)
+      return unsupportedIssue('a kettle (TEMA K) is built horizontal only: orientation vertical is not modelled', 'orientation');
+    if (tema.fixedTubesheet)
+      return unsupportedIssue(
+        `a kettle takes a removable-bundle rear (P, S, T, U, W), not ${tema.rear}: fixed tubesheets in the enlarged shell are not modelled`,
+        'temaType.2',
+      );
+    if (input.kettle === undefined)
+      return issue(
+        'EQP_PARAM_INVALID',
+        'a kettle shell (K) needs kettle { enlargedInsideDiameter, enlargedLength, transitionLength, weirHeight }',
+        'kettle',
+      );
+  } else if (input.kettle !== undefined) return issue('EQP_PARAM_INVALID', `kettle is for the shell letter K, not ${tema.shell}`, 'kettle');
+  if (tema.front === 'D') {
+    for (const field of ['thickness', 'coverThickness'] as const)
+      if (input.frontChannel[field] === undefined)
+        return issue(
+          'EQP_PARAM_INVALID',
+          `front head D (high-pressure closure) needs frontChannel.${field}: no TEMA dimension is shipped, it is never defaulted`,
+          `frontChannel.${field}`,
+        );
+  }
+  return null;
+}
+
+function resolveKettle(input: ExchangerInput, allowance: number, defaulted: string[]): ExchangerKettle | VesselIssue {
+  const kettle = input.kettle as NonNullable<ExchangerInput['kettle']>;
+  if (kettle.enlargedInsideDiameter <= input.shellInsideDiameter)
+    return issue(
+      'EQP_PARAM_INVALID',
+      `kettle.enlargedInsideDiameter ${kettle.enlargedInsideDiameter} must exceed shellInsideDiameter ${input.shellInsideDiameter}`,
+      'kettle.enlargedInsideDiameter',
+    );
+  if (kettle.weirHeight >= kettle.enlargedInsideDiameter)
+    return issue(
+      'EQP_PARAM_INVALID',
+      `kettle.weirHeight ${kettle.weirHeight} must be below enlargedInsideDiameter ${kettle.enlargedInsideDiameter}`,
+      'kettle.weirHeight',
+    );
+  if ((kettle.weirStation === undefined) !== (kettle.weirThickness === undefined))
+    return issue(
+      'EQP_PARAM_INVALID',
+      'kettle.weirStation and kettle.weirThickness are given together (the weir plate needs both) or not at all',
+      kettle.weirStation === undefined ? 'kettle.weirStation' : 'kettle.weirThickness',
+    );
+  if (kettle.weirStation !== undefined && kettle.weirThickness !== undefined) {
+    const problem = weirPositionProblem(kettle.weirStation, kettle.weirThickness, kettle.enlargedLength);
+    if (problem !== null) return issue('EQP_WEIR_OUT_OF_RANGE', problem, 'kettle.weirStation');
+  }
+  if (kettle.enlargedThickness === undefined) defaulted.push('kettle.enlargedThickness');
+  const enlargedThickness = kettle.enlargedThickness ?? input.shellThickness;
+  if (enlargedThickness <= allowance)
+    return issue(
+      'EQP_PARAM_INVALID',
+      `kettle.enlargedThickness ${enlargedThickness} must exceed the corrosion allowance ${allowance}`,
+      'kettle.enlargedThickness',
+    );
+  return {
+    enlargedInsideDiameter: kettle.enlargedInsideDiameter,
+    enlargedLength: kettle.enlargedLength,
+    transitionLength: kettle.transitionLength,
+    enlargedThickness,
+    weirHeight: kettle.weirHeight,
+    ...(kettle.weirStation === undefined || kettle.weirThickness === undefined
+      ? {}
+      : { weirStation: kettle.weirStation, weirThickness: kettle.weirThickness }),
+  };
+}
+
 /**
  * Validated template of `input`, with the names of the defaults applied.
- * @failure invalid / unsupported TEMA type -> EQP_TEMA_INVALID / EQP_TEMA_UNSUPPORTED (path temaType.<i>); thickness <= allowance, tube wall without bore,
+ * @failure invalid TEMA type -> EQP_TEMA_INVALID (path temaType.<i>); kettle vertical or with a fixed rear -> EQP_EXCHANGER_UNSUPPORTED; D without channel + cover thickness, K without kettle, kettle dimensions that do not fit, thickness <= allowance, tube wall without bore,
  *   pitch <= OD, tubes that cannot fit the shell, tube length <= tubesheets, rear channel for a non-fixed rear -> EQP_PARAM_INVALID; support not suiting a
  *   horizontal exchanger -> EQP_SUPPORT_INVALID
  */
@@ -192,8 +327,10 @@ export function buildExchangerTemplate(
   const defaulted: string[] = [];
   const parsed = parseTema(input.temaType);
   if ('code' in parsed) return issue(parsed.code, parsed.message, parsed.path);
-  if (parsed.unsupported !== null) return issue(parsed.unsupported.code, parsed.unsupported.message, parsed.unsupported.path);
   const { tema } = parsed;
+  const vertical = input.orientation === 'vertical';
+  const unsupported = unsupportedCombination(input, tema, vertical);
+  if (unsupported !== null) return unsupported;
   const allowance = input.corrosionAllowance ?? 0;
   if (input.corrosionAllowance === undefined) defaulted.push('corrosionAllowance');
   if (input.shellThickness <= allowance)
@@ -202,19 +339,29 @@ export function buildExchangerTemplate(
       `shellThickness ${input.shellThickness} must exceed the corrosion allowance ${allowance}`,
       'shellThickness',
     );
-  const channel = (given: { length: number; thickness?: number | undefined }, path: string): ExchangerChannel | VesselIssue => {
+  const channel = (
+    given: { length: number; thickness?: number | undefined; coverThickness?: number | undefined },
+    path: string,
+    bonnet: boolean,
+  ): ExchangerChannel | VesselIssue => {
     if (given.thickness === undefined) defaulted.push(`${path}.thickness`);
     const thickness = given.thickness ?? input.shellThickness;
+    if (bonnet && given.coverThickness !== undefined)
+      return issue('EQP_PARAM_INVALID', `${path}.coverThickness: a bonnet (B / M) has no flat cover`, `${path}.coverThickness`);
     return thickness <= allowance
       ? issue('EQP_PARAM_INVALID', `${path}.thickness ${thickness} must exceed the corrosion allowance ${allowance}`, `${path}.thickness`)
-      : { length: given.length, thickness };
+      : { length: given.length, thickness, ...(given.coverThickness === undefined ? {} : { coverThickness: given.coverThickness }) };
   };
-  const frontChannel = channel(input.frontChannel, 'frontChannel');
+  const frontChannel = channel(input.frontChannel, 'frontChannel', tema.front === 'B');
   if (isVesselIssue(frontChannel)) return frontChannel;
   let rearChannel: ExchangerChannel | undefined;
   if (tema.fixedTubesheet) {
     if (input.rearChannel === undefined) defaulted.push('rearChannel');
-    const resolved = channel(input.rearChannel ?? input.frontChannel, 'rearChannel');
+    const resolved = channel(
+      input.rearChannel ?? { length: input.frontChannel.length, thickness: input.frontChannel.thickness },
+      'rearChannel',
+      tema.rear === 'M',
+    );
     if (isVesselIssue(resolved)) return resolved;
     rearChannel = resolved;
   } else if (input.rearChannel !== undefined)
@@ -223,6 +370,8 @@ export function buildExchangerTemplate(
       `the rear head ${tema.rear} has no channel (it is closed by a shell cover): leave rearChannel out`,
       'rearChannel',
     );
+  const kettle = tema.shell === 'K' ? resolveKettle(input, allowance, defaulted) : undefined;
+  if (kettle !== undefined && isVesselIssue(kettle)) return kettle;
   const tubes = tubeBundle(input.tubes, units, defaulted);
   if (isVesselIssue(tubes)) return tubes;
   const shellLength = tubes.length - (tema.fixedTubesheet ? 2 : 1) * input.tubesheetThickness;
@@ -241,10 +390,19 @@ export function buildExchangerTemplate(
       'tubes.count',
     );
   const wall = Math.max(input.shellThickness, frontChannel.thickness, rearChannel?.thickness ?? 0);
+  if (kettle !== undefined) {
+    const straight = shellLength - kettle.enlargedLength - kettle.transitionLength;
+    if (straight <= 0)
+      return issue(
+        'EQP_PARAM_INVALID',
+        `kettle.enlargedLength ${kettle.enlargedLength} + transitionLength ${kettle.transitionLength} leave no restricted cylinder in the shell length ${shellLength}`,
+        'kettle.enlargedLength',
+      );
+  }
   const support = resolveSupport(
     input.support ?? { type: 'none' },
     {
-      orientation: 'horizontal',
+      orientation: vertical ? 'vertical' : 'horizontal',
       insideDiameter: input.shellInsideDiameter,
       tangentLength: shellLength,
       heads: {},
@@ -252,13 +410,19 @@ export function buildExchangerTemplate(
       support: { type: 'none' },
     },
     defaulted,
+    {
+      from: input.tubesheetThickness + frontChannel.length,
+      to: input.tubesheetThickness + frontChannel.length + shellLength,
+      rootRadius: input.shellInsideDiameter / 2 + input.shellThickness,
+    },
   );
   if (isVesselIssue(support)) return issue(support.code, support.message, support.path);
   if (input.support === undefined) defaulted.push('support');
   const design = input.design;
   const template: ExchangerTemplate = {
     kind: 'exchanger',
-    orientation: 'horizontal',
+    orientation: vertical ? 'vertical' : 'horizontal',
+    ...(kettle === undefined ? {} : { kettle }),
     temaType: input.temaType.trim().toUpperCase(),
     tema,
     shellInsideDiameter: input.shellInsideDiameter,

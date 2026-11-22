@@ -116,6 +116,10 @@ function liveStepKeys(history: readonly FeatureStep[]): ReadonlySet<string> {
   return new Set(history.filter((step) => step.suppressed !== true).flatMap(stepKeysOf));
 }
 
+const SITE_CONTEXT_COMMANDS: ReadonlySet<string> = new Set(['set_site_context', 'clear_site_context']);
+
+const KERNEL_SETTINGS_COMMANDS: ReadonlySet<string> = new Set(['set_modeling_tolerance', 'set_mesh_storage']);
+
 /** Empty geometry that keeps the document-level settings and input state of `base` (what no recorded step regenerates). */
 function replaySeed(base: CadDocument, history: FeatureStep[]): CadDocument {
   const live = liveStepKeys(history);
@@ -136,6 +140,15 @@ function replaySeed(base: CadDocument, history: FeatureStep[]): CadDocument {
     // re-expand its recipe when this history is replayed again (e.g. via replay_history).
     recipes: base.recipes,
     configurations: base.configurations,
+    // The site context is a document setting that clear_document keeps while it resets the history: carried unless a step in `history` owns it
+    // (a suppressed set / clear step still removes it: the orphan rule).
+    ...(base.siteContext !== undefined && !history.some((step) => SITE_CONTEXT_COMMANDS.has(step.name))
+      ? { siteContext: base.siteContext }
+      : {}),
+    // Same for the kernel settings (modeling tolerance, mesh storage): carried unless a set_modeling_tolerance / set_mesh_storage step owns them.
+    ...(base.kernelSettings !== undefined && !history.some((step) => KERNEL_SETTINGS_COMMANDS.has(step.name))
+      ? { kernelSettings: base.kernelSettings }
+      : {}),
     // Review state (viewpoints, issues, walkthroughs) is written only by metaHistory commands, so no step regenerates it.
     ...(base.review !== undefined ? { review: base.review } : {}),
     // Display profiles are written only by metaHistory commands as well.

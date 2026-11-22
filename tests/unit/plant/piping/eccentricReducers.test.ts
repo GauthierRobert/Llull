@@ -326,7 +326,7 @@ describe('branches and persistence', () => {
     expect(!derived.ok && derived.code).toBe('RTE_ECCENTRIC_INVALID');
   });
 
-  it('a branch downstream of an eccentric reducer on the same leg is refused (its port would sit off the stored axis); before it is fine', () => {
+  it('a horizontal branch downstream of a flat-top reducer derives on the shifted axis (z 27); before the reducer it stays on z 0', () => {
     const s = scene();
     const routed = riser(s, 'top');
     const runId = (routed.data as Route).runId;
@@ -336,7 +336,12 @@ describe('branches and persistence', () => {
       dn: 100,
       legs: [{ direction: '-Y', length: 500 }],
     });
-    expectRefusal(routed.document, 'add_branch', branch(3000), 'RTE_BRANCH_ON_FITTING');
+    const after = ok(routed.document, 'add_branch', branch(3000));
+    const branchRun = Object.values(piping(after.document).runs).find((run) => run.id !== runId) as PipeRun;
+    expect(branchRun.start.point).toEqual([3000, 0, 0]);
+    const derived = deriveRun(after.document, branchRun);
+    const pipe = derived.ok ? derived.parts.find((part) => part.kind === 'pipe') : undefined;
+    expect(pipe?.ports[0]?.position[2]).toBeCloseTo(27, 6);
     ok(routed.document, 'add_branch', branch(1000));
   });
 });
