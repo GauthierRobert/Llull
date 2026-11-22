@@ -101,11 +101,42 @@ fn a_trimmed_face_gets_the_rectangle_box_only_when_its_edges_prove_it() {
         rectangle.iter().zip(optimal).any(|(a, b)| (a - b).abs() > 1.0),
         "the rectangle overstands the face: {rectangle:?} against {optimal:?}"
     );
-    assert!(
-        fast.iter().all(|value| *value == 0.0) || fast.iter().zip(optimal).all(|(a, b)| (a - b).abs() < 1e-6),
-        "{fast:?} against {optimal:?}"
-    );
     assert!(fast.iter().all(|value| *value == 0.0), "the rectangle box is refused: {fast:?}");
+}
+
+/// BLD §13.46 review: a trimmed face whose sides the face itself reaches (kind 7: a corner cut off where no side of the box lies) is accepted by the proof: the box by Bezier patch encloses the
+/// dense sample of its rectangle and is within the AddOptimal widening (1.1e-7) of AddOptimal (a 300 x 300 sample is only a lower bound, 6e-5 short of the extreme here, so it cannot pin 2e-9).
+#[test]
+fn a_trimmed_face_that_reaches_every_side_of_its_rectangle_box_is_accepted() {
+    let probe = crate::test_bridge::spline_bounds(7);
+    let (fast, optimal, rectangle) = (&probe[0..6], &probe[6..12], &probe[12..18]);
+    assert!(fast.iter().any(|value| *value != 0.0), "the proof accepts it: {fast:?}");
+    for k in 0..6 {
+        let outward = if k < 3 { rectangle[k] - fast[k] } else { fast[k] - rectangle[k] };
+        assert!(outward >= 0.0, "side {k}: fast {} does not enclose the dense sample {}", fast[k], rectangle[k]);
+        assert!((fast[k] - optimal[k]).abs() < 1.1e-7, "side {k}: {} against AddOptimal {}", fast[k], optimal[k]);
+    }
+}
+
+/// BLD §13.46 review: the box of a shape with a trimmed face whose rectangle box is not proved: contained in the box of the other faces (a big box around: nothing to add, the box encloses it) and not
+/// contained (alone: the spike of the cut-off corner stands out, AddOptimal gives the face its own box). Both agree with AddOptimal of the whole shape to its widening (1.1e-7), never enclosing less.
+#[test]
+fn a_deferred_trimmed_face_adds_its_box_only_when_the_others_do_not_contain_it() {
+    for contained in [1, 0] {
+        let probe = crate::test_bridge::trimmed_shape_bounds(contained);
+        let (ours, optimal) = (&probe[0..6], &probe[6..12]);
+        for k in 0..6 {
+            assert!((ours[k] - optimal[k]).abs() < 1.1e-7, "contained {contained} side {k}: {} against AddOptimal {}", ours[k], optimal[k]);
+            let outward = if k < 3 { optimal[k] - ours[k] } else { ours[k] - optimal[k] };
+            assert!(outward > -1.1e-7, "contained {contained} side {k}");
+        }
+    }
+    let alone = crate::test_bridge::trimmed_shape_bounds(0);
+    let spike_free = crate::test_bridge::spline_bounds(6);
+    assert!(
+        alone[4] < spike_free[16] - 1.0,
+        "the spike of the cut-off corner is not in the box: {alone:?} against the rectangle {spike_free:?}"
+    );
 }
 
 #[test]

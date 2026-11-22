@@ -64,6 +64,7 @@ mod ffi {
         fn boundary_angle_probe(shape: &Shape, face: i32, drop_one: bool) -> f64;
         /// `[Bezier-patch box, AddOptimal box, dense sample box]` (6 numbers each) of a synthetic many-patch B-spline face; the first box is zeros when the fast path refuses the face.
         fn spline_bounds_probe(kind: i32) -> Vec<f64>;
+        fn trimmed_shape_bounds_probe(contained: i32) -> Vec<f64>;
     }
 }
 
@@ -164,6 +165,10 @@ pub fn last_shell_star_poles() -> i32 {
 
 pub fn adaptive_rule(shape: &Shape) -> bool {
     ffi::adaptive_rule(crate::inner(shape).expect("a shape"))
+}
+
+pub fn trimmed_shape_bounds(contained: i32) -> Vec<f64> {
+    ffi::trimmed_shape_bounds_probe(contained)
 }
 
 pub fn spline_bounds(kind: i32) -> Vec<f64> {

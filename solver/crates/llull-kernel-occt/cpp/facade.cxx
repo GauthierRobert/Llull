@@ -155,8 +155,8 @@ Bnd_Box bounds_of(const TopoDS_Shape &shape) {
     box.Get(a0, b0, c0, a1, b1, c1);
     outer.Get(x0, y0, z0, x1, y1, z1);
     const double slack = 3e-9 * std::max(std::sqrt((a1 - a0) * (a1 - a0) + (b1 - b0) * (b1 - b0) + (c1 - c0) * (c1 - c0)), 1e-12);
-    if (x0 >= a0 - slack && y0 >= b0 - slack && z0 >= c0 - slack && x1 <= a1 + slack && y1 <= b1 + slack && z1 <= c1 + slack) continue;
-    BRepBndLib::AddOptimal(face, box, Standard_False, Standard_False);
+    if (x0 >= a0 - slack && y0 >= b0 - slack && z0 >= c0 - slack && x1 <= a1 + slack && y1 <= b1 + slack && z1 <= c1 + slack) box.Add(outer);  // holds it to 3e-9 of the diagonal: enclose it
+    else BRepBndLib::AddOptimal(face, box, Standard_False, Standard_False);
   }
   for (TopExp_Explorer edges(shape, TopAbs_EDGE, TopAbs_FACE); edges.More(); edges.Next()) BRepBndLib::AddOptimal(edges.Current(), box, Standard_False, Standard_False);
   for (TopExp_Explorer vertices(shape, TopAbs_VERTEX, TopAbs_EDGE); vertices.More(); vertices.Next()) BRepBndLib::AddOptimal(vertices.Current(), box, Standard_False, Standard_False);

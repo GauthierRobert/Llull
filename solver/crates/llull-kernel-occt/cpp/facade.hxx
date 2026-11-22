@@ -120,6 +120,8 @@ double boundary_angle_probe(const Shape &shape, int32_t face, bool drop_one);
 
 // Test-only probe of surface_bounds.hxx: [Bezier-patch box, AddOptimal box, dense sample box] of a synthetic many-patch B-spline face (cpp/surface_bounds_probe.cxx).
 rust::Vec<double> spline_bounds_probe(int32_t kind);
+// Test-only: shape_bounds and AddOptimal of a compound with a trimmed face whose rectangle box is contained (1) or not (0) in the others' box (cpp/surface_bounds_probe.cxx).
+rust::Vec<double> trimmed_shape_bounds_probe(int32_t contained);
 
 void init_runtime();
 rust::String occt_version();

@@ -282,6 +282,7 @@ bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double
   }
   out.marks.assign(std::size(kMarks), 0.0);
   std::array<double, 6> worst{0, 0, 0, 0, 0, 0};
+  bool gates_reached = false;  // a rung built all its fans and was judged against the gates
   std::string face_why;  // a rung whose fan cannot be made into a face (OCCT) is skipped; kept for the message when every rung fails
   int rung = 0;
   // cheapest first (each face costs an integral in every analysis of the shell, 13.46): the cube passes at 22 x 26, the box and the other bodies climb the ladder; 20 x 26 meets the gates too but
@@ -436,10 +437,15 @@ bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double
       if (face_failed) break;
     }
     if (face_failed) continue;
+    gates_reached = true;
     if (out.arc_gap <= 0.5 * max_gap && out.arc_angle <= kAngle && arc_excess <= 0 && seam_excess <= 0 && tau_gap <= 0.5 * max_gap && tau_angle <= kAngle) return true;
     worst = {out.arc_gap, out.arc_angle, arc_excess, seam_excess, tau_gap, tau_angle};
   }
-  why = "the vertex fans leave the sub-patches by " + std::to_string(worst[0]) + " (" + std::to_string(worst[1]) + " rad, curvature over the gate by " + std::to_string(worst[2]) + "), their seams are over the curvature gate by " + std::to_string(worst[3]) + " and the two fans at a vertex meet with a gap of " + std::to_string(worst[4]) + " and an angle of " + std::to_string(worst[5]) + " rad (gates: curvature, G0, G1)" + (face_why.empty() ? std::string() : "; " + face_why);
+  if (!gates_reached && !face_why.empty()) {
+    why = face_why;
+    return false;
+  }
+  why = "the vertex fans leave the sub-patches by " + std::to_string(worst[0]) + " (" + std::to_string(worst[1]) + " rad, curvature over the gate by " + std::to_string(worst[2]) + "), their seams are over the curvature gate by " + std::to_string(worst[3]) + " and the two fans at a vertex meet with a gap of " + std::to_string(worst[4]) + " and an angle of " + std::to_string(worst[5]) + " rad (gates: curvature, G0, G1)";
   return false;
 }
 

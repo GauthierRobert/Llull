@@ -64,8 +64,6 @@ inline void add_samples(Bnd_Box &box, const Handle(Geom_BezierSurface) &patch, d
 // A face with one wire that fills at least this share of the rectangle [u0, u1] x [v0, v1] of its surface (a sewn sub-patch, or one with its corners cut off by a straight line) is a candidate for the
 // box of the whole rectangle, accepted only when `rectangle_box_is_exact` proves it equal to the face's own (BLD 13.46).
 constexpr double kMinFill = 0.85;
-// A fill this close to 1 is the whole rectangle: the box of the rectangle is the box of the face.
-constexpr double kWholeFill = 1e-6;
 
 // The share of the rectangle the face fills (0 when it has not one wire).
 inline double fill_of_rectangle(const TopoDS_Face &face, double u0, double u1, double v0, double v1) {
@@ -89,25 +87,26 @@ inline double fill_of_rectangle(const TopoDS_Face &face, double u0, double u1, d
   return std::fabs(twice_area) / (2 * (u1 - u0) * (v1 - v0));
 }
 
-// A trimmed face lies inside its rectangle, so its box is inside the box R of the rectangle. When every side of R is reached by the face (to kReachSlack of the diagonal), R is the exact box
+// A trimmed face lies inside its rectangle, so its box is inside the box R of the rectangle. When every side of R is reached by the face (to kReachSlack = 1e-8 of the diagonal; membership of a point in the face is tested to 1e-9 of the larger (u, v) span), R is the exact box
 // of the face. A side counts as reached when the witness of the search lies in the face, or else when a point of a kReachGrid x kReachGrid grid of the rectangle that lies in the face is as far out
 // (a flat side is touched all along an edge: the witness may be in a cut-off corner while the rest of the edge is in the face). A spike in a cut-off corner is reached by no point of the face:
 // refused, and the caller keeps AddOptimal on the face.
-constexpr double kReachSlack = 1e-7;
+constexpr double kReachSlack = 1e-8;
 constexpr int kReachGrid = 40;
 
-inline bool in_face(const TopoDS_Face &face, const gp_Pnt2d &at) {
-  BRepClass_FaceClassifier classifier(face, at, 1e-7);
+inline bool in_face(const TopoDS_Face &face, const gp_Pnt2d &at, double span) {
+  BRepClass_FaceClassifier classifier(face, at, 1e-9 * span);
   return classifier.State() == TopAbs_IN || classifier.State() == TopAbs_ON;
 }
 
 inline bool rectangle_box_is_exact(const TopoDS_Face &face, const Handle(Geom_BSplineSurface) &spline, const Witness &witness, double u0, double u1, double v0, double v1, double diagonal) {
   const double slack = kReachSlack * diagonal;
+  const double span = std::max({u1 - u0, v1 - v0, 1e-300});
   bool open_sides[2][3];
   bool any_open = false;
   for (int side = 0; side < 2; ++side)
     for (int axis = 0; axis < 3; ++axis) {
-      open_sides[side][axis] = !in_face(face, witness.at[side][axis]);
+      open_sides[side][axis] = !in_face(face, witness.at[side][axis], span);
       any_open = any_open || open_sides[side][axis];
     }
   if (!any_open) return true;
@@ -120,7 +119,7 @@ inline bool rectangle_box_is_exact(const TopoDS_Face &face, const Handle(Geom_BS
       for (int side = 0; side < 2; ++side)
         for (int axis = 0; axis < 3; ++axis)
           if (open_sides[side][axis] && std::fabs(xyz[axis] - witness.value[side][axis]) <= slack) near_open = true;
-      if (!near_open || !in_face(face, at)) continue;
+      if (!near_open || !in_face(face, at, span)) continue;
       for (int side = 0; side < 2; ++side)
         for (int axis = 0; axis < 3; ++axis)
           if (open_sides[side][axis] && std::fabs(xyz[axis] - witness.value[side][axis]) <= slack) open_sides[side][axis] = false;
@@ -149,7 +148,7 @@ inline bool add_spline_bounds(const TopoDS_Face &face, Bnd_Box &box, int max_dep
   if (!is_full_patch(face, u0, u1, v0, v1)) {
     const double fill = fill_of_rectangle(face, u0, u1, v0, v1);
     if (fill < kMinFill) return false;
-    trimmed = fill < 1.0 - kWholeFill;
+    trimmed = true;  // every face that is not a full patch goes through the proof (a 16-segment polyline misses a narrow notch)
   }
   GeomConvert_BSplineSurfaceToBezierSurface converter(spline);
   const int nu = converter.NbUPatches(), nv = converter.NbVPatches();
