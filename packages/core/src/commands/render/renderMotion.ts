@@ -70,6 +70,7 @@ export const renderMotion = defineCommand({
     'can be checked without a screen. Pick instants with `times` (seconds, at most 12) or `frames` (N evenly spaced instants from 0 to ' +
     'the duration, both included; default 4). Every frame uses the same camera, so motion reads directly. `trace` draws the centre-of-mass ' +
     'path of the named rigid bodies (e.g. the coupler or the end-effector) over all samples, with a dot at the current position. ' +
+    "With a site context (set_site_context) the frames carry the sun's shadows and, with groundElevation, the ground plane, fitted to the bounds of all frames so it does not move. " +
     'Camera as render_view: `view` or `direction`. Returns data.svg (the grid), data.width/height, and data.frames[{ time, bodies{ bodyId: ' +
     '{ position (centre of mass, document units), rotationDeg (Euler XYZ degrees from the start pose) } } }] to read numbers. Frames show ' +
     'the requested instants exactly (poses are interpolated between recorded samples; data.frames[].time is the requested time). With the CLI, `llull render_motion … --save m.png` writes a PNG ' +
@@ -167,6 +168,9 @@ export const renderMotion = defineCommand({
       const shading = surfaceShadingOf(frameDoc, ctx);
       const data = renderDocument(frameDoc, view, width, height, {
         ...resolved.options,
+        ...(frame === null || resolved.options.light?.shadows === undefined
+          ? {}
+          : { light: { ...resolved.options.light, shadows: { ...resolved.options.light.shadows, groundBounds: frame } } }),
         frame,
         background: null,
         caption: false,

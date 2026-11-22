@@ -3,6 +3,7 @@ import type { Bounds } from '../../geometry/bounds';
 import type { Camera, RenderLight, ViewName } from './camera';
 import type { OverlayKind, OverlayStats } from '../../model/renderOverlay';
 import type { RasterScene } from '../../model/raster';
+import type { SunShadowReport } from './shadowTypes';
 
 /** The `data` payload of render_view. */
 export interface RenderViewData {
@@ -40,6 +41,8 @@ export interface RenderViewData {
   routedTo?: 'viewport' | 'raster';
   drawnShare?: number;
   warnings?: { code: string; message: string }[];
+  /** Raster sun shadows: what the shadow pass did (absent without a site context, in vector mode or with the sun below the horizon). */
+  sunShadows?: SunShadowReport;
   /** Entities clipped by `cut` (empty without a cut). */
   cutEntityIds: string[];
   /** What the `overlay` kinds drew (04 DIR FR-DIR-40): entity ids and the counts of segments and dots in the SVG; absent without `overlay`. */

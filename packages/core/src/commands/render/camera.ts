@@ -1,5 +1,6 @@
 import type { Vec3 } from '../../model/types';
 import { sub3, dot3, cross3, normalize3 } from '../../lib/vec3';
+import type { ShadowPlan } from './shadowTypes';
 
 export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso' | 'custom';
 
@@ -84,7 +85,13 @@ const AMBIENT = 0.35;
 export interface RenderLight {
   readonly direction: Vec3 | null;
   /** Present = raster sun shadows (when the sun is up) and the ground plane at `groundElevation` (null = none); see `sunShadows.ts`. */
-  readonly shadows?: { readonly groundElevation: number | null };
+  readonly shadows?: {
+    readonly groundElevation: number | null;
+    /** World AABB the ground plane is fitted to (a static document extent across the frames of an animation); absent = the drawn faces' own bounds. */
+    readonly groundBounds?: { readonly min: Vec3; readonly max: Vec3 };
+    /** The shadow pass already run for these polygons (`planShadows`); absent = the raster stage runs it. */
+    readonly plan?: ShadowPlan;
+  };
 }
 
 /** Lambert-shade `baseColor` (`#rrggbb`) for a face with unit `normal`; returns `rgb(r,g,b)`. Default light unless `light` overrides it. */

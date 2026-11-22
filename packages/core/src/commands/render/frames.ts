@@ -15,6 +15,7 @@ import { computeSceneSnapshot } from '../inspect/scene';
 import { rasterScenePixels } from './raster';
 import type { RasterScene } from '../../model/raster';
 import type { PixelStage, SurfaceShading } from './types';
+import type { RenderLight } from './camera';
 import { renderDocument } from './scene';
 import { viewpointView } from './viewSetup';
 
@@ -40,7 +41,13 @@ export interface FrameExtras {
   /** Receives the screen-space scene the pixel stage is about to draw and returns the scene to draw (overlays appended). */
   readonly augment?: (scene: RasterScene) => RasterScene;
   readonly colorOverrides?: Readonly<Record<string, string>>;
+  /** Static extent the site ground plane is fitted to in every frame (animation: the motion bounds); absent = each frame's own faces. */
+  readonly groundBounds?: { readonly min: Vec3; readonly max: Vec3 };
 }
+
+/** `light` with the ground plane fitted to `groundBounds` when given. */
+const frameLight = (light: RenderLight, groundBounds: FrameExtras['groundBounds']): RenderLight =>
+  groundBounds === undefined || light.shadows === undefined ? light : { ...light, shadows: { ...light.shadows, groundBounds } };
 
 /** Opaque RGBA (`width` × `height` × 4) of `doc` seen by `camera` over `background` (#rrggbb). */
 export function renderCameraRgba(
@@ -64,7 +71,7 @@ export function renderCameraRgba(
     caption: false,
     background: null,
     pixels: capture,
-    ...(site === null ? {} : { light: site.light }),
+    ...(site === null ? {} : { light: frameLight(site.light, extras.groundBounds) }),
     ...(extras.shading === undefined ? {} : { shading: extras.shading }),
     ...(extras.colorOverrides === undefined ? {} : { colorOverrides: extras.colorOverrides }),
   });
