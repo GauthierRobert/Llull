@@ -59,6 +59,14 @@ function flangePieces(part: RoutedPart): Piece[] {
   ];
 }
 
+/** The plate of a spectacle blind: the larger of its two discs (the ring and the solid disc), `thickness` thick between the two faces; the web and handle are inside that envelope. */
+function spectaclePieces(part: RoutedPart): Piece[] {
+  const [first, second] = part.ports;
+  const { discDiameterClosed: closed, discDiameterOpen: open } = part.dims;
+  if (first === undefined || second === undefined || closed === undefined || open === undefined) return [];
+  return [{ from: first.position, to: second.position, half: Math.max(closed, open) / 2, insulated: false }];
+}
+
 /** The straight pieces of a part's solid body (none for parts that are not modelled). */
 function pieces(part: RoutedPart): Piece[] {
   const [first, second, third] = part.ports;
@@ -85,6 +93,7 @@ function pieces(part: RoutedPart): Piece[] {
     case 'flange':
       return flangePieces(part);
     case 'inline':
+      if (part.typeKey === 'spectacleBlind') return spectaclePieces(part);
       return od === undefined
         ? []
         : [{ from: first.position, to: second.position, half: Math.max(part.dims['bodyOd'] ?? od, od) / 2, insulated: false }];

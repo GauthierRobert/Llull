@@ -11,6 +11,7 @@ import { fittingEnd, isJoinFailure, joinFrom } from './connections';
 import { resolveFlangeSet, type FlangeFace, type FlangeSet } from './flangeSet';
 import { angleBetweenDeg, epsilonFor, unitVector } from './legs';
 import { portIdOf, portOfRef } from './ports';
+import { spectacleRow } from './spectacleRow';
 import { at, joinOf, partOf, type EndSetup, type Env, type Mint } from './routeEnv';
 import { branchStartSetup } from './routeBranch';
 import { isMiss } from './specLookup';
@@ -75,7 +76,7 @@ function capSetup(env: Env, side: 'start' | 'end', dn: number): EndSetup | Deriv
  * the spec's `flangeBlind` row of the same rating and facing with its `thickness`. The run end point is the outer face of the blind.
  * @failure no flange set -> its code; no blind row (RTE_SPEC_NO_COMPONENT / PSC_*), no `thickness`, FL-FL rule missing -> RTE_NO_CONNECTION_RULE
  */
-function blindSetup(env: Env, side: 'start' | 'end', dn: number): EndSetup | DerivationFailure {
+function blindSetup(env: Env, side: 'start' | 'end', dn: number, spectacle?: 'open' | 'closed'): EndSetup | DerivationFailure {
   const { lookup } = env;
   if (lookup.connection('FL', 'FL') === null)
     return fail(
@@ -88,17 +89,29 @@ function blindSetup(env: Env, side: 'start' | 'end', dn: number): EndSetup | Der
   if (isFailure(pipe)) return pipe;
   const set = resolveFlangeSet(lookup, {}, dn, pipe.row.pipeEnd ?? 'BW');
   if ('code' in set) return fail(set.code, set.message, [...set.ids, env.run.id], [side], set.detail);
-  const row = lookup.component({
-    types: ['flangeBlind'],
-    dn,
-    ...(set.flange.rating === undefined ? {} : { rating: set.flange.rating }),
-    ...(set.flange.facing === undefined ? {} : { facing: set.flange.facing }),
-  });
+  const row =
+    spectacle === undefined
+      ? lookup.component({
+          types: ['flangeBlind'],
+          dn,
+          ...(set.flange.rating === undefined ? {} : { rating: set.flange.rating }),
+          ...(set.flange.facing === undefined ? {} : { facing: set.flange.facing }),
+        })
+      : spectacleRow(env, dn, set, [env.run.id], [side]);
+  if (isFailure(row)) return row;
   if (isMiss(row)) return fail(row.miss, row.detail, [...row.ids, env.run.id], [side], { dn });
   const thickness = row.dims['thickness'];
   if (thickness === undefined || !(thickness > 0))
     return fail('RTE_SPEC_NO_COMPONENT', `blind flange row ${row.key} has no thickness dimension (${row.source})`, [row.key], [side]);
-  return { length: thickness + set.length, gap: set.join.gapMm, set, join: set.join, port: null, portId: null, blind: { row, thickness } };
+  return {
+    length: thickness + set.length,
+    gap: set.join.gapMm,
+    set,
+    join: set.join,
+    port: null,
+    portId: null,
+    blind: { row, thickness, ...(spectacle === undefined ? {} : { state: spectacle }) },
+  };
 }
 
 /**
@@ -108,15 +121,21 @@ function blindSetup(env: Env, side: 'start' | 'end', dn: number): EndSetup | Der
 export function setupEnd(env: Env, end: RunEnd, side: 'start' | 'end', dn: number): EndSetup | DerivationFailure {
   const { doc, line, lookup, weld } = env;
   if (end.ref === undefined) {
-    if (end.cap === true && end.blind === true)
-      return fail('RTE_CAP_INVALID', `the ${side} of run ${env.run.id} is both capped and closed by a blind flange`, [env.run.id], [side]);
+    if ([end.cap === true, end.blind === true, end.spectacle !== undefined].filter(Boolean).length > 1)
+      return fail(
+        'RTE_CAP_INVALID',
+        `the ${side} of run ${env.run.id} has more than one closure (cap, blind flange, spectacle blind)`,
+        [env.run.id],
+        [side],
+      );
+    if (end.spectacle !== undefined) return blindSetup(env, side, dn, end.spectacle);
     if (end.blind === true) return blindSetup(env, side, dn);
     return end.cap === true ? capSetup(env, side, dn) : { length: 0, gap: 0, set: null, port: null, portId: null };
   }
-  if (end.cap === true || end.blind === true)
+  if (end.cap === true || end.blind === true || end.spectacle !== undefined)
     return fail(
       'RTE_CAP_INVALID',
-      `the ${side} of run ${env.run.id} is connected to a port and also closed by a ${end.cap === true ? 'cap' : 'blind flange'}`,
+      `the ${side} of run ${env.run.id} is connected to a port and also closed by a ${end.cap === true ? 'cap' : end.spectacle === undefined ? 'blind flange' : 'spectacle blind'}`,
       [env.run.id],
       [side],
     );
@@ -248,9 +267,11 @@ export function blindParts(
   const faceSpec: FlangeFace = { ...(rating === undefined ? {} : { rating }), ...(facing === undefined ? {} : { facing }) };
   const fl = (position: Vec3, direction: Vec3): PartPort => ({ position, direction, dn: row.dn, endType: 'FL', ...faceSpec });
   // One port, the mating face (as a cap's mouth): the outer face is closed, not a connection.
-  const blind = partOf(runId, blindId, 'flange', row, [fl(mating, into)], {
+  const spectacle = setup.blind.state !== undefined;
+  const blind = partOf(runId, blindId, spectacle ? 'inline' : 'flange', row, [fl(mating, into)], {
     centre: face,
-    dims: { ...row.dims, pipeOutsideDiameter: pipeOd },
+    ...(spectacle ? { typeKey: row.type, state: setup.blind.state } : {}),
+    dims: { ...row.dims, ...(spectacle ? { outsideDiameter: pipeOd } : {}), pipeOutsideDiameter: pipeOd },
   });
   return {
     parts: [...flangeParts(runId, ids, setup.set, faceSpec, mating, into, pipeOd, false), blind],

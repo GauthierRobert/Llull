@@ -10,7 +10,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { distance3, normalize3, sub3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
 import type { NetworkComponent, NetworkPoint } from '../model';
-import { ZERO } from './eccentric';
+import { storedBranchPoints, ZERO } from './eccentric';
 import { addBranch, arrive, comp, createState, free, refuse, take, type PlanState, type Walk } from './planState';
 import type { PlanOptions, PlannedRun, PlannedSupport, RoutePlan, RouteRefusal, Seed } from './planTypes';
 import { startClosure, startFlangeSet, walkRun } from './planWalk';
@@ -62,12 +62,14 @@ function branchOlets(
     if (!pending.has(i) || component.branch === undefined) continue;
     const centre = component.centre ?? component.branch.xyz;
     const stored = line
-      .flatMap((p, k) => (k === 0 ? [] : (shifts[k] ?? []).map((shift) => ({ point: sub3(centre, shift), a: line[k - 1] as Vec3, b: p }))))
-      .find((candidate) => onSegment(candidate.point, candidate.a, candidate.b))?.point;
+      .flatMap((p, k) =>
+        k === 0 ? [] : (shifts[k] ?? []).map((shift) => ({ shift, point: sub3(centre, shift), a: line[k - 1] as Vec3, b: p })),
+      )
+      .find((candidate) => onSegment(candidate.point, candidate.a, candidate.b));
     if (stored === undefined) continue;
     pending.delete(i);
     take(s, i);
-    addBranch(s, seed.key, stored, component.branch);
+    addBranch(s, seed.key, stored.point, component.branch, stored.shift);
   }
 }
 
@@ -116,7 +118,7 @@ function walkSeed(
   runs.push({
     key: seed.key,
     dn: seed.dn,
-    points: line,
+    points: storedBranchPoints(line, seed.sideways),
     ...(w.startPort === undefined ? {} : { startPort: w.startPort }),
     ...(w.endPort === undefined ? {} : { endPort: w.endPort }),
     ...(w.cap === undefined ? {} : { cap: w.cap }),

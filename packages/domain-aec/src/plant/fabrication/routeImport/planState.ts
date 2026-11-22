@@ -1,7 +1,9 @@
 /** The state of one route-plan walk (visited components, welds, gaskets, branch seeds) and the lookups over the component network. */
 
 import type { Vec3 } from '@core/model/vectors';
+import { add3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
+import { branchSideways } from './eccentric';
 import type { NetworkComponent, NetworkPoint } from '../model';
 import type { PlannedInline } from './inlineBody';
 import type { PlanOptions, PlannedCap, PlannedPort, PlannedWeld, RouteRefusal, Seed } from './planTypes';
@@ -84,9 +86,17 @@ export function arrive(s: PlanState, key: string): void {
   }
 }
 
-export function addBranch(s: PlanState, parent: string, centre: Vec3, outlet: NetworkPoint): void {
+export function addBranch(s: PlanState, parent: string, centre: Vec3, outlet: NetworkPoint, shift: Vec3 = [0, 0, 0]): void {
   s.branches += 1;
-  s.seeds.push({ key: `branch-${s.branches}`, start: centre, startKey: nodeKey(outlet.xyz), dn: outlet.boreMm, parent });
+  const sideways = branchSideways(shift, add3(centre, shift), outlet.xyz);
+  s.seeds.push({
+    key: `branch-${s.branches}`,
+    start: centre,
+    startKey: nodeKey(outlet.xyz),
+    dn: outlet.boreMm,
+    parent,
+    ...(sideways === undefined ? {} : { sideways }),
+  });
 }
 
 /** The refusal of an INSTRUMENT with a tapping point (BRANCH1-POINT), or undefined: the RTE cannot branch off an instrument body. */

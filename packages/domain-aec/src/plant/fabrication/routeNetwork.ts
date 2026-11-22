@@ -93,6 +93,10 @@ function typeOf(part: RoutedPart): PcfComponentType | { readonly skip: string } 
     case 'stubIn':
       return { skip: 'a stub-in has no PCF component: the branch pipe is welded to the header' };
     case 'inline':
+      if (part.typeKey === 'spectacleBlind')
+        return {
+          skip: `a spectacle blind (${part.state ?? 'closed'}) has no PCF component: the keyword list (docs/plant/05 validation pcf_keywords.json) has no spectacle blind, and FLANGE-BLIND is a closed end; the part is left out, the flanges and gaskets around it are written`,
+        };
       return part.typeKey === 'instrument' ? 'INSTRUMENT' : { skip: 'a generic inline part has no PCF component' };
   }
 }

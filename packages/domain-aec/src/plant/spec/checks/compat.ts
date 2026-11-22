@@ -106,6 +106,7 @@ const JOINT_TYPES: ReadonlySet<ComponentType> = new Set([
   'flangeWeldNeck',
   'flangeSlipOn',
   'flangeBlind',
+  'spectacleBlind',
   'flangeSocketWeld',
   'flangeThreaded',
   'flangeLapJoint',
