@@ -616,5 +616,9 @@ fn a_trim_star_that_stands_outside_the_part_is_measured_and_refused_above_the_li
     let text = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(text.starts_with("[BLD_CORNER_FAILED]") && text.contains("stands 0.0") && text.contains("outside the part, above"), "{text}");
     assert!(text.contains(&format!("above {}", (limit * 1e5).round() / 1e5)) || text.contains("above 0.017"), "{text}");
-    // the same gate on the cylinder block: the edge against the cylinder sharp, r 0.3, ball 2 stands 0.0155 outside (limit 1e-3 x the diagonal)    let (block, vertex, _) = cylinder_block();    let (edges, corners) = trim_step(&block, vertex, 2, 0.3, 2.0);    let text = setback_reason(&block, &edges, &corners).unwrap();    assert!(text.contains("stands 0.015") && text.contains("outside the part, above"), "{text}");
+    // the same gate on the cylinder block: the edge against the cylinder sharp, r 0.3, ball 2 stands 0.0155 outside (limit 1e-3 x the diagonal)
+    let (block, vertex, _) = cylinder_block();
+    let (edges, corners) = trim_step(&block, vertex, 2, 0.3, 2.0);
+    let text = setback_reason(&block, &edges, &corners).unwrap();
+    assert!(text.contains("stands 0.015") && text.contains("outside the part, above"), "{text}");
 }
