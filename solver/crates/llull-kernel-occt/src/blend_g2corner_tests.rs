@@ -9,7 +9,7 @@ use serde_json::Value;
 const NAN: f64 = f64::NAN;
 
 /// Every edge of `shape` blended with `size` and the section `kind` / `param` (1 = curvature, 0 = conic), the corners found automatically.
-fn profile_of(shape: &Shape, size: f64, kind: f64, param: f64) -> Result<Shape, String> {
+pub(crate) fn profile_of(shape: &Shape, size: f64, kind: f64, param: f64) -> Result<Shape, String> {
     let count = topology(shape).unwrap()["edges"].as_array().unwrap().len();
     let specs: Vec<f64> = (0..count).flat_map(|edge| [edge as f64, kind, param, size, NAN, -1.0, 0.0]).collect();
     match fillet_profile_blend(shape, &specs, &[], &[], kind, param).unwrap() {
