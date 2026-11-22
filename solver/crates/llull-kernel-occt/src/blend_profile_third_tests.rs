@@ -359,6 +359,8 @@ fn the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke() {
         (2, 0.5, 1.5),
         (2, 0.3, 1.5),
         (2, 0.8, 2.0),
+        (2, 0.8, 1.5),
+        (2, 1.0, 2.0),
     ];
     for (sharp, radius, ball) in cases {
         let (edges, corners) = trim_step(&shape, vertex, sharp, radius, ball);
@@ -577,19 +579,21 @@ fn a_ball_that_does_not_hold_the_crease_is_refused_at_a_second_radius_too() {
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
 }
 
-/// BLD §13.39.5 / 13.42: where the star is refused the step says so by name with the measure: the edge against the cylinder sharp at r 1 / ball 2 (the creased star misses the blend ends by 1.8e-5 against 3.2e-6;
-/// a cause of its own, not the chain map of 13.42).
+/// BLD §13.43: the creased star that missed the blend ends by 1e-5 (r 1 / ball 2 against the cylinder, 13.42.3) builds since the bottom edge of every sub-patch equals its chain (the cross tangent at v = 0 is the projected
+/// one). Where the creased star is refused now it is by the overshoot gate, named with the measure: the circular top edge sharp at r 1 / ball 3 stands 0.0155 outside the part, above 0.015.
 #[test]
-fn a_creased_trim_star_that_misses_the_blend_ends_is_refused_with_the_measure() {
+fn a_creased_trim_star_over_the_overshoot_limit_is_refused_with_the_measure() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
     let (shape, vertex, _) = cylinder_block();
     let (edges, corners) = trim_step(&shape, vertex, 2, 1.0, 2.0);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
+    let (edges, corners) = trim_step(&shape, vertex, 0, 1.0, 3.0);
     let text = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(
         text.starts_with("[BLD_CORNER_FAILED]")
             && text.contains("the only patch that holds the crease")
-            && text.contains("leave the edges by 0.00001"),
+            && text.contains("outside the part, above 0.015"),
         "{text}"
     );
 }
