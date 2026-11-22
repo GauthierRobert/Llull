@@ -99,6 +99,7 @@ fn bodies() -> Vec<(&'static str, Shape)> {
             })
             .collect();
     bodies.push(("box", uneven_box()));
+    bodies.push(("cut block", profile_of(&crate::blend_corner_tests::cut_block_vertex(15.0).0, 0.2, 1.0, 0.5).expect("the cut block")));
     bodies
 }
 
@@ -311,29 +312,25 @@ fn the_bounds_of_the_fan_shell_are_the_box_of_the_part() {
     assert!((areas[0] - areas[1]).abs() < 1e-6 * areas[0], "{areas:?}");
 }
 
-/// BLD §13.46: the gates themselves refuse (not the hook): on the block cut by a cylinder (radius 15, size 0.2) one corner gets its fans and the other seven miss the seam curvature gate
-/// (the chain of the bottom has a joint where the support changes, inside a corner triangle, 13.45.3). They keep the 13.38 spokes, name the gate, and the face count is the 13.38 one plus 12 per fan corner.
+/// BLD §13.47: the block cut by a cylinder (radius 15, size 0.2) gets the fans at all 8 corners (13.46 refused 7: the offsets from V were read from absolute coordinates, whose rounding is amplified
+/// by the collocation inverse into the curvature across the spoke near V). The star is the 13.38 one plus 12 faces per corner, valid, and every spoke mark passes the gate.
 #[test]
-fn fans_that_miss_a_gate_keep_the_beyond_reach_spokes_and_name_the_gate() {
+fn the_block_cut_by_a_cylinder_gets_the_vertex_fans_at_every_corner() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
     let (block, _, _) = crate::blend_corner_tests::cut_block_vertex(15.0);
     crate::test_bridge::set_corner_fan(0);
     let reference = profile_of(&block, 0.2, 1.0, 0.5).unwrap();
     crate::test_bridge::set_corner_fan(1);
+    let started = std::time::Instant::now();
     let shape = profile_of(&block, 0.2, 1.0, 0.5).unwrap();
+    eprintln!("cut block, fans on: {:?} for {} corners", started.elapsed(), corners_of(&shape).len());
     assert!(is_valid(&shape).unwrap());
-    let spokes = spokes_of(&shape);
-    let fans = spokes.iter().filter(|spokes| *spokes == "G2-fan").count();
-    assert!(fans >= 1 && fans < spokes.len(), "{spokes:?}");
+    assert_eq!(spokes_of(&shape), vec!["G2-fan".to_string(); 8]);
     assert_eq!(corners_of(&shape), corners_of(&reference));
-    assert_eq!(faces_of(&shape), faces_of(&reference) + 12 * fans);
-    for (spoke, corner) in spokes.iter().zip(corner_notes(&shape)) {
-        if spoke == "G2-fan" {
-            assert!(corner["spokeFanRefused"].is_null(), "{corner}");
-        } else {
-            assert_eq!(spoke, "G2-beyond-reach");
-            assert!(corner["spokeFanRefused"].as_str().is_some_and(|why| why.contains("over the curvature gate by")), "{corner}");
-        }
-    }
+    assert_eq!(faces_of(&shape), faces_of(&reference) + 12 * 8);
+    assert!(corner_notes(&shape).iter().all(|corner| corner["spokeFanRefused"].is_null()));
+    assert!((volume(&shape) - volume(&reference)).abs() < 1e-4 * volume(&reference));
+    let marks = spoke_marks(&shape);
+    assert!(marks.excess.iter().all(|excess| *excess <= 0.0), "over the gate by {:?}", marks.excess);
 }

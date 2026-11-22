@@ -157,6 +157,7 @@ struct Basis {
 // One corner of a sub-patch: the parameter point of the polar coordinates (r, tau): tau = 0 on the bottom edge, 1 on the spoke.
 struct Corner {
   Handle(Geom_BSplineSurface) surface;
+  Handle(Geom_BSplineSurface) local;  // the same surface with its poles taken about V: positions read from it are offsets from V without the rounding of absolute coordinates
   bool right = false;  // the corner (1, 0) rather than (0, 0)
   double a = 0, b = kSpan;
   gp_Pnt2d uv(double r, double tau) const {
@@ -205,7 +206,7 @@ Handle(Geom_BSplineSurface) interpolate(const std::vector<std::vector<gp_XYZ>> &
     for (size_t j = 0; j < ns; ++j) {
       gp_XYZ sum(0, 0, 0);
       for (size_t c = 0; c < ns; ++c) sum += mid[i][c] * inverse_s[j][c];
-      grid.SetValue(static_cast<int>(i) + 1, static_cast<int>(j) + 1, gp_Pnt(sum));
+      grid.SetValue(static_cast<int>(i) + 1, static_cast<int>(j) + 1, gp_Pnt(sum + vertex.XYZ()));
     }
   for (int j = 1; j <= static_cast<int>(ns); ++j) grid.SetValue(1, j, vertex);  // the collapsed edge is one point exactly
   const auto along_r = basis_r.distinct(), along_s = basis_s.distinct();
@@ -305,8 +306,14 @@ bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double
     for (size_t k = 0; k < m; ++k) {
       const size_t previous = (k + m - 1) % m;
       Corner corners[2];
-      corners[0] = Corner{surfaces[k], false, a_left[k], kSpan};
-      corners[1] = Corner{surfaces[previous], true, a_right[previous], kSpan};
+      const gp_Pnt vertex = surfaces[k]->Value(0.0, 0.0);
+      const auto about_vertex = [&](const Handle(Geom_BSplineSurface) &surface) {
+        Handle(Geom_BSplineSurface) copy = Handle(Geom_BSplineSurface)::DownCast(surface->Copy());
+        copy->Translate(gp_Vec(-vertex.X(), -vertex.Y(), -vertex.Z()));
+        return copy;
+      };
+      corners[0] = Corner{surfaces[k], about_vertex(surfaces[k]), false, a_left[k], kSpan};
+      corners[1] = Corner{surfaces[previous], about_vertex(surfaces[previous]), true, a_right[previous], kSpan};
       // the displacement along the spoke at the r of the interpolation points
       std::vector<std::array<double, 2>> delta(static_cast<size_t>(basis_r.poles), {0.0, 0.0});
       std::vector<Vec> normal(static_cast<size_t>(basis_r.poles), Vec(0, 0, 0));
@@ -321,7 +328,6 @@ bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double
         normal[static_cast<size_t>(i)] = data[0].normal;
         for (int side = 0; side < 2; ++side) delta[static_cast<size_t>(i)][static_cast<size_t>(side)] = data[side].lambda * data[side].lambda * (mean - data[side].kappa);
       }
-      const gp_Pnt vertex = surfaces[k]->Value(0.0, 0.0);
       Handle(Geom_BSplineSurface) fan[2];
       for (int side = 0; side < 2; ++side) {
         std::vector<std::vector<gp_XYZ>> samples(static_cast<size_t>(basis_r.poles), std::vector<gp_XYZ>(static_cast<size_t>(basis_s.poles), gp_XYZ(0, 0, 0)));
@@ -330,8 +336,7 @@ bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double
           for (int j = 0; j < basis_s.poles; ++j) {
             const double tau = corners[side].tau_of(basis_s.greville(j));
             const gp_Pnt2d at = corners[side].uv(r, tau);
-            gp_Pnt p = i == 0 ? vertex : corners[side].surface->Value(at.X(), at.Y());
-            gp_XYZ sum = p.XYZ();
+            gp_XYZ sum = i == 0 ? gp_XYZ(0, 0, 0) : corners[side].local->Value(at.X(), at.Y()).XYZ();
             if (i > 0) sum += normal[static_cast<size_t>(i)].XYZ() * (delta[static_cast<size_t>(i)][static_cast<size_t>(side)] * psi(tau));
             samples[static_cast<size_t>(i)][static_cast<size_t>(j)] = sum;
           }

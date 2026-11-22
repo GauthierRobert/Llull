@@ -2410,3 +2410,31 @@ Left: the fan shell still has 2.5x the faces (tessellation +1 s, volume integral
 - The whole fan branch, `read_spokes` included, is inside the `try`/`catch` (`Standard_Failure` and `std::exception`; `make_fans` catches both too); a failure restores the star's spoke reading and the faces already pushed. A fan that OCCT cannot make into a face skips its pole rung (the next rung builds; when no rung reaches the gates the reason is that of the face alone). Hooks: `set_corner_fan` 4 (std::exception), 5 (first rung's faces fail), 6 (exception after the fans are built); test `every_kind_of_failure_in_the_fan_branch_falls_back_or_climbs_to_the_next_rung`.
 - A step with fans that fails after the sewing (free edges, validity, volume, oriented check) is rebuilt with the 13.38 spokes (`Mode::no_fans`) before the G1 star and the plate; the corners say so in `spokeFanRefused`. Hook `set_corner_exact_patch(8)` fails a step that has fans after the fills; test `a_step_with_fans_that_fails_after_the_sewing_is_rebuilt_with_the_beyond_reach_spokes`.
 - The rails size sweep (`nativeBlendRails.test.ts`) is one test per size (4 x about 25 s with the fans on, 120 s each); the single 180 s test took 112 s of wall with the fans on against 57 s with them off at the same load (cube-corner cases dominate: 24 s against 11.5 s per fillet + check), too close to its limit under load. Per cube at one size (fillet_edge + check_blends, kernel): fans off 8.7 + 2.8 s, fans on 15.4 + 9.0 s (2.1x; fillet_edge alone 1.8x). What is left of the ratio is the Gauss integral of 144 faces (volume and area in `topology`, `mass_properties`, `analyze`): 5.2 s of topology, 5.5 s of mass properties against 1.8 and 1.7 s.
+
+## 13.47 As built: fans on the cut block, the "chain joint" was rounding (DES-6c, 2026-11-22)
+
+Result: the block cut by a cylinder of radius 15 (size 0.2, the 13.45.3 / 13.46.1 left case) now gets G2 fans at **8 of 8 corners** (was 1 of 8 at the time of 13.46, 5 of 8 on the merged base), all at the first pole rung (22 x 26), and every spoke mark passes on it and on the five bodies of the never-worse test. No gate was touched.
+
+### 13.47.1 Diagnosis (instrumented `build_fans`, release)
+
+- The sub-patches have **no joint**: their knot vectors are uniform (57 spans, multiplicity 1 inside), so no C0 knot lies in a corner triangle. The data fed to the fans is smooth: on every corner the curvature across the spoke of both sides against r is a smooth curve (-0.0134 / -0.0013 at r = 0.01, crossing, equal from r = 0.59), identical between symmetric corners.
+- The refusing gate is the **seam curvature gate** (the second fan pair meeting at the spoke, tau = 1), at one place only: the first sample after the vertex, r = 0.01 (0.34 % of the spoke). Relative jump there 0.02 to 0.26 on the refusing corners and 5e-4 to 9e-3 on the passing ones, for the same smooth data; scale 7.5e-3, gate 0.02 x scale + 2e-4/length = 8e-4. Beyond r = 0.03 it is under 0.01 everywhere. The arc gate misses only at the last rung (36 x 40, 1.7e-4 at r = 0.02). Each failing corner differs from rung to rung at random (excess 3e-5 to 2.4e-3), and the finer rungs are worse (22 x 26 3.2e-5, 24 x 26 5.9e-4, 30 x 32 9.4e-4, 36 x 40 2.4e-3): a conditioning signature, not a model error. Cause: the interpolation samples were absolute coordinates `P(u, v)` (|V| of tens), each with an absolute rounding of about 5e-15; the collocation inverse (cond 1e4 and up at 22 to 40 poles) and the second derivative along tau (x n^2) amplify it to 1e-10 to 1e-8, against the signal at r = 0.01: the displacement term is lambda^2 kappa = 1e-6 x 7e-3 = 7e-9.
+- Hence the rounding is a function of how far V is from the origin and of the pole count, which is why the cube (V on a small coordinate) passed and the cut block failed, 13.45.3's "joint" being a coincidence of the first failing test body. The split-at-knot / smaller triangle / per-span ideas were therefore not needed.
+
+### 13.47.2 Fix (`cpp/blend_corner_fan.cxx`)
+
+The sampled positions are read from a copy of each sub-patch with its poles taken about V (`Corner::local`, `Translate(-V)`): `local->Value(u, v)` is `P - V` with the rounding of its own size (r times the spoke length) instead of that of |V|. The interpolation runs in offsets; the vertex is added back to every pole (row r = 0 stays V exactly). The surface the fan is judged against (`Corner::surface`, absolute) and every gate are unchanged. Same geometry (the poles differ by 1e-15 absolute).
+
+### 13.47.3 Measured (native llull-kernel, release, same machine under load from a parallel coverage run)
+
+| body | fans before | fans after | build, 8 corners |
+| --- | --- | --- | --- |
+| cut block r15, size 0.2 | 5 of 8 (3 refused: seam excess 3e-5 .. 2.4e-3) | 8 of 8, 162 faces (66 + 12 x 8), volume = 13.38 within 1e-4, valid | 5.2 s (4.8 to 6.5 s before, with refusals climbing the ladder to 36 x 40) = 0.65 s per corner |
+| cut block r15, size 0.1 / 0.4; r20, size 0.1 / 0.2 / 0.4 | not measured | 8 of 8 each, 162 faces | 4.9 to 5.7 s |
+| cube, box, the other cube bodies | 8 of 8 | 8 of 8, marks unchanged to the rounding | unchanged |
+
+Radius 8 and 12 and cube sizes 3 and 4 are refused earlier (no star), not by the fans.
+
+### 13.47.4 Tests, left
+
+`blend_g2fan_tests.rs`: `the_block_cut_by_a_cylinder_gets_the_vertex_fans_at_every_corner` (8 of 8, face count, volume, validity, every mark within the gate) replaces `fans_that_miss_a_gate_keep_...` (no body of the set misses a gate now); the cut block joins `bodies()`, so `the_vertex_fans_are_never_worse_...` covers it (spoke marks, volume, contacts, validity). The gate-refusal message path (`over the curvature gate by`) is exercised only by the hook modes (refusal and fallback to 13.38 spokes: `refused_vertex_fans_...`, `every_kind_of_failure_...`); no body that the gates themselves refuse is known at present. Left: a body with a true C0 joint inside a corner triangle was never found to be refused, so that case stays untested (the fan samples the sub-patch by value and second form, which a joint would break at the joint's r; the gate would then refuse and keep 13.38).
