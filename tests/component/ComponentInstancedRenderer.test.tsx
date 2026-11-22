@@ -56,6 +56,17 @@ async function mount(element: React.ReactElement): Promise<Mounted> {
   return { scene, unmount: () => act(async () => root.unmount()) };
 }
 
+function colourOf(mesh: THREE.InstancedMesh, slot: number): number {
+  const colour = new THREE.Color();
+  mesh.getColorAt(slot, colour);
+  return colour.getHex();
+}
+
+function moveOver(mesh: THREE.InstancedMesh, instanceId: number | undefined): void {
+  const props = (mesh as unknown as { __r3f: { props: { onPointerMove: (e: unknown) => void } } }).__r3f.props;
+  props.onPointerMove({ instanceId, point: new THREE.Vector3(), nativeEvent: {} });
+}
+
 function clickInstance(mesh: THREE.InstancedMesh, instanceId: number): void {
   const handlers = (mesh as unknown as { __r3f: { props: { onClick: (e: unknown) => void } } }).__r3f.props;
   handlers.onClick({ instanceId, point: new THREE.Vector3(), stopPropagation: vi.fn(), nativeEvent: {} });
@@ -70,7 +81,8 @@ describe('ComponentInstancedRenderer', () => {
     const document = polarPattern(1000);
     useStore.setState({ document });
     const { scene, unmount } = await mount(<Entities />);
-    const drawn = meshes(scene);
+    // The far-LOD tier meshes exist but hold no instance until the camera puts some there: one draw call.
+    const drawn = meshes(scene).filter((mesh) => mesh.count > 0);
     expect(drawn).toHaveLength(1);
     expect(drawn[0]?.count).toBe(1000);
     const plain: THREE.Mesh[] = [];
@@ -130,6 +142,56 @@ describe('ComponentInstancedRenderer', () => {
     });
     expect(colours.filter((c) => c !== colours[0])).toHaveLength(1);
     expect(colours[3]).not.toBe(colours[0]);
+    await unmount();
+  });
+});
+
+describe('ComponentInstancedRenderer hover', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it('highlights only the instance under the pointer, without rebuilding the mesh, and restores it on leave', async () => {
+    const document = polarPattern(12);
+    const plan = planComponentBatches(Object.values(document.entities), document.components, () => true);
+    const { scene, unmount } = await mount(
+      <ComponentInstancedRenderer
+        plan={plan}
+        entities={document.entities}
+        materials={document.materials}
+        selectionSet={new Set()}
+        onSelect={() => {}}
+      />,
+    );
+    const [mesh] = meshes(scene);
+    const rest = Array.from({ length: 12 }, (_, i) => colourOf(mesh as THREE.InstancedMesh, i));
+    moveOver(mesh as THREE.InstancedMesh, 4);
+    const hovered = Array.from({ length: 12 }, (_, i) => colourOf(mesh as THREE.InstancedMesh, i));
+    expect(hovered.filter((c, i) => c !== rest[i])).toHaveLength(1);
+    expect(hovered[4]).not.toBe(rest[4]);
+    expect(meshes(scene)[0]).toBe(mesh);
+    const props = (mesh as unknown as { __r3f: { props: { onPointerOut: () => void } } }).__r3f.props;
+    props.onPointerOut();
+    expect(Array.from({ length: 12 }, (_, i) => colourOf(mesh as THREE.InstancedMesh, i))).toEqual(rest);
+    await unmount();
+  });
+
+  it('does not touch the document or the selection', async () => {
+    const document = polarPattern(12);
+    useStore.setState({ document });
+    const before = useStore.getState().document;
+    const plan = planComponentBatches(Object.values(document.entities), document.components, () => true);
+    const { scene, unmount } = await mount(
+      <ComponentInstancedRenderer
+        plan={plan}
+        entities={document.entities}
+        materials={document.materials}
+        selectionSet={new Set()}
+        onSelect={() => {}}
+      />,
+    );
+    moveOver(meshes(scene)[0] as THREE.InstancedMesh, 2);
+    expect(useStore.getState().document).toBe(before);
     await unmount();
   });
 });
