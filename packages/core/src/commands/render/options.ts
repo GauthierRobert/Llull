@@ -4,6 +4,7 @@ import type { CadDocument, Vec3 } from '../../model/types';
 import { isValidCut } from './clip';
 import { MAX_POLYGONS } from './budget';
 import type { CutSpec, RenderOptions, RenderViewData } from './types';
+import type { RenderLight } from './camera';
 import { siteLightOf } from './siteLight';
 import { clamp } from '../../lib/clamp';
 
@@ -18,6 +19,7 @@ interface RenderParams {
   maxPolygons?: number | undefined;
   mode?: 'raster' | 'vector' | undefined;
   sunShadows?: boolean | undefined;
+  sky?: boolean | undefined;
   cut?: { planes: { normal: Vec3; offset: number }[]; mode?: CutSpec['mode'] | undefined; entityIds?: string[] | undefined } | undefined;
 }
 
@@ -69,7 +71,14 @@ export function resolveRenderOptions(doc: CadDocument, params: RenderParams): { 
     };
   }
   const site = siteLightOf(doc);
-  if (site !== null) options.light = params.sunShadows === false ? { direction: site.light.direction } : site.light;
+  if (site !== null) {
+    const { sky, shadows, ...rest } = site.light;
+    options.light = {
+      ...rest,
+      ...(params.sky === false ? {} : { sky }),
+      ...(params.sunShadows === false ? {} : { shadows }),
+    } as RenderLight;
+  }
   return { options };
 }
 

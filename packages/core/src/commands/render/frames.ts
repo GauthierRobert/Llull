@@ -18,6 +18,7 @@ import type { PixelStage, SurfaceShading } from './types';
 import type { RenderLight } from './camera';
 import { renderDocument } from './scene';
 import { viewpointView } from './viewSetup';
+import { skyBackdrop } from './skyRaster';
 
 export const FRAME_BACKGROUND = '#1a1a2e';
 
@@ -66,20 +67,26 @@ export function renderCameraRgba(
     return new Uint8Array(drawn.length);
   };
   const site = siteLightOf(doc);
+  const view = viewpointView(camera, width, height, center);
+  const { sky, ...lit } = site === null ? { sky: undefined } : frameLight(site.light, extras.groundBounds);
   renderDocument(doc, 'custom', width, height, {
-    view: viewpointView(camera, width, height, center),
+    view,
     caption: false,
     background: null,
     pixels: capture,
-    ...(site === null ? {} : { light: frameLight(site.light, extras.groundBounds) }),
+    ...(site === null ? {} : { light: lit as RenderLight }),
     ...(extras.shading === undefined ? {} : { shading: extras.shading }),
     ...(extras.colorOverrides === undefined ? {} : { colorOverrides: extras.colorOverrides }),
   });
   const source: Uint8Array = drawn ?? new Uint8Array(width * height * 4);
   const out = new Uint8Array(width * height * 4);
+  const backdrop = sky === undefined ? null : skyBackdrop(sky, view.camera, width, height);
   for (let i = 0; i < width * height; i += 1) {
     const alpha = (source[i * 4 + 3] ?? 0) / 255;
-    for (let c = 0; c < 3; c += 1) out[i * 4 + c] = Math.round((source[i * 4 + c] ?? 0) * alpha + (background[c] ?? 0) * (1 - alpha));
+    for (let c = 0; c < 3; c += 1)
+      out[i * 4 + c] = Math.round(
+        (source[i * 4 + c] ?? 0) * alpha + (backdrop === null ? (background[c] ?? 0) : (backdrop[i * 3 + c] ?? 0)) * (1 - alpha),
+      );
     out[i * 4 + 3] = 255;
   }
   return out;

@@ -16,9 +16,10 @@ export function siteLightOf(doc: Pick<CadDocument, 'siteContext'>): { light: Ren
   if (sun === null) return null;
   const shadows = { groundElevation: site.groundElevation ?? null };
   const where = `site sun at ${site.dateTime} (azimuth ${sun.azimuthDeg.toFixed(1)} deg, elevation ${sun.elevationDeg.toFixed(1)} deg)`;
+  const sky = { sunDirection: sun.direction };
   return sun.up
-    ? { light: { direction: sun.direction, shadows }, note: `Lit by the ${where}.` }
-    : { light: { direction: null, shadows }, note: `Sun below the horizon: ${where}; sky light only.` };
+    ? { light: { direction: sun.direction, sky, shadows }, note: `Lit by the ${where}.` }
+    : { light: { direction: null, sky, shadows }, note: `Sun below the horizon: ${where}; sky light only.` };
 }
 
 /** The summary sentence for the raster sun shadows and ground plane of `light` ('' without `light.shadows`); `report` = what the shadow pass did (`RenderViewData.sunShadows`). */
@@ -34,4 +35,11 @@ export function sunShadowNote(light: RenderLight | undefined, report: SunShadowR
   if (report?.state === 'skipped')
     return `Sun shadows skipped: the shadow pass would cost ${report.work} texels, over the limit of ${SHADOW_MAX_WORK}; pass sunShadows false to silence this.${ground}`;
   return `Sun shadows: ${SHADOW_MAP_SIZE}x${SHADOW_MAP_SIZE} shadow map fitted to the model; large faces are shaded in pieces of at most ${PIECE_TEXELS} texels, so a shadow edge is placed within about ${PIECE_TEXELS / 2} texels.${ground}`;
+}
+
+/** The summary sentence for the raster sky of `light` ('' without `light.sky`). */
+export function skyNote(light: RenderLight | undefined, raster: boolean): string {
+  if (light?.sky === undefined) return '';
+  if (!raster) return 'The sky is drawn in raster mode only.';
+  return 'Sky: Preetham daylight model as in three.js Sky.js (turbidity 2, rayleigh 1, mie 0.005, mieDirectionalG 0.8) behind the model, per pixel direction (an orthographic view shows one sky colour); sky: false removes it.';
 }
