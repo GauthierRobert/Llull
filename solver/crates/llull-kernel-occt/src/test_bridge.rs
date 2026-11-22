@@ -46,6 +46,8 @@ mod ffi {
         fn set_corner_spoke_gate(scale: f64);
         /// The vertex fans of a G2 star (BLD 13.45): 1 (default) built when they meet their gates, 0 never, 2 always refused (the G2-beyond-reach spokes).
         fn set_corner_fan(mode: i32);
+        /// The face graph projects the midpoint of an edge on its faces instead of reading the pcurve (BLD 13.46).
+        fn set_face_graph_projection(on: bool);
         /// Every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
         fn set_law_inversion_fault(after: i32);
         /// The most nodes a stretch of a radius law on an uneven edge may take (0: the default, 128).
@@ -128,6 +130,10 @@ pub fn set_corner_spoke_gate(scale: f64) {
 }
 
 /// Test hook: the vertex fans of a G2 star (BLD 13.45): 1 (default) built when they meet their gates, 0 never, 2 always refused with a named reason, 3 an OCCT exception thrown inside the construction.
+pub fn set_face_graph_projection(on: bool) {
+    ffi::set_face_graph_projection(on);
+}
+
 pub fn set_corner_fan(mode: i32) {
     ffi::set_corner_fan(mode);
 }

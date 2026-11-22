@@ -401,61 +401,66 @@ describeNative('BLD M2 remainder: profiles on curved edges and faces, varying si
     expect(checked.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_UNVERIFIED_CONTACT');
   });
 
-  it('works at every size: G0 and G1 pass check_blends from a 1 mm to a 1000 mm part (the part is 10 s across), relative to the part', () => {
-    for (const size of [1, 10, 100, 1000]) {
-      const cases: Array<[string, (s: number) => ReturnType<typeof made>]> = [
-        [
-          'rim conic',
-          (s) => {
-            const rim = cylinder(5 * s, 10 * s);
-            return made(rim.doc, 'fillet_edge', {
-              id: rim.id,
-              edgesNear: [[5 * s, 0, 10 * s]],
-              radius: s,
-              profile: { type: 'conic', rho: 0.5 },
-            });
-          },
-        ],
-        [
-          'rim curvature varying',
-          (s) => {
-            const rim = cylinder(5 * s, 10 * s);
-            return made(rim.doc, 'fillet_edge', {
-              id: rim.id,
-              edges: [{ near: [5 * s, 0, 10 * s], size: s, sizeEnd: s, sizes: [{ t: 0.5, size: 0.5 * s }] }],
-              profile: { type: 'curvature', shape: 0.5 },
-            });
-          },
-        ],
-        [
-          'variable straight edge',
-          (s) => {
-            const block = box([20 * s, 10 * s, 10 * s]);
-            return made(block.doc, 'fillet_edge', {
-              id: block.id,
-              edges: [{ near: [10 * s, 10 * s, 10 * s], size: s, sizeEnd: 2 * s }],
-              profile: { type: 'conic', rho: 0.4 },
-            });
-          },
-        ],
-        [
-          'cube corners',
-          (s) => {
-            const cube = box([10 * s, 10 * s, 10 * s]);
-            return made(cube.doc, 'fillet_edge', { id: cube.id, radius: s, profile: { type: 'curvature', shape: 0.5 } });
-          },
-        ],
-      ];
-      for (const [label, build] of cases) {
-        const done = build(size / 10);
-        expect(done.result.error, `${label} at ${size}`).toBeUndefined();
-        const checked = check(done.doc, done.id);
-        expect(checked.status, `${label} at ${size}`).toBe('pass');
-        expect(checked.findings.filter((finding) => finding.severity === 'fail')).toEqual([]);
-        expect(contactsOf(checked).length).toBeGreaterThan(0);
+  // one test per size: the cube with its vertex fans (13.45) is 144 corner faces, and the four sizes together outgrew one 180 s budget under load (13.46)
+  it.each([1, 10, 100, 1000])(
+    'works at size %i: G0 and G1 pass check_blends from a 1 mm to a 1000 mm part (the part is 10 s across), relative to the part',
+    (size) => {
+      {
+        const cases: Array<[string, (s: number) => ReturnType<typeof made>]> = [
+          [
+            'rim conic',
+            (s) => {
+              const rim = cylinder(5 * s, 10 * s);
+              return made(rim.doc, 'fillet_edge', {
+                id: rim.id,
+                edgesNear: [[5 * s, 0, 10 * s]],
+                radius: s,
+                profile: { type: 'conic', rho: 0.5 },
+              });
+            },
+          ],
+          [
+            'rim curvature varying',
+            (s) => {
+              const rim = cylinder(5 * s, 10 * s);
+              return made(rim.doc, 'fillet_edge', {
+                id: rim.id,
+                edges: [{ near: [5 * s, 0, 10 * s], size: s, sizeEnd: s, sizes: [{ t: 0.5, size: 0.5 * s }] }],
+                profile: { type: 'curvature', shape: 0.5 },
+              });
+            },
+          ],
+          [
+            'variable straight edge',
+            (s) => {
+              const block = box([20 * s, 10 * s, 10 * s]);
+              return made(block.doc, 'fillet_edge', {
+                id: block.id,
+                edges: [{ near: [10 * s, 10 * s, 10 * s], size: s, sizeEnd: 2 * s }],
+                profile: { type: 'conic', rho: 0.4 },
+              });
+            },
+          ],
+          [
+            'cube corners',
+            (s) => {
+              const cube = box([10 * s, 10 * s, 10 * s]);
+              return made(cube.doc, 'fillet_edge', { id: cube.id, radius: s, profile: { type: 'curvature', shape: 0.5 } });
+            },
+          ],
+        ];
+        for (const [label, build] of cases) {
+          const done = build(size / 10);
+          expect(done.result.error, `${label} at ${size}`).toBeUndefined();
+          const checked = check(done.doc, done.id);
+          expect(checked.status, `${label} at ${size}`).toBe('pass');
+          expect(checked.findings.filter((finding) => finding.severity === 'fail')).toEqual([]);
+          expect(contactsOf(checked).length).toBeGreaterThan(0);
+        }
       }
-    }
-  }, 180_000);
+    },
+    120_000,
+  );
 
   it('replay and regeneration: an upstream edit re-runs the profile on the same edge; replay_history gives the identical recipe', () => {
     const { doc, id } = cylinder(10, 20);

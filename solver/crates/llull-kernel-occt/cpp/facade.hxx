@@ -3,14 +3,19 @@
 // OCCT's Standard_Failure (not a std::exception), into a Rust Err instead of std::terminate.
 #pragma once
 
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
+#include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <gp_Pnt.hxx>
 
 #include "rust/cxx.h"
 
@@ -48,6 +53,24 @@ class Shape {
   bool refined_mass = false;
   // What the builder of this shape reports about how it was made (a JSON object; blend builders: builder, measured gap, fallback, corner setbacks).
   std::string notes;
+  // Per-face area and centre already integrated for this shape, by face number (query_support.hxx `face_metric_of`); filled by the read-only queries.
+  struct FaceMetricEntry {
+    TopoDS_Face face;
+    bool refined;
+    double area;
+    gp_Pnt centroid;
+    double worst;
+  };
+  mutable std::map<int, FaceMetricEntry> face_metrics;
+  // The box of the shape (bounds_of), computed once: mass_properties, analyze, shape_bounds and bounding_diagonal all read it (a Shape is never edited after it is built).
+  mutable std::optional<Bnd_Box> bounds_cache;
+  // Volume integrals of this shape under the fixed rule (not for a refined shape), by piece: `topology` and `analyze` integrate the same solid (volume_props).
+  struct VolumeEntry {
+    TopoDS_Shape piece;
+    bool only_closed;
+    GProp_GProps props;
+  };
+  mutable std::vector<VolumeEntry> volumes;
 };
 
 class StepWriter {
@@ -77,6 +100,8 @@ void set_corner_c0_knots(bool on);
 void set_corner_g2_star(bool on);
 void set_corner_spoke_gate(double scale);
 void set_corner_fan(int32_t mode);
+// Test-only hook: the face graph projects the midpoint of an edge on each face instead of reading the pcurve (face_queries.cxx).
+void set_face_graph_projection(bool on);
 // Test-only hook (law_fillet.cxx): every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
 void set_law_inversion_fault(int32_t after);
 void set_law_node_cap(int32_t nodes);

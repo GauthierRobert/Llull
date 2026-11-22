@@ -84,6 +84,64 @@ fn out_of_range_faces_answer_null() {
     assert_eq!(face_samples(&shape, 0.0, UvRequest::Grid { nu: 0, nv: 3 }).unwrap(), Value::Null);
 }
 
+/// Puts the face graph back on the pcurve read when a test ends (BLD 13.46).
+struct PcurveRead;
+
+impl Drop for PcurveRead {
+    fn drop(&mut self) {
+        crate::test_bridge::set_face_graph_projection(false);
+    }
+}
+
+fn convexities(shape: &Shape, projection: bool) -> Vec<Value> {
+    crate::test_bridge::set_face_graph_projection(projection);
+    face_graph(shape).unwrap()["edgeConvexity"].as_array().unwrap().clone()
+}
+
+/// BLD §13.46: the face graph reads (u, v) of an edge midpoint off the pcurve. On a block with a blind hole (a reversed use of the circle in the cylinder, a seam edge of the cylinder, a convex rim and a
+/// concave floor edge) it gives the same answers as the projection it replaced, and the known ones.
+#[test]
+fn the_pcurve_read_of_the_face_graph_equals_the_projection_with_a_seam_and_reversed_edges() {
+    let _serial = crate::serial_blends();
+    let _reset = PcurveRead;
+    let block = make_box([-5.0, -5.0, -5.0], [10.0, 10.0, 10.0]).unwrap().unwrap();
+    let hole = make_cylinder(2.0, 20.0).unwrap().unwrap();
+    let drilled = crate::boolean(crate::BooleanOp::Subtract, &block, &hole, true).unwrap().unwrap();
+    let by_pcurve = convexities(&drilled, false);
+    let by_projection = convexities(&drilled, true);
+    assert_eq!(by_pcurve, by_projection);
+    let kinds = |name: &str| by_pcurve.iter().filter(|kind| **kind == json!(name)).count();
+    assert!(kinds("convex") >= 13, "{by_pcurve:?}");
+    assert!(kinds("concave") >= 1, "the floor edge of the hole: {by_pcurve:?}");
+    assert!(kinds("smooth") >= 1, "the seam of the cylinder: {by_pcurve:?}");
+    assert_eq!(by_pcurve.len(), topology(&drilled).unwrap()["edges"].as_array().unwrap().len());
+}
+
+/// BLD §13.46: the fallback (no usable pcurve, forced by the hook) and the pcurve read agree on the B-spline faces of a filleted cube, edge by edge.
+#[test]
+fn the_pcurve_read_equals_the_projection_on_the_bspline_faces_of_a_blended_cube() {
+    let _serial = crate::serial_blends();
+    let _reset = PcurveRead;
+    let _hooks = crate::blend_corner_tests::CornerHooks;
+    crate::test_bridge::set_corner_fan(0);
+    let cube = crate::blend_corner_tests::cube(10.0);
+    let shape = crate::blend_g2corner_tests::profile_of(&cube, 1.0, 1.0, 0.5).unwrap();
+    assert_eq!(convexities(&shape, false), convexities(&shape, true));
+}
+
+/// BLD §13.46: a hit of the per-shape face metric cache returns the bits of a fresh computation (a second shape built the same way, never read before).
+#[test]
+fn a_cached_face_area_is_bit_identical_to_a_fresh_computation() {
+    let cached = make_sphere(3.0).unwrap().unwrap();
+    let area_in_topology = topology(&cached).unwrap()["faces"][0]["area"].as_f64().unwrap();
+    let area_in_graph = face_graph(&cached).unwrap()["faces"][0]["area"].as_f64().unwrap();
+    let again = topology(&cached).unwrap()["faces"][0]["area"].as_f64().unwrap();
+    let fresh = face_graph(&make_sphere(3.0).unwrap().unwrap()).unwrap()["faces"][0]["area"].as_f64().unwrap();
+    assert_eq!(area_in_topology.to_bits(), area_in_graph.to_bits());
+    assert_eq!(area_in_topology.to_bits(), again.to_bits());
+    assert_eq!(area_in_graph.to_bits(), fresh.to_bits());
+}
+
 #[test]
 fn box_face_graph_edges_are_convex_between_two_faces() {
     let graph = face_graph(&unit_box()).unwrap();

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <array>
+#include <stdexcept>
 #include <string>
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -246,8 +247,9 @@ TopoDS_Face trimmed_face(const Handle(Geom_BSplineSurface) &surface, double a_le
   return face;
 }
 
-bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, bool inject_fault, Fans &out, std::string &why) {
-  if (inject_fault) throw Standard_Failure("fault injected by the test hook");
+bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, int inject, Fans &out, std::string &why) {
+  if (inject == 1) throw Standard_Failure("fault injected by the test hook");
+  if (inject == 2) throw std::runtime_error("fault injected by the test hook");
   const size_t m = surfaces.size();
   std::vector<double> a_left(m), a_right(m);
   // the extent along the bottom edge: the corner triangle has about the same size along both its legs
@@ -280,10 +282,14 @@ bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double
   }
   out.marks.assign(std::size(kMarks), 0.0);
   std::array<double, 6> worst{0, 0, 0, 0, 0, 0};
+  std::string face_why;  // a rung whose fan cannot be made into a face (OCCT) is skipped; kept for the message when every rung fails
+  int rung = 0;
   // cheapest first (each face costs an integral in every analysis of the shell, 13.46): the cube passes at 22 x 26, the box and the other bodies climb the ladder; 20 x 26 meets the gates too but
   // reads 0.10 relative at the 0.25 % mark of the spoke (0.076 at 22 x 26, 0.056 at 24 x 28), which is why the ladder starts at 22
   int pole_counts[][2] = {{22, 26}, {24, 26}, {22, 28}, {24, 28}, {30, 32}, {36, 40}};
   for (const auto &counts : pole_counts) {
+    const bool rung_faults = inject == 3 && rung++ == 0;  // test hook: the first rung's faces cannot be made
+    bool face_failed = false;
     // a knot of multiplicity 4 where the correction of 13.38 has finished fading in (its weight is C3 there)
     const Basis basis_r(counts[0], {0.2 / kSpan}, 4), basis_s(counts[1]);
     std::vector<std::vector<double>> inverse_r, inverse_s;
@@ -420,29 +426,34 @@ bool build_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double
         tau_gap = std::max(tau_gap, p0.Distance(p1));
         tau_angle = std::max(tau_angle, std::acos(std::min(1.0, n0 * n1)));
       }
-      for (int side = 0; side < 2; ++side) {
+      for (int side = 0; side < 2 && !face_failed; ++side) {
         const BRepBuilderAPI_MakeFace maker(fan[side], 0.0, 1.0, 0.0, 1.0, 1e-7);
-        if (!maker.IsDone()) {
-          why = "a vertex fan could not be made into a face";
-          return false;
-        }
-        out.fans.push_back(maker.Face());
+        if (rung_faults || !maker.IsDone()) {
+          face_why = "a vertex fan could not be made into a face at " + std::to_string(counts[0]) + " x " + std::to_string(counts[1]) + " poles";
+          face_failed = true;
+        } else out.fans.push_back(maker.Face());
       }
+      if (face_failed) break;
     }
+    if (face_failed) continue;
     if (out.arc_gap <= 0.5 * max_gap && out.arc_angle <= kAngle && arc_excess <= 0 && seam_excess <= 0 && tau_gap <= 0.5 * max_gap && tau_angle <= kAngle) return true;
     worst = {out.arc_gap, out.arc_angle, arc_excess, seam_excess, tau_gap, tau_angle};
   }
-  why = "the vertex fans leave the sub-patches by " + std::to_string(worst[0]) + " (" + std::to_string(worst[1]) + " rad, curvature over the gate by " + std::to_string(worst[2]) + "), their seams are over the curvature gate by " + std::to_string(worst[3]) + " and the two fans at a vertex meet with a gap of " + std::to_string(worst[4]) + " and an angle of " + std::to_string(worst[5]) + " rad (gates: curvature, G0, G1)";
+  why = "the vertex fans leave the sub-patches by " + std::to_string(worst[0]) + " (" + std::to_string(worst[1]) + " rad, curvature over the gate by " + std::to_string(worst[2]) + "), their seams are over the curvature gate by " + std::to_string(worst[3]) + " and the two fans at a vertex meet with a gap of " + std::to_string(worst[4]) + " and an angle of " + std::to_string(worst[5]) + " rad (gates: curvature, G0, G1)" + (face_why.empty() ? std::string() : "; " + face_why);
   return false;
 }
 
 }  // namespace
 
-bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, bool inject_fault, Fans &out, std::string &why) {
+bool make_fans(const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double max_gap, double mean_length, int inject, Fans &out, std::string &why) {
   try {
-    return build_fans(surfaces, max_gap, mean_length, inject_fault, out, why);
+    return build_fans(surfaces, max_gap, mean_length, inject, out, why);
   } catch (const Standard_Failure &failure) {
     why = std::string("an OCCT exception inside the vertex fans: ") + failure.DynamicType()->Name() + " " + (failure.GetMessageString() ? failure.GetMessageString() : "");
+    out = Fans();
+    return false;
+  } catch (const std::exception &failure) {
+    why = std::string("an exception inside the vertex fans: ") + failure.what();
     out = Fans();
     return false;
   }

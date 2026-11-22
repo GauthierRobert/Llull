@@ -888,7 +888,7 @@ SpokeReading read_spokes(const Star &star, const std::vector<Handle(Geom_BSpline
 }  // namespace
 
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease, bool g2, double tangent_scale) {
+           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease, bool g2, double tangent_scale, bool allow_fans) {
   const size_t raw_count = loop.size();
   if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
@@ -1308,33 +1308,47 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     if (others_met && spoke_excess <= 0) {
       out.g2_built = g2;
       if (attempt.reach == 0.0) out.spokes.refused = spokes_refused;
-      const int fan_mode = g_fan_mode.load();
+      const int fan_mode = allow_fans ? g_fan_mode.load() : 0;
       if (g2 && attempt.reach > 0 && fan_mode != 0) {
         Fans fans;
         double fan_length = 0;
         for (const Side &side : star.sides) fan_length += side.length / static_cast<double>(m);
         if (fan_mode == 2) why = "refused by the test hook";
-        if (fan_mode != 2 && make_fans(surfaces, max_gap, fan_length, fan_mode == 3, fans, why)) {
-          double unused = 0;
-          const SpokeReading beyond = read_spokes(star, surfaces, attempt.reach, fan_length, unused, kFanSpan);
-          out.spokes.fan = true;
-          out.spokes.reach = 0;
-          out.spokes.jump = std::max(beyond.jump, fans.seam_jump);
-          out.spokes.relative = std::max(beyond.relative, fans.seam_relative);
-          out.spokes.vertex_relative = *std::max_element(fans.marks.begin(), fans.marks.end());
-          for (size_t k = 0; k < fans.trimmed.size(); ++k) {
-            out.faces.push_back(fans.trimmed[k]);
-            out.loop_index.push_back(star.sides[k].source);
-            out.part.push_back(star.sides[k].part);
+        const size_t kept = out.faces.size();
+        const SpokeReading saved = out.spokes;
+        // the whole fan branch, the spoke reading included, falls back to the 13.38 spokes on an exception (hook 3: OCCT, 4: std::exception, 5: a rung whose faces fail, 6: after the fans are built)
+        try {
+          if (fan_mode != 2 && make_fans(surfaces, max_gap, fan_length, fan_mode >= 3 && fan_mode <= 5 ? fan_mode - 2 : 0, fans, why)) {
+            if (fan_mode == 6) throw Standard_Failure("fault injected after the fans");
+            double unused = 0;
+            const SpokeReading beyond = read_spokes(star, surfaces, attempt.reach, fan_length, unused, kFanSpan);
+            out.spokes.fan = true;
+            out.spokes.reach = 0;
+            out.spokes.jump = std::max(beyond.jump, fans.seam_jump);
+            out.spokes.relative = std::max(beyond.relative, fans.seam_relative);
+            out.spokes.vertex_relative = *std::max_element(fans.marks.begin(), fans.marks.end());
+            for (size_t k = 0; k < fans.trimmed.size(); ++k) {
+              out.faces.push_back(fans.trimmed[k]);
+              out.loop_index.push_back(star.sides[k].source);
+              out.part.push_back(star.sides[k].part);
+            }
+            for (size_t k = 0; k < fans.fans.size(); ++k) {
+              out.faces.push_back(fans.fans[k]);
+              const size_t owner = (k / 2 + (k % 2 == 1 ? fans.trimmed.size() - 1 : 0)) % fans.trimmed.size();  // the second fan of vertex k lies on sub-patch k - 1
+              out.loop_index.push_back(star.sides[owner].source);
+              out.part.push_back(star.sides[owner].part);
+            }
+            return true;
           }
-          for (size_t k = 0; k < fans.fans.size(); ++k) {
-            out.faces.push_back(fans.fans[k]);
-            const size_t owner = (k / 2 + (k % 2 == 1 ? fans.trimmed.size() - 1 : 0)) % fans.trimmed.size();  // the second fan of vertex k lies on sub-patch k - 1
-            out.loop_index.push_back(star.sides[owner].source);
-            out.part.push_back(star.sides[owner].part);
-          }
-          return true;
+        } catch (const Standard_Failure &failure) {
+          why = std::string("an OCCT exception while the vertex fans were read: ") + failure.DynamicType()->Name();
+        } catch (const std::exception &failure) {
+          why = std::string("an exception while the vertex fans were read: ") + failure.what();
         }
+        out.faces.resize(kept);
+        out.loop_index.resize(kept);
+        out.part.resize(kept);
+        out.spokes = saved;
         out.spokes.fan_refused = why;
       }
       for (const Handle(Geom_BSplineSurface) &surface : surfaces) {

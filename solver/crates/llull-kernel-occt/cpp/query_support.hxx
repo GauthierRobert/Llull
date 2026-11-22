@@ -5,9 +5,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
-#include <mutex>
 #include <optional>
-#include <unordered_map>
 #include <vector>
 #include <sstream>
 #include <string>
@@ -27,6 +25,7 @@
 #include <TopoDS_Face.hxx>
 #include <gp_Pnt2d.hxx>
 
+#include "llull-kernel-occt/cpp/facade.hxx"
 #include "llull-kernel-occt/cpp/json_writer.hxx"
 #include "llull-kernel-occt/cpp/mass_spans.hxx"
 
@@ -124,42 +123,19 @@ inline FaceMetric face_metric_uncached(const TopoDS_Face &face, bool refined, do
   return {props.Mass(), props.CentreOfMass()};
 }
 
-// The metric of a face again (topology, the face graph, a second read of the same shape): the integral costs 0.1 s on a B-spline face of a corner star (BLD 13.46). The key is the face itself
-// (same TShape and location, so an edited copy is a new face); the entry holds the face, which keeps its TShape alive so that an address is never reused. The guard estimate is kept
-// with the metric and raised again on a hit. Bounded: the table is emptied when it outgrows kMetricCacheLimit faces.
-constexpr size_t kMetricCacheLimit = 20000;
-
-inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, double *tripped = nullptr) {
-  struct Entry {
-    TopoDS_Face face;
-    bool refined;
-    FaceMetric metric;
-    double worst;
-  };
-  static std::mutex lock;
-  static std::unordered_map<const void *, std::vector<Entry>> table;
-  static size_t count = 0;
-  const void *key = face.TShape().get();
-  {
-    const std::lock_guard<std::mutex> guard(lock);
-    const auto found = table.find(key);
-    if (found != table.end())
-      for (const Entry &entry : found->second)
-        if (entry.refined == refined && entry.face.IsSame(face)) {
-          if (tripped != nullptr && std::isfinite(entry.worst) && !(*tripped >= entry.worst)) *tripped = entry.worst;
-          return entry.metric;
-        }
+// The metric of face number `index` of `shape` again (topology, the face graph, a second read of the same shape): the integral costs 0.1 s on a B-spline face of a corner star (BLD 13.46). The cache lives
+// in the Shape wrapper (`Shape::face_metrics`), so it dies with the shape and never crosses documents; an entry is used only while it holds the same face (TShape and location) and rule. The guard
+// estimate is kept with the metric and raised again on a hit. A Shape is never edited after it is built (an edit makes a new wrapper), so no stale pcurve is read.
+inline FaceMetric face_metric_of(const Shape &shape, int index, const TopoDS_Face &face, bool refined, double *tripped) {
+  const auto found = shape.face_metrics.find(index);
+  if (found != shape.face_metrics.end() && found->second.refined == refined && found->second.face.IsSame(face)) {
+    if (tripped != nullptr && std::isfinite(found->second.worst) && !(*tripped >= found->second.worst)) *tripped = found->second.worst;
+    return {found->second.area, found->second.centroid};
   }
   double worst = std::numeric_limits<double>::quiet_NaN();
   const FaceMetric metric = face_metric_uncached(face, refined, &worst);
   if (tripped != nullptr && std::isfinite(worst) && !(*tripped >= worst)) *tripped = worst;
-  const std::lock_guard<std::mutex> guard(lock);
-  if (count >= kMetricCacheLimit) {
-    table.clear();
-    count = 0;
-  }
-  table[key].push_back({face, refined, metric, worst});
-  ++count;
+  shape.face_metrics[index] = {face, refined, metric.area, metric.centroid, worst};
   return metric;
 }
 

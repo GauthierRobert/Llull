@@ -91,6 +91,23 @@ fn a_face_that_is_not_a_full_patch_keeps_add_optimal() {
     assert!(probe[6..12].iter().any(|value| *value != 0.0));
 }
 
+/// BLD §13.46 review: a trimmed face (a corner cut off by a pcurve line, fill 0.995) must not get the box of its whole rectangle: the spike of the cut-off corner (the rectangle's dense box stands more
+/// than 1 above the face's AddOptimal box) is outside the face, so the proof by its edges fails and the fast path refuses. The old shortcut returned the rectangle's box.
+#[test]
+fn a_trimmed_face_gets_the_rectangle_box_only_when_its_edges_prove_it() {
+    let probe = crate::test_bridge::spline_bounds(6);
+    let (fast, optimal, rectangle) = (&probe[0..6], &probe[6..12], &probe[12..18]);
+    assert!(
+        rectangle.iter().zip(optimal).any(|(a, b)| (a - b).abs() > 1.0),
+        "the rectangle overstands the face: {rectangle:?} against {optimal:?}"
+    );
+    assert!(
+        fast.iter().all(|value| *value == 0.0) || fast.iter().zip(optimal).all(|(a, b)| (a - b).abs() < 1e-6),
+        "{fast:?} against {optimal:?}"
+    );
+    assert!(fast.iter().all(|value| *value == 0.0), "the rectangle box is refused: {fast:?}");
+}
+
 #[test]
 fn a_profile_blend_has_the_box_of_its_block_and_few_stations() {
     let _serial = crate::serial_blends();

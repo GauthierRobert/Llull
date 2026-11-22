@@ -246,6 +246,51 @@ fn an_occt_exception_inside_the_fans_falls_back_to_the_beyond_reach_spokes() {
     }
 }
 
+/// BLD §13.46 review: a std::exception inside the fans (hook 4), an exception after they are built, while their seams are read (hook 6), and a rung whose faces OCCT cannot make (hook 5: the next
+/// rung builds the fans, so the star still has them).
+#[test]
+fn every_kind_of_failure_in_the_fan_branch_falls_back_or_climbs_to_the_next_rung() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    for (mode, expected, reason) in [
+        (4, "G2-beyond-reach", "an exception inside the vertex fans"),
+        (6, "G2-beyond-reach", "while the vertex fans were read"),
+        (5, "G2-fan", ""),
+    ] {
+        crate::test_bridge::set_corner_fan(mode);
+        let shape = profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap();
+        assert!(is_valid(&shape).unwrap(), "mode {mode}");
+        assert_eq!(spokes_of(&shape), vec![expected.to_string(); 8], "mode {mode}");
+        assert_eq!(faces_of(&shape), if expected == "G2-fan" { 162 } else { 66 }, "mode {mode}");
+        for corner in corner_notes(&shape) {
+            match corner["spokeFanRefused"].as_str() {
+                Some(why) => assert!(why.contains(reason), "mode {mode}: {corner}"),
+                None => assert!(reason.is_empty(), "mode {mode}: {corner}"),
+            }
+        }
+    }
+}
+
+/// BLD §13.46 review: a step whose shell with fans fails after the fills (hook 8 of the exact patch) is built again with the 13.38 spokes, not with the G1 star or the plate: every corner is G2 with
+/// G2-beyond-reach spokes and says so in `spokeFanRefused`.
+#[test]
+fn a_step_with_fans_that_fails_after_the_sewing_is_rebuilt_with_the_beyond_reach_spokes() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_exact_patch(8);
+    let shape = profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap();
+    assert!(is_valid(&shape).unwrap());
+    assert_eq!(corners_of(&shape), all("G2"));
+    assert_eq!(spokes_of(&shape), vec!["G2-beyond-reach".to_string(); 8]);
+    assert_eq!(faces_of(&shape), 66);
+    for corner in corner_notes(&shape) {
+        assert!(
+            corner["spokeFanRefused"].as_str().is_some_and(|why| why.contains("the step with the vertex fans failed after the sewing")),
+            "{corner}"
+        );
+    }
+}
+
 /// BLD §13.46: the box of the fan shell comes from the Bezier patches of its faces (the trimmed sub-patches count by their rectangle) and is the box of the part: the blends round the edges
 /// inside it, so it is the cube itself to 1e-6, with the fans and without; the volume, area and the corner count are the same.
 #[test]
