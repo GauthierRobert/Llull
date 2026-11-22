@@ -955,29 +955,29 @@ r(0.1) = 1.1 and r(0.25) = 1.25 to 1e-14 relative (the request: 1e-6). The volum
 
 **As built: DISP1, display deflection scaled with the model (2026-11).** The display tessellation (`mesh::display_mesh`, the `tessellate` op of the native kernel without options) used the absolute linear deflection 0.1 whatever the size. It is now `max(f, f x D / 100)` with `f` = 0.1 (0.02 for the finer retry of an open closed-solid mesh) and `D` the diagonal of the tight bounding box (`bounding_diagonal`, the same box as `mass_properties`): 1e-3 of the diagonal (2e-4 for the retry) above a 100-unit diagonal, the old value below it, so a part under 100 units meshes bit for bit as before. The angular deflection stays 0.5 rad (it already bounds the facets of a curved face, and it is what the large cases now hit). Measured on this machine (win32-x64, release build, `display_mesh` timed in a throwaway test, the block 20 x 10 x 5 x s with the straight 1 -> 2 x s law of `nativeBlendStraight.test.ts`, display mesh only):
 
-| s       | before            | after          |
-| ------- | ----------------- | -------------- |
-| 1       | 64 tri, 1 ms      | 64 tri, 8 ms   |
-| 10      | 1344 tri, 7 ms    | 644 tri, 8 ms  |
-| 100     | 22694 tri, 179 ms | 644 tri, 21 ms |
-| 1000    | 252884 tri, 4024 ms | 644 tri, 23 ms |
+| s    | before              | after          |
+| ---- | ------------------- | -------------- |
+| 1    | 64 tri, 1 ms        | 64 tri, 8 ms   |
+| 10   | 1344 tri, 7 ms      | 644 tri, 8 ms  |
+| 100  | 22694 tri, 179 ms   | 644 tri, 21 ms |
+| 1000 | 252884 tri, 4024 ms | 644 tri, 23 ms |
 
 (The 7.6 s of the table above also counted the contact-line sampling; the tessellation alone is 4.0 s here.) At s = 1000 the chord error allowed is 1e-3 of the part, the same relative accuracy a 100-unit part always had.
 
 **Explicit tessellation and the consumers of the display mesh.** The display mesh is stored in the result entity (`mesh`, next to its `brep` recipe) and read by many commands, so the port is now `GeometryKernel.tessellate(shape, options?)` with `TessellationOptions { linearDeflection, angularDeflection }` (absolute, document units / radians): the native `tessellate` op takes it as its second argument (`mesh::mesh_at`, no size scaling; capability `tessellateOptions`, surfaced as `kernel.honoursTessellationOptions`), Manifold ignores it (flag absent). A display and an explicit mesh are cached apart in `kernelFromOps`, and `tessellate` cleans the shape's triangulation first (OCCT keeps a finer one it already holds, which made the mesh depend on earlier calls). The constant of the knee (100) is in document units whatever they are (a metre document starts scaling at a 100 m diagonal); a non-finite or open box (diagonal over 1e12) keeps the floor; the diagonal is kept on the shape. Consumers and their path:
 
-| Consumer | Path |
-| --- | --- |
-| viewport, `render_view`, glTF export (a viewing format) | display mesh |
-| `export_stl`, `export_3mf`, `export_obj` (kernel-optional, param `chordTolerance`, minimum 1e-4, default 0.1 document units + 0.5 rad = the accuracy before DISP1) | kernel re-tessellation at `chordTolerance` for a body or an instance of bodies that keeps its `brep`; else the stored mesh. The summary states which path and the tolerance (nothing when no body keeps a recipe; "no exact kernel" and "the kernel ignores options" are told apart). A tolerance finer than diagonal / 1e6 is refused (`EXPORT_TESSELLATION_BUDGET`, remediation = the smallest value; the native op refuses the same ratio with `NATIVE_TESSELLATION_BUDGET`) |
-| deform sources (`sourceMeshOf`, `loadTarget`, `output.mode: 'mesh'`) | kernel mesh at 0.1 / 0.5 when the kernel honours options (same accuracy as before), else display mesh |
-| OpenSCAD / FreeCAD fallback triangles of a fillet / shell (`codegen/recipeLowering.ts`, a deliverable) | kernel mesh at 0.1 / 0.5 when honoured |
-| flow-solver surface (`domain-aero/src/cfd/flowSurface.ts`, the STL of `flowJob.ts`) | kernel mesh (single body: `withExactMesh`; union: `tessellateAt`) at 0.1 / 0.5 when honoured |
-| `check_machining` thickness ray casts | kernel mesh at 0.1 / 0.5 when honoured |
-| FEA STL fallback (`server/src/fea/feaGeometry.ts`, only when the kernel has no STEP) | kernel mesh at 0.1 / 0.5 when honoured |
-| `inspect_face_triangles` | display mesh on purpose (indices must match the drawn triangles); the label of a triangle is exact except within max(0.1, 1e-3 D) of a face boundary or on a face thinner than that (@invariant) |
-| mass / inertia (`resolveMassProperties`) | native kernel: exact `massProperties`; the stored-mesh inertia scaled to the exact volume is the Manifold-only path (no explicit tolerance available) and `solidVolume` uses the exact topology volume |
-| every other reader of `kernel.tessellate` / `entityToTriangles` (bounds, diagonal, reach, face matching, measures, scan fits, voxelisation, drawing views, previews) | stored display mesh, max(0.1, 1e-3 D) chord error, accepted per file by an `@invariant display-mesh:` tag that `tests/unit/contract/kernelConsumers.test.ts` requires (a consumer must use `tessellateAt` / `withExactMesh` or carry the tag; stale tags fail) |
+| Consumer                                                                                                                                                             | Path                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| viewport, `render_view`, glTF export (a viewing format)                                                                                                              | display mesh                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `export_stl`, `export_3mf`, `export_obj` (kernel-optional, param `chordTolerance`, minimum 1e-4, default 0.1 document units + 0.5 rad = the accuracy before DISP1)   | kernel re-tessellation at `chordTolerance` for a body or an instance of bodies that keeps its `brep`; else the stored mesh. The summary states which path and the tolerance (nothing when no body keeps a recipe; "no exact kernel" and "the kernel ignores options" are told apart). A tolerance finer than diagonal / 1e6 is refused (`EXPORT_TESSELLATION_BUDGET`, remediation = the smallest value; the native op refuses the same ratio with `NATIVE_TESSELLATION_BUDGET`) |
+| deform sources (`sourceMeshOf`, `loadTarget`, `output.mode: 'mesh'`)                                                                                                 | kernel mesh at 0.1 / 0.5 when the kernel honours options (same accuracy as before), else display mesh                                                                                                                                                                                                                                                                                                                                                                           |
+| OpenSCAD / FreeCAD fallback triangles of a fillet / shell (`codegen/recipeLowering.ts`, a deliverable)                                                               | kernel mesh at 0.1 / 0.5 when honoured                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| flow-solver surface (`domain-aero/src/cfd/flowSurface.ts`, the STL of `flowJob.ts`)                                                                                  | kernel mesh (single body: `withExactMesh`; union: `tessellateAt`) at 0.1 / 0.5 when honoured                                                                                                                                                                                                                                                                                                                                                                                    |
+| `check_machining` thickness ray casts                                                                                                                                | kernel mesh at 0.1 / 0.5 when honoured                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| FEA STL fallback (`server/src/fea/feaGeometry.ts`, only when the kernel has no STEP)                                                                                 | kernel mesh at 0.1 / 0.5 when honoured                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `inspect_face_triangles`                                                                                                                                             | display mesh on purpose (indices must match the drawn triangles); the label of a triangle is exact except within max(0.1, 1e-3 D) of a face boundary or on a face thinner than that (@invariant)                                                                                                                                                                                                                                                                                |
+| mass / inertia (`resolveMassProperties`)                                                                                                                             | native kernel: exact `massProperties`; the stored-mesh inertia scaled to the exact volume is the Manifold-only path (no explicit tolerance available) and `solidVolume` uses the exact topology volume                                                                                                                                                                                                                                                                          |
+| every other reader of `kernel.tessellate` / `entityToTriangles` (bounds, diagonal, reach, face matching, measures, scan fits, voxelisation, drawing views, previews) | stored display mesh, max(0.1, 1e-3 D) chord error, accepted per file by an `@invariant display-mesh:` tag that `tests/unit/contract/kernelConsumers.test.ts` requires (a consumer must use `tessellateAt` / `withExactMesh` or carry the tag; stale tags fail)                                                                                                                                                                                                                  |
 
 Cost of the diagonal (cold, release, win32-x64): `bounding_diagonal` takes 0.23 ms on a 64-edge rim fillet (display mesh 18 ms, 1.3 %) and 17.7 ms on the long B-spline blend face of the 20 m block (display mesh of it 5.8 ms after the scaling, 4.0 s before: 0.4 % of the old cost); it is kept on the shape, so every later call is free. Explicit meshes are kept three per shape in `kernelFromOps`.
 
@@ -1722,6 +1722,7 @@ Part: a prism 3 high over a trapezoid with end walls tilted by tan = 0.5 at each
 ### 13.30.4 Tests and red-proofs
 
 Rust `blend_end_tests.rs` (8 tests): circular blend on flared / narrowed / parallelogram ends (closed form, OCCT fillet, contacts, end face area), conic closed form, concave sheared column (volume, OCCT, face count), concave tilted columns with non-parallel ends (5 tilt pairs: volume, OCCT, contacts, end face planarity and area), the refusals (near-parallel end face, legs cut to nothing, reflex vertex, curved face), a rib beyond the end plane, an oblique end of a curved edge; `blend_rail_tests.rs` keeps its oblique refusal on a varying law. `server/tests/nativeBlendEnds.test.ts` (7 tests: conic + `check_blends`, near-parallel end, the prism reasons through `fillet_edge` for a reflex end / curved end face / rib, `size2` at 1 and 10 mm, curvature profile). Red-proofs (revert, see fail, restore): no extension past the end 3 of 5 fail; no far-cap classification 1; no trim of the concave tool 1; no cap merge 1; legs run assumed square 2; no 80 degree bound 1; no curved-face refusal 1.
+
 ## 13.33 As built: a vertex with an unrounded third edge (DES-6c step 14, 2026-10-31)
 
 Two rounded edges that meet a third edge left sharp (two top edges of a box rounded, the vertical one kept) were refused by name at a setback corner (`edge N meets the setback vertex ... but is not rounded`); without a corner entry OCCT builds its own result, the mitre of the two cylinders (a crease between two blends, not tangent). A setback corner now takes that vertex: the sharp edge stays sharp up to a point `setback` from the vertex, the two blends stop at their setback sections, and the star fills the hole between them. `fillet_edge corners[]` picks the vertex with `name` or `near` (`all` still means "3 or more rounded edges" and skips it); the sharp edge gets its `setback` (or its own `setbacks[]` distance) like the others. Profile (conic / curvature) corners (`Mode::automatic`) and the rolling-ball trim builder take it too since 13.39 (they refused here before).
@@ -1745,11 +1746,11 @@ A MakeFilling plate is G1 to its supports along the whole loop and cannot be tan
 The independent route is OCCT's rolling-ball fillet of the same two edges, and the closed form of the mitre: a cube of side L with two edges at a vertex rounded, V = L^3 - 2 r^2 (1 - pi/4) L + r^3 (5/3 - pi/2) (each blend removes r^2 (1 - pi/4) L and the two removed prisms overlap in r^3 (5/3 - pi/2) at the vertex: the integral of (r - sqrt(r^2 - c^2))^2 over c). L = 10, r = 1: 995.80383, OCCT's volume equal to 1e-6.
 
 | 10-cube, r, setback | star volume | rolling-ball volume | star outside the rolling ball | rolling ball outside the star |
-| --- | --- | --- | --- | --- |
-| r 1, 1.5 | 995.55994 | 995.80383 | 0 | 0.24389 |
-| r 1, 2 | 995.14195 | 995.80383 | 0 | 0.66188 |
-| r 1, 3 | 993.47095 | 995.80383 | 0.00075 | 2.33232 |
-| r 2, 3 | 981.64768 | 983.59882 | 0 | 1.95113 |
+| ------------------- | ----------- | ------------------- | ----------------------------- | ----------------------------- |
+| r 1, 1.5            | 995.55994   | 995.80383           | 0                             | 0.24389                       |
+| r 1, 2              | 995.14195   | 995.80383           | 0                             | 0.66188                       |
+| r 1, 3              | 993.47095   | 995.80383           | 0.00075                       | 2.33232                       |
+| r 2, 3              | 981.64768   | 983.59882           | 0                             | 1.95113                       |
 
 The star lies inside the mitre (to 7.5e-4 mm^3, the approximation of the patch) and removes the sliver of the two faces of the sharp edge between the contact line of its blend and the chord to E: the patch must leave the face along its chord, the mitre leaves it along the contact line. All 8 vertices x 3 choices of the sharp edge give one volume (995.1420, 24 builds). Valid, 8 + 5 faces (6 planes, 2 cylinders, 5 sub-patches); G1 over every patch edge but the crease spoke 1.0e-3 rad (the interior samples; the pole sample of a spoke 0.004), G0 under 0.2e-6 x the diagonal; the crease spoke leaves E at 1.5708 rad (90 degrees, equal to the dihedral of the part to 1e-6) and falls monotonically to 0.004 at the pole (21 samples: 1.571 1.561 1.535 1.496 1.445 1.384 ... 0.089 0.040 0.010 0.004). A box 20 x 10 x 8 with its four top edges rounded and the four vertical edges sharp (a corner at each top vertex, setback 2): valid, 6 planes + 4 blends + 4 stars of 5, inside the rolling-ball solid of the four edges by less than r^3 per corner and no sliver outside it. A concave vertex (the notch of a cube, three concave edges, two rounded r 0.5, one sharp, setback 1.5): valid, adds 0.8161 mm^3, one crease spoke at 90 degrees. A 60 degree prism (crease 2 pi / 3 = 2.0944 at the vertical edge) and an acute tetrahedron apex build (the pole sample of a spoke reads 0.0105 to 0.0120 rad there, above the 0.01 of check_blends, against 0.0085 for the same apex with three rounded edges: a warn at the end point).
 
@@ -1761,13 +1762,13 @@ At most one edge of a three-edge vertex sharp (`a setback corner leaves at most 
 
 `shell_solid` without `openFacesNear` (`shell_hollow`: the solid minus its inward offset) took 17 to 130 s on a solid with star corner faces and could hit the kernel call limit (13.22.6). Measured here, native kernel, release, the cylinder block of 13.22.6 (setbacks 1.2 / 1.2 / x along the edges of the vertex, radius 0.5, thickness 0.2; `blend_shell_tests.rs` and the probe that produced the table):
 
-| setbacks | most poles in a direction of a star face | sealed shell | result |
-| --- | --- | --- | --- |
-| cube r 1, setback 2 (8 corners) | 8 | 0.04 s | OCCT answers null (no hollow solid built; not a star refusal) |
-| 1.2 / 1.2 / 1.2 | 27 | 26.2 s | valid hollow solid (volume 71.94) |
-| 1.2 / 1.2 / 1.3 | 54 | 166 s | the volume of the FULL solid (402.66): the cut of the cavity did nothing |
-| 1.2 / 1.2 / 1.4 | 70 | 410 s | the full solid (877.06) |
-| 1.2 / 1.2 / 1.6 | 54 | 161 s | the full solid (401.89) |
+| setbacks                        | most poles in a direction of a star face | sealed shell | result                                                                   |
+| ------------------------------- | ---------------------------------------- | ------------ | ------------------------------------------------------------------------ |
+| cube r 1, setback 2 (8 corners) | 8                                        | 0.04 s       | OCCT answers null (no hollow solid built; not a star refusal)            |
+| 1.2 / 1.2 / 1.2                 | 27                                       | 26.2 s       | valid hollow solid (volume 71.94)                                        |
+| 1.2 / 1.2 / 1.3                 | 54                                       | 166 s        | the volume of the FULL solid (402.66): the cut of the cavity did nothing |
+| 1.2 / 1.2 / 1.4                 | 70                                       | 410 s        | the full solid (877.06)                                                  |
+| 1.2 / 1.2 / 1.6                 | 54                                       | 161 s        | the full solid (401.89)                                                  |
 
 Time grows with the poles like their 2.7th power (27 to 54: x6.3) and from 54 poles the answer is not a hollow solid at all. The pole counts are those of the star attempts (13.22.6: 8, 11, 14, 24, 36 poles, 48, 64) plus the knots at the joints of a chain (24 -> 27, 36 -> 54, 64 -> 70).
 
@@ -1797,13 +1798,13 @@ The blend arcs of the hole are the profile sections at the setback, not circles;
 
 ### 13.39.2 Measured (native llull-kernel, release; cube 10, size 1, factor 2, vertex at the origin, third edge sharp; `blend_profile_third_tests.rs`)
 
-| section | star volume | mitre of the two blends (reference) | sliver (mitre - star) | G1 over patch edges but the crease | G1 at the pole | crease spoke from E to the pole |
-| --- | --- | --- | --- | --- | --- | --- |
-| conic rho 0.5 | 995.9876 | 996.7333 (closed form; intersection of the blends 996.7333) | 0.7457 | 6.7e-4 rad | 5.3e-4 | 1.5708 -> 3.7e-3, monotone |
-| conic rho sqrt(2)-1 (circle) | 995.1439 | 995.8038 (closed form 995.8038) | 0.6599 | 9.8e-4 | 2.0e-4 | 1.5708 -> 3.5e-3 |
-| conic rho 0.3 | 993.8316 | 994.4485 | 0.6169 | 7.8e-4 | 4.2e-5 | 1.5708 -> 1.4e-3 |
-| conic rho 0.7 | 997.5751 | 998.5580 | 0.9829 | 4.9e-6 | 6.4e-6 | 1.5708 -> 1.9e-6 |
-| curvature shape 0.5 (G1 star, `g2Refused` set) | 997.1605 | 998.0317 (intersection of the blends) | 0.8712 | 1.7e-3 | 4.8e-4 | 1.5708 -> 3.5e-3 |
+| section                                        | star volume | mitre of the two blends (reference)                         | sliver (mitre - star) | G1 over patch edges but the crease | G1 at the pole | crease spoke from E to the pole |
+| ---------------------------------------------- | ----------- | ----------------------------------------------------------- | --------------------- | ---------------------------------- | -------------- | ------------------------------- |
+| conic rho 0.5                                  | 995.9876    | 996.7333 (closed form; intersection of the blends 996.7333) | 0.7457                | 6.7e-4 rad                         | 5.3e-4         | 1.5708 -> 3.7e-3, monotone      |
+| conic rho sqrt(2)-1 (circle)                   | 995.1439    | 995.8038 (closed form 995.8038)                             | 0.6599                | 9.8e-4                             | 2.0e-4         | 1.5708 -> 3.5e-3                |
+| conic rho 0.3                                  | 993.8316    | 994.4485                                                    | 0.6169                | 7.8e-4                             | 4.2e-5         | 1.5708 -> 1.4e-3                |
+| conic rho 0.7                                  | 997.5751    | 998.5580                                                    | 0.9829                | 4.9e-6                             | 6.4e-6         | 1.5708 -> 1.9e-6                |
+| curvature shape 0.5 (G1 star, `g2Refused` set) | 997.1605    | 998.0317 (intersection of the blends)                       | 0.8712                | 1.7e-3                             | 4.8e-4         | 1.5708 -> 3.5e-3                |
 
 G0 (the build's patch gap against the 0.2e-6 x diagonal limit of 3.5e-6): 2e-15 (rho 0.5), 1.2e-6 (circle), 8e-7, 2.9e-7, 2e-15 (curvature). The conic with rho = sqrt(2) - 1 is the circular star of the same hole: 995.1439 against 995.1420 (circular, 13.33.4), 1.9e-3. The star outside the mitre (boolean, conic rho 0.5, 0.3, circle): 0; rho 0.7: 4.7e-5 mm3. All 8 vertices x 3 sharp edges (24 builds): one volume to 1e-6.
 
@@ -1824,16 +1825,16 @@ The oracle of the conic is a closed form: the mitre of two conic blends of size 
 
 Cylinder block 10 x 10 x 5 cut by a cylinder r 12, vertex (10, 6.633, 5). "Sharp 1" is the straight top edge (plane / plane, 90 degrees), "sharp 2" the edge against the cylinder (0.5857 rad). The part is inside the source: smaller volume, and sampled points of every star face (9 per face) classified against the source with a slack of 2e-3 x the diagonal (the mass-properties bounds of a B-spline face are its control polygon, 0.19 outside on the cube, so the box is checked on the sampled points).
 
-| case | volume | OCCT mitre of the two rounded edges | G1 over patch edges but the crease | pole | outside the source |
-| --- | --- | --- | --- | --- | --- |
-| sharp 1, r 0.5, ball 1.2 | 475.0284 | 475.1719 (-0.143) | 1.1e-3 | 2e-8 | 3.8e-3 |
-| sharp 2, r 0.5, ball 1.2 | 474.6734 | 474.8394 (-0.166) | 7.8e-3 | 3e-7 | 3.2e-3 |
-| sharp 2, r 0.5, ball 1.5 | 474.4854 | | 5.5e-3 | 2e-8 | |
-| sharp 2, r 0.3, ball 1.5 | 474.8452 | | 8.0e-3 | 1e-8 | |
-| sharp 2, r 0.3, ball 2 | 474.3076 (before the overshoot gate; now refused, 1.55e-2 outside) | 475.2342 (-0.93) | 7.8e-3 | 1e-8 | 1.55e-2 |
-| sharp 2, r 0.8, ball 2 | 473.0858 | | 7.2e-3 | 3e-7 | |
-| cube, trim forced, r 1, ball 2 | 995.1410 | 995.8038 closed form (-0.663) | 1.9e-3 | 1.7e-6 | 1.1e-3 |
-| cube, r 0.5 ball 1.5 / r 1 ball 3 | | | | | 1.4e-2 / 2.8e-2 |
+| case                              | volume                                                             | OCCT mitre of the two rounded edges | G1 over patch edges but the crease | pole   | outside the source |
+| --------------------------------- | ------------------------------------------------------------------ | ----------------------------------- | ---------------------------------- | ------ | ------------------ |
+| sharp 1, r 0.5, ball 1.2          | 475.0284                                                           | 475.1719 (-0.143)                   | 1.1e-3                             | 2e-8   | 3.8e-3             |
+| sharp 2, r 0.5, ball 1.2          | 474.6734                                                           | 474.8394 (-0.166)                   | 7.8e-3                             | 3e-7   | 3.2e-3             |
+| sharp 2, r 0.5, ball 1.5          | 474.4854                                                           |                                     | 5.5e-3                             | 2e-8   |                    |
+| sharp 2, r 0.3, ball 1.5          | 474.8452                                                           |                                     | 8.0e-3                             | 1e-8   |                    |
+| sharp 2, r 0.3, ball 2            | 474.3076 (before the overshoot gate; now refused, 1.55e-2 outside) | 475.2342 (-0.93)                    | 7.8e-3                             | 1e-8   | 1.55e-2            |
+| sharp 2, r 0.8, ball 2            | 473.0858                                                           |                                     | 7.2e-3                             | 3e-7   |                    |
+| cube, trim forced, r 1, ball 2    | 995.1410                                                           | 995.8038 closed form (-0.663)       | 1.9e-3                             | 1.7e-6 | 1.1e-3             |
+| cube, r 0.5 ball 1.5 / r 1 ball 3 |                                                                    |                                     |                                    |        | 1.4e-2 / 2.8e-2    |
 
 The sliver (mitre minus star) grows with the ball (0.14 to 0.93 on the block) and the star is under the mitre in every case. The crease spoke runs from the dihedral to a flat pole in every case. The loop-vertex end-point G1 readings stay under the gate of the star (0.0095): the largest is 8.0e-3 (sharp 2, r 0.3, ball 1.5), so the gate is not raised. The excursion outside the source grows with the setback (1.1e-3 to 2.8e-2 on the cube) and is NOT gated by the build (a finding, not a bound; the fully rounded trim cube has 1.3e-3). A boolean of the trim stars against the rolling-ball solid was tried and dropped: B-spline stars of 36 to 64 poles against OCCT's blends grew a process past 18 GB.
 
@@ -1907,14 +1908,14 @@ Running legs on a closed edge (`BLD_LAW_NOT_PERIODIC`: a rim has no start and en
 
 The removed volume is compared with an integral the test computes itself: the revolved outline (corner, A, conic, B) by Green's theorem for rims and caps, the section area (shoelace of the conic) integrated along the edge for running legs.
 
-| Case                                                                                                                                         | Oracle                                                                                                                       | Measured                                                                                                                                |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Cylinder rim R 10 h 20, legs 1 x 3 and 3 x 1 (top x side) and 1 x 3 (cylinder first), conic rho 0.5 and circular, at 1, 10, 100             | revolved conic spandrel                                                                                                      | 6.1e-7 relative (the mass-property integration of a B-spline face), constant across scales; contacts G0 < 1e-6 x diagonal, G1 < 1e-4 rad |
-| Boss foot R 5 on a plate (concave), legs 1.5 on the plate x 3 on the boss, at 1, 10, 100                                                     | added revolved spandrel                                                                                                      | within 1e-6                                                                                                                             |
-| Sphere cap R 10 cut at z = 5, legs 1 (plane) x 2 (sphere chord), conic and circular, at 1, 10, 100                                           | B the meridian point at the chord 2 from the corner, T the intersection of the plane line and the tangent at B, sphere arc back | within 1e-5                                                                                                                             |
-| Straight edge, legs 1 -> 2 and 2 -> 3, side1 on the top and on the front, conic rho 0.5 / 0.3 and circular                                  | integral of the conic section area                                                                                           | 2.2e-14 relative (the chamfer of a straight edge between planes is exact)                                                               |
-| Half cylinder R 20 h 10 arc, legs 1 -> 2 / 2 -> 3 on the top or on the cylinder, and 2 -> 1 / 1 -> 2                                         | pi integral (R A - M_x) ds (parabola: A = d1 d2 / 6, M_x = d1^2 d2 / 30)                                                     | within 5e-5 (the variable chamfer is a 65-station loft: its contact lines are within about 4e-6 mm of the law)                          |
-| Server, rim and boss through `fillet_edge`, `check_blends`                                                                                   | same integrals; status `pass`; `data.legs`                                                                                   | legs read within 1e-3 (rim), 1e-6 (straight running); no `BLD_CHECK_RADIUS_LAW`                                                         |
+| Case                                                                                                                            | Oracle                                                                                                                          | Measured                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Cylinder rim R 10 h 20, legs 1 x 3 and 3 x 1 (top x side) and 1 x 3 (cylinder first), conic rho 0.5 and circular, at 1, 10, 100 | revolved conic spandrel                                                                                                         | 6.1e-7 relative (the mass-property integration of a B-spline face), constant across scales; contacts G0 < 1e-6 x diagonal, G1 < 1e-4 rad |
+| Boss foot R 5 on a plate (concave), legs 1.5 on the plate x 3 on the boss, at 1, 10, 100                                        | added revolved spandrel                                                                                                         | within 1e-6                                                                                                                              |
+| Sphere cap R 10 cut at z = 5, legs 1 (plane) x 2 (sphere chord), conic and circular, at 1, 10, 100                              | B the meridian point at the chord 2 from the corner, T the intersection of the plane line and the tangent at B, sphere arc back | within 1e-5                                                                                                                              |
+| Straight edge, legs 1 -> 2 and 2 -> 3, side1 on the top and on the front, conic rho 0.5 / 0.3 and circular                      | integral of the conic section area                                                                                              | 2.2e-14 relative (the chamfer of a straight edge between planes is exact)                                                                |
+| Half cylinder R 20 h 10 arc, legs 1 -> 2 / 2 -> 3 on the top or on the cylinder, and 2 -> 1 / 1 -> 2                            | pi integral (R A - M_x) ds (parabola: A = d1 d2 / 6, M_x = d1^2 d2 / 30)                                                        | within 5e-5 (the variable chamfer is a 65-station loft: its contact lines are within about 4e-6 mm of the law)                           |
+| Server, rim and boss through `fillet_edge`, `check_blends`                                                                      | same integrals; status `pass`; `data.legs`                                                                                      | legs read within 1e-3 (rim), 1e-6 (straight running); no `BLD_CHECK_RADIUS_LAW`                                                          |
 
 ### 13.34.5 Tests and red-proofs
 
@@ -1952,15 +1953,15 @@ A star sub-patch is judged with the blend-scale floor of a blend face (`BLEND_FL
 
 ### 13.36.4 Measured (native llull-kernel, release; cube 10, every edge size 1, curvature shape 0.5, automatic corners, setback 2)
 
-| | G1 star | G2 star |
-| --- | --- | --- |
-| jump of the normal curvature, sub-patch against blend / flat face (1/mm, worst of 21 interior samples per edge) | 1.04 | 7.3e-5 |
-| G1 angle at those contacts (rad) | 6.7e-4 | 1.1e-6 |
-| G1 angle across the spokes (rad) | 1.4e-3 | 6e-8 |
-| curvature jump across the spokes (1/mm; pinned by the test between 0.5 and 1.2, and at most the G1 star's) | 1.43 | 0.83 (G1 seam) |
-| G0 at the contacts and spokes | 1e-14 | 1e-14 |
-| volume | 980.2641 | 980.7481 (+0.049 %) |
-| time of the whole `fillet_profile_blend` step, 8 corners, 66 faces | 0.79 s | 1.89 s |
+|                                                                                                                 | G1 star  | G2 star             |
+| --------------------------------------------------------------------------------------------------------------- | -------- | ------------------- |
+| jump of the normal curvature, sub-patch against blend / flat face (1/mm, worst of 21 interior samples per edge) | 1.04     | 7.3e-5              |
+| G1 angle at those contacts (rad)                                                                                | 6.7e-4   | 1.1e-6              |
+| G1 angle across the spokes (rad)                                                                                | 1.4e-3   | 6e-8                |
+| curvature jump across the spokes (1/mm; pinned by the test between 0.5 and 1.2, and at most the G1 star's)      | 1.43     | 0.83 (G1 seam)      |
+| G0 at the contacts and spokes                                                                                   | 1e-14    | 1e-14               |
+| volume                                                                                                          | 980.2641 | 980.7481 (+0.049 %) |
+| time of the whole `fillet_profile_blend` step, 8 corners, 66 faces                                              | 0.79 s   | 1.89 s              |
 
 Other parts: sizes 0.8 to 1.1 on a 10 x 7 x 5 box 8.2e-5, shape 0.3 6.9e-6, shape 0.8 1.7e-5, size 2.4 3.0e-5, size 0.01 7.3e-3 (curvatures of 100 per mm: the same relative jump); all eight corners G2, spokes 1e-7 rad or less. Shape 0.05 is refused (the curvature of the section is a spike at its ends; at 64 poles a sub-patch turns round): G1 star, `g2Refused` set. A conic cube is built G1 and the G2 star is not tried.
 
@@ -2011,16 +2012,16 @@ OCCT holds the radius constant past the vertices of the edge and its surface the
 
 Oracles: (1) flared prism, edge 10 long, walls leaning 1 in 2 at each end, parabola (rho 0.5) and the circle (conic of weight cos 45 degrees), linear laws 0.4 -> 0.8 and 0.8 -> 0.4: the planar-section integral of the continued law (8-point Gauss; the wedge integrated in the substitution `u = w^2` that removes the square root of the wall depth), independent of OCCT; and the same law on the square-ended box. (2) a curved end: the integral of the revolved spandrel over the points on the solid's side of the end surface (a vertical cylinder of radius 5 on the axis x = -7, a sphere of radius 7 at x = -7), and a straight edge cut by a cylinder (the section planes x = const against the depth `sqrt(64 - x^2)`); OCCT's own fillet for a constant size.
 
-| case | relative difference to the oracle |
-| --- | --- |
-| flared prism, parabola 0.4 -> 0.8 / 0.8 -> 0.4 | -9.7e-7 / 3.3e-6 |
-| flared prism, circle 0.4 -> 0.8 / 0.8 -> 0.4 | 2.2e-6 / 3.6e-6 |
-| the same, oblique wedge only (blend of the prism minus blend of the box) | 6.3e-5 to 2.2e-4 of the wedge (0.0097 of 0.63 for the parabola, 0.014 for the circle) |
-| square-ended box, same laws | 1e-6 or better |
-| concave edge of the sheared L column (end planes z = 0 and 6; one end flares, the other narrows; shift +3 and -3), parabola / circle | 3.1e-7 / -2.5e-6 and -8.7e-7 / -5.7e-7 |
-| cylinder rim ending on a cylindrical end face: circle / parabola / circle of size 0.4 | -2.8e-8 / -9.2e-7 / -1.2e-6 (OCCT's fillet of the circle: within 1e-6) |
-| cylinder rim ending on a sphere | -6.9e-8 (OCCT's fillet: within 1e-6) |
-| straight edge, law 0.4 -> 0.8, ending on a cylinder of radius 8 | 4.7e-7 (constant size 0.6: equals OCCT's fillet to 1e-6) |
+| case                                                                                                                                 | relative difference to the oracle                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| flared prism, parabola 0.4 -> 0.8 / 0.8 -> 0.4                                                                                       | -9.7e-7 / 3.3e-6                                                                      |
+| flared prism, circle 0.4 -> 0.8 / 0.8 -> 0.4                                                                                         | 2.2e-6 / 3.6e-6                                                                       |
+| the same, oblique wedge only (blend of the prism minus blend of the box)                                                             | 6.3e-5 to 2.2e-4 of the wedge (0.0097 of 0.63 for the parabola, 0.014 for the circle) |
+| square-ended box, same laws                                                                                                          | 1e-6 or better                                                                        |
+| concave edge of the sheared L column (end planes z = 0 and 6; one end flares, the other narrows; shift +3 and -3), parabola / circle | 3.1e-7 / -2.5e-6 and -8.7e-7 / -5.7e-7                                                |
+| cylinder rim ending on a cylindrical end face: circle / parabola / circle of size 0.4                                                | -2.8e-8 / -9.2e-7 / -1.2e-6 (OCCT's fillet of the circle: within 1e-6)                |
+| cylinder rim ending on a sphere                                                                                                      | -6.9e-8 (OCCT's fillet: within 1e-6)                                                  |
+| straight edge, law 0.4 -> 0.8, ending on a cylinder of radius 8                                                                      | 4.7e-7 (constant size 0.6: equals OCCT's fillet to 1e-6)                              |
 
 The wedge difference (up to 2.2e-4 of the wedge) is the slope measurement: the quadratic fit reads OCCT's surface, whose radius carries an error of about 1e-6, divided by the 0.02 L baseline. The gates are 1e-5 of the whole volume and 1e-3 of the wedge. Contacts G0 under `1e-6 diagonal` and G1 under 1e-3 rad in every case; the edge between the blend and the end face (every edge of the solid shared by two faces, `worst_edge_gap`): 4e-8 to 2.8e-7 absolute for a part of diagonal about 17 (the new end curve lies on the end face); one new face, the end walls stay one face; `analyze` valid, no free edge, one solid.
 
@@ -2043,23 +2044,23 @@ The wedge difference (up to 2.2e-4 of the wedge) is the slope measurement: the q
 
 **Red-proofs** (each: one revert, one build, the named suite, restored; failing / total):
 
-| revert | failing tests |
-| --- | --- |
-| `continue_size` does nothing (OCCT's section kept past the vertex) | 2 / 2 of `blend_rail_extend_tests` |
-| the slope of a straight law ignored (0, the end size held constant) in `law_end_slopes` | 2 / 3 of `blend_rail_extend_tests` (the flared prism and the concave column; the cross-check also raises an internal error) |
-| a monotone law given the straight slope | 1 / 3 (the zero-slope test: cross-check internal error) |
-| the kink guard of 13.35.1 (2) disabled (`kLawKink` huge) | 2 of the whole `blend_rail_` filter: `a_varying_size_on_a_rim_arc_whose_oblique_end_needs_the_contact_past_the_vertex_keeps_the_kink_refusal` and `what_a_curved_end_face_cannot_have_is_named` |
+| revert                                                                                                      | failing tests                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `continue_size` does nothing (OCCT's section kept past the vertex)                                          | 2 / 2 of `blend_rail_extend_tests`                                                                                                                                                                     |
+| the slope of a straight law ignored (0, the end size held constant) in `law_end_slopes`                     | 2 / 3 of `blend_rail_extend_tests` (the flared prism and the concave column; the cross-check also raises an internal error)                                                                            |
+| a monotone law given the straight slope                                                                     | 1 / 3 (the zero-slope test: cross-check internal error)                                                                                                                                                |
+| the kink guard of 13.35.1 (2) disabled (`kLawKink` huge)                                                    | 2 of the whole `blend_rail_` filter: `a_varying_size_on_a_rim_arc_whose_oblique_end_needs_the_contact_past_the_vertex_keeps_the_kink_refusal` and `what_a_curved_end_face_cannot_have_is_named`        |
 | the early returns of `plan_extension` removed (the line check; the planar-supports check; both: three runs) | 0 failures in each: those returns are NOT what keeps the rim-arc refusal (the activation test, that an apex of the skin lies past the chord of the arc, does not hold there, and the guard above does) |
-| (TypeScript, kernel rebuilt for each) `continue_size` does nothing | 1 / 4 of `nativeBlendRailEnds.test.ts` (the flared prism through `fillet_edge`) |
-| (TypeScript) the piece on the wrong side of a curved end face kept | 1 / 9 of `nativeBlendEnds.test.ts` (the box cut by a cylinder) |
-| the edge the end wall shares with each support is not moved | 2 / 2 |
-| the kink guard of 13.35.1 (2) not skipped for a continued size | 2 / 2 |
-| no pcurve for the new end curve on a curved end face | 3 / 5 of `blend_rail_curved_tests` (cylinder, sphere, straight edge) |
-| the end curve's distance to the end surface not checked (`on_end`) | 1 / 5 (the cylinder rim: the contact lines are taken for pieces of the end curve) |
-| the piece on the wrong side of the surface kept | 3 / 5 |
-| the margin of the skin past the circular blend set to 0 | 2 / 5 (the straight edge on a cylinder and the moved-contact-point scene) |
-| the crease limit of a curved end off | 1 / 5 (`what_a_curved_end_face_cannot_have_is_named`) |
-| the guard on the move of a contact point off | 1 / 5 (`a_contact_point_that_would_move_past_the_edge_of_its_end_face_is_refused_with_both_lengths`) |
+| (TypeScript, kernel rebuilt for each) `continue_size` does nothing                                          | 1 / 4 of `nativeBlendRailEnds.test.ts` (the flared prism through `fillet_edge`)                                                                                                                        |
+| (TypeScript) the piece on the wrong side of a curved end face kept                                          | 1 / 9 of `nativeBlendEnds.test.ts` (the box cut by a cylinder)                                                                                                                                         |
+| the edge the end wall shares with each support is not moved                                                 | 2 / 2                                                                                                                                                                                                  |
+| the kink guard of 13.35.1 (2) not skipped for a continued size                                              | 2 / 2                                                                                                                                                                                                  |
+| no pcurve for the new end curve on a curved end face                                                        | 3 / 5 of `blend_rail_curved_tests` (cylinder, sphere, straight edge)                                                                                                                                   |
+| the end curve's distance to the end surface not checked (`on_end`)                                          | 1 / 5 (the cylinder rim: the contact lines are taken for pieces of the end curve)                                                                                                                      |
+| the piece on the wrong side of the surface kept                                                             | 3 / 5                                                                                                                                                                                                  |
+| the margin of the skin past the circular blend set to 0                                                     | 2 / 5 (the straight edge on a cylinder and the moved-contact-point scene)                                                                                                                              |
+| the crease limit of a curved end off                                                                        | 1 / 5 (`what_a_curved_end_face_cannot_have_is_named`)                                                                                                                                                  |
+| the guard on the move of a contact point off                                                                | 1 / 5 (`a_contact_point_that_would_move_past_the_edge_of_its_end_face_is_refused_with_both_lengths`)                                                                                                   |
 
 Not red-proven because no scene reaches them (internal errors, off the contract; the three added with the review: the end vertex that cannot be placed, the middle section that is not inside the edge, the spline of the kernel too short to fit, and the projection of the new end curve on a curved face that misses the curve by more than `5e-6` of the diagonal at five samples): the continued size falling to 5 percent, the move of a contact point against a quarter of the end curve, the missing shared edge, the crossing of a contact line with the end plane, the miss of the cut against the end of a contact line, the mitre combination, and the projection / split guards of the curved cut.
 
@@ -2082,15 +2083,15 @@ Along spoke `s` both sub-patches have the tangent plane of the shared normal fie
 
 ### 13.38.3 Measured (native llull-kernel, release; cube 10, size 1, shape 0.5, setback 2)
 
-| | 13.36 (G1 spokes) | 13.38 |
-| --- | --- | --- |
-| curvature jump across the spokes, worst of 21 interior samples (1/mm) | 0.83 | 0.0148 |
-| relative jump beyond the first fifth of each spoke (build gate 0.02) | 1 | 0.0045 or less (all parts below) |
-| relative jump within the first fifth (`spokeVertexRelative`) | 1 | 1.74 |
-| G1 angle across the spokes (rad) | 6e-8 | 2.6e-8 |
-| contacts: curvature jump / G1 angle | 7.3e-5 / 1.1e-6 | 6.9e-6 / 2.1e-8 |
-| volume | 980.7481 | 980.7073 |
-| time of the whole step (8 corners, 66 faces) | 1.89 s | 1.81 to 1.96 s |
+|                                                                       | 13.36 (G1 spokes) | 13.38                            |
+| --------------------------------------------------------------------- | ----------------- | -------------------------------- |
+| curvature jump across the spokes, worst of 21 interior samples (1/mm) | 0.83              | 0.0148                           |
+| relative jump beyond the first fifth of each spoke (build gate 0.02)  | 1                 | 0.0045 or less (all parts below) |
+| relative jump within the first fifth (`spokeVertexRelative`)          | 1                 | 1.74                             |
+| G1 angle across the spokes (rad)                                      | 6e-8              | 2.6e-8                           |
+| contacts: curvature jump / G1 angle                                   | 7.3e-5 / 1.1e-6   | 6.9e-6 / 2.1e-8                  |
+| volume                                                                | 980.7481          | 980.7073                         |
+| time of the whole step (8 corners, 66 faces)                          | 1.89 s            | 1.81 to 1.96 s                   |
 
 Other parts (jump over 21 samples, relative beyond the stretch, contact jump): sizes 0.8 to 1.1 on a 10 x 7 x 5 box 0.041, 0.0045, 6.4e-5; shape 0.3 0.127, 0.0030, 7.6e-5; shape 0.8 0.035, 4e-5, 7.7e-5; size 2.4 0.0062, 1.2e-4, 2.9e-6. Reach tried (spoke jump, outcome): 0.5 0.116; 0.3 0.028; 0.25 0.0164; 0.2 0.0148; 0.15 0.0126 (the step takes 1.4 times as long); 0.1 refused (the contact reads 7.5e-3 at 64 poles: the transition is too short for the degree 7 interpolant). 0.2 is the shortest reach at the usual pole count.
 
@@ -2131,17 +2132,17 @@ The surface is the polynomial B-spline of degree 5 across by the six interpolate
 
 ### 13.40.3 Measured (native llull-kernel, OCCT 7.9.2)
 
-| Case                                                                                                                  | Oracle                                                                                                                                | Measured                                                                                                                           |
-| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Cylinder rim R 10 h 20, legs 1 x 3, 3 x 1 (top x side) and 1 x 3 (cylinder first), shape 0.3 / 0.5 / 0.7, at 1, 10, 100 | revolved quintic (both normal curvatures 0), Green's theorem                                                                          | within 3e-6 relative (1.0e-6 at the worst: the mass-property integration of a degree-5 B-spline face); contacts G0 < 1e-6 x diagonal, G1 < 1e-4 rad |
-| Sphere cap R 10 cut at z = 5, legs 1 x 2 and 1 x 3, shape 0.4 / 0.5, at 1, 10, 100                                    | revolved quintic with the 4th pole moved by 1.25 (1 / R) lead^2 toward the plane, sphere arc back (without the bend the volume differs by more than 20 x the tolerance) | within 1e-5 relative; contacts G0 / G1 as above                                                                                    |
-| Straight edge, legs 1 -> 2 / 2 -> 3 on the top and 2 -> 1 / 1 -> 2 on the front; half cylinder R 20 arc, legs on the top and on the wall | section area (quintic, shoelace) integrated along the edge; pi integral (R A - M_x) ds                                                | 1e-6 (straight), 5e-5 (arc: the 65-station loft of the variable chamfer, 13.34.4)                                                  |
-| Lens of two spheres R 10 / R 30 (curvature 1 / R at BOTH contacts), legs 1 x 2, 1.5 x 1.5, 0.8 x 2.5 (x scale 3, 10), shape 0.4 / 0.5 | revolved: arc, bent quintic, arc (the unbent section is off by more than 5 x the tolerance); edge_continuity at 97 samples, 25 of them stations | within 1e-5 of the removed volume (or 1e-6 of the lens volume, the bound of the mass-property integration of the source); normal-curvature jump x R < 0.02 at the stations and between them |
-| Spherical dimple (concave sphere R 10 centre 6 above the plate top), legs 1 x 2 shape 0.2, 0.5 x 1 shape 0.1 | revolved: quintic bent toward the sphere centre, arc | within 3e-5 (1.1e-5 / 3.9e-5 on a plate of 36000 mm3 before the plate was cut down to 3456 mm3: the difference of two big volumes); jump x R < 0.02 |
-| Boss foot (concave, plane + cylinder wall), legs 1.5 x 3 shape 0.5, 3 x 1 shape 0.3 | revolved quintic added to the source | within 3e-6; jump < 0.02 / R |
-| Oblique rim: cylinder R 10 cut by z = 20 + 0.3 x (ellipse; the wall bends along the section by (t . tau)^2 / R, not a principal direction), legs 1 x 3 shape 0.5, 2 x 1 shape 0.4 | **3D** numeric integral written in the test: (1/3) the surface integral of r . n dS over the ring (plane strip, blend, wall strip) at 720 angles x 600 Gauss nodes, sections from chord legs, tangent lines, bent quintic; no revolution | 5.8e-7 and 2.6e-6 relative; the same integral without the bend is 1.6e-2 and 4.6e-4 off; jump x R < 0.02 at and between stations |
-| Small legs on a large cap (R 100 cut at 50, diagonal 300, legs 0.1 x 0.3; 0.05 x 0.15 is below what the OCCT chamfer builds), shape 0.3 / 0.5 | edge_continuity at 97 samples (every 4th is a station of the 24 intervals, 72 are between) | jump x R < 0.02 at both |
-| Server: rim and cap through `fillet_edge`, `check_blends` with `require: 'G2'`                                         | the same integrals                                                                                                                    | status `pass`, both contacts order `G2`, no `BLD_CHECK_G2_JUMP`, G1 < 1e-4, legs read within 1e-3 (`data.legs`), no radius. The cap is read at 11 (the default: only the ends and the middle are stations), 37 and 97 samples per contact line (`data.provenance.method` states the count): g2Gap 2.4e-9 1/unit against a sphere curvature of 0.1, bounded at 1e-7, g2Rel bounded at 1e-6. A lens (R 30) reads G2 at both contacts at 97 samples |
+| Case                                                                                                                                                                              | Oracle                                                                                                                                                                                                                                   | Measured                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cylinder rim R 10 h 20, legs 1 x 3, 3 x 1 (top x side) and 1 x 3 (cylinder first), shape 0.3 / 0.5 / 0.7, at 1, 10, 100                                                           | revolved quintic (both normal curvatures 0), Green's theorem                                                                                                                                                                             | within 3e-6 relative (1.0e-6 at the worst: the mass-property integration of a degree-5 B-spline face); contacts G0 < 1e-6 x diagonal, G1 < 1e-4 rad                                                                                                                                                                                                                                                                                              |
+| Sphere cap R 10 cut at z = 5, legs 1 x 2 and 1 x 3, shape 0.4 / 0.5, at 1, 10, 100                                                                                                | revolved quintic with the 4th pole moved by 1.25 (1 / R) lead^2 toward the plane, sphere arc back (without the bend the volume differs by more than 20 x the tolerance)                                                                  | within 1e-5 relative; contacts G0 / G1 as above                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Straight edge, legs 1 -> 2 / 2 -> 3 on the top and 2 -> 1 / 1 -> 2 on the front; half cylinder R 20 arc, legs on the top and on the wall                                          | section area (quintic, shoelace) integrated along the edge; pi integral (R A - M_x) ds                                                                                                                                                   | 1e-6 (straight), 5e-5 (arc: the 65-station loft of the variable chamfer, 13.34.4)                                                                                                                                                                                                                                                                                                                                                                |
+| Lens of two spheres R 10 / R 30 (curvature 1 / R at BOTH contacts), legs 1 x 2, 1.5 x 1.5, 0.8 x 2.5 (x scale 3, 10), shape 0.4 / 0.5                                             | revolved: arc, bent quintic, arc (the unbent section is off by more than 5 x the tolerance); edge_continuity at 97 samples, 25 of them stations                                                                                          | within 1e-5 of the removed volume (or 1e-6 of the lens volume, the bound of the mass-property integration of the source); normal-curvature jump x R < 0.02 at the stations and between them                                                                                                                                                                                                                                                      |
+| Spherical dimple (concave sphere R 10 centre 6 above the plate top), legs 1 x 2 shape 0.2, 0.5 x 1 shape 0.1                                                                      | revolved: quintic bent toward the sphere centre, arc                                                                                                                                                                                     | within 3e-5 (1.1e-5 / 3.9e-5 on a plate of 36000 mm3 before the plate was cut down to 3456 mm3: the difference of two big volumes); jump x R < 0.02                                                                                                                                                                                                                                                                                              |
+| Boss foot (concave, plane + cylinder wall), legs 1.5 x 3 shape 0.5, 3 x 1 shape 0.3                                                                                               | revolved quintic added to the source                                                                                                                                                                                                     | within 3e-6; jump < 0.02 / R                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Oblique rim: cylinder R 10 cut by z = 20 + 0.3 x (ellipse; the wall bends along the section by (t . tau)^2 / R, not a principal direction), legs 1 x 3 shape 0.5, 2 x 1 shape 0.4 | **3D** numeric integral written in the test: (1/3) the surface integral of r . n dS over the ring (plane strip, blend, wall strip) at 720 angles x 600 Gauss nodes, sections from chord legs, tangent lines, bent quintic; no revolution | 5.8e-7 and 2.6e-6 relative; the same integral without the bend is 1.6e-2 and 4.6e-4 off; jump x R < 0.02 at and between stations                                                                                                                                                                                                                                                                                                                 |
+| Small legs on a large cap (R 100 cut at 50, diagonal 300, legs 0.1 x 0.3; 0.05 x 0.15 is below what the OCCT chamfer builds), shape 0.3 / 0.5                                     | edge_continuity at 97 samples (every 4th is a station of the 24 intervals, 72 are between)                                                                                                                                               | jump x R < 0.02 at both                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Server: rim and cap through `fillet_edge`, `check_blends` with `require: 'G2'`                                                                                                    | the same integrals                                                                                                                                                                                                                       | status `pass`, both contacts order `G2`, no `BLD_CHECK_G2_JUMP`, G1 < 1e-4, legs read within 1e-3 (`data.legs`), no radius. The cap is read at 11 (the default: only the ends and the middle are stations), 37 and 97 samples per contact line (`data.provenance.method` states the count): g2Gap 2.4e-9 1/unit against a sphere curvature of 0.1, bounded at 1e-7, g2Rel bounded at 1e-6. A lens (R 30) reads G2 at both contacts at 97 samples |
 
 ### 13.40.4 Tests and red-proofs
 
@@ -2176,19 +2177,19 @@ Checked on the cube with different setbacks (1.5 / 2 / 2.5 at the origin; the bo
 
 ### 13.41.4 Measured (native llull-kernel, release; the overshoot is `data.corners[].overshoot`)
 
-| case | overshoot before | after | centre / tangent factor | note |
-| --- | --- | --- | --- | --- |
-| trim cube r 1 ball 2, 8 stars | 1.8e-3 | 1.8e-3 | surface / 1 | under the gate (0.0173): unchanged, volume on the rolling-ball cube |
-| cube, setbacks 1.5 / 2 / 2.5, origin star | 0.22 | 0 | rule / 0.7 | volume 976.513 -> 974.975 (-0.16 %; the other 7 stars unchanged) |
-| evolving radius cube | 0.027 (corner 0) | 2e-8 | rule / 1 | |
-| circular / straight / cylinder vertex r 0.5 s 1.2 | 0.069 | 5e-7 | rule / 1 | volume within 1e-3 of the rolling ball |
-| tapered cylinder block (2 builds) | 0.074 | 1e-6 | rule / 1 | |
-| cylinder block r 12, thirds 1.3 / 1.4 / 1.6 | 0.36 / 0.38 / 0.40 | 0.0143 / 0.0109 / 0.0138 | rule / 0.35, 0.25, 0.25 | crease 0.0009 to 0.0015, boundary G1 under 0.0095 |
-| cylinder block r 10.2, thirds 1.3 / 1.4 / 1.6 | 0.13 | 0.0036 / 0.0042 / 0.0047 | rule / 0.7 | |
-| cylinder block r 11, thirds 1.3 / 1.4 / 1.6 | 0.46 / 0.48 / 0.51 | 0.024 / 0.034 / 0.057 | rule / 0.25 | NOW REFUSED (the plate misses the blend ends by 2e-4 to 3e-4): the cylinder meets the side plane at 0.43 rad inside the ball |
-| notch (concave), setbacks 1.2 / 1.5 / 1.8 | 0.405 (wrong sign) | 0.005 | rule / 0.35 | |
-| feature behind the vertex (planes) | 0.19 | 0.016 | rule / 0.25 | |
-| C0-knot hook, r 12 third 1.6 | 0.40 | 0.0138 | rule / 0.25 | |
+| case                                              | overshoot before   | after                    | centre / tangent factor | note                                                                                                                         |
+| ------------------------------------------------- | ------------------ | ------------------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| trim cube r 1 ball 2, 8 stars                     | 1.8e-3             | 1.8e-3                   | surface / 1             | under the gate (0.0173): unchanged, volume on the rolling-ball cube                                                          |
+| cube, setbacks 1.5 / 2 / 2.5, origin star         | 0.22               | 0                        | rule / 0.7              | volume 976.513 -> 974.975 (-0.16 %; the other 7 stars unchanged)                                                             |
+| evolving radius cube                              | 0.027 (corner 0)   | 2e-8                     | rule / 1                |                                                                                                                              |
+| circular / straight / cylinder vertex r 0.5 s 1.2 | 0.069              | 5e-7                     | rule / 1                | volume within 1e-3 of the rolling ball                                                                                       |
+| tapered cylinder block (2 builds)                 | 0.074              | 1e-6                     | rule / 1                |                                                                                                                              |
+| cylinder block r 12, thirds 1.3 / 1.4 / 1.6       | 0.36 / 0.38 / 0.40 | 0.0143 / 0.0109 / 0.0138 | rule / 0.35, 0.25, 0.25 | crease 0.0009 to 0.0015, boundary G1 under 0.0095                                                                            |
+| cylinder block r 10.2, thirds 1.3 / 1.4 / 1.6     | 0.13               | 0.0036 / 0.0042 / 0.0047 | rule / 0.7              |                                                                                                                              |
+| cylinder block r 11, thirds 1.3 / 1.4 / 1.6       | 0.46 / 0.48 / 0.51 | 0.024 / 0.034 / 0.057    | rule / 0.25             | NOW REFUSED (the plate misses the blend ends by 2e-4 to 3e-4): the cylinder meets the side plane at 0.43 rad inside the ball |
+| notch (concave), setbacks 1.2 / 1.5 / 1.8         | 0.405 (wrong sign) | 0.005                    | rule / 0.35             |                                                                                                                              |
+| feature behind the vertex (planes)                | 0.19               | 0.016                    | rule / 0.25             |                                                                                                                              |
+| C0-knot hook, r 12 third 1.6                      | 0.40               | 0.0138                   | rule / 0.25             |                                                                                                                              |
 
 VOLUME against OCCT's rolling-ball blend of the same edges, for every rebuilt row (signed, star minus rolling ball over rolling ball; `VOLDEV` probe): cylinder block r 12, thirds 1.3 / 1.4 / 1.6: -0.269 / -0.309 / -0.349 %; r 10.2: +0.112 / +0.111 / +0.111 %; cube with setbacks 1.5 / 2 / 2.5 (12 edges, r 1): -0.063 % (-0.16 % against the equal-setback star); notch (concave): +0.103 %; d-shape vertex (rule centre, factor 1): within 1e-3 (asserted). Not measured: the feature-behind row and the C0-knot hook row. The server window of `nativeBlendCurvedCorners.test.ts` is pinned per build at 1.2x the measure (3.3e-3 / 3.7e-3 / 4.2e-3 for the thirds 1.3 / 1.4 / 1.6; it was 2e-3 for all three).
 
@@ -2204,7 +2205,7 @@ Not done: a construction that does not bulge from a long thin hole (the Hermite 
 
 ### 13.41.5 Tests and red-proofs
 
-`blend_overshoot_tests.rs` (8: the smooth hole, the cube kept at the surface centre, the different-setbacks cube, the concave sign, the long thin hole, the r 11 refusal, a mixed trim corner not measured and not gated, the pinned star shape), `checkCornerOvershoot.test.ts` (3, mock notes), server `nativeBlendCurvedCorners.test.ts` (check_blends reads BLD_CHECK_CORNER_OVERSHOOT; the r 11 refusal returns the unchanged document with the `BLD_CORNER_FAILED` summary; the volume windows per build), the changed `blend_corner_tests.rs` (kink r 12, smaller cylinder r 10.2 builds and r 11 refused, different setbacks volume 974.975). Red-proofs (a temporary `LLULL_MUT` switch read by the kernel, one run per mutation over the 11 tests of this section and the changed ones, removed; baseline 0 failures): the gate on plain stars off (the old `sharp_of[c] >= 0`) 2 fail (`a_star_that_stays_outside_the_part_after_the_rebuilds_is_refused_by_name`, `a_smaller_cylinder_builds_...`); `refine_star` off 7 fail (the rule-centre test on the smooth hole, the different-setbacks cube and its volume, the long thin hole, the kink test, the r 11 refusal, `the_vertex_of_a_circular_edge_...`); the ladder reduced to the centre rule without shorter tangents 5 fail (the thin hole, the kink test, both different-setbacks tests, the r 11 refusal message); the wrong side of a concave corner (measured as a convex one) 1 fails (`a_concave_star_is_measured_...`: the star is refused at 0.38 and the plate is built). Review round (13 tests: the 8 of this section and 5 changed ones; baseline 0 failures): ladder cut short at factor 0.5 (no 0.35 / 0.25) 4 fail (the kink test, the concave star, the long thin hole, the pinned shape); the surface centre kept in every rebuild (no 3/8 rule) 7 fail. The round-1 mutations were not re-run after the convexity change.
+`blend_overshoot_tests.rs` (8: the smooth hole, the cube kept at the surface centre, the different-setbacks cube, the concave sign, the long thin hole, the r 11 refusal, a mixed trim corner not measured and not gated, the pinned star shape), `checkCornerOvershoot.test.ts` (3, mock notes), server `nativeBlendCurvedCorners.test.ts` (check*blends reads BLD_CHECK_CORNER_OVERSHOOT; the r 11 refusal returns the unchanged document with the `BLD_CORNER_FAILED` summary; the volume windows per build), the changed `blend_corner_tests.rs` (kink r 12, smaller cylinder r 10.2 builds and r 11 refused, different setbacks volume 974.975). Red-proofs (a temporary `LLULL_MUT` switch read by the kernel, one run per mutation over the 11 tests of this section and the changed ones, removed; baseline 0 failures): the gate on plain stars off (the old `sharp_of[c] >= 0`) 2 fail (`a_star_that_stays_outside_the_part_after_the_rebuilds_is_refused_by_name`, `a_smaller_cylinder_builds*...`); `refine*star`off 7 fail (the rule-centre test on the smooth hole, the different-setbacks cube and its volume, the long thin hole, the kink test, the r 11 refusal,`the_vertex_of_a_circular_edge*...`); the ladder reduced to the centre rule without shorter tangents 5 fail (the thin hole, the kink test, both different-setbacks tests, the r 11 refusal message); the wrong side of a concave corner (measured as a convex one) 1 fails (`a*concave_star_is_measured*...`: the star is refused at 0.38 and the plate is built). Review round (13 tests: the 8 of this section and 5 changed ones; baseline 0 failures): ladder cut short at factor 0.5 (no 0.35 / 0.25) 4 fail (the kink test, the concave star, the long thin hole, the pinned shape); the surface centre kept in every rebuild (no 3/8 rule) 7 fail. The round-1 mutations were not re-run after the convexity change.
 
 ## 13.42 As built: the creased trim star meets the blend ends; the curved sharp edge is lifted (DES-6c, 2026-11-21)
 
@@ -2303,12 +2304,12 @@ Probe: `blend_g2vertex_probe_tests.rs`, `g2_vertex_probe_cube_and_box` (`#[ignor
 
 Stability: the fitted supports' numbers do not move between r = 0.04, 0.08 and 0.12 (cube size 1: mismatch 0.4059, 0.4058, 0.4057); the support slopes at `V` (the first-order terms of the fit, a check that `V` is on the tangent plane) are under 1e-7.
 
-| body (profile curvature, shape 0.5) | spoke length L | angle (e_A, e_B) | `C_A(s,e_A,e_B)` blend side | `C_B(s,e_A,e_B)` flat side | mismatch (1/mm^2) | least residual of K_A - K_B: ww component, norm | natural patches `K_ww` (r = 0.04): flat side, blend side |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| cube 10, size 1 | 1.629 | 135.0 deg | +0.4059 | 0 (3e-21) | 0.4059 | -0.4619, 0.4687 | -0.0482, -0.5255 |
-| cube 10, size 2.4 | 3.909 | 135.0 deg | +0.0705 | 0 | 0.0705 | -0.0802, 0.0814 | -0.0085, -0.0911 |
-| box 10 x 7 x 5, sizes 0.8 to 1.1 (vertex 0) | 1.758 | 141.8 deg | +0.6019 | 0 | 0.6019 | -0.6647, 0.6694 | -0.0396, -0.7254 |
-| same, the 12 vertices read | 1.44 to 1.86 | 128 to 142 deg | 0 | 0.33 to 0.63 | 0.33 to 0.63 | (vertex 1: -0.721, 0.732) | |
+| body (profile curvature, shape 0.5)         | spoke length L | angle (e_A, e_B) | `C_A(s,e_A,e_B)` blend side | `C_B(s,e_A,e_B)` flat side | mismatch (1/mm^2) | least residual of K_A - K_B: ww component, norm | natural patches `K_ww` (r = 0.04): flat side, blend side |
+| ------------------------------------------- | -------------- | ---------------- | --------------------------- | -------------------------- | ----------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| cube 10, size 1                             | 1.629          | 135.0 deg        | +0.4059                     | 0 (3e-21)                  | 0.4059            | -0.4619, 0.4687                                 | -0.0482, -0.5255                                         |
+| cube 10, size 2.4                           | 3.909          | 135.0 deg        | +0.0705                     | 0                          | 0.0705            | -0.0802, 0.0814                                 | -0.0085, -0.0911                                         |
+| box 10 x 7 x 5, sizes 0.8 to 1.1 (vertex 0) | 1.758          | 141.8 deg        | +0.6019                     | 0                          | 0.6019            | -0.6647, 0.6694                                 | -0.0396, -0.7254                                         |
+| same, the 12 vertices read                  | 1.44 to 1.86   | 128 to 142 deg   | 0                           | 0.33 to 0.63               | 0.33 to 0.63      | (vertex 1: -0.721, 0.732)                       |                                                          |
 
 (The flat support has `G = 0` as 13.44.2 says: its height over the common plane is 0, the fit gives 1e-20 to 1e-27.) Every vertex of the three bodies reads a mismatch of the same size and the sign flips with the orientation of the pair (flat, blend) around the loop. The mismatch is nowhere near zero (0.07 to 0.63 1/mm^2); the flat side reads 1e-20 to 1e-27, which is the fit's floor. The cube size 1 reads the same 0.4057 to 0.4059 at all 12 vertices read; the size 2.4 cube 0.0705.
 
@@ -2320,10 +2321,10 @@ Built as an experiment and removed (the C++ was reverted; nothing of it ships): 
 
 Measured on the cube (10, size 1, shape 0.5; relative jump of the normal curvature across the spokes, worst over all spokes, at 0.25, 0.5, 1, 2, 4, 8, 16, 24 % of the spoke from its vertex; 401 samples per seam):
 
-| build | 0.25 | 0.5 | 1 | 2 | 4 | 8 | 16 | 24 | contacts jump / G1 | time | volume |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 13.38 (default; read on the size 2.4 cube, the size 1 cube reads the same at 1, 2, 4, 8, 16 %) | 0.90 | 0.90 | 0.89 | 0.88 | 0.82 | 0.38 | 0.19 | 0 | 6.9e-6 / 2.6e-8 | 3.9 s | 980.7073 |
-| singular, lambda 4, 2 refined knots (the best found) | 1.02 | 0.31 | 0.82 | 0.066 | 0.041 | 0.017 | 0.038 | 0.012 | 2.9e-5 / 3.0e-8 | 5.2 s | 980.7426 |
+| build                                                                                          | 0.25 | 0.5  | 1    | 2     | 4     | 8     | 16    | 24    | contacts jump / G1 | time  | volume   |
+| ---------------------------------------------------------------------------------------------- | ---- | ---- | ---- | ----- | ----- | ----- | ----- | ----- | ------------------ | ----- | -------- |
+| 13.38 (default; read on the size 2.4 cube, the size 1 cube reads the same at 1, 2, 4, 8, 16 %) | 0.90 | 0.90 | 0.89 | 0.88  | 0.82  | 0.38  | 0.19  | 0     | 6.9e-6 / 2.6e-8    | 3.9 s | 980.7073 |
+| singular, lambda 4, 2 refined knots (the best found)                                           | 1.02 | 0.31 | 0.82 | 0.066 | 0.041 | 0.017 | 0.038 | 0.012 | 2.9e-5 / 3.0e-8    | 5.2 s | 980.7426 |
 
 Other settings (spokes G2-beyond-reach accepted, or refused with the measure): lambda 0.5 / 1 / 2 without refinement are refused (the contact curvature jump reads 0.0157 / 0.0033 / 0.0007 per length at 64 poles: the uniform knots cannot resolve the fade at small `v`); lambda 4 without refinement is accepted but reads 1.0, 0.17, 0.7 at 1 to 4 %; lambda 4 with 1 refined knot 1.05, 1.01, 0.29, 0.80 at 0.25 to 2 %; with 3 or more refined knots (lambda 3, 4, 6, 8, 16 tried) the interpolation of the degree 7 patch degrades: the attempt's own measure beyond the reach reads a relative jump of 0.10 to 0.58 and the corners fall back to G1 spokes (the worst seam of the shell then reads 1.3 to 1.6 all along); lambda 2 with refinement is refused at the contacts.
 
@@ -2343,17 +2344,17 @@ Around each loop vertex V the corners (u, v) in the triangle (0,0), (a,0), (0,b)
 
 ### 13.45.2 Measured (native llull-kernel, release; relative jump across the spokes, worst over all spokes, 401 samples per seam, at 0.25, 0.5, 1, 2, 4, 8, 16, 24 % of a spoke; `spoke_marks` in `blend_g2fan_tests.rs`)
 
-| body | build | 0.25 | 0.5 | 1 | 2 | 4 | 8 | 16 | 24 | gate at all marks |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| cube 10, size 1 | 13.38 | 0.903 | 0.900 | 0.894 | 0.877 | 0.826 | 0.520 | 0.601 | 0.000 | no (7 of 8) |
-| | fan | 0.055 | 0.009 | 0.003 | 0.001 | 0.000 | 0.000 | 0.000 | 0.001 | yes |
-| cube size 2.4 | fan | 0.068 | 0.008 | 0.001 | 0.000 | 0.000 | 0.000 | 0.000 | 0.001 | yes |
-| cube shape 0.3 | 13.38 | 0.904 | 0.902 | 0.898 | 0.888 | 0.856 | 0.687 | 0.180 | 0.002 | no |
-| | fan | 0.013 | 0.003 | 0.001 | 0.000 | 0.000 | 0.000 | 0.001 | 0.033 | yes |
-| cube shape 0.8 | 13.38 | 0.861 | 0.750 | 1.622 | 1.098 | 1.042 | 0.927 | 0.206 | 0.000 | no |
-| | fan | 0.781 | 0.228 | 1.542 | 0.003 | 0.000 | 0.006 | 0.003 | 0.002 | yes (the curvature there is under the floor) |
-| box 10 x 7 x 5, sizes 0.8-1.1 | 13.38 | 0.934 | 0.931 | 0.924 | 0.910 | 0.870 | 0.727 | 1.993 | 0.000 | no |
-| | fan | 0.050 | 0.014 | 0.003 | 0.000 | 0.000 | 0.000 | 0.004 | 0.003 | yes |
+| body                          | build | 0.25  | 0.5   | 1     | 2     | 4     | 8     | 16    | 24    | gate at all marks                            |
+| ----------------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | -------------------------------------------- |
+| cube 10, size 1               | 13.38 | 0.903 | 0.900 | 0.894 | 0.877 | 0.826 | 0.520 | 0.601 | 0.000 | no (7 of 8)                                  |
+|                               | fan   | 0.055 | 0.009 | 0.003 | 0.001 | 0.000 | 0.000 | 0.000 | 0.001 | yes                                          |
+| cube size 2.4                 | fan   | 0.068 | 0.008 | 0.001 | 0.000 | 0.000 | 0.000 | 0.000 | 0.001 | yes                                          |
+| cube shape 0.3                | 13.38 | 0.904 | 0.902 | 0.898 | 0.888 | 0.856 | 0.687 | 0.180 | 0.002 | no                                           |
+|                               | fan   | 0.013 | 0.003 | 0.001 | 0.000 | 0.000 | 0.000 | 0.001 | 0.033 | yes                                          |
+| cube shape 0.8                | 13.38 | 0.861 | 0.750 | 1.622 | 1.098 | 1.042 | 0.927 | 0.206 | 0.000 | no                                           |
+|                               | fan   | 0.781 | 0.228 | 1.542 | 0.003 | 0.000 | 0.006 | 0.003 | 0.002 | yes (the curvature there is under the floor) |
+| box 10 x 7 x 5, sizes 0.8-1.1 | 13.38 | 0.934 | 0.931 | 0.924 | 0.910 | 0.870 | 0.727 | 1.993 | 0.000 | no                                           |
+|                               | fan   | 0.050 | 0.014 | 0.003 | 0.000 | 0.000 | 0.000 | 0.004 | 0.003 | yes                                          |
 
 Other readings (cube / box): shell valid (BRepCheck of the sewn solid, and `is_valid`); faces 66 -> 162 (6 trimmed + 12 fans per corner); volume 980.7073 / 333.5574 identical to the default; build time 3.3 -> 8.6 s (cube), 3.7 -> 7.7 s (box); contacts jump (21 samples per edge) 2.5e-5 / 6.4e-5 against 6.9e-6 (inside the 1e-3 gate, worse than the default in absolute value), G1 across spokes 2.6e-6 (default 2e-8); spoke jump over the 21 samples 1.1e-4 against 0.048.
 
@@ -2390,12 +2391,12 @@ The fan construction itself is cheap (`make_fans` 55 ms per vertex, all 8 vertic
 
 Timings (`fillet_edge` of the curvature cube through the native kernel and the worker, the same machine; `LLULL_FAN_MODE`-style comparison with the hook; seconds):
 
-| step | before: fans off | before: fans on | after: fans off | after: fans on |
-| --- | --- | --- | --- | --- |
-| fillet_edge, whole | 24.0 | 47.5 to 49.3 (74 in 13.45.3, under load) | 9.6 to 9.8 | 14.9 to 16.0 |
-| face_graph | 13.7 | 28.8 | 0.004 | 0.01 |
-| bounds of the shell (Rust) | 6.5 | 24.0 | 3.6 | 4.3 |
-| analyze (Rust) | 8.3 | 28.9 | 5.6 | 9.7 |
+| step                       | before: fans off | before: fans on                          | after: fans off | after: fans on |
+| -------------------------- | ---------------- | ---------------------------------------- | --------------- | -------------- |
+| fillet_edge, whole         | 24.0             | 47.5 to 49.3 (74 in 13.45.3, under load) | 9.6 to 9.8      | 14.9 to 16.0   |
+| face_graph                 | 13.7             | 28.8                                     | 0.004           | 0.01           |
+| bounds of the shell (Rust) | 6.5              | 24.0                                     | 3.6             | 4.3            |
+| analyze (Rust)             | 8.3              | 28.9                                     | 5.6             | 9.7            |
 
 Fans on over fans off: 2.0x before, 1.5 to 1.65x after (14.9 to 16.0 s against 9.6 to 9.8 s). The `nativeBlendRails.test.ts` size sweep (180 s timeout, 456 s before) passes inside its timeout with the fans on.
 
@@ -2427,11 +2428,11 @@ The sampled positions are read from a copy of each sub-patch with its poles take
 
 ### 13.47.3 Measured (native llull-kernel, release, same machine under load from a parallel coverage run)
 
-| body | fans before | fans after | build, 8 corners |
-| --- | --- | --- | --- |
-| cut block r15, size 0.2 | 5 of 8 (3 refused: seam excess 3e-5 .. 2.4e-3) | 8 of 8, 162 faces (66 + 12 x 8), volume = 13.38 within 1e-4, valid | 5.2 s (4.8 to 6.5 s before, with refusals climbing the ladder to 36 x 40) = 0.65 s per corner |
-| cut block r15, size 0.1 / 0.4; r20, size 0.1 / 0.2 / 0.4 | not measured | 8 of 8 each, 162 faces | 4.9 to 5.7 s |
-| cube, box, the other cube bodies | 8 of 8 | 8 of 8, marks unchanged to the rounding | unchanged |
+| body                                                     | fans before                                    | fans after                                                         | build, 8 corners                                                                              |
+| -------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| cut block r15, size 0.2                                  | 5 of 8 (3 refused: seam excess 3e-5 .. 2.4e-3) | 8 of 8, 162 faces (66 + 12 x 8), volume = 13.38 within 1e-4, valid | 5.2 s (4.8 to 6.5 s before, with refusals climbing the ladder to 36 x 40) = 0.65 s per corner |
+| cut block r15, size 0.1 / 0.4; r20, size 0.1 / 0.2 / 0.4 | not measured                                   | 8 of 8 each, 162 faces                                             | 4.9 to 5.7 s                                                                                  |
+| cube, box, the other cube bodies                         | 8 of 8                                         | 8 of 8, marks unchanged to the rounding                            | unchanged                                                                                     |
 
 Radius 8 and 12 and cube sizes 3 and 4 are refused earlier (no star), not by the fans.
 
@@ -2458,13 +2459,13 @@ BRepGProp integrates a face with a Gauss order of its own per knot span and eval
 
 ### 13.48.3 Measured (release, the curvature cube, size 1, shape 0.5, seconds; fans off / fans on)
 
-| read | BRepGProp | strips |
-| --- | --- | --- |
-| mass_properties | 1.8 / 5.5 | 0.7 / 1.3 |
-| topology | 1.7 / 5.3 | 0.8 / 1.3 to 1.5 |
-| analyze | 0.9 / 2.8 | 0.4 / 0.7 |
-| fan shell volume integral alone (144 faces) | 2.6 | 0.7 |
-| build (fillet_profile_blend) | 2.7 / 4.7 | 2.3 / 3.0 (the blend volume checks) |
+| read                                        | BRepGProp | strips                              |
+| ------------------------------------------- | --------- | ----------------------------------- |
+| mass_properties                             | 1.8 / 5.5 | 0.7 / 1.3                           |
+| topology                                    | 1.7 / 5.3 | 0.8 / 1.3 to 1.5                    |
+| analyze                                     | 0.9 / 2.8 | 0.4 / 0.7                           |
+| fan shell volume integral alone (144 faces) | 2.6       | 0.7                                 |
+| build (fillet_profile_blend)                | 2.7 / 4.7 | 2.3 / 3.0 (the blend volume checks) |
 
 Values against BRepGProp on the fan shell, relative: volume 5.6e-13, area 3e-14, centroid 1e-14, inertia 5.6e-13 with the fans; 1.6e-12, 1.3e-11 (area; BRepGProp is the less accurate there: the strips are the same at every order from 6 to 48) without. mass_properties on and off: volume and area agree to the same figures, so no golden or server value moved (`tests/golden`, `tests/unit/contract`, the native server suites).
 
