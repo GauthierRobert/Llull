@@ -112,8 +112,10 @@ export interface Revision<T extends EquipmentTemplate> {
 }
 
 /** `value` without its undefined entries (a zod partial object carries explicit undefined). */
-const defined = <T extends object>(value: T | undefined | null): Partial<T> =>
-  Object.fromEntries(Object.entries(value ?? {}).filter(([, entry]) => entry !== undefined)) as Partial<T>;
+const defined = <T extends object>(value: T | undefined | null): { [K in keyof T]?: Exclude<T[K], undefined> } =>
+  Object.fromEntries(Object.entries(value ?? {}).filter(([, entry]) => entry !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
 
 /** Dotted paths (one and two levels) of the fields a patch sets. */
 function patchedPaths(patch: object): string[] {

@@ -415,7 +415,7 @@ describe('kettle weir plate and liquid level', () => {
   it('weirStation: null removes the weir plate and keeps weirHeight; the volume then has no kettleWeir block', () => {
     const removed = apply(doc, 'update_equipment_parameters', { equipment: 'E-402', exchanger: { kettle: { weirStation: null } } });
     expect(partsOf(removed)).not.toContain('weir');
-    const template = equipmentOf(removed, 'E-402').plant?.template as { kettle: Record<string, unknown> };
+    const template = equipmentOf(removed, 'E-402').plant?.template as unknown as { kettle: Record<string, unknown> };
     expect(template.kettle).toEqual({
       enlargedInsideDiameter: 900,
       enlargedLength: 2000,
