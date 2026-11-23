@@ -1,5 +1,6 @@
-// Decoders of the two binary result files the flow transports store (`llull-compute flow-query`): `LLSL` (a slice patch) and `LLST`
-// (streamline polylines). Pure: bytes in, typed arrays out; nothing is computed about the flow.
+// The ONE decoder of the two binary result files the flow transports store (`llull-compute flow-query`): `LLSL` (a slice patch) and `LLST`
+// (streamline polylines). Pure: bytes in, typed arrays out; nothing is computed about the flow. Read by the viewport overlay (`src/ui`) and the
+// headless `cfd_render` (`server/`); the bytes are untrusted (the backend serves them), so every header word is checked before it sizes anything.
 
 import type { Vec3 } from '@core/model/types';
 
@@ -43,7 +44,8 @@ function words<T extends Float32Array | Uint32Array>(
   count: number,
   kind: new (buffer: ArrayBuffer) => T,
 ): T {
-  return new kind(bytes.slice(from, from + count * 4).buffer);
+  // Uint8Array.from copies: a Node Buffer's slice is a view over a shared pool whose `.buffer` is not these bytes.
+  return new kind(Uint8Array.from(bytes.subarray(from, from + count * 4)).buffer);
 }
 
 function rangeOf(values: Float32Array): { min: number; max: number } | null {
@@ -101,13 +103,8 @@ export function parseStreamlinesFile(bytes: Uint8Array): StreamlinesFile | strin
   )
     return 'The streamline offsets are inconsistent.';
   const positionsAt = STREAMLINES_HEADER_BYTES + 4 * (lineCount + 1);
+  const positions = words(bytes, positionsAt, 3 * pointCount, Float32Array);
+  if (!positions.every(Number.isFinite)) return 'The streamline file holds a non-finite position.';
   const speeds = words(bytes, positionsAt + 12 * pointCount, pointCount, Float32Array);
-  return {
-    lineCount,
-    pointCount,
-    offsets,
-    positions: words(bytes, positionsAt, 3 * pointCount, Float32Array),
-    speeds,
-    range: rangeOf(speeds),
-  };
+  return { lineCount, pointCount, offsets, positions, speeds, range: rangeOf(speeds) };
 }

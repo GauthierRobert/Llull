@@ -735,3 +735,9 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   with the camera it reports (`makeProjector`, orthographic): the slice as one coloured polygon per sample (thinned to 96 a side), streamlines as speed-coloured
   segments (at most 60 000), and a legend (field, unit, min .. max). Drawn over the surface, not depth-tested. `data` = render_view's data with the composed `svg`
   and `data.cfd`; `--save view.png` rasterizes it. Tests `server/tests/cfdRender.test.ts`.
+- **Review round (CLI lane).** `cfd_render` refuses a turntable, `projection: perspective`, `fovDeg` and a perspective viewpoint with CFD_PARAM_INVALID (core draws no overlay there); the
+  svg provenance (`svgSha256`) is recomputed over the composed picture. `cfd_solve` refuses a bad `quantity` / `safetyFactor`, or either without `gridStudy`, before any solve
+  (bounds come from `record_cfd_grid_study`'s own schema, which also supplies the tool schema). The LLSL / LLST decoder is one pure module, `@aero/cfd/resultFiles`
+  (`parseSliceFile`, `parseStreamlinesFile`; also refuses a non-finite position), read by the viewport and by `cfd_render`; its hostile-input registration is `tests/helpers/hostile/cfdFileReaders.ts`.
+- **Follow-up (Lane 1 + aero):** a real `render_view` overlay kind `cfd` in `@aero` (a plugin `RenderOverlay` with `overlayOptions.cfd = { caseId, slice?, streamlines? }`) reading the
+  stored result files through a new result-file port in `ctx` (`OverlayView.ports`); `cfd_render` then reduces to that overlay and its transport.

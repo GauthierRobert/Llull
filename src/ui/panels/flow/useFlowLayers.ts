@@ -7,7 +7,7 @@ import { useFlowViewStore, type LayerFeed } from '@ui/store/flowViewStore';
 import { fetchCfdFile } from '@ui/services/cfdFiles';
 import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
-import { parseSliceFile, parseStreamlinesFile } from '@ui/viewport/3d/cfd/cfdFiles';
+import { parseSliceFile, parseStreamlinesFile } from '@aero/index';
 import { callFlowTool, OFFLINE, type FlowOutcome } from './flowTransport';
 import type { FlowCase } from './flowData';
 import { rakeParams, sliceParams, type SliceAxis, type SliceField } from './flowQueries';

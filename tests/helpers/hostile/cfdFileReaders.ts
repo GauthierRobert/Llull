@@ -1,5 +1,5 @@
-/** Hostile-input table: the renderer's decoders of the flow result files (`LLSL` slice, `LLST` streamlines) the backend serves from /cfd/file. */
-import { parseSliceFile, parseStreamlinesFile } from '@ui/viewport/3d/cfd/cfdFiles';
+/** Hostile-input table: the shared decoder of the flow result files (`LLSL` slice, `LLST` streamlines): read by the renderer (served from /cfd/file) and by `cfd_render`. */
+import { parseSliceFile, parseStreamlinesFile } from '@aero/cfd/resultFiles';
 import { asBytes, type HostileInput, type HostileReader } from './types';
 
 const MAGIC = (text: string): number[] => [...text].map((char) => char.charCodeAt(0));
@@ -37,15 +37,20 @@ const withWord = (bytes: Uint8Array, at: number, value: number): Uint8Array => {
   new DataView(copy.buffer).setUint32(at, value, true);
   return copy;
 };
+const withFloat = (bytes: Uint8Array, at: number, value: number): Uint8Array => {
+  const copy = bytes.slice();
+  new DataView(copy.buffer).setFloat32(at, value, true);
+  return copy;
+};
 const truncated = (build: () => Uint8Array): { name: string; input: () => HostileInput } => ({
   name: 'header cut short',
   input: () => build().subarray(0, 20),
 });
 
-export const UI_READERS: readonly HostileReader[] = [
+export const CFD_FILE_READERS: readonly HostileReader[] = [
   {
-    name: 'ui: parseSliceFile (LLSL flow slice)',
-    covers: ['../src/ui/viewport/3d/cfd/cfdFiles.ts:parseSliceFile'],
+    name: 'aero: parseSliceFile (LLSL flow slice)',
+    covers: ['domain-aero/src/cfd/resultFiles.ts:parseSliceFile'],
     input: 'bytes',
     build: (records) => sliceFile(Math.min(512, 2 + records)),
     maxRecords: 510,
@@ -61,8 +66,8 @@ export const UI_READERS: readonly HostileReader[] = [
     ],
   },
   {
-    name: 'ui: parseStreamlinesFile (LLST flow streamlines)',
-    covers: ['../src/ui/viewport/3d/cfd/cfdFiles.ts:parseStreamlinesFile'],
+    name: 'aero: parseStreamlinesFile (LLST flow streamlines)',
+    covers: ['domain-aero/src/cfd/resultFiles.ts:parseStreamlinesFile'],
     input: 'bytes',
     build: (records) => lineFile(Math.min(4096, records + 1), 3),
     maxRecords: 4000,
@@ -76,6 +81,7 @@ export const UI_READERS: readonly HostileReader[] = [
       { name: 'line count near 2^32', input: () => withWord(lineFile(3, 4), 8, 0xffffffff) },
       { name: 'point count near 2^32', input: () => withWord(lineFile(3, 4), 12, 0xfffffff0) },
       { name: 'point count disagreeing with the offsets', input: () => lineFile(3, 4, 0, 5) },
+      { name: 'one NaN position among the points', input: () => withFloat(lineFile(3, 4), 16 + 4 * 4 + 4 * 5, NaN) },
     ],
   },
 ];

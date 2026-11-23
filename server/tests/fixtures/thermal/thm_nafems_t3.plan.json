@@ -97,10 +97,7 @@
       "outputEveryS": 0.5
     }
   },
-  {
-    "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.005 }
-  },
+  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.005 } },
   {
     "command": "add_result_probe",
     "params": { "analysisId": "$an", "name": "x080", "point": [0.08, 0.005, 0.005], "quantity": "temperature" }

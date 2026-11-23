@@ -121,10 +121,7 @@
       "conductance": { "value": 2000.0, "unit": "W/(m^2*K)" }
     }
   },
-  {
-    "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.01 }
-  },
+  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.01 } },
   {
     "command": "add_result_probe",
     "params": { "analysisId": "$an", "name": "t_hot", "point": [0.05, 0.05, 0.0], "quantity": "temperature" }

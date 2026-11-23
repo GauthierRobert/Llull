@@ -149,7 +149,8 @@ const cfdStreamlines = (): ToolDefinition => ({
 
 /** render_view's own schema plus caseId, slice and streamlines (one schema: the registry's, never a copy). */
 function renderSchema(): ParamsSchema {
-  const base = getCommand('render_view')?.paramsSchema ?? { type: 'object', properties: {}, required: [] };
+  const base = getCommand('render_view')?.paramsSchema;
+  if (base === undefined) throw new Error('cfd_render: render_view is not registered');
   const own = toParamsSchema(
     z.object({
       caseId,

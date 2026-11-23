@@ -37,4 +37,5 @@ export { cfdSummary } from './cfd/summary';
 export { caseOf as cfdCaseOf } from './cfd/caseDoc';
 // Result queries on the recorded field (cfd_probe, cfd_slice, cfd_streamlines transports: job in, query.json + file out -> report)
 export { flowQueryInput, parseFlowQuery, type FlowQueryOp } from './cfd/queryInput';
+export { parseSliceFile, parseStreamlinesFile, type SliceFile, type StreamlinesFile } from './cfd/resultFiles';
 export { FIELD_HEADER_BYTES, flowFieldHeader, flowQueryReport, parseFlowQueryAnswer } from './cfd/queryOutput';

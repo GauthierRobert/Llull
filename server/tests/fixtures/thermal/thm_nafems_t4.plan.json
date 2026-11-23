@@ -85,9 +85,6 @@
       "source": { "citation": "test input of this validation case (not a material claim)" }
     }
   },
-  {
-    "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.02 }
-  },
+  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.02 } },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "E", "point": [0.6, 0.2, 0.005], "quantity": "temperature" } }
 ]

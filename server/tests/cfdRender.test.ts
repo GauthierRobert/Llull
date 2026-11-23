@@ -9,12 +9,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
+import { makeProjector } from '@core/commands/render/camera';
+import { createEmptyDocument } from '@core/model/types';
 import { _stopAllCfdSolves, runCfdSolve } from '../src/cfd/flowSolve';
 import { runCfdRender } from '../src/cfd/flowRender';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { rasterizeSvg } from '../src/renderImage';
 import { runNativeTool } from '../src/native/tools';
-import { fakeRunner, hostOf, missingRunner, sphereModel, type TestHost } from './cfdTestSupport';
+import { fakeRunner, hostOf, missingRunner, sha, sphereModel, type TestHost } from './cfdTestSupport';
 
 let dir = '';
 let store: FeArtifactCache;
@@ -135,7 +137,74 @@ describe('cfd_render', () => {
     const png = rasterizeSvg(data.svg, data.width);
     expect(png).not.toBeNull();
     const withoutOverlay = rasterizeSvg(plain.svg, data.width);
-    expect(png).not.toBe(withoutOverlay);
+    expect(Buffer.from(png ?? '', 'base64').equals(Buffer.from(withoutOverlay ?? '', 'base64'))).toBe(false);
+  });
+
+  it('recomputes the reference provenance over the composed svg', async () => {
+    const host = await solvedHost();
+    const result = await runCfdRender({ caseId: 're100', view: 'top', slice }, host, { store, runner: runner() });
+    const data = result.data as { svg: string; svgSha256: string; renderer: string };
+    expect(data.renderer).toBe('reference');
+    expect(data.svgSha256).toBe(sha(Buffer.from(data.svg, 'utf8')));
+    const plain = execute(host.current(), 'render_view', { view: 'top' }).data as { svgSha256: string };
+    expect(data.svgSha256).not.toBe(plain.svgSha256);
+  });
+
+  it('projects a world point off the origin of a millimetre document with the camera of the picture', async () => {
+    const model = sphereModel();
+    const mm = execute({ ...createEmptyDocument(), units: 'mm' }, 'add_sphere', { radius: 500, position: [0, 0, 0] });
+    const ballId = mm.affected[0] as string;
+    const doc = execute(mm.document, 'create_cfd_case', {
+      id: 're100',
+      entityIds: [ballId],
+      freestream: { speedMS: 1, air: { densityKgM3: 1, temperatureK: 288.15, viscosityPaS: 0.01 } },
+      reference: { areaM2: 0.7853981634, lengthM: 1 },
+      cellsPerReferenceLength: 8,
+      outputs: { probes: [[2, 0, 0]], slices: [{ origin: [0, 0, 0], normal: [0, 1, 0], field: 'speed' }] },
+    }).document;
+    expect(model.ballId).toBeDefined();
+    const host = hostOf({ doc, ballId }, store);
+    const solved = await runCfdSolve('re100', {}, host, { store, runner: fakeRunner() });
+    expect(solved.isError, solved.summary).toBe(false);
+    const result = await runCfdRender({ caseId: 're100', view: 'top', width: 400, height: 300, slice }, host, { store, runner: runner() });
+    expect(result.isError, result.summary).toBe(false);
+    const data = result.data as { svg: string; camera: Parameters<typeof makeProjector>[0]; orthoHalf: number };
+    const project = makeProjector(data.camera, data.orthoHalf, 400, 300);
+    // sample (iu 3, iv 2) is at world (0.5 m, 0) = (500 mm, 0, 0)
+    const [wantX, wantY] = project([500, 0, 0]);
+    const group = data.svg.slice(data.svg.indexOf('class="cfd-slice"'), data.svg.indexOf('class="cfd-legend"'));
+    const centroids = [...group.matchAll(/<polygon points="([^"]+)"/g)].map((m) => {
+      const points = (m[1] ?? '').split(' ').map((pair) => pair.split(',').map(Number) as [number, number]);
+      return [points.reduce((sum, p) => sum + p[0], 0) / points.length, points.reduce((sum, p) => sum + p[1], 0) / points.length];
+    });
+    expect(centroids.some(([x, y]) => Math.abs((x ?? 0) - wantX) < 0.5 && Math.abs((y ?? 0) - wantY) < 0.5)).toBe(true);
+    expect(Math.abs(wantX - 200)).toBeGreaterThan(10);
+  });
+
+  it('refuses views the overlay cannot be projected on (turntable, perspective, fovDeg, a perspective viewpoint) before any query runs', async () => {
+    const host = await solvedHost();
+    const fake = runner();
+    for (const extra of [{ turntable: { frames: 4 } }, { projection: 'perspective' }, { fovDeg: 50 }]) {
+      const refused = await runCfdRender({ caseId: 're100', slice, ...extra }, host, { store, runner: fake });
+      expect(refused, JSON.stringify(extra)).toMatchObject({ isError: true, data: { code: 'CFD_PARAM_INVALID' } });
+    }
+    expect(fake.calls).toHaveLength(0);
+    host.set(
+      execute(host.current(), 'save_viewpoint', {
+        name: 'inside',
+        camera: { projection: 'perspective', eye: [0, -4, 0.5], direction: [0, 1, 0], fovDeg: 60 },
+      }).document,
+    );
+    const viewpoint = await runCfdRender({ caseId: 're100', slice, viewpointId: 'vp-1', mode: 'raster' }, host, { store, runner: fake });
+    expect(viewpoint).toMatchObject({ isError: true });
+    expect(String(viewpoint.data && (viewpoint.data as { code?: string }).code)).toBe('CFD_PARAM_INVALID');
+  });
+
+  it('refuses a stored file it cannot decode (CFD_SOLVER_FAILED)', async () => {
+    const host = await solvedHost();
+    const damaged = fakeRunner({ query: () => ({ ...queryAnswers('slice'), file: sliceFile.subarray(0, 100) }) });
+    const refused = await runCfdRender({ caseId: 're100', slice }, host, { store, runner: damaged });
+    expect(refused).toMatchObject({ isError: true });
   });
 
   it('is reachable as the cfd_render transport tool and offers render_view params next to slice and streamlines', async () => {

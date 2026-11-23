@@ -7,6 +7,7 @@
  *   cfd_render       render_view with a slice / streamlines of the recorded result drawn over it (`flowRender.ts`)
  */
 
+import { getCommand } from '@core/commands/registry';
 import type { FeaHost } from '@protocol/index';
 import type { CommandOutcome } from '@protocol/restProtocol';
 import { isRecord } from '@lib/isRecord';
@@ -22,6 +23,31 @@ export const CFD_TOOL_NAMES: readonly string[] = ['cfd_solve', 'cfd_stop', 'cfd_
 const QUERY_OPS = { cfd_probe: 'probe', cfd_slice: 'slice', cfd_streamlines: 'streamlines' } as const;
 
 const failure = (summary: string): CommandOutcome => ({ summary, affected: [], isError: true, changed: false });
+
+/**
+ * `quantity` / `safetyFactor` belong to the study: refused (CFD_PARAM_INVALID, data.gridStudy) without gridStudy, or when `record_cfd_grid_study`
+ * (the one source of their bounds) would refuse them, BEFORE any solve starts.
+ */
+function gridStudyParamRefusal(caseId: string, args: Record<string, unknown>): CommandOutcome | null {
+  const given = ['quantity', 'safetyFactor'].filter((key) => args[key] !== undefined);
+  if (given.length === 0) return null;
+  const refuse = (message: string): CommandOutcome => ({
+    summary: `cfd_solve: ${message}`,
+    affected: [caseId],
+    isError: true,
+    changed: false,
+    data: { code: 'CFD_PARAM_INVALID', gridStudy: true },
+  });
+  if (args['gridStudy'] !== true) return refuse(`${given.join(' / ')} apply to gridStudy=true only`);
+  const checked = getCommand('record_cfd_grid_study')?.paramsValidator?.safeParse({
+    caseId,
+    resultsHashes: ['x', 'x', 'x'],
+    ...Object.fromEntries(given.map((key) => [key, args[key]])),
+  });
+  if (checked === undefined || checked.success) return null;
+  const issue = checked.error.issues[0];
+  return refuse(`${issue?.path.join('.') ?? 'params'}: ${issue?.message ?? 'invalid'}`);
+}
 
 /**
  * Runs the flow transport `name`.
@@ -42,6 +68,8 @@ export async function runCfdTool(
   const caseId = nonEmptyString(args['caseId']);
   if (caseId === undefined) return failure(`${name}: caseId is required.`);
   if (name === 'cfd_stop') return { ...runCfdStop(caseId), changed: false };
+  const refused = gridStudyParamRefusal(caseId, args);
+  if (refused !== null) return refused;
   const device = args['device'];
   const quantity = args['quantity'];
   const options: CfdSolveOptions = {

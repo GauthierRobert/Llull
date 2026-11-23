@@ -84,6 +84,25 @@ describe('cfd_solve gridStudy', () => {
     expect(plain.current().cfd?.studies?.['re100']).toMatchObject({ quantity: 'cd', safetyFactor: 1.25 });
   });
 
+  it('refuses a bad quantity / safetyFactor, or either without gridStudy, before any solve starts', async () => {
+    for (const bad of [
+      { gridStudy: true, quantity: 'CL' },
+      { gridStudy: true, safetyFactor: 20 },
+      { quantity: 'cl' },
+      { safetyFactor: 1.5 },
+    ]) {
+      const host = hostOf(modelAt(32), store);
+      const runner = fakeRunner();
+      const refused = await runCfdTool('cfd_solve', { caseId: 're100', ...bad }, host, { store, runner });
+      expect(refused, JSON.stringify(bad)).toMatchObject({
+        isError: true,
+        changed: false,
+        data: { code: 'CFD_PARAM_INVALID', gridStudy: true },
+      });
+      expect(runner.calls).toHaveLength(0);
+    }
+  });
+
   it('refuses by name before anything runs when a level leaves 8..2048 or is not an integer', async () => {
     for (const cells of [8, 16, 28 + 6]) {
       const host = hostOf(modelAt(cells), store);

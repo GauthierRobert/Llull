@@ -60,10 +60,7 @@
     "command": "add_fea_constraint",
     "params": { "analysisId": "$an", "name": "clamp", "kind": "fixed", "target": { "entityId": "$bar", "facesNear": [[0, 5, 2.5]] } }
   },
-  {
-    "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 2.5 }
-  },
+  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 2.5 } },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "tip", "point": [500, 5, 2.5], "quantity": "u_z" } },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "stress_mid", "point": [250.0, 5, 5], "quantity": "s_xx" } }
 ]

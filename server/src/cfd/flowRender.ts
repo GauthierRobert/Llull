@@ -9,6 +9,7 @@
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { makeProjector, type Projector } from '@core/commands/render/camera';
+import { referenceProvenance } from '@core/commands/render/rendererProvenance';
 import { appendBeforeClose } from '@core/commands/render/svg';
 import { toMetres } from '@core/model/units';
 import type { CadDocument, Vec3 } from '@core/model/types';
@@ -17,10 +18,10 @@ import { escapeXml } from '@lib/escapeXml';
 import { isRecord } from '@lib/isRecord';
 import { resultColor } from '@lib/isoBands';
 import type { FeaHost, FeaToolResult } from '@protocol/index';
+import { parseSliceFile, parseStreamlinesFile, type SliceFile, type StreamlinesFile } from '@aero/index';
 import { feaFailure } from '../fea/feaCommon';
 import type { NativeDeps } from '../native/fatigueField';
 import { cfdFileStore } from './fileStore';
-import { parseSliceFile, parseStreamlinesFile, type SliceFile, type StreamlinesFile } from './flowFiles';
 import { runCfdQuery } from './flowQuery';
 
 const TOOL = 'cfd_render';
@@ -141,8 +142,9 @@ async function queried(
   params: Record<string, unknown>,
   host: FeaHost,
   deps: NativeDeps,
+  signal: AbortSignal | undefined,
 ): Promise<Queried | FeaToolResult> {
-  const result = await runCfdQuery(op, params, host, deps);
+  const result = await runCfdQuery(op, params, host, deps, { signal });
   if (result.isError) return result;
   const data = isRecord(result.data) ? result.data : {};
   const sha = isRecord(data['file']) ? data['file']['sha256'] : undefined;
@@ -153,8 +155,16 @@ async function queried(
 
 const isFailure = (value: Queried | FeaToolResult): value is FeaToolResult => 'summary' in value;
 
+/** Why the render params cannot carry an overlay (core's `render_view` draws none on these), or null. */
+function perspectiveRefusal(renderParams: Record<string, unknown>): string | null {
+  if (renderParams['turntable'] !== undefined) return 'a turntable strip takes no overlay: render one view';
+  if (renderParams['projection'] === 'perspective' || renderParams['fovDeg'] !== undefined)
+    return 'the overlay needs an orthographic view (no projection perspective / fovDeg)';
+  return null;
+}
+
 /**
- * @failure caseId missing / neither slice nor streamlines -> CFD_PARAM_INVALID; the query refusals of cfd_slice / cfd_streamlines (CFD_CASE_NOT_FOUND,
+ * @failure caseId missing / neither slice nor streamlines, a turntable, a perspective projection / fovDeg / viewpoint -> CFD_PARAM_INVALID; the query refusals of cfd_slice / cfd_streamlines (CFD_CASE_NOT_FOUND,
  *   CFD_NO_RESULT, CFD_RESULT_MISSING, CFD_RESULT_HASH_MISMATCH, CFD_RESULT_STALE, CFD_SOLVER_MISSING, ...), nothing is rendered; a refused
  *   render_view -> its own error; an undecodable stored file -> CFD_SOLVER_FAILED
  */
@@ -173,10 +183,12 @@ export async function runCfdRender(params: unknown, host: FeaHost, deps: NativeD
   ] as const)
     if (value !== undefined && !isRecord(value)) return fail('CFD_PARAM_INVALID', `${TOOL}: ${name} must be an object`, [caseId]);
 
-  const [doc, runnerDeps] = [host.getDoc(), { ...deps }];
-  const sliceAnswer = isRecord(slice) ? await queried('slice', { ...slice, caseId }, host, runnerDeps) : undefined;
+  const perspective = perspectiveRefusal(renderParams);
+  if (perspective !== null) return fail('CFD_PARAM_INVALID', `${TOOL}: ${perspective}`, [caseId]);
+  const doc = host.getDoc();
+  const sliceAnswer = isRecord(slice) ? await queried('slice', { ...slice, caseId }, host, deps, signal) : undefined;
   if (sliceAnswer !== undefined && isFailure(sliceAnswer)) return sliceAnswer;
-  const linesAnswer = isRecord(streamlines) ? await queried('streamlines', { ...streamlines, caseId }, host, runnerDeps) : undefined;
+  const linesAnswer = isRecord(streamlines) ? await queried('streamlines', { ...streamlines, caseId }, host, deps, signal) : undefined;
   if (linesAnswer !== undefined && isFailure(linesAnswer)) return linesAnswer;
   if (signal?.aborted === true) return fail('CFD_CANCELLED', `${TOOL}: cancelled`, [caseId]);
 
@@ -191,10 +203,17 @@ export async function runCfdRender(params: unknown, host: FeaHost, deps: NativeD
   const view = rendered.data as {
     svg: string;
     camera: Parameters<typeof makeProjector>[0];
+    renderer?: string;
     orthoHalf: number;
     width: number;
     height: number;
   };
+  if (view.camera.fovDeg !== undefined)
+    return fail(
+      'CFD_PARAM_INVALID',
+      `${TOOL}: the picture is a perspective view (a saved viewpoint?): the overlay needs an orthographic one`,
+      [caseId],
+    );
   const project: Projector = makeProjector(view.camera, view.orthoHalf, view.width, view.height);
   const perMetre = 1 / toMetres(doc as Pick<CadDocument, 'units'>, 1);
 
@@ -222,6 +241,7 @@ export async function runCfdRender(params: unknown, host: FeaHost, deps: NativeD
     summary: `${TOOL}: ${rendered.summary} Drawn over it: ${parts.join(' and ')} of the recorded result of '${caseId}'.`,
     affected: [caseId],
     isError: false,
-    data: { ...rendered.data, svg, cfd },
+    // the provenance of render_view describes ITS svg: over the composed one it is recomputed (a native / viewport picture carries none)
+    data: { ...rendered.data, svg, ...(view.renderer === 'reference' ? referenceProvenance(svg) : {}), cfd },
   };
 }
