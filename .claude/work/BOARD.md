@@ -151,9 +151,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[WIP]` **TOP-V1b** Topology V1 left after TOP-V1 (MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads +
   compliance ratio, `deadlineS` checkpoint: built 2026-10-22, §15): VC-TOP-34 on a desktop GPU (GPU cap), PHY-18 shape optimisation (needs
   PHY-18 M2), unstructured SIMP on the tet mesh, displacement constraints for `min_volume`, `massG`: `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §15.7. _deps: —_
-- `[WIP]` **CFD-M3+** (CFD-M2 merged, `feat/cfd-m2` fully in main): nested grid boxes, `cfd_streamlines` / `cfd_slice` /
-  `cfd_probe` / `cfd_stop`, `gridStudy`, overlay + Flow panel, AA-pattern storage, VC-CFD-21 at 32 cells per diameter on a GPU (ignored test),
-  VC-CFD-13 / 23–25 / 54. _deps: —_
+- `[WIP]` **CFD-M3+** (CFD-M2 + M3a merged; 2026-11-23 merged on the session branch: `record_cfd_grid_study` + `cfd_solve gridStudy` (levels n, n/2, n/4, atomic record, per-level warnings), spec 12 "M3b audit"): left — overlay + Flow panel (`[WIP]` lane 2 UI), nested grid boxes (multi-resolution LBM in `llull-flow-lbm`: solver rewrite, own spec section first), AA-pattern storage, gridStudy `quantity` / `safetyFactor` on the transport, VC-CFD-21 at 32 cells per diameter on a GPU (ignored test), VC-CFD-13 / 23–25 / 54. _deps: —_
 
 ## Aero + FEA program (owner 2026-11-07: "finish all aero and fea tasks"; spec = each pack's TECHNICAL_SPEC §10; each lane first audits which milestones are already built)
 
