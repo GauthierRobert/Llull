@@ -722,3 +722,16 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   `render_view overlay=cfd:...` (CLI lane), VC-CFD-40 (legend ranges are tested in `tests/component/FlowPanel.test.tsx`; the native-side check is open).
 - **Tests.** `tests/component/FlowPanel.test.tsx` (cases, param gathering and dispatch, solve / stop / failure, result, stale, unverified, study states, overlay
   queries, legend), `tests/unit/cfdOverlayFiles.test.ts` (decoders, quad, segments).
+
+### M3b CLI: gridStudy options and the CFD render (CLI lane) — 2026-11-23
+
+- **`cfd_solve gridStudy` takes `quantity` (cd | cl | cdAM2) and `safetyFactor` (1..10)**, forwarded as given to `record_cfd_grid_study` (the command's own defaults
+  apply when omitted: cd, 1.25). The dry run of the study command uses the same params, so a mismatch is refused before anything is recorded.
+- **`cfd_render`** (native transport, toolset flow; `server/src/cfd/flowRender.ts`) is the headless `render_view` with the flow overlay. Not a `render_view`
+  `overlay=cfd:...` kind: a core overlay (`RenderOverlay.draw`) sees the document and a point-cloud port only, never the stored result files, so the kind would
+  need a new overlay port in core (`OverlayView.ports`, the render context) plus a plugin overlay in `@aero`. The transport instead runs the same
+  `cfd_slice` / `cfd_streamlines` transports (so the trust and staleness refusals are the queries': CFD_NO_RESULT, CFD_RESULT_STALE, CFD_RESULT_MISSING,
+  CFD_SOLVER_MISSING, nothing rendered), decodes the stored LLSL / LLST files (`flowFiles.ts`), executes `render_view` with the other params and projects the layers
+  with the camera it reports (`makeProjector`, orthographic): the slice as one coloured polygon per sample (thinned to 96 a side), streamlines as speed-coloured
+  segments (at most 60 000), and a legend (field, unit, min .. max). Drawn over the surface, not depth-tested. `data` = render_view's data with the composed `svg`
+  and `data.cfd`; `--save view.png` rasterizes it. Tests `server/tests/cfdRender.test.ts`.

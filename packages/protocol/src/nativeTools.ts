@@ -390,6 +390,16 @@ const cfdSolve = (): ToolDefinition => ({
             'so n a multiple of 4 from 32), record the finest with record_cfd_results and the study (observed order, Richardson value, GCI) with ' +
             'record_cfd_grid_study; refused with CFD_PARAM_INVALID otherwise. cfd_stop cancels the whole study.',
         ),
+      quantity: z
+        .enum(['cd', 'cl', 'cdAM2'])
+        .optional()
+        .describe('gridStudy: coefficient studied: cd (drag, default), cl (lift) or cdAM2 (drag area in m²).'),
+      safetyFactor: z
+        .number()
+        .min(1)
+        .max(10)
+        .optional()
+        .describe('gridStudy: GCI safety factor Fs in [1, 10] (default 1.25 for three grids).'),
     }),
   ),
   annotations: {},

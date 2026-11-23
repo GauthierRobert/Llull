@@ -52,6 +52,9 @@ export interface CfdSolveOptions {
   readonly les?: boolean;
   /** Three solves at refinement ratio 2 (the case's own resolution, n/2, n/4) and `record_cfd_grid_study` (`flowGridStudy.ts`). */
   readonly gridStudy?: boolean;
+  /** gridStudy: the coefficient studied (default cd) and the GCI safety factor (default 1.25), forwarded to `record_cfd_grid_study`. */
+  readonly quantity?: 'cd' | 'cl' | 'cdAM2';
+  readonly safetyFactor?: number;
   /** The caller's own cancellation (CLI Ctrl-C, a closed request): it stops waiting; the run dies when no other caller waits for it. */
   readonly signal?: AbortSignal;
 }

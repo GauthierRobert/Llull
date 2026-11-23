@@ -10,7 +10,7 @@
  *   vortex_lattice_solve analyze_vortex_lattice with the influence build + dense LU in llull-compute panel (AER M3)
  *   explicit_run   explicit_dynamics case -> llull-compute explicit -> fe_explicit artifact -> record_explicit_results (PHY-19 RS-8)
  *   scan_import / scan_list  point-cloud file -> llull-compute cloud import -> asset store (`../scan/scanTools.ts`, plant 10)
- *   cfd_solve, cfd_stop, cfd_probe, cfd_slice, cfd_streamlines   flow solve / stop / result queries (12 CFD M2 + M3a, `../cfd/cfdTools.ts`)
+ *   cfd_solve, cfd_stop, cfd_probe, cfd_slice, cfd_streamlines, cfd_render   flow solve / stop / result queries (12 CFD M2 + M3a, `../cfd/cfdTools.ts`)
  */
 
 import type { FeaHost } from '@protocol/index';

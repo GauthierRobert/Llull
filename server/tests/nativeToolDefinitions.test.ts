@@ -17,7 +17,7 @@ const named = (name: string): ReturnType<typeof buildNativeToolDefinitions>[numb
 describe('native tool definitions (@protocol)', () => {
   it('declares exactly the tools the server runs', () => {
     for (const { name } of tools) expect(isNativeTool(name) || isScanTool(name) || isMeshHostTool(name), name).toBe(true);
-    expect(tools).toHaveLength(18);
+    expect(tools).toHaveLength(19);
   });
 
   it('files each tool in a toolset (analysis for the FE / solver transports)', () => {

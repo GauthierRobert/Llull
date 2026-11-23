@@ -86,7 +86,7 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
                               line per iteration; without llull-compute only 2D studies up to 2000 voxels (TypeScript), else
                               TOP_TOOL_MISSING; then: topology_report studyId=ID, check_topology studyId=ID
   cfd_solve caseId=ID         native llull-compute lattice-Boltzmann flow solve of a low-speed case (create_cfd_case, Mach < 0.3), recorded
-                              with record_cfd_results  [timeoutS=3600 device=cpu|gpu|auto maxSteps=200000 latticeMach=0.1 deviceMemoryBytes=N les=true gridStudy=true];
+                              with record_cfd_results  [timeoutS=3600 device=cpu|gpu|auto maxSteps=200000 latticeMach=0.1 deviceMemoryBytes=N les=true gridStudy=true quantity=cd|cl|cdAM2 safetyFactor=1.25];
                               gridStudy=true: solves n, n/2, n/4 cells per length and records the grid-convergence study;
                               --progress prints one line per drag sample; without llull-compute: CFD_SOLVER_MISSING; then: cfd_report caseId=ID
   cfd_stop caseId=ID          kill the running cfd_solve of the case in this host (use --app for the desktop backend); nothing is recorded
@@ -94,6 +94,9 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
   cfd_slice caseId=ID origin='[x,y,z]' normal='[0,1,0]'   [field=speed|p|cp|ux|uy|uz spacingM=… extentM=…] plane patch -> LLSL file
   cfd_streamlines caseId=ID rake='{"kind":"line","start":[…],"end":[…],"count":32}'   [direction=both device=auto|gpu|cpu stepM maxLengthM
                               maxSteps] RK4 streamlines (GPU f32 or CPU f64 deterministic) -> LLST file; queries refuse stale / untrusted results
+  cfd_render caseId=ID slice='{"origin":[…],"normal":[…],"field":"speed"}' streamlines='{"rake":{…}}' [render_view params: view width height …]
+                              render_view with the recorded flow drawn over it (slice colour patch and / or speed-coloured streamlines, legend),
+                              projected with the render camera, not depth-tested; --save view.png; refused without a current result
   mtest_run mtest=SCRIPT      OPTIONAL MFront / MTest (user-installed, never bundled: $LLULL_MTEST, $LLULL_MFRONT; needs LLULL_ALLOW_CODE_EXECUTION=1):
                               run an MTest script [mfront={name,source} timeoutS=120 probe=true]; absent tools -> MFRONT_TOOL_MISSING with the reason
   auto_route lineId=ID from='{"portId":"tie-1.1"}' to='{"portId":"tie-2.1"}' [route_problem params]

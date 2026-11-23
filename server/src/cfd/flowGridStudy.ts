@@ -142,7 +142,12 @@ export async function runCfdGridStudy(caseId: string, options: CfdSolveOptions, 
 
   // The study command runs first, as a dry run over the document the host holds now and the port its own commands use: a refusal (stale
   // case or geometry, a bundle that does not belong) leaves nothing recorded. Its study is passed back so a replay without the store keeps it.
-  const params = { caseId, resultsHashes };
+  const params = {
+    caseId,
+    resultsHashes,
+    ...(options.quantity !== undefined ? { quantity: options.quantity } : {}),
+    ...(options.safetyFactor !== undefined ? { safetyFactor: options.safetyFactor } : {}),
+  };
   const dry = execute(host.getDoc(), 'record_cfd_grid_study', params, {
     ...defaultContext(),
     cfdResults: deps.cfdResults ?? cfdResultPort(deps.store),
