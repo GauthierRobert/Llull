@@ -5,7 +5,9 @@ import { isRecord } from '@lib/isRecord';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isVec3 } from '@lib/vec3';
 import type { CfdCase } from '@aero/cfd/types';
+import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { semanticProblem } from './caseValidate';
+import { studySchema } from './studySchema';
 
 const REGIMES: readonly unknown[] = ['auto', 'low_speed', 'compressible'];
 const RULES: readonly unknown[] = ['external_aero', 'buildings', 'custom'];
@@ -85,25 +87,20 @@ function resultErrors(key: string, raw: unknown): string[] {
   return ok ? [] : [`${at} needs caseId equal to its key, resultsHash, caseHash, geometryHash and a solver`];
 }
 
-const STUDY_STATUSES: readonly unknown[] = ['monotone', 'oscillatory', 'divergent', 'converged_exactly', 'order_not_converged'];
-
-function studyErrors(key: string, raw: unknown): string[] {
+function studyErrors(key: string, raw: unknown, caseKeys: ReadonlySet<string>): string[] {
   const at = `cfd.studies.${key}`;
-  if (!isRecord(raw)) return [`${at} must be an object`];
-  const ok =
-    raw['caseId'] === key &&
-    ['cd', 'cl', 'cdAM2'].includes(String(raw['quantity'])) &&
-    isText(raw['caseHash']) &&
-    isFiniteNumber(raw['safetyFactor']) &&
-    STUDY_STATUSES.includes(raw['status']) &&
-    Array.isArray(raw['levels']) &&
-    raw['levels'].length === 3 &&
-    raw['levels'].every(
-      (level) => isRecord(level) && isText(level['resultsHash']) && isFiniteNumber(level['cellM']) && isFiniteNumber(level['value']),
-    );
-  return ok
-    ? []
-    : [`${at} needs caseId equal to its key, a quantity, caseHash, safetyFactor, a status and three levels { resultsHash, cellM, value }`];
+  const errors = sliceSchemaErrors(studySchema, raw, at);
+  if (errors.length > 0) return errors;
+  const problems: string[] = [];
+  if ((raw as { caseId: string }).caseId !== key) problems.push(`${at}: caseId must equal its key`);
+  if (!caseKeys.has(key)) problems.push(`${at}: no case '${key}' (orphan study)`);
+  return problems;
+}
+
+function studiesErrors(studies: unknown, caseKeys: ReadonlySet<string>): string[] {
+  if (studies === undefined) return [];
+  if (!isRecord(studies)) return ['cfd.studies must be an object'];
+  return Object.entries(studies).flatMap(([key, entry]) => studyErrors(key, entry, caseKeys));
 }
 
 export const cfdDocument: DocumentExtension = {
@@ -114,7 +111,7 @@ export const cfdDocument: DocumentExtension = {
     return [
       ...Object.entries(slice['cases']).flatMap(([key, entry]) => caseErrors(key, entry)),
       ...Object.entries(slice['results']).flatMap(([key, entry]) => resultErrors(key, entry)),
-      ...(isRecord(slice['studies']) ? Object.entries(slice['studies']).flatMap(([key, entry]) => studyErrors(key, entry)) : []),
+      ...studiesErrors(slice['studies'], new Set(Object.keys(slice['cases']))),
     ];
   },
   derivedEntityIds: () => new Set(),

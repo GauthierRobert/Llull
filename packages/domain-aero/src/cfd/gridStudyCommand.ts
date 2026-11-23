@@ -5,13 +5,14 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { CfdResultArtifact } from '@core/model/cfdResult';
 import type { CfdCase, CfdGridStudy, CfdStudyQuantity } from '@aero/cfd/types';
-import { gciTriplet } from '@lib/convergence';
+import { gciTriplet, type ConvergenceStatus } from '@lib/convergence';
 import { canonicalJson } from '@lib/canonicalJson';
 import { significantNumber } from '@lib/compactNumber';
 import { sha256Hex } from '@lib/sha256';
 import { caseHashOf, caseOf, cfdSlice, withCfd } from './caseDoc';
 import { refuseCfd } from './codes';
 import { resultStaleness } from './staleness';
+import { studySchema } from './studySchema';
 import { cfdSummary } from './summary';
 
 const TOOL = 'record_cfd_grid_study';
@@ -29,13 +30,68 @@ function builtForCase(cfdCase: CfdCase, artifact: CfdResultArtifact): boolean {
   return artifact.caseHash === caseHashOf({ ...cfdCase, cellsPerReferenceLength: cells });
 }
 
+type Level = CfdGridStudy['levels'][number];
+type Status = CfdGridStudy['status'];
+
+const STATUSES: readonly ConvergenceStatus[] = ['monotone', 'oscillatory', 'divergent', 'converged_exactly'];
+
+/** The GCI fields of a finest-first triplet, or null when `gciTriplet` answers a status a three-grid triplet never has. */
+function convergenceOf(
+  levels: readonly [Level, Level, Level],
+  safetyFactor: number,
+): Pick<
+  CfdGridStudy,
+  'status' | 'orderP' | 'extrapolated' | 'gci21Fine' | 'gci32Fine' | 'gciAbs' | 'relativeUndefined' | 'asymptoticRatio'
+> | null {
+  const [l1, l2, l3] = levels;
+  const gci = gciTriplet(
+    [
+      { h: l1.cellM, value: l1.value },
+      { h: l2.cellM, value: l2.value },
+      { h: l3.cellM, value: l3.value },
+    ],
+    safetyFactor,
+  );
+  if ('orderNotConverged' in gci) return { status: 'order_not_converged' };
+  if (!STATUSES.includes(gci.status)) return null;
+  return {
+    status: gci.status as Status,
+    ...(gci.p !== undefined && { orderP: gci.p }),
+    ...(gci.extrapolated !== undefined && { extrapolated: gci.extrapolated }),
+    ...(gci.gci21Fine !== undefined && { gci21Fine: gci.gci21Fine }),
+    ...(gci.gci32Fine !== undefined && { gci32Fine: gci.gci32Fine }),
+    ...(gci.gciAbs !== undefined && { gciAbs: gci.gciAbs }),
+    ...(gci.relativeUndefined === true && { relativeUndefined: true as const }),
+    ...(gci.asymptoticRatio !== undefined && { asymptoticRatio: gci.asymptoticRatio }),
+  };
+}
+
+function detailOf(study: CfdGridStudy): string {
+  if (study.status === 'monotone' && study.orderP !== undefined) {
+    const gci =
+      study.relativeUndefined === true
+        ? `fine-grid GCI ${significantNumber(study.gciAbs ?? NaN, 3)} absolute (fine value 0: relative GCI undefined)`
+        : `fine-grid GCI ${significantNumber((study.gci21Fine ?? NaN) * 100, 3)} %`;
+    return (
+      `order p ${significantNumber(study.orderP, 3)}, extrapolated ${significantNumber(study.extrapolated ?? NaN, 5)}, ${gci}` +
+      (study.asymptoticRatio === undefined ? '' : `, asymptotic ratio ${significantNumber(study.asymptoticRatio, 3)}`)
+    );
+  }
+  if (study.status === 'converged_exactly') return 'converged_exactly: two grids give the same value, no order or GCI to compute';
+  if (study.status === 'order_not_converged') return 'order_not_converged: monotone, but the observed order did not converge: no GCI';
+  return `${study.status}: no GCI (the refinement does not converge monotonically)`;
+}
+
 /**
- * @affects doc.cfd.studies[caseId] (set; affected: [caseId])
+ * @affects doc.cfd.studies[caseId] (set, replacing an earlier study; affected: [caseId])
  * @invariant every bundle is in the result store, hashes to the given hash, belongs to the case (same case id, flow surface and case apart from
  *   the grid resolution, the surface current) and is sorted finest first by its cell size; the coefficient comes from the bundle (case reference),
- *   never from the caller; the GCI is `@lib/convergence` gciTriplet (Celik 2008); a non-monotone triplet is recorded with its status and no GCI
- * @failure unknown case -> CFD_CASE_NOT_FOUND; a bundle absent -> CFD_RESULT_MISSING; hash / case id mismatch -> CFD_RESULT_HASH_MISMATCH; other
- *   case, other surface or stale -> CFD_INPUT_STALE; repeated hashes or refinement ratio below 1.1 -> CFD_PARAM_INVALID (all refusals, unchanged doc)
+ *   never from the caller; the GCI is `@lib/convergence` gciTriplet (Celik 2008); a non-monotone triplet is recorded with its status and no GCI;
+ *   a given `study` must equal the recomputed one; WITHOUT the bundles (replay on another machine) a given complete `study` of this case whose
+ *   levels are the given hashes is kept flagged `verified: false`
+ * @failure unknown case -> CFD_CASE_NOT_FOUND; a bundle absent and no complete echoed study -> CFD_RESULT_MISSING; hash / case id / study mismatch ->
+ *   CFD_RESULT_HASH_MISMATCH; other case, other surface or stale -> CFD_INPUT_STALE; repeated hashes, refinement ratio below 1.1 or an unexpected
+ *   convergence status -> CFD_PARAM_INVALID (all refusals, unchanged doc)
  * @invariant kernel-optional: surface staleness re-prepares the case through the kernel when present
  */
 export const recordCfdGridStudy = defineCommand({
@@ -46,9 +102,11 @@ export const recordCfdGridStudy = defineCommand({
     'runs them; refinement ratio 2 is the default, at least 1.1 between neighbours). Not for hand numbers: each bundle is looked up in the result ' +
     'store and its coefficient recomputed from its forces and the case reference. Computes the observed order p, the Richardson extrapolated ' +
     'value and the fine-grid GCI of the chosen coefficient (Celik et al. 2008, safety factor 1.25 for three grids) with the asymptotic-range ' +
-    'ratio (about 1 when the grids are in the asymptotic range). Oscillating or diverging triplets are recorded with that status and no GCI. ' +
-    'Refused with CFD_RESULT_MISSING (bundle not in the store: needs this machine), CFD_RESULT_HASH_MISMATCH, CFD_INPUT_STALE (other case or ' +
-    'geometry), CFD_PARAM_INVALID (repeated bundle, ratio below 1.1).',
+    'ratio (about 1 when the grids are in the asymptotic range); a fine value of exactly 0 gives the absolute GCI. Oscillating, diverging or ' +
+    'order-not-converging triplets are recorded with that status and no GCI. `study` is optional: the transport passes the study it returned so a ' +
+    'replay without the result store keeps it as unverified; with the store it must equal the recomputed one. ' +
+    'Refused with CFD_RESULT_MISSING (bundle not in the store and no complete study given), CFD_RESULT_HASH_MISMATCH, CFD_INPUT_STALE (other ' +
+    'case or geometry), CFD_PARAM_INVALID (repeated bundle, ratio below 1.1).',
   params: z.object({
     caseId: z.string().describe('Id of the case (create_cfd_case).'),
     resultsHashes: z
@@ -60,21 +118,42 @@ export const recordCfdGridStudy = defineCommand({
       .optional()
       .describe('Coefficient studied: cd (drag, default), cl (lift) or cdAM2 (drag area in m²).'),
     safetyFactor: z.number().min(1).max(10).optional().describe('GCI safety factor Fs (default 1.25 for three grids).'),
+    study: z
+      .looseObject({})
+      .optional()
+      .describe('Exactly the study returned by the transport (never hand-written): recomputed from the bundles and compared.'),
   }),
-  run: (doc, { caseId, resultsHashes, quantity = 'cd', safetyFactor = DEFAULT_SAFETY_FACTOR }, ctx): CommandResult => {
+  run: (doc, { caseId, resultsHashes, quantity = 'cd', safetyFactor = DEFAULT_SAFETY_FACTOR, study: given }, ctx): CommandResult => {
     const fail = (code: string, message: string): CommandResult =>
       refuseCfd(doc, TOOL, code, message, [caseId, ...resultsHashes], ['resultsHashes']);
     const cfdCase = caseOf(doc, caseId);
     if (cfdCase === undefined) return refuseCfd(doc, TOOL, 'CFD_CASE_NOT_FOUND', `no case '${caseId}'`, [caseId], ['caseId']);
     if (new Set(resultsHashes).size !== 3) return fail('CFD_PARAM_INVALID', 'the three result hashes must be different');
+    const store = (study: CfdGridStudy, summary: string): CommandResult => ({
+      ...changed(withCfd(doc, { studies: { ...cfdSlice(doc).studies, [caseId]: study } }), summary, [caseId]),
+      data: { study },
+    });
     const found: { hash: string; artifact: CfdResultArtifact }[] = [];
     for (const hash of resultsHashes) {
       const artifact = ctx?.cfdResults?.get(hash) ?? null;
-      if (artifact === null)
-        return fail(
-          'CFD_RESULT_MISSING',
-          `no result bundle ${hash.slice(0, 12)} in the store: run cfd_solve with gridStudy on this machine`,
+      if (artifact === null) {
+        const parsed = studySchema.safeParse(given);
+        const complete =
+          parsed.success &&
+          parsed.data.caseId === caseId &&
+          parsed.data.levels.length === 3 &&
+          parsed.data.levels.every((level) => resultsHashes.includes(level.resultsHash));
+        if (!complete)
+          return fail(
+            'CFD_RESULT_MISSING',
+            `no result bundle ${hash.slice(0, 12)} in the store, and no complete study of this case and these bundles was given: ` +
+              'run cfd_solve with gridStudy on this machine',
+          );
+        return store(
+          { ...(parsed.data as CfdGridStudy), verified: false },
+          `${TOOL}: ${caseId} grid study recorded UNVERIFIED (bundles not available on this machine): no number is trusted until cfd_solve runs here.`,
         );
+      }
       if (sha256Hex(canonicalJson(artifact)) !== hash)
         return fail('CFD_RESULT_HASH_MISMATCH', `the stored bundle does not hash to ${hash}`);
       if (artifact.caseId !== caseId)
@@ -100,23 +179,19 @@ export const recordCfdGridStudy = defineCommand({
         'CFD_PARAM_INVALID',
         `refinement ratios ${r21.toPrecision(4)} and ${r32.toPrecision(4)}: each must be at least ${MIN_RATIO}`,
       );
-    const levels = [first, second, third].map(({ hash, artifact }) => ({
-      resultsHash: hash,
-      cellM: artifact.grid.cellM,
-      cells: artifact.grid.cells,
-      value: cfdSummary(cfdCase, artifact, hash).forces[quantity as CfdStudyQuantity],
-      converged: artifact.converged,
-    }));
-    const [l1, l2, l3] = levels;
-    if (l1 === undefined || l2 === undefined || l3 === undefined) return fail('CFD_PARAM_INVALID', 'three bundles are required');
-    const gci = gciTriplet(
-      [
-        { h: l1.cellM, value: l1.value },
-        { h: l2.cellM, value: l2.value },
-        { h: l3.cellM, value: l3.value },
-      ],
-      safetyFactor,
+    const [l1, l2, l3] = [first, second, third].map(
+      ({ hash, artifact }): Level => ({
+        resultsHash: hash,
+        cellM: artifact.grid.cellM,
+        cells: artifact.grid.cells,
+        value: cfdSummary(cfdCase, artifact, hash).forces[quantity as CfdStudyQuantity],
+        converged: artifact.converged,
+      }),
     );
+    if (l1 === undefined || l2 === undefined || l3 === undefined) return fail('CFD_PARAM_INVALID', 'three bundles are required');
+    const levels: [Level, Level, Level] = [l1, l2, l3];
+    const convergence = convergenceOf(levels, safetyFactor);
+    if (convergence === null) return fail('CFD_PARAM_INVALID', 'the grid triplet has no three-level convergence classification');
     const study: CfdGridStudy = {
       caseId,
       quantity,
@@ -126,36 +201,18 @@ export const recordCfdGridStudy = defineCommand({
       levels,
       r21,
       r32,
-      ...('orderNotConverged' in gci
-        ? { status: 'order_not_converged' as const }
-        : {
-            status:
-              gci.status === 'two_level' || gci.status === 'order_pair' || gci.status === 'no_fit' ? ('divergent' as const) : gci.status,
-            ...(gci.p !== undefined && { orderP: gci.p }),
-            ...(gci.extrapolated !== undefined && { extrapolated: gci.extrapolated }),
-            ...(gci.gci21Fine !== undefined && { gci21Fine: gci.gci21Fine }),
-            ...(gci.gci32Fine !== undefined && { gci32Fine: gci.gci32Fine }),
-            ...(gci.asymptoticRatio !== undefined && { asymptoticRatio: gci.asymptoticRatio }),
-          }),
+      ...convergence,
+      verified: true,
     };
+    if (given !== undefined && canonicalJson(given) !== canonicalJson(study))
+      return fail('CFD_RESULT_HASH_MISMATCH', 'the given study differs from the one recomputed from the bundles');
     const unconverged = levels.filter((level) => !level.converged).length;
-    const studies = { ...cfdSlice(doc).studies, [caseId]: study };
-    const detail =
-      study.status === 'monotone' && study.orderP !== undefined
-        ? `order p ${significantNumber(study.orderP, 3)}, extrapolated ${significantNumber(study.extrapolated ?? NaN, 5)}, fine-grid GCI ` +
-          `${significantNumber((study.gci21Fine ?? NaN) * 100, 3)} %` +
-          (study.asymptoticRatio === undefined ? '' : `, asymptotic ratio ${significantNumber(study.asymptoticRatio, 3)}`)
-        : `${study.status}: no GCI (the refinement does not converge monotonically)`;
-    return {
-      ...changed(
-        withCfd(doc, { studies }),
-        `${TOOL}: ${caseId} ${quantity} on 3 grids (h ${levels.map((level) => significantNumber(level.cellM, 4)).join(' / ')} m, ratios ` +
-          `${significantNumber(r21, 3)} / ${significantNumber(r32, 3)}): ${levels.map((level) => significantNumber(level.value, 5)).join(' / ')}; ${detail}` +
-          (unconverged === 0 ? '' : `; ${unconverged} of 3 solves NOT converged (CFD_NOT_CONVERGED): treat the GCI with care`) +
-          '.',
-        [caseId],
-      ),
-      data: { study },
-    };
+    return store(
+      study,
+      `${TOOL}: ${caseId} ${quantity} on 3 grids (h ${levels.map((level) => significantNumber(level.cellM, 4)).join(' / ')} m, ratios ` +
+        `${significantNumber(r21, 3)} / ${significantNumber(r32, 3)}): ${levels.map((level) => significantNumber(level.value, 5)).join(' / ')}; ${detailOf(study)}` +
+        (unconverged === 0 ? '' : `; ${unconverged} of 3 solves NOT converged (CFD_NOT_CONVERGED): treat the GCI with care`) +
+        '.',
+    );
   },
 });

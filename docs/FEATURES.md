@@ -770,7 +770,7 @@
 | `cfd_report` | Read-only report of the recorded flow result of a case: forces and coefficients (Cd, Cl, Cs, Cm, CdA), per-body forces, pressure and speed peaks with positions… | read-only |
 | `check_cfd` | Read-only pass / warn / fail list over the flow (CFD) cases: runs the prepare_cfd_case checks of every case (watertight, self-intersection, small features, blo… | read-only |
 | `create_cfd_case` | Create a flow-simulation (CFD) case: the bodies to put in the flow, the free stream (Mach or speed, altitude or air state, angle of attack / sideslip), the ref… |  |
-| `delete_cfd_case` | Delete a flow case and its recorded result summary from the document. |  |
+| `delete_cfd_case` | Delete a flow case, its recorded result summary and its grid study from the document. |  |
 | `prepare_cfd_case` | Read-only preparation report of a flow case, before any solve. | read-only |
 | `record_cfd_grid_study` | Record the grid-convergence study of a flow case from three recorded solves at different cell sizes (the cfd_solve gridStudy transport runs them; refinement ra… |  |
 | `record_cfd_results` | Record the result of a flow solve run by the host (cfd_solve transport) on a case. |  |

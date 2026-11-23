@@ -2,37 +2,22 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext, CommandResult } from '@core/commands/types';
-import type { CfdResultArtifact, CfdResultPort } from '@core/model/cfdResult';
+import type { CfdResultPort } from '@core/model/cfdResult';
 import type { CfdCase, CfdGridStudy } from '@aero/cfd/types';
 import { gciTriplet } from '@lib/convergence';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
 import { cfdDocument } from '@aero/cfd/document';
 import { caseHashOf } from '@aero/cfd/caseDoc';
 import { expectPure } from '../../../helpers/expectNoOp';
 import { ok } from './fixtures';
 import { recordedSphere } from './resultFixtures';
+import { portOf, studyLevel, type StudyLevel } from './studyFixtures';
 
 const recorded = recordedSphere();
 const Q = 2;
 const AREA = 0.7853981634;
 
-/** An artifact of the recorded sphere solved at cell size `cellM` with drag `dragN` (the coefficient follows from the case reference). */
-function level(cellM: number, dragN: number, patch: Partial<CfdResultArtifact> = {}): { artifact: CfdResultArtifact; hash: string } {
-  const base = recorded.artifact;
-  const artifact: CfdResultArtifact = {
-    ...base,
-    grid: { ...base.grid, cellM, cells: Math.round(1000 / cellM) },
-    forces: { ...base.forces, totalN: [dragN, 0, 0.02] },
-    ...patch,
-  };
-  return { artifact, hash: sha256Hex(canonicalJson(artifact)) };
-}
-
-const contextOf = (levels: readonly { artifact: CfdResultArtifact; hash: string }[]): ExecutionContext => {
-  const port: CfdResultPort = { get: (key) => levels.find((entry) => entry.hash === key)?.artifact ?? null };
-  return { ...recorded.ctx, cfdResults: port };
-};
+const level = studyLevel;
+const contextOf = (levels: readonly StudyLevel[]): ExecutionContext => ({ ...recorded.ctx, cfdResults: portOf(levels) });
 
 // f = f0 + a h^2 on h = 0.05, 0.1, 0.2: second order, extrapolated drag 0.5 N
 const drag = (h: number): number => 0.5 + 4 * h * h;
@@ -138,15 +123,138 @@ describe('record_cfd_grid_study', () => {
     refuse({ resultsHashes: [fine.hash, close.hash, medium.hash] }, contextOf([fine, close, medium]));
   });
 
-  it('is removed with its case and validated on load', () => {
+  it('stores the absolute GCI when the fine value is exactly 0', () => {
+    const levels = [level(0.05, 0), level(0.1, 0.1), level(0.2, 0.3)];
+    const result = ok(
+      recorded.doc,
+      'record_cfd_grid_study',
+      { caseId: 'c1', resultsHashes: levels.map((entry) => entry.hash) },
+      contextOf(levels),
+    );
+    const recordedStudy = result.document.cfd?.studies?.['c1'] as CfdGridStudy;
+    expect(recordedStudy.relativeUndefined).toBe(true);
+    expect(recordedStudy.gciAbs).toBeGreaterThan(0);
+    expect(recordedStudy.gci21Fine).toBeUndefined();
+    expect(result.summary).toContain('absolute');
+    expect(result.summary).not.toContain('NaN');
+  });
+
+  it('records a monotone triplet whose observed order does not converge with its own status and message', () => {
+    const levels = [level(0.05, 0.5), level(0.0551, 1), level(0.1102, 1.75)];
+    const result = ok(
+      recorded.doc,
+      'record_cfd_grid_study',
+      { caseId: 'c1', resultsHashes: levels.map((entry) => entry.hash) },
+      contextOf(levels),
+    );
+    expect(result.document.cfd?.studies?.['c1']?.status).toBe('order_not_converged');
+    expect(result.summary).toContain('observed order did not converge');
+    expect(result.summary).not.toContain('does not converge monotonically');
+  });
+
+  it('says converged_exactly is not a non-convergence', () => {
+    const levels = [level(0.05, 0.5), level(0.1, 0.5), level(0.2, 0.7)];
+    const result = ok(
+      recorded.doc,
+      'record_cfd_grid_study',
+      { caseId: 'c1', resultsHashes: levels.map((entry) => entry.hash) },
+      contextOf(levels),
+    );
+    expect(result.document.cfd?.studies?.['c1']?.status).toBe('converged_exactly');
+    expect(result.summary).toContain('same value');
+  });
+
+  it('overwrites an earlier study of the case', () => {
+    const first = study().document;
+    const second = ok(first, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, quantity: 'cdAM2' }, ctx);
+    expect(first.cfd?.studies?.['c1']?.quantity).toBe('cd');
+    expect(second.document.cfd?.studies?.['c1']?.quantity).toBe('cdAM2');
+    expect(Object.keys(second.document.cfd?.studies ?? {})).toEqual(['c1']);
+  });
+
+  it('runs without a kernel and with one (surface staleness)', () => {
+    expect(study(recorded.doc, {}, { ...ctx, kernel: null }).rejected).not.toBe(true);
+    expect(study(recorded.doc, {}, ctx).rejected).not.toBe(true);
+  });
+
+  it('accepts the resolution-only hash only for the matching grid: wrong cells or another quality are stale', () => {
+    const cfdCase = recorded.doc.cfd?.cases['c1'] as CfdCase;
+    const refuseWith = (caseHash: string): void => {
+      const bad = level(0.05, drag(0.05), { caseHash });
+      const result = execute(
+        recorded.doc,
+        'record_cfd_grid_study',
+        { caseId: 'c1', resultsHashes: [bad.hash, medium.hash, coarse.hash] },
+        contextOf([bad, medium, coarse]),
+      );
+      expect(result.error?.code, result.summary).toBe('CFD_INPUT_STALE');
+      expect(result.document).toBe(recorded.doc);
+    };
+    refuseWith(caseHashOf({ ...cfdCase, cellsPerReferenceLength: 40 }));
+    refuseWith(caseHashOf({ ...cfdCase, cellsPerReferenceLength: 20, quality: 'fine' }));
+  });
+
+  it('refuses when only the coarse ratio is below 1.1', () => {
+    const near = level(0.105, drag(0.105));
+    const result = execute(
+      recorded.doc,
+      'record_cfd_grid_study',
+      { caseId: 'c1', resultsHashes: [fine.hash, medium.hash, near.hash] },
+      contextOf([fine, medium, near]),
+    );
+    expect(result.error?.code).toBe('CFD_PARAM_INVALID');
+  });
+
+  it('keeps an echoed study unverified without the bundles, recomputes and compares it with them', () => {
+    const echoed = (study().data as { study: CfdGridStudy }).study;
+    const none: ExecutionContext = { ...recorded.ctx, cfdResults: { get: () => null } };
+    const replay = execute(recorded.doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study: echoed }, none);
+    expect(replay.rejected).not.toBe(true);
+    expect(replay.document.cfd?.studies?.['c1']).toEqual({ ...echoed, verified: false });
+    expect(replay.summary).toContain('UNVERIFIED');
+    const codeOf = (params: Record<string, unknown>, context = none): string | undefined =>
+      execute(recorded.doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, ...params }, context).error?.code;
+    expect(codeOf({})).toBe('CFD_RESULT_MISSING');
+    expect(codeOf({ study: { ...echoed, levels: [] } })).toBe('CFD_RESULT_MISSING');
+    expect(codeOf({ study: { ...echoed, caseId: 'other' } })).toBe('CFD_RESULT_MISSING');
+    expect(codeOf({ study: { ...echoed, levels: echoed.levels.map((entry) => ({ ...entry, resultsHash: 'x' })) } })).toBe(
+      'CFD_RESULT_MISSING',
+    );
+    const withBundles = execute(recorded.doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study: echoed }, ctx);
+    expect(withBundles.rejected).not.toBe(true);
+    expect(codeOf({ study: { ...echoed, orderP: 9 } }, ctx)).toBe('CFD_RESULT_HASH_MISMATCH');
+  });
+
+  it('is removed with its case; update_cfd_case reports it stale when the case hash changes', () => {
     const recordedStudy = study().document;
     expect(execute(recordedStudy, 'delete_cfd_case', { caseId: 'c1' }).document.cfd?.studies).toEqual({});
-    const slice = recordedStudy.cfd as unknown as Record<string, unknown>;
-    expect(cfdDocument.validate({ cfd: slice })).toEqual([]);
-    const broken = { ...slice, studies: { c1: { caseId: 'x' }, c2: 5 } };
-    expect(cfdDocument.validate({ cfd: broken })).toEqual([
-      expect.stringContaining('cfd.studies.c1 needs caseId equal to its key'),
-      'cfd.studies.c2 must be an object',
-    ]);
+    const same = execute(recordedStudy, 'update_cfd_case', { caseId: 'c1', quality: 'fine' });
+    expect((same.data as { gridStudyStale: boolean }).gridStudyStale).toBe(true);
+    expect(same.summary).toContain('grid study is now stale');
+    const without = execute(recorded.doc, 'update_cfd_case', { caseId: 'c1', quality: 'fine' });
+    expect((without.data as { gridStudyStale: boolean }).gridStudyStale).toBe(false);
+  });
+
+  it('validates the slice on load: shape, every field, order, orphans', () => {
+    const slice = study().document.cfd as unknown as Record<string, unknown>;
+    const good = (slice['studies'] as Record<string, Record<string, unknown>>)['c1'] as Record<string, unknown>;
+    const errorsOf = (studies: unknown): string[] => cfdDocument.validate({ cfd: { ...slice, studies } });
+    expect(errorsOf(undefined)).toEqual([]);
+    expect(errorsOf({ c1: good })).toEqual([]);
+    for (const bad of [5, null, [], 'x']) expect(errorsOf(bad)).toEqual(['cfd.studies must be an object']);
+    expect(errorsOf({ c1: 5 })).toEqual([expect.stringContaining('cfd.studies.c1')]);
+    for (const field of ['geometryHash', 'r21', 'r32', 'verified', 'quantity', 'status', 'safetyFactor', 'caseHash'])
+      expect(errorsOf({ c1: { ...good, [field]: undefined } }), field).not.toEqual([]);
+    const levels = good['levels'] as Record<string, unknown>[];
+    for (const field of ['cells', 'converged', 'cellM', 'value', 'resultsHash'])
+      expect(errorsOf({ c1: { ...good, levels: [{ ...levels[0], [field]: undefined }, levels[1], levels[2]] } }), field).not.toEqual([]);
+    for (const field of ['orderP', 'extrapolated', 'gci21Fine', 'gci32Fine', 'gciAbs', 'asymptoticRatio'])
+      expect(errorsOf({ c1: { ...good, [field]: 'x' } }), field).not.toEqual([]);
+    expect(errorsOf({ c1: { ...good, orderP: Number.NaN } })).not.toEqual([]);
+    expect(errorsOf({ c1: { ...good, extra: 1 } })).not.toEqual([]);
+    expect(errorsOf({ c1: { ...good, levels: [...levels].reverse() } })).toEqual([expect.stringContaining('finest first')]);
+    expect(errorsOf({ c1: { ...good, levels: levels.slice(0, 2) } })).not.toEqual([]);
+    expect(errorsOf({ c1: { ...good, caseId: 'zz' } })).toEqual([expect.stringContaining('caseId')]);
+    expect(errorsOf({ zz: { ...good, caseId: 'zz' } })).toEqual([expect.stringContaining('orphan')]);
   });
 });

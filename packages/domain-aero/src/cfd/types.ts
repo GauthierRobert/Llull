@@ -127,7 +127,7 @@ export interface CfdGridStudy {
     readonly value: number;
     readonly converged: boolean;
   }[];
-  /** `monotone` carries the order, extrapolation and GCI; the other statuses only the classification (`@lib/convergence`). */
+  /** `monotone` carries the order, extrapolation and GCI; `order_not_converged` is monotone but the observed order did not converge. */
   readonly status: 'monotone' | 'oscillatory' | 'divergent' | 'converged_exactly' | 'order_not_converged';
   readonly r21: number;
   readonly r32: number;
@@ -135,7 +135,12 @@ export interface CfdGridStudy {
   readonly extrapolated?: number;
   readonly gci21Fine?: number;
   readonly gci32Fine?: number;
+  /** Fine value exactly 0: the relative GCI is undefined, this is the absolute one (in the unit of the coefficient). */
+  readonly gciAbs?: number;
+  readonly relativeUndefined?: true;
   readonly asymptoticRatio?: number;
+  /** False when replayed without the bundles (kept from the echoed record; no number is trusted until cfd_solve runs here). */
+  readonly verified: boolean;
 }
 
 export interface CfdDocumentSlice {

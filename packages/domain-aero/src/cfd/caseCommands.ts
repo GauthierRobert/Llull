@@ -117,7 +117,7 @@ export const cfdCreateCase = defineCommand({
 });
 
 /**
- * @affects doc.cfd.cases[caseId] (replaces the given fields; affected: [caseId]); recorded results of the case become stale (hash differs)
+ * @affects doc.cfd.cases[caseId] (replaces the given fields; affected: [caseId]); recorded results and the grid study of the case become stale (hash differs)
  * @invariant free stream replaces as a whole; reference / domain / ground / outputs merge one level; boundaries replace as a list
  * @failure unknown case -> CFD_CASE_NOT_FOUND; no field given / bad numbers -> CFD_PARAM_INVALID; unknown entity -> CFD_ENTITY_NOT_FOUND; tag clash -> CFD_BOUNDARY_CONFLICT; Mach mismatch -> CFD_REGIME_MISMATCH
  */
@@ -147,27 +147,30 @@ export const cfdUpdateCase = defineCommand({
     const result = Object.hasOwn(slice.results, caseId) ? slice.results[caseId] : undefined;
     const caseHash = caseHashOf(next);
     const stale = result !== undefined && result.caseHash !== caseHash;
+    const study = Object.hasOwn(slice.studies ?? {}, caseId) ? slice.studies?.[caseId] : undefined;
+    const studyStale = study !== undefined && study.caseHash !== caseHash;
     const notes =
       fields.entityIds !== undefined && fields.reference?.momentPointM === undefined
         ? ['reference.momentPointM was not recomputed for the new bodies: pass reference.momentPointM to move it']
         : [];
     const summary =
-      `update_cfd_case: case '${caseId}' updated (${given.join(', ')})${stale ? '; its recorded result is now stale' : ''}.` +
+      `update_cfd_case: case '${caseId}' updated (${given.join(', ')})${stale ? '; its recorded result is now stale' : ''}${studyStale ? '; its grid study is now stale' : ''}.` +
       (notes.length > 0 ? ` Note: ${notes.join('; ')}.` : '');
     return {
       ...changed(withCfd(doc, { cases: { ...slice.cases, [caseId]: next } }), summary, [caseId]),
-      data: { case: next, caseHash, resultStale: stale, changed: given, notes },
+      data: { case: next, caseHash, resultStale: stale, gridStudyStale: studyStale, changed: given, notes },
     };
   },
 });
 
 /**
- * @affects doc.cfd.cases, doc.cfd.results (removes the case and its recorded result; affected: [caseId]); bodies are untouched
+ * @affects doc.cfd.cases, doc.cfd.results, doc.cfd.studies (removes the case, its recorded result and its grid study; affected: [caseId]); bodies are untouched
  * @failure unknown case -> CFD_CASE_NOT_FOUND
  */
 export const cfdDeleteCase = defineCommand({
   name: 'delete_cfd_case',
-  description: 'Delete a flow case and its recorded result summary from the document. The bodies (entities) are not touched.',
+  description:
+    'Delete a flow case, its recorded result summary and its grid study from the document. The bodies (entities) are not touched.',
   params: z.object({ caseId: z.string().describe('Id of the case to delete.') }),
   run: (doc, { caseId }): CommandResult => {
     if (caseOf(doc, caseId) === undefined)
