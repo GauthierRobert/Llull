@@ -738,6 +738,25 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     query: { name: 'check_topology', params: (doc) => ({ studyId: studyId(doc) }) },
     mutate: { name: 'set_topology_settings', params: (doc) => ({ studyId: studyId(doc), penal: 3 }) },
   },
+  // PHY-17 V1b: a min_volume study with a displacement constraint (target, component, limit, label) in the objective
+  'topology#displacement': {
+    roots: ['analysis'],
+    build: () => {
+      const model = mbbModel();
+      return must(model.doc, 'set_topology_objective', {
+        studyId: model.studyId,
+        objective: {
+          kind: 'min_volume',
+          maxCompliance: 400,
+          displacementConstraints: [
+            { label: 'tip', target: { entityId: model.entityId, pointsNear: [[0, 20, 0]] }, component: 'uy', maxDisplacement: 0.5 },
+          ],
+        },
+      }).doc;
+    },
+    query: { name: 'check_topology', params: (doc) => ({ studyId: studyId(doc) }) },
+    mutate: { name: 'set_topology_settings', params: (doc) => ({ studyId: studyId(doc), penal: 3 }) },
+  },
   explicit: {
     roots: ['analysis'],
     build: () => {

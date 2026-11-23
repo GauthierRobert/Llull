@@ -269,43 +269,69 @@ fn ascent_direction(hessian: &[Vec<f64>], gradient: &[f64]) -> Option<Vec<f64>> 
     Some(d)
 }
 
-/// Maximises the concave dual over `λ ≥ 0`: projected Newton with Armijo backtracking, from λ = 0.
+/// Armijo backtracking along `direction` from `lambda` (projected on λ ≥ 0): the accepted point with its dual value, gradient and Hessian.
+type DualPoint = (Vec<f64>, f64, Vec<f64>, Vec<Vec<f64>>);
+
+fn backtrack(a: &Approximation, m: usize, point: &DualPoint, direction: &[f64]) -> Option<DualPoint> {
+    let (lambda, value, gradient, _) = point;
+    let mut t = 1.0;
+    for _ in 0..60 {
+        let trial: Vec<f64> = (0..m).map(|i| (lambda[i] + t * direction[i]).max(0.0)).collect();
+        let (trial_value, trial_gradient, trial_hessian) = dual(a, &trial, m);
+        let progress: f64 = (0..m).map(|i| gradient[i] * (trial[i] - lambda[i])).sum();
+        if trial_value >= value + 1e-4 * progress && trial != *lambda {
+            return Some((trial, trial_value, trial_gradient, trial_hessian));
+        }
+        t *= 0.5;
+    }
+    None
+}
+
+/// Maximises the concave dual over `λ ≥ 0`: projected Newton with Armijo backtracking, from λ = 0. The Newton system is solved on the
+/// free multipliers only (λ_i > 0 or g_i > 0): a multiplier at its bound with a falling dual (an inactive constraint) is held at 0
+/// and neither feeds its Hessian row into the others nor distorts the step. A Newton step the line search rejects is replaced by
+/// a projected-gradient step (with several rows only: the single-row problems of every earlier release end at the rejected step, and their
+/// results stay bit for bit what they were); the loop ends only when that fails too.
 fn solve_dual(a: &Approximation, m: usize) -> Vec<f64> {
-    let mut lambda = vec![0.0; m];
     if m == 0 {
-        return lambda;
+        return Vec::new();
     }
     let scale = a.b.iter().map(|b| b.abs()).fold(1.0, f64::max);
-    let (mut value, mut gradient, mut hessian) = dual(a, &lambda, m);
+    let (value, gradient, hessian) = dual(a, &vec![0.0; m], m);
+    let mut point: DualPoint = (vec![0.0; m], value, gradient, hessian);
     for _ in 0..DUAL_MAX_ITERATIONS {
-        let projected: Vec<f64> = (0..m).map(|i| if lambda[i] <= 0.0 && gradient[i] < 0.0 { 0.0 } else { gradient[i] }).collect();
+        let (lambda, _, gradient, hessian) = &point;
+        let held: Vec<bool> = (0..m).map(|i| lambda[i] <= 0.0 && gradient[i] < 0.0).collect();
+        let projected: Vec<f64> = (0..m).map(|i| if held[i] { 0.0 } else { gradient[i] }).collect();
         let norm = projected.iter().map(|g| g.abs()).fold(0.0, f64::max);
         if norm <= DUAL_TOLERANCE * scale {
             break;
         }
-        let newton = ascent_direction(&hessian, &projected).filter(|d| d.iter().zip(&projected).map(|(d, g)| d * g).sum::<f64>() > 0.0);
-        let direction = newton.unwrap_or_else(|| projected.iter().map(|g| g / norm.max(1e-300) * scale).collect());
-        let mut t = 1.0;
-        let mut accepted = false;
-        for _ in 0..60 {
-            let trial: Vec<f64> = (0..m).map(|i| (lambda[i] + t * direction[i]).max(0.0)).collect();
-            let (trial_value, trial_gradient, trial_hessian) = dual(a, &trial, m);
-            let progress: f64 = (0..m).map(|i| gradient[i] * (trial[i] - lambda[i])).sum();
-            if trial_value >= value + 1e-4 * progress && trial != lambda {
-                lambda = trial;
-                value = trial_value;
-                gradient = trial_gradient;
-                hessian = trial_hessian;
-                accepted = true;
-                break;
-            }
-            t *= 0.5;
-        }
-        if !accepted {
-            break;
+        let reduced: Vec<Vec<f64>> = (0..m)
+            .map(|i| {
+                (0..m)
+                    .map(|k| {
+                        if !held[i] && !held[k] {
+                            hessian[i][k]
+                        } else if i == k {
+                            -1.0
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        let newton = ascent_direction(&reduced, &projected).filter(|d| d.iter().zip(&projected).map(|(d, g)| d * g).sum::<f64>() > 0.0);
+        let gradient_step: Vec<f64> = projected.iter().map(|g| g / norm.max(1e-300) * scale).collect();
+        let next =
+            newton.and_then(|d| backtrack(a, m, &point, &d)).or_else(|| if m > 1 { backtrack(a, m, &point, &gradient_step) } else { None });
+        match next {
+            Some(accepted) => point = accepted,
+            None => break,
         }
     }
-    lambda
+    point.0
 }
 
 #[cfg(test)]
@@ -392,6 +418,33 @@ mod tests {
         let from_original = mma.step(&x, &df0, &f, &df, bounds);
         assert_eq!(from_restored, from_original);
         assert!(Mma::restore(2, 1, &state[..7], iteration).is_none());
+    }
+
+    /// Two coupled dense rows, the second never binding (a copy of the first shifted far into feasibility), give the one-row result
+    /// (to the dual tolerance): a multiplier held at its bound neither joins the Newton system nor sends the step off (the m = 2 regression).
+    #[test]
+    fn an_inactive_row_beside_an_active_one_leaves_the_single_row_result() {
+        let a = [1.0, 4.0, 9.0, 16.0];
+        let bounds = Bounds { xmin: 0.01, xmax: 1.0, move_limit: 0.2 };
+        let objective = |x: &[f64]| -> Vec<f64> { a.iter().zip(x).map(|(a, x)| -a / (x * x)).collect() };
+        let active = |x: &[f64]| (x.iter().sum::<f64>() - 2.0, vec![1.0; 4]);
+        let one = run(vec![0.5; 4], 1, bounds, |x| {
+            let (f, g) = active(x);
+            (objective(x), vec![f], vec![g])
+        });
+        let two = run(vec![0.5; 4], 2, bounds, |x| {
+            let (f, g) = active(x);
+            // x1 + 2 x2 + x3 + 0.5 x4 <= 50: far from binding, a dense row coupled to the first through every variable
+            let weights = [1.0, 2.0, 1.0, 0.5];
+            let slack = x.iter().zip(weights).map(|(x, w)| x * w).sum::<f64>() - 50.0;
+            (objective(x), vec![f, slack], vec![g, weights.to_vec()])
+        });
+        for (value, expected) in two.iter().zip([0.2, 0.4, 0.6, 0.8]) {
+            assert!((value - expected).abs() < 1e-6, "{two:?}");
+        }
+        for (a, b) in one.iter().zip(&two) {
+            assert!((a - b).abs() < 1e-9, "{one:?} vs {two:?}");
+        }
     }
 
     #[test]

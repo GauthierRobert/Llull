@@ -224,6 +224,9 @@ pub struct TopError {
     pub message: String,
 }
 
+/// Relative slack a constraint row may exceed its limit by and still count as satisfied (every row, the host's `check_topology` too).
+pub const CONSTRAINT_TOLERANCE: f64 = 1e-4;
+
 /// Smallest grid (DOFs) that `device: auto` sends to a hardware GPU.
 pub const AUTO_GPU_MIN_DOFS: usize = 500_000;
 
@@ -594,7 +597,7 @@ pub fn optimise(
                 label: None,
                 value: volume,
                 limit: problem.volume_fraction,
-                satisfied: volume <= problem.volume_fraction + 1e-9,
+                satisfied: volume <= problem.volume_fraction * (1.0 + CONSTRAINT_TOLERANCE),
             }],
         ),
         Objective::MinVolume { max_compliance } => (
@@ -604,7 +607,7 @@ pub fn optimise(
                 label: None,
                 value: compliance,
                 limit: max_compliance,
-                satisfied: compliance <= max_compliance * (1.0 + 1e-6),
+                satisfied: compliance <= max_compliance * (1.0 + CONSTRAINT_TOLERANCE),
             }],
         ),
     };
@@ -616,9 +619,11 @@ pub fn optimise(
             label: Some(constraint.label.clone()),
             value,
             limit: constraint.limit,
-            satisfied: value <= constraint.limit * (1.0 + 1e-6),
+            satisfied: value <= constraint.limit * (1.0 + CONSTRAINT_TOLERANCE),
         });
     }
+    // a run that stopped moving with a row still violated has not converged to a design that answers the problem
+    let status = if status == Status::Converged && constraints.iter().any(|c| !c.satisfied) { Status::MaxIterations } else { status };
     Ok(Outcome {
         volume,
         grey: sum(&grey_terms) / active_count as f64,

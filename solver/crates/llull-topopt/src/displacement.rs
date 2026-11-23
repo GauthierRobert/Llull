@@ -26,10 +26,11 @@ impl DisplacementConstraint {
         self.dofs.iter().map(|&d| u[d]).sum::<f64>() / self.dofs.len() as f64
     }
 
-    fn rhs(&self, len: usize) -> Vec<f64> {
-        let mut b = vec![0.0; len];
+    /// `ℓ`: the mean weights, zero on fixed DOFs (those displacements are 0: they add nothing to ū nor to its gradient).
+    fn rhs(&self, fixed: &[bool]) -> Vec<f64> {
+        let mut b = vec![0.0; fixed.len()];
         let weight = 1.0 / self.dofs.len() as f64;
-        for &d in &self.dofs {
+        for &d in self.dofs.iter().filter(|&&d| !fixed[d]) {
             b[d] += weight;
         }
         b
@@ -46,8 +47,8 @@ pub fn validate(constraints: &[DisplacementConstraint], problem: &Problem) -> Re
         if c.dofs.is_empty() || c.dofs.iter().any(|&d| d >= problem.grid.dofs()) {
             return Err(format!("displacement constraint '{name}': needs at least one DOF inside the grid"));
         }
-        if c.dofs.iter().any(|&d| problem.fixed[d]) {
-            return Err(format!("displacement constraint '{name}': a constrained DOF is fixed (its displacement is 0)"));
+        if c.dofs.iter().all(|&d| problem.fixed[d]) {
+            return Err(format!("displacement constraint '{name}': every constrained DOF is fixed (its displacement is 0)"));
         }
         if !(c.limit.is_finite() && c.limit > 0.0) {
             return Err(format!("displacement constraint '{name}': maxDisplacement must be > 0"));
@@ -69,7 +70,7 @@ pub(crate) fn sensitivity(
     active: &[bool],
     penal: f64,
 ) -> Result<Vec<f64>, TopError> {
-    let lambda = solver.solve_cold(op, &constraint.rhs(u.len()))?;
+    let lambda = solver.solve_cold(op, &constraint.rhs(&problem.fixed))?;
     let plus: Vec<f64> = u.iter().zip(&lambda).map(|(a, b)| a + b).collect();
     let minus: Vec<f64> = u.iter().zip(&lambda).map(|(a, b)| a - b).collect();
     let (e_plus, e_minus) = (op.element_energies(&plus), op.element_energies(&minus));
@@ -172,7 +173,7 @@ mod tests {
     fn value_is_the_mean_of_the_dofs_and_the_rhs_sums_to_one() {
         let c = DisplacementConstraint { label: "t".into(), load_case: 0, dofs: vec![1, 3], limit: 1.0 };
         assert_eq!(c.value(&[0.0, 2.0, 0.0, 4.0]), 3.0);
-        let b = c.rhs(4);
+        let b = c.rhs(&[false; 4]);
         assert_eq!(b, vec![0.0, 0.5, 0.0, 0.5]);
     }
 }

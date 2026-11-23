@@ -398,6 +398,7 @@ fn displacement_constraint_limits_the_tip_and_costs_material() {
     assert_eq!(rows[1]["limit"].as_f64().unwrap(), cap);
     assert_eq!(rows[1]["satisfied"], true, "|u| {value} above {cap}");
     assert!(value <= cap * 1.01);
+    assert!(value >= 0.99 * cap, "the cap is meant to be active: |u| {value} against {cap}");
     // for the unit load the compliance equals the tip displacement: the displacement limit is the tighter one
     assert!(result["compliance"].as_f64().unwrap() <= cap * 1.01);
     assert!(result["volumeFraction"].as_f64().unwrap() > free["volumeFraction"].as_f64().unwrap());
@@ -421,7 +422,7 @@ fn displacement_constraint_rejects_bad_input() {
         (json!([{ "loadCase": "nope", "dofs": [1], "maxDisplacement": 1.0 }]), "unknown load case"),
         (json!([{ "loadCase": "tip", "dofs": [], "maxDisplacement": 1.0 }]), "at least one DOF"),
         (json!([{ "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": 0.0 }]), "must be > 0"),
-        (json!([{ "loadCase": "tip", "dofs": [0], "maxDisplacement": 1.0 }]), "is fixed"),
+        (json!([{ "loadCase": "tip", "dofs": [0], "maxDisplacement": 1.0 }]), "every constrained DOF is fixed"),
     ];
     for (constraints, needle) in cases {
         let (code, message) = run(&dir, &ok(constraints)).unwrap_err();
@@ -437,23 +438,62 @@ fn displacement_constraint_rejects_bad_input() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// min_volume with a self-weight case: the tip cap is the only binding row, so tightening it must cost material, and every row must hold.
 #[test]
-fn displacement_constraint_holds_with_a_self_weight_case() {
-    let mut job = mbb(30, 10, json!({ "optimizer": "mma", "filter": { "kind": "density" } }));
-    job["loadCases"][0]["gravity"] = json!([0.0, -0.0002]);
-    job["displacementConstraints"] = constraint_of(1.0e9);
-    let loose_dir = folder("disp-gravity-loose");
-    let (loose, _, _) = run(&loose_dir, &job).unwrap();
-    let free_tip = loose["constraints"][1]["value"].as_f64().unwrap();
-    job["displacementConstraints"] = constraint_of(0.9 * free_tip);
-    let dir = folder("disp-gravity");
-    let (result, _, _) = run(&dir, &job).unwrap();
-    let row = &result["constraints"][1];
-    eprintln!("gravity + displacement: free tip {free_tip}, {row}, volume {}", result["volumeFraction"]);
-    assert_eq!(row["satisfied"], true, "{row}");
-    // the adjoint is checked against finite differences in `displacement.rs`; here only the end-to-end contract
-    assert!(row["value"].as_f64().unwrap() <= 0.9 * free_tip * 1.01);
-    for d in [loose_dir, dir] {
-        let _ = std::fs::remove_dir_all(d);
+fn displacement_cap_with_a_self_weight_case_is_active_and_costs_material_monotonically() {
+    let mut volumes = Vec::new();
+    for cap in [400.0, 300.0, 230.0] {
+        let mut job = min_volume_job(30, 10, 1.0e5, constraint_of(cap));
+        job["loadCases"][0]["gravity"] = json!([0.0, -0.0002]);
+        let dir = folder(&format!("disp-gravity-{cap}"));
+        let (result, _, _) = run(&dir, &job).unwrap();
+        let rows = result["constraints"].as_array().unwrap();
+        eprintln!("gravity cap {cap}: volume {} rows {rows:?} status {}", result["volumeFraction"], result["status"]);
+        assert!(rows.iter().all(|row| row["satisfied"] == true), "{rows:?}");
+        let value = rows[1]["value"].as_f64().unwrap();
+        assert!(value >= 0.99 * cap, "the cap {cap} is meant to be active: |u| {value}");
+        volumes.push(result["volumeFraction"].as_f64().unwrap());
+        let _ = std::fs::remove_dir_all(dir);
     }
+    assert!(volumes.windows(2).all(|pair| pair[1] > pair[0]), "volume must rise as the cap tightens: {volumes:?}");
+}
+
+#[test]
+fn a_displacement_row_resumes_bit_for_bit_from_a_checkpoint() {
+    let job = min_volume_job(30, 10, 1.0e5, constraint_of(300.0));
+    checkpoint_equals_whole("disp-resume", job, 6, |_| {});
+}
+
+#[test]
+fn a_target_that_touches_a_support_keeps_the_fixed_dofs_as_zero_in_the_mean() {
+    // the x = 0 column of the MBB is fixed in x: the mean over [fixed ux of node (0, 10), free ux of node (1, 10)] is half the free one,
+    // so a cap of 0.5 x the free value of that mean makes the constraint bind without a solver refusal
+    let free_dof = 2 + 2 * 31 * 10;
+    let fixed_dof = 2 * (31 * 10);
+    let probe = |dofs: Value, cap: f64| {
+        let dir = folder("disp-fixed-mix");
+        let constraint = json!([{ "label": "mix", "loadCase": "tip", "dofs": dofs, "maxDisplacement": cap }]);
+        let (result, _, _) = run(&dir, &min_volume_job(30, 10, 400.0, constraint)).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+        result["constraints"][1].clone()
+    };
+    let alone = probe(json!([free_dof]), 1.0e6);
+    let free_value = alone["value"].as_f64().unwrap();
+    assert!(free_value > 0.0);
+    let mixed = probe(json!([fixed_dof, free_dof]), 0.8 * free_value / 2.0);
+    assert_eq!((mixed["label"].as_str(), mixed["satisfied"].as_bool()), (Some("mix"), Some(true)), "{mixed}");
+    assert!(mixed["value"].as_f64().unwrap() >= 0.99 * mixed["limit"].as_f64().unwrap(), "{mixed}");
+}
+
+#[test]
+fn a_run_that_ends_with_a_violated_row_is_never_reported_converged() {
+    // a compliance limit nobody can miss lets the design vanish; the displacement cap then cannot hold and the run says so
+    let dir = folder("unsatisfied");
+    let constraint = json!([{ "label": "tip", "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": 1.0e-6 }]);
+    let (result, _, events) = run(&dir, &min_volume_job(30, 10, 1.0e9, constraint)).unwrap();
+    let rows = result["constraints"].as_array().unwrap();
+    assert!(rows.iter().any(|row| row["satisfied"] == false), "{rows:?}");
+    assert_eq!(result["status"], "max_iterations", "{result}");
+    assert!(events.contains("TOP_CONSTRAINT_UNSATISFIED"), "{events}");
+    let _ = std::fs::remove_dir_all(dir);
 }

@@ -13,8 +13,10 @@ import type {
 } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { base64ToUint8Array, uint8ArrayToBase64 } from '@lib/base64';
+import { toMetres } from '@core/model/units';
+import { analysisLengthMetres } from '../shared/defaults';
 import { caseOf } from '../shared/access';
-import { COMPLIANCE_UNIT, HISTORY_ROW_CAP } from './defaults';
+import { COMPLIANCE_UNIT, CONSTRAINT_TOLERANCE, HISTORY_ROW_CAP } from './defaults';
 import { type TopologyJob } from './job';
 import { elasticOf, massOf } from './material';
 
@@ -124,9 +126,21 @@ export function topologySummary(
   const reasons = typeof elastic === 'string' ? [elastic] : elastic.unverifiedReasons;
   const volumeFraction = sum / Math.max(1, grid.active);
   // artifacts of earlier binaries carry no constraint report: the volume constraint is what they all ran under
-  const constraints = artifact.constraints ?? [
-    { name: 'volume', value: volumeFraction, limit: study.volumeFraction, satisfied: volumeFraction <= study.volumeFraction + 1e-9 },
-  ];
+  // the solver's displacement rows are in the analysis length unit; the report states them in document units, like the study's limits
+  const lengthFactor = toMetres(doc, 1) / analysisLengthMetres(analysisCase.unitSystem);
+  const constraints = (
+    artifact.constraints ?? [
+      {
+        name: 'volume',
+        value: volumeFraction,
+        limit: study.volumeFraction,
+        satisfied: volumeFraction <= study.volumeFraction * (1 + CONSTRAINT_TOLERANCE),
+      },
+    ]
+  ).map(
+    (row): TopologyConstraint =>
+      row.name === 'displacement' ? { ...row, value: row.value / lengthFactor, limit: row.limit / lengthFactor } : row,
+  );
   const thresholdedVolume = solid * voxelVolume;
   const massG = massOf(doc, study, thresholdedVolume);
   return {

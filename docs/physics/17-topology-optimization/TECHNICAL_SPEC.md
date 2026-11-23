@@ -688,11 +688,26 @@ after the compliance row, and `check_topology` raises `TOP_CONSTRAINT_VIOLATED` 
 mma`): one more MMA row `ū² / limit² − 1 ≤ 0` (sign agnostic, O(1)). Gradient by the adjoint: `K λ = ℓ` (ℓ = ones / n at the DOFs; one extra PCG
 solve per constraint and iteration, cold started so a resumed run stays bit for bit), `dū/dx_e = −p (E0 − Emin) xPhys_e^(p−1) g λ_eᵀ k0 u_e + λ_eᵀ f_e`
 (the cross energy by polarisation of the element energies, the second term for gravity cases), then the same projection / filter / column chain as the
-compliance row. Verified against central finite differences on a 4 × 3 plate with gravity (`displacement::tests`, 1e-5 relative); end to end: MBB 30 × 10
-min_volume with the tip capped at 0.7 of its free value ends at |ū| within the cap with more material than the free layout, deterministic.
-A fixed DOF, a DOF outside the grid, an empty DOF list, a limit <= 0, an unknown load case or OC are `NATIVE_JOB_INPUT`. `result.json` constraint rows carry
-`label` for these. Transport: the host forwards `objective.displacementConstraints` of the job as the `displacementConstraints` of `job.json` and
-accepts `name: 'displacement'` rows (`server/src/native/topologyJobFiles.ts`, `topologySolve.ts`: host lane).
+compliance row. Verified against central finite differences on a 4 × 3 plate with gravity (`displacement::tests`, 1e-5 relative). A fixed DOF in the
+list counts as u = 0 in the mean (a face touching a clamp); a target held entirely by supports is `TOP_TARGET_UNMAPPED` (TS) / `NATIVE_JOB_INPUT`
+(native); a DOF outside the grid, an empty list, a limit <= 0, an unknown load case or OC are `NATIVE_JOB_INPUT`. `result.json` constraint rows carry
+`label`; the summary states displacement rows in document units (the solver's are in the analysis length unit).
+
+**Dual solver fix (found by review).** With two or more MMA rows the dual Newton step used the full Hessian including rows at their bound
+(λ_i = 0, g_i < 0, an inactive constraint), whose coupling distorted the step; the line search then failed and the loop ended at λ = 0, an
+objective-only step that drove the volume to 1. The step now solves on the free multipliers only (bound rows get a −1 diagonal, d_i = 0) and a
+rejected Newton step falls back to a projected-gradient step when m > 1. Single-row problems (every earlier run) take the old path: MBB 60 × 20 MMA
+203.1556703851201 in 138 iterations, `min_volume` MBB 30 × 10 373.2413141973718 in 45 iterations (the figures of §15.1 / §15.2 were from an earlier build; these
+are the measurements before and after this change, identical). Tested: two coupled dense rows, one inactive, equal the one-row run (`mma::tests`).
+Measured after the fix, MBB 30 × 10 `min_volume` density filter: tip capped at 0.7 of the free layout's → volume 0.482 (free 0.393), |ū| = cap
+(261.2691 against 261.2689); with a self-weight case and compliance limit 1e5, caps 400 / 300 / 230 → volume 0.382 / 0.443 / 0.540, |ū| = cap, every row
+satisfied; a displacement row resumes from a checkpoint bit for bit.
+
+**Constraint tolerance and status.** One named `CONSTRAINT_TOLERANCE` = 1e-4 (relative) decides `satisfied` for every row (volume, compliance,
+displacement) in the solver and in the TS fallback (`defaults.ts`). A run that stops moving with a violated row is never `converged`: the status is
+`max_iterations` and the warning `TOP_CONSTRAINT_UNSATISFIED` names the row (a `min_volume` limit nobody can miss lets the design vanish).
+Transport: the host forwards `objective.displacementConstraints` of the job as the `displacementConstraints` of `job.json` and accepts `name:
+'displacement'` rows (`server/src/native/topologyJobFiles.ts`, `topologySolve.ts`).
 
 **`massG`** (`TopologyResultSummary.massG?`, §3): grams of the thresholded solid, `thresholdedVolume × Material.density` (density is g per cubic
 document unit); absent when the design domain has no single material with a density > 0. It is derived from the current material, so the trust

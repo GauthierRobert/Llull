@@ -362,6 +362,7 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
     lengthFactor,
     loadCases.map((loadCase) => loadCase.name),
     (entityId) => trianglesOf(doc, entityId),
+    fixed,
   );
   if ('ok' in displacement) return displacement;
   const minMemberSize = study.manufacturing.minMemberSize;

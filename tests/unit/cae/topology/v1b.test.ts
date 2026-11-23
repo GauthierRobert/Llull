@@ -53,13 +53,13 @@ describe('displacement constraints of min_volume', () => {
 
   it('a constraint on one named load case and a face target (mean over its nodes) keep the label', () => {
     const result = withConstraints(model, [
-      tip(model, { label: 'left-ux', component: 'ux', loadCase: 'LC1', target: { entityId: model.entityId, facesNear: [[0, 10, 0.5]] } }),
+      tip(model, { label: 'left-uy', component: 'uy', loadCase: 'LC1', target: { entityId: model.entityId, facesNear: [[0, 10, 0.5]] } }),
     ]);
     const rows = jobOf({ ...model, doc: result.document }).objective;
     const [row] = rows.kind === 'min_volume' ? (rows.displacementConstraints ?? []) : [];
-    expect(row).toMatchObject({ label: 'left-ux', loadCase: 'LC1' });
+    expect(row).toMatchObject({ label: 'left-uy', loadCase: 'LC1' });
     expect(row?.dofs).toHaveLength(21);
-    expect(row?.dofs.every((dof) => dof % 2 === 0)).toBe(true);
+    expect(row?.dofs.every((dof) => dof % 2 === 1)).toBe(true);
   });
 
   it('create_topology_study takes the constraints; the input hash moves with them (a recorded result goes stale)', () => {
@@ -116,6 +116,94 @@ describe('displacement constraints of min_volume', () => {
     expect(jobCode(tip(model, { loadCase: 'LC9' }))).toMatch(/^TOP_SETUP_INVALID: displacement constraint 'uy-1': load case 'LC9'/);
     expect(jobCode(tip(model, { component: 'uz' }))).toMatch(/^TOP_TARGET_UNMAPPED: .*normal of the 2D grid plane/);
     expect(jobCode(tip(model, { target: { entityId: model.entityId, pointsNear: [[900, 900, 0]] } }))).toMatch(/^TOP_TARGET_UNMAPPED/);
+  });
+
+  it('refuses a target held entirely by a support (displacement 0), but keeps one that only touches it', () => {
+    // the MBB clamps ux along the whole left edge
+    const held = withConstraints(model, [tip(model, { component: 'ux', target: { entityId: model.entityId, facesNear: [[0, 10, 0.5]] } })]);
+    const built = buildTopologyJob(held.document, study(held.document, model));
+    expect(built).toMatchObject({ ok: false, code: 'TOP_TARGET_UNMAPPED' });
+    expect(built.ok ? '' : built.message).toContain('held by a support along ux');
+    // the same face along uy is free
+    const free = withConstraints(model, [tip(model, { component: 'uy', target: { entityId: model.entityId, facesNear: [[0, 10, 0.5]] } })]);
+    expect(buildTopologyJob(free.document, study(free.document, model)).ok).toBe(true);
+  });
+
+  it('reports displacement rows in document units (solver rows are in the analysis length unit)', () => {
+    const centimetres: CadDocument = { ...model.doc, units: 'cm' };
+    const doc = withConstraints(model, [tip(model, { label: 'tip', maxDisplacement: 0.5 })], centimetres).document;
+    const job = jobOf({ ...model, doc });
+    // 0.5 cm = 5 mm in the N-mm-t-s analysis
+    expect(job.objective.kind === 'min_volume' && job.objective.displacementConstraints?.[0]?.maxDisplacement).toBeCloseTo(5, 12);
+    const solverRows = [
+      { name: 'compliance', value: 200, limit: 400, satisfied: true },
+      { name: 'displacement', label: 'tip', value: 4, limit: 5, satisfied: true },
+    ] as const;
+    const artifact = buildTopologyArtifact(
+      job,
+      fieldBytes(Float32Array.from({ length: 1200 }, (_, n) => (n % 60 < 36 ? 1 : 0))),
+      {
+        compliance: 200,
+        perLoadCase: { LC1: 200 },
+        iterations: 3,
+        status: 'converged',
+        history: [],
+        device: 'cpu',
+        deterministic: true,
+        version: 't',
+        optimizer: 'mma',
+        constraints: solverRows,
+      },
+      'topopt',
+    ) as FeTopologyArtifact;
+    const store = artifactStore();
+    const recorded = execute(
+      doc,
+      'record_topology_result',
+      { studyId: model.studyId, fieldHash: store.put(artifact) },
+      contextWith(store.port),
+    );
+    expect(recorded.rejected).not.toBe(true);
+    const rows = study(recorded.document, model).result?.constraints;
+    expect(rows?.[1]).toMatchObject({ name: 'displacement', label: 'tip', satisfied: true });
+    expect(rows?.[1]?.value).toBeCloseTo(0.4, 12);
+    expect(rows?.[1]?.limit).toBeCloseTo(0.5, 12);
+    expect(rows?.[0]).toEqual(solverRows[0]);
+  });
+
+  it('rejects malformed displacement constraints on load (selector lists, empty or duplicate labels, a target outside the domain)', () => {
+    const set = withConstraints(model, [tip(model)]).document;
+    const reject = (change: (row: Record<string, unknown>, rows: unknown[]) => void): string => {
+      const envelope = JSON.parse(serializeDocument(set)) as {
+        document: {
+          analysis: { cases: Record<string, { topology: Record<string, { objective: { displacementConstraints: unknown[] } }> }> };
+        };
+      };
+      const rows = envelope.document.analysis.cases[model.analysisId]?.topology[model.studyId]?.objective.displacementConstraints ?? [];
+      change(rows[0] as Record<string, unknown>, rows);
+      try {
+        deserializeDocument(JSON.stringify(envelope));
+        return '';
+      } catch (error) {
+        return (error as Error).message;
+      }
+    };
+    expect(reject(() => undefined)).toBe('');
+    const target = (row: Record<string, unknown>): Record<string, unknown> => row['target'] as Record<string, unknown>;
+    for (const mutate of [
+      (row: Record<string, unknown>) => (target(row)['facesNear'] = 5),
+      (row: Record<string, unknown>) => (target(row)['pointsNear'] = []),
+      (row: Record<string, unknown>) => (target(row)['pointsNear'] = [[0, 'x', 0]]),
+      (row: Record<string, unknown>) => (target(row)['pointsNear'] = [[0, 0]]),
+      (row: Record<string, unknown>) => {
+        delete target(row)['pointsNear'];
+      },
+      (row: Record<string, unknown>) => (row['label'] = ''),
+      (row: Record<string, unknown>) => (target(row)['entityId'] = 'elsewhere'),
+      (row: Record<string, unknown>) => (row['loadCase'] = 3),
+      (_row: Record<string, unknown>, rows?: unknown[]) => rows?.push({ ...(rows[0] as object) }),
+    ])
+      expect(reject(mutate)).toMatch(/displacementConstraints/);
   });
 
   it('persists, loads a study written before the constraints, and rejects malformed constraints on load', () => {

@@ -42,7 +42,7 @@
 //!   `c(x) ≤ maxCompliance` (needs `optimizer: mma`).
 //! - `displacementConstraints` (optional, needs `optimizer: mma`): `[{ "label": "tip", "loadCase": "lc1", "dofs": [2521],
 //!   "maxDisplacement": 0.5 }]` limits the mean displacement of the DOFs (`node·dim + c`) in that load case to ±`maxDisplacement` (one MMA row `ū² / limit² − 1 ≤ 0`, gradient by an adjoint solve); the result lists each as a
-//!   constraint `{ name: "displacement", label, value: |ū|, limit, satisfied }`. A fixed DOF is an input error.
+//!   constraint `{ name: "displacement", label, value: |ū|, limit, satisfied }`. A fixed DOF in the list counts as u = 0 in the mean (a face touching a clamp); all of them fixed is an input error.
 //! - Masks (`active`, `keepIn`, `keepOut`): optional file names in the job folder, one byte per voxel in voxel order,
 //!   non-zero = set. `active` absent = every voxel active. Inactive voxels are removed from the system (no Emin) and their
 //!   nodes drop out; keep-in / keep-out on an inactive voxel are ignored; a voxel in both keep masks is an input error.
@@ -75,7 +75,7 @@
 //!
 //! One `progress` per iteration: `{"type":"progress","step":it,"total":maxIterations,"message":"…","it":it,
 //! "compliance":c,"volume":v,"change":Δ}`; `warning` `TOP_GPU_FALLBACK` (GPU asked for but not used, or a GPU solve fell
-//! back to the CPU twin) or `TOP_DEADLINE` (checkpointed); then `done` with the outputs and their sha256, or `error` with a
+//! back to the CPU twin), `TOP_DEADLINE` (checkpointed) or `TOP_CONSTRAINT_UNSATISFIED` (a constraint row ends violated; the status is then `max_iterations`, never `converged`); then `done` with the outputs and their sha256, or `error` with a
 //! code: `NATIVE_JOB_IO`, `NATIVE_JOB_INPUT`, `TOP_GRID_TOO_LARGE`, `TOP_SOLVER_FAILED` (singular system / PCG not converged).
 //!
 //! # Outputs
@@ -770,6 +770,17 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
                 "deadline of {} s reached after {} iteration(s): checkpoint written (resume with startDesign, startDisplacements and startState)",
                 settings.deadline_s.unwrap_or(0.0),
                 outcome.iterations
+            ),
+        });
+    }
+    if let Some(row) = outcome.constraints.iter().find(|c| !c.satisfied) {
+        warnings.push(WarningEntry {
+            code: "TOP_CONSTRAINT_UNSATISFIED",
+            message: format!(
+                "constraint '{}' ends at {} against its limit {} (status is never `converged` with a violated row)",
+                row.label.as_deref().unwrap_or(row.name),
+                row.value,
+                row.limit
             ),
         });
     }
