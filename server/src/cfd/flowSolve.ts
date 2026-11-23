@@ -12,6 +12,7 @@ import { defaultContext } from '@core/commands/context';
 import { withFullResolution } from '@core/geometry/entityTriangles';
 import { defaultMeshAssetStore } from '../meshAssets/store';
 import type { CfdResultArtifact } from '@core/model/cfdResult';
+import type { CadDocument } from '@core/model/types';
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import {
   buildFlowJob,
@@ -36,8 +37,11 @@ import { readOutput, withJobFolder, type JobRun } from '../native/computeJob';
 import type { NativeDeps } from '../native/fatigueField';
 import { nativeInstallHint } from '../native/nativeBinary';
 
-const TOOL = 'cfd_solve';
+export const TOOL = 'cfd_solve';
 export const DEFAULT_CFD_TIMEOUT_S = 3600;
+
+export type CfdCase = NonNullable<ReturnType<typeof cfdCaseOf>>;
+type CfdResultSummary = ReturnType<typeof cfdSummary>;
 
 export interface CfdSolveOptions {
   readonly timeoutS?: number;
@@ -46,11 +50,13 @@ export interface CfdSolveOptions {
   readonly maxSteps?: number;
   readonly latticeMach?: number;
   readonly les?: boolean;
+  /** Three solves at refinement ratio 2 (the case's own resolution, n/2, n/4) and `record_cfd_grid_study` (`flowGridStudy.ts`). */
+  readonly gridStudy?: boolean;
   /** The caller's own cancellation (CLI Ctrl-C, a closed request): it stops waiting; the run dies when no other caller waits for it. */
   readonly signal?: AbortSignal;
 }
 
-const failure = (code: string, message: string, ids: readonly string[], extra: Record<string, unknown> = {}): FeaToolResult => ({
+export const failure = (code: string, message: string, ids: readonly string[], extra: Record<string, unknown> = {}): FeaToolResult => ({
   ...feaFailure(TOOL, code, message, ids),
   data: { code, ...extra },
 });
@@ -78,7 +84,7 @@ const progressLine = (event: Readonly<Record<string, unknown>>): string =>
   (typeof event['change'] === 'number' ? `, change ${event['change'].toExponential(2)}` : '') +
   ')';
 
-interface Solved {
+export interface Solved {
   readonly artifact: CfdResultArtifact;
   readonly elapsedMs: number;
   readonly warnings: readonly { readonly code: string; readonly message: string }[];
@@ -193,8 +199,18 @@ const runningSolve = (run: RunInfo<SolveMeta>): RunningSolve => ({
   waiters: run.waiters,
 });
 
+/** Grid studies running in this host: `cfd_stop` between two of their solves must still stop them (`flowGridStudy.ts`). */
+export interface ActiveStudy {
+  readonly caseId: string;
+  stopped: boolean;
+}
+export const activeStudies = new Set<ActiveStudy>();
+
 /** @internal tests only: stop every running solve (a failed test must not leave a run behind for the next one). */
 export function _stopAllCfdSolves(): number {
+  activeStudies.forEach((study) => {
+    study.stopped = true;
+  });
   return solves.stop(() => true).length;
 }
 
@@ -209,7 +225,11 @@ const runKey = (job: FlowJob, store: string): string =>
  */
 export function runCfdStop(caseId: string): FeaToolResult {
   const stopped = solves.stop((meta) => meta.caseId === caseId).map(runningSolve);
-  if (stopped.length === 0) {
+  const studies = [...activeStudies].filter((study) => study.caseId === caseId);
+  studies.forEach((study) => {
+    study.stopped = true;
+  });
+  if (stopped.length === 0 && studies.length === 0) {
     const others = solves.list().map(runningSolve);
     return failure(
       'CFD_NOT_RUNNING',
@@ -220,23 +240,32 @@ export function runCfdStop(caseId: string): FeaToolResult {
   }
   const waiters = stopped.reduce((sum, entry) => sum + entry.waiters, 0);
   return {
-    summary: `cfd_stop: stopped ${stopped.length} running solve(s) of ${caseId} (process tree killed, ${waiters} waiting caller(s) answered CFD_CANCELLED); nothing was recorded.`,
+    summary:
+      `cfd_stop: stopped ${stopped.length} running solve(s) of ${caseId} (process tree killed, ${waiters} waiting caller(s) answered CFD_CANCELLED)` +
+      `${studies.length === 0 ? '' : `, cancelled ${studies.length} grid study(ies)`}; nothing was recorded.`,
     affected: [],
     isError: false,
-    data: { caseId, stopped },
+    data: { caseId, stopped, studies: studies.length },
   };
 }
 
+/** What `runSolveJob` hands back: the finished run, its bundle stored content-addressed. */
+export interface StoredSolve {
+  readonly solved: Solved;
+  readonly resultsHash: string;
+}
+
 /**
- * @failure unknown case -> CFD_CASE_NOT_FOUND; preparation fail rows -> their code (CFD_GEOMETRY_NOT_WATERTIGHT, ...); compressible case ->
- *   CFD_REGIME_MISMATCH; estimate above deviceMemoryBytes -> CFD_MEMORY_EXCEEDED (nothing allocated); no binary -> CFD_SOLVER_MISSING (+ hint);
- *   native errors -> their CFD_* code or CFD_SOLVER_FAILED, timeout -> CFD_TIMEOUT (data.nativeCode keeps the job's code); record refusals
- *   (CFD_INPUT_STALE, ...) -> their code from `record_cfd_results`. A step-limited run is recorded (converged false) with the warning CFD_NOT_CONVERGED.
+ * The checks and the job of one solve of `cfdCase` (the case as given: a grid study passes the case with its own resolution), or the refusal.
+ * @failure see `runCfdSolve`
  */
-export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host: FeaHost, deps: NativeDeps): Promise<FeaToolResult> {
-  const doc = host.getDoc();
-  const cfdCase = cfdCaseOf(doc, caseId);
-  if (cfdCase === undefined) return failure('CFD_CASE_NOT_FOUND', `no flow case '${caseId}': create_cfd_case first`, [caseId]);
+export function buildSolveJob(
+  doc: CadDocument,
+  cfdCase: CfdCase,
+  options: CfdSolveOptions,
+  deps: NativeDeps,
+): { readonly job: FlowJob } | FeaToolResult {
+  const caseId = cfdCase.id;
   if (options.maxSteps !== undefined && !(Number.isInteger(options.maxSteps) && options.maxSteps >= 1))
     return failure('CFD_PARAM_INVALID', `maxSteps must be an integer >= 1, got ${options.maxSteps}`, [caseId]);
   if (options.latticeMach !== undefined && !(options.latticeMach > 0 && options.latticeMach <= 0.3))
@@ -250,14 +279,27 @@ export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host
     deviceMemoryBytes: options.deviceMemoryBytes,
   });
   if (!built.ok) return failure(built.code, built.message, built.ids, { checks: built.checks });
-  const { job } = built;
   if (deps.runner.binary === null) return missingTool(caseId);
+  return { job: built.job };
+}
+
+/**
+ * Runs `job` (shared with identical concurrent solves, stoppable by `cfd_stop`) and stores its bundle; a failure is the tool result.
+ * Nothing is recorded here.
+ */
+export async function runSolveJob(
+  job: FlowJob,
+  caseId: string,
+  options: CfdSolveOptions,
+  deps: NativeDeps,
+  onProgress: ((line: string) => void) | undefined = deps.onProgress,
+): Promise<StoredSolve | FeaToolResult> {
   const seconds = Math.min(FEA_SOLVE_TIMEOUT_S.max, Math.max(FEA_SOLVE_TIMEOUT_S.min, options.timeoutS ?? DEFAULT_CFD_TIMEOUT_S));
   const joined = await solves.join(
     runKey(job, deps.store.directory),
     { caseId },
     (signal, progress) => solveNatively(job, caseId, seconds, deps, signal, progress),
-    { signal: options.signal, onProgress: deps.onProgress },
+    { signal: options.signal, onProgress },
   );
   if (joined.kind === 'failed')
     return failure('CFD_SOLVER_FAILED', `the solve of '${caseId}' failed in the host: ${joined.error}; nothing was recorded`, [caseId]);
@@ -271,18 +313,25 @@ export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host
     );
   const solved = joined.value;
   if (!('artifact' in solved)) return solved;
-
-  const { artifact } = solved;
-  let resultsHash: string;
   try {
-    resultsHash = deps.store.put(artifact);
+    return { solved, resultsHash: deps.store.put(solved.artifact) };
   } catch (error) {
     return failure('CFD_SOLVER_FAILED', `the result bundle could not be stored: ${errorMessage(error)}; nothing was recorded`, [caseId]);
   }
+}
+
+/** `record_cfd_results` for a stored solve (a no-op summary when a concurrent caller of the same run recorded it already). */
+export function recordSolve(
+  host: FeaHost,
+  cfdCase: CfdCase,
+  stored: StoredSolve,
+): { readonly summary: CfdResultSummary; readonly recorded: FeaToolResult } {
+  const { artifact } = stored.solved;
+  const { resultsHash } = stored;
+  const caseId = cfdCase.id;
   const summary = cfdSummary(cfdCase, artifact, resultsHash);
   const current = host.getDoc().cfd?.results[caseId];
-  // A concurrent caller of the same run may have recorded it already: recording the same summary again would only add a history step.
-  const recorded =
+  const recorded: FeaToolResult =
     current !== undefined && canonicalJson(current) === canonicalJson(summary)
       ? {
           summary: `record_cfd_results: ${caseId} result ${resultsHash.slice(0, 12)} already recorded (a concurrent caller of the same run).`,
@@ -290,6 +339,28 @@ export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host
           isError: false,
         }
       : host.applyCommand('record_cfd_results', { caseId, resultsHash, summary });
+  return { summary, recorded };
+}
+
+/**
+ * @failure unknown case -> CFD_CASE_NOT_FOUND; preparation fail rows -> their code (CFD_GEOMETRY_NOT_WATERTIGHT, ...); compressible case ->
+ *   CFD_REGIME_MISMATCH; estimate above deviceMemoryBytes -> CFD_MEMORY_EXCEEDED (nothing allocated); no binary -> CFD_SOLVER_MISSING (+ hint);
+ *   native errors -> their CFD_* code or CFD_SOLVER_FAILED, timeout -> CFD_TIMEOUT (data.nativeCode keeps the job's code); record refusals
+ *   (CFD_INPUT_STALE, ...) -> their code from `record_cfd_results`. A step-limited run is recorded (converged false) with the warning CFD_NOT_CONVERGED.
+ *   `gridStudy` -> `runCfdGridStudy` (three solves, `flowGridStudy.ts`).
+ */
+export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host: FeaHost, deps: NativeDeps): Promise<FeaToolResult> {
+  const doc = host.getDoc();
+  const cfdCase = cfdCaseOf(doc, caseId);
+  if (cfdCase === undefined) return failure('CFD_CASE_NOT_FOUND', `no flow case '${caseId}': create_cfd_case first`, [caseId]);
+  const built = buildSolveJob(doc, cfdCase, options, deps);
+  if (!('job' in built)) return built;
+  const { job } = built;
+  const stored = await runSolveJob(job, caseId, options, deps);
+  if (!('solved' in stored)) return stored;
+  const { solved, resultsHash } = stored;
+  const { artifact } = solved;
+  const { summary, recorded } = recordSolve(host, cfdCase, stored);
   const warnings = [
     ...solved.warnings,
     ...artifact.warnings.filter((entry) => !solved.warnings.some((seen) => seen.code === entry.code)),
