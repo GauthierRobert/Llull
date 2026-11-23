@@ -59,6 +59,25 @@ const isNamed = (value: unknown): boolean =>
 
 const SETTING_KEYS = ['penal', 'eminRatio', 'move', 'changeTol', 'maxIterations', 'threshold', 'greyLimit'];
 
+const validDisplacement = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value['label'] === 'string' &&
+  ['ux', 'uy', 'uz'].includes(String(value['component'])) &&
+  typeof value['maxDisplacement'] === 'number' &&
+  value['maxDisplacement'] > 0 &&
+  Number.isFinite(value['maxDisplacement']) &&
+  isRecord(value['target']) &&
+  typeof value['target']['entityId'] === 'string' &&
+  (value['loadCase'] === undefined || typeof value['loadCase'] === 'string');
+
+/** The optional `displacementConstraints` of a min_volume objective (studies written before them have none). */
+const displacementErrors = (objective: unknown): boolean =>
+  !isRecord(objective) ||
+  objective['displacementConstraints'] === undefined ||
+  (objective['kind'] === 'min_volume' &&
+    Array.isArray(objective['displacementConstraints']) &&
+    objective['displacementConstraints'].every(validDisplacement));
+
 function studyErrors(where: string, key: string, study: unknown): string[] {
   const bad = (why: string): string[] => [`${where}: ${why}`];
   if (!isRecord(study) || study['id'] !== key || typeof study['name'] !== 'string' || typeof study['analysisId'] !== 'string')
@@ -70,6 +89,7 @@ function studyErrors(where: string, key: string, study: unknown): string[] {
   if (typeof volumeFraction !== 'number' || !(volumeFraction > 0 && volumeFraction < 1)) return bad('volumeFraction must be in (0, 1)');
   if (!Array.isArray(study['keepIn']) || !Array.isArray(study['keepOut'])) return bad('keepIn / keepOut must be lists');
   if (!isRecord(settings) || !SETTING_KEYS.every((name) => isNamed(settings[name]))) return bad('settings are malformed');
+  if (!displacementErrors(study['objective'])) return bad('objective.displacementConstraints are malformed');
   const filter = settings['filter'];
   if (!isRecord(filter) || !isNamed(filter['radius']) || (filter['kind'] !== 'sensitivity' && filter['kind'] !== 'density'))
     return bad('settings.filter is malformed');

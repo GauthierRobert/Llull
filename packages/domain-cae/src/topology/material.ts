@@ -37,3 +37,14 @@ export function densityOf(doc: CadDocument, study: TopologyStudy, unitSystem: Un
     return `material '${shared.id}' has no density: gravity needs one (create_material density / densityUnit)`;
   return densityToAnalysis(shared.material.density, doc.units, unitSystem);
 }
+
+/**
+ * Mass in grams of `volume` (cubic document units) of the domain material (`Material.density` is grams per cubic document unit).
+ * @failure no shared material or a density that is not > 0 -> null (the summary then carries no massG)
+ */
+export function massOf(doc: CadDocument, study: TopologyStudy, volume: number): number | null {
+  const shared = sharedMaterial(doc, study);
+  if (typeof shared === 'string') return null;
+  const { density } = shared.material;
+  return density > 0 && Number.isFinite(density) ? volume * density : null;
+}

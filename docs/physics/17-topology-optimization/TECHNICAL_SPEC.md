@@ -563,7 +563,7 @@ GPU memory in 3D). `job.json` `dofCap` overrides. Next: measure on a desktop GPU
 
 **Compliance ratio and width samples (as built, TR-TOP-10 / TR-TOP-09).** `compare_to_topology` finds the first `static` 05 analysis that has the rebuilt solid as a part and reads it through `trustedRecord` (the 05 staleness hashes and artifact re-verification: only a `solved`, non-stale, artifact-verified result counts). The external work F^T u is rebuilt from the artifacts, because 05 records neither strain energy nor external work: the `fe_results` DISP field of each load case of the optimum, times the nodal forces of the case's `force` loads (the vector split over the nodes of the mesh node set `L_<loadId>`, `distribution: 'total'` | `'per_node'`, as the deck writer does). The weighted sum uses the study's load case weights (the optimum's own weighting); both values go to N\*mm (`N-mm-t-s` 1, `N-m-kg-s` 1000, `lbf-in-slinch-s` 112.98) and `complianceRatio = F^T u(rebuild) / c(optimum)`. It is checked against `complianceRatioTarget` (default `COMPLIANCE_RATIO_TARGET` = 1.15, named, to calibrate; >= 1 else TOP_SETUP_INVALID): above it is TOP_REBUILD_DEVIATION (status fail), within it with the IoU met is pass. With no usable result `complianceRatio` is null, `complianceStatus { available: false, code: 'TOP_REBUILD_NOT_ANALYSED', reason, message }` with `reason` one of `no_analysis | not_solved | stale | unverified | unsupported | optimum_zero` and the status is warn. `unsupported` = a load of the case that is not a nodal `force` (pressure, gravity, moment), a force without mesh nodes, a node without displacement, or a load case of the optimum missing in the rebuild analysis. `check_topology` raises the same two items per `rebuildEntityIds` entry (target fixed at the default). `suggest_rebuild.widthSamples`: an exact Euclidean distance transform (Felzenszwalb-Huttenlocher) of the section nodes at the threshold; local maxima at least one node from the void are the medial-axis candidates, thinned so none lies in a wider sample's inscribed disc (at most 200); `width` = 2 x the exact distance to the contour (document units, plus `widthMm`), widest first.
 
-**Open** (after §15): compliance ratio of rebuilds loaded by moments and of face / body loads on non-tetrahedral meshes, `massG`, the per-device DOF
+**Open** (after §15): compliance ratio of rebuilds loaded by moments and of face / body loads on non-tetrahedral meshes, the per-device DOF
 cap (`TOPOLOGY_VOXEL_CAP` is provisional; VC-TOP-34 on a desktop GPU not measured).
 
 ## 15. As built: V1 (TOP-V1, 2026-10-22)
@@ -667,7 +667,34 @@ real binary (a 300-iteration MBB run stopped at a 3 s deadline and resumed equal
 
 ### 15.7 Not built / left
 
-PHY-18 shape optimisation (M4 line of §10; depends on PHY-18 M2), unstructured SIMP on the 05 tet mesh (§11.5), VC-TOP-34 on a desktop GPU (the
-machine of this build was not measured: the cap stays provisional), displacement constraints for `min_volume` (compliance only), `massG`, a
-`TOP_GREY_HIGH` remediation that suggests the projection is in place. `docs/FEATURES.md` and the tool-schema snapshot were regenerated for
-`set_topology_objective` and the new parameters.
+PHY-18 shape optimisation (M4 line of §10; depends on PHY-18 M2), unstructured SIMP on the 05 tet mesh (§11.5; needs its own spec: the study,
+grid and artifact contracts are voxel based), VC-TOP-34 on a desktop GPU (the machine of this build was not measured: the cap stays
+provisional), a `TOP_GREY_HIGH` remediation that suggests the projection is in place. `docs/FEATURES.md` and the tool-schema snapshot were
+regenerated for `set_topology_objective` and the new parameters.
+
+### 15.8 Displacement constraints for `min_volume` and `massG` (TOP-V1b)
+
+**Shape.** `objective { kind: 'min_volume', maxCompliance, displacementConstraints?: [{ label?, target, component: 'ux'|'uy'|'uz',
+maxDisplacement, loadCase? }] }` on `create_topology_study` / `set_topology_objective` (an optional field: studies written before it load
+unchanged; the persistence check validates it when present, the input hash includes it only when present). `target` = the selectors of a keep-in
+region (`facesNear` / `edgesNear` / `pointsNear` of a design-domain entity); the constraint limits `|ū|`, the mean of the displacement component
+over the grid nodes the target maps to, in document length units, in load case `loadCase` (absent: every load case, one constraint each, labelled
+`<label>@<case>` with several cases). A component normal to the 2D plane is `TOP_TARGET_UNMAPPED`; `maxDisplacement <= 0`, a target without a
+point, an entity outside the design domain, a duplicate label and an unknown load case are `TOP_SETUP_INVALID` (the unknown load case at job
+build). `topology_report.rules` lists each; the result carries `constraints` rows `{ name: 'displacement', label, value: |ū|, limit, satisfied }`
+after the compliance row, and `check_topology` raises `TOP_CONSTRAINT_VIOLATED` naming the label.
+
+**Native** (`llull-topopt/src/displacement.rs`, job key `displacementConstraints: [{ label?, loadCase, dofs, maxDisplacement }]`, needs `optimizer:
+mma`): one more MMA row `ū² / limit² − 1 ≤ 0` (sign agnostic, O(1)). Gradient by the adjoint: `K λ = ℓ` (ℓ = ones / n at the DOFs; one extra PCG
+solve per constraint and iteration, cold started so a resumed run stays bit for bit), `dū/dx_e = −p (E0 − Emin) xPhys_e^(p−1) g λ_eᵀ k0 u_e + λ_eᵀ f_e`
+(the cross energy by polarisation of the element energies, the second term for gravity cases), then the same projection / filter / column chain as the
+compliance row. Verified against central finite differences on a 4 × 3 plate with gravity (`displacement::tests`, 1e-5 relative); end to end: MBB 30 × 10
+min_volume with the tip capped at 0.7 of its free value ends at |ū| within the cap with more material than the free layout, deterministic.
+A fixed DOF, a DOF outside the grid, an empty DOF list, a limit <= 0, an unknown load case or OC are `NATIVE_JOB_INPUT`. `result.json` constraint rows carry
+`label` for these. Transport: the host forwards `objective.displacementConstraints` of the job as the `displacementConstraints` of `job.json` and
+accepts `name: 'displacement'` rows (`server/src/native/topologyJobFiles.ts`, `topologySolve.ts`: host lane).
+
+**`massG`** (`TopologyResultSummary.massG?`, §3): grams of the thresholded solid, `thresholdedVolume × Material.density` (density is g per cubic
+document unit); absent when the design domain has no single material with a density > 0. It is derived from the current material, so the trust
+check does not compare it (an older record without it stays `solved`, a density edit does not make the record `untrusted`). In the record /
+report summary text and `topology_report.result.massG`.

@@ -16,7 +16,7 @@ import { base64ToUint8Array, uint8ArrayToBase64 } from '@lib/base64';
 import { caseOf } from '../shared/access';
 import { COMPLIANCE_UNIT, HISTORY_ROW_CAP } from './defaults';
 import { type TopologyJob } from './job';
-import { elasticOf } from './material';
+import { elasticOf, massOf } from './material';
 
 /** What the solver reports (`result.json` of `llull-compute topopt`); the V1 facts are optional for outputs of earlier binaries. */
 export interface TopologySolveOutput {
@@ -127,6 +127,8 @@ export function topologySummary(
   const constraints = artifact.constraints ?? [
     { name: 'volume', value: volumeFraction, limit: study.volumeFraction, satisfied: volumeFraction <= study.volumeFraction + 1e-9 },
   ];
+  const thresholdedVolume = solid * voxelVolume;
+  const massG = massOf(doc, study, thresholdedVolume);
   return {
     fieldHash,
     inputHash: artifact.inputHash,
@@ -139,8 +141,9 @@ export function topologySummary(
     perLoadCase: artifact.perLoadCase,
     volumeFraction,
     grey: grey / Math.max(1, grid.active),
-    thresholdedVolume: solid * voxelVolume,
+    thresholdedVolume,
     volumeUnit: `${doc.units}^3`,
+    ...(massG === null ? {} : { massG }),
     history: cappedHistory(artifact.history),
     solver: artifact.solver,
     optimizer: artifact.optimizer ?? 'oc',
