@@ -50,6 +50,8 @@ import { FocusOverlay } from '../FocusOverlay';
 import { FocusBanner } from '../FocusBanner';
 import { AnalysisOverlay } from './analysis/AnalysisOverlay';
 import { AnalysisLegend } from './analysis/AnalysisLegend';
+import { CfdOverlay } from './cfd/CfdOverlay';
+import { CfdLegend } from './cfd/CfdLegend';
 import { SweepFramesOverlay } from './analysis/SweepFramesOverlay';
 import { DeformOverlay } from './overlays/DeformOverlay';
 import { ImplicitGpuPreview } from './implicitPreview/ImplicitGpuPreview';
@@ -193,6 +195,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <DimensionLens />
         <PmiLayer />
         <AnalysisOverlay />
+        <CfdOverlay />
         <SweepFramesOverlay />
         <DeformOverlay />
         <ImplicitGpuPreview />
@@ -257,6 +260,7 @@ export function Viewport3D(): React.ReactElement {
       <SpaceMouseControl />
       <FocusBanner onZoom={zoomToHighlight} />
       <AnalysisLegend />
+      <CfdLegend />
       <ViewOptionsToggle />
       {viewOptionsOpen && (
         <>

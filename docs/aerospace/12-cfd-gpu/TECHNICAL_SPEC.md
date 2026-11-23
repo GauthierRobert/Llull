@@ -691,3 +691,29 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   nothing is recorded (`CFD_CANCELLED`); a failed level answers its own code with the level named in the summary. Tests:
   `server/tests/cfdGridStudy.test.ts` (fake runner whose drag follows the cell size) and the real CPU solver in
   `server/tests/cfdGridStudyNative.test.ts` (skipped without `llull-compute`).
+
+### M3c Flow panel and viewport overlay (UI lane) — 2026-11-23
+
+- **Flow panel** (`src/ui/panels/flow/`, sidebar tab `flow`, domain section: on the rail once the document has a case, in "More panels" while
+  `create_cfd_case` is registered). Cases with a state badge (Not solved / Current / Stale / Not converged / Unverified); a "New case" form that
+  gathers the selected solids, speed, altitude, angle of attack, reference area / length and cells per length and dispatches `create_cfd_case`
+  (delete: `delete_cfd_case`); everything else keeps the command's named defaults. Solve: `cfd_solve` (device cpu / auto / gpu, optional
+  `gridStudy`) and `cfd_stop` over `POST /exchange` like `topology_solve` (`flowTransport.ts`, `useFlowSolve.ts`); offline the buttons are disabled with
+  the reason, a `CFD_CANCELLED` answer reads as stopped, not failed, and the panel shows the elapsed time (the transport answers when the run ends;
+  per-sample progress lines are not streamed to the UI). The result section shows Cd / Cl / Cs / CdA from the recorded summary and, from the read-only
+  `cfd_report`, the stale reasons, the unverified note, the warnings and the drag history chart; the study section shows the three levels (finest
+  first), the observed order, extrapolated value, asymptotic ratio and fine-grid GCI, the verified / unverified badge, the non-monotone refusal
+  (no GCI), the absolute GCI when the fine value is 0, unconverged levels, and a stale note. A study counts as stale when the result is stale
+  or the study's `caseHash` differs from the recorded result's (the document keeps no separate "study stale" flag; `update_cfd_case` only reports it once).
+- **Overlay** (`src/ui/viewport/3d/cfd/`): `CfdOverlay` (inside the floating-origin group) draws a `cfd_slice` patch as a nearest-filtered colour texture
+  on one quad and `cfd_streamlines` as speed-coloured line segments; `CfdLegend` prints the field, unit, min / max and ramp. The panel gathers the
+  query (a slice plane normal to a world axis through the case's moment point, or a plane rake of seeds one reference length upstream), runs the
+  transport, fetches the stored file by hash, decodes it (`cfdFiles.ts`: pure LLSL / LLST decoders) and publishes it to `flowViewStore`; closing the
+  panel clears it. Files are world metres; the overlay scales to document units. The colour scale is the shared `resultColor`.
+- **Open: the backend serves no result file.** The query transports store `slice.bin` / `streamlines.bin` content-addressed
+  (`server/src/cfd/fileStore.ts`) and return only the hash; no HTTP route reads them. The UI fetches `GET /cfd/file/<sha256>` (`src/ui/services/cfdFiles.ts`,
+  bearer token like the other routes, `application/octet-stream`, 404 when absent); until that route exists the panel says "could not serve the
+  result file (HTTP 404)" and nothing is drawn. Also open: surface colours (Cp / Mach on the body: `surface.bin` is in the bundle, no query serves it),
+  `render_view overlay=cfd:...` (CLI lane), VC-CFD-40 (legend ranges are tested in `tests/component/FlowPanel.test.tsx`; the native-side check is open).
+- **Tests.** `tests/component/FlowPanel.test.tsx` (cases, param gathering and dispatch, solve / stop / failure, result, stale, unverified, study states, overlay
+  queries, legend), `tests/unit/cfdOverlayFiles.test.ts` (decoders, quad, segments).

@@ -24,6 +24,7 @@ const SIDEBAR_TABS = [
   'review',
   'analysis',
   'aero',
+  'flow',
   'pipestress',
   'scan',
 ] as const;

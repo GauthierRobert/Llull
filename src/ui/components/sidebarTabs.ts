@@ -114,6 +114,14 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
     description: 'Drag, frontal area, airfoil lift and pressure',
   },
   {
+    tab: 'flow',
+    label: 'Flow',
+    shortLabel: 'Flow',
+    icon: 'aero',
+    section: 'domain',
+    description: 'CFD cases, solve, convergence study, slices and streamlines',
+  },
+  {
     tab: 'pipestress',
     label: 'Pipe stress',
     shortLabel: 'Stress',
@@ -150,6 +158,7 @@ export const SIDEBAR_TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) 
   fasteners: (doc) => Object.keys(doc.fasteners?.stacks ?? {}).length,
   analysis: (doc) => doc.analysis?.caseOrder.length ?? 0,
   aero: (doc) => Object.values(doc.entities).filter((entity) => is3D(entity) && entity.kind !== 'image').length,
+  flow: (doc) => Object.keys(doc.cfd?.cases ?? {}).length,
   pipestress: (doc) => Object.keys(doc.plant?.stress?.models ?? {}).length,
   scan: (doc) => doc.scan?.cloudOrder.length ?? 0,
   review: () => 0,
@@ -159,6 +168,7 @@ export const SIDEBAR_TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) 
 export function isSidebarTabAvailable(tab: SidebarTab, reviewLoaded: boolean): boolean {
   if (tab === 'manufacturing') return getCommand('check_sheet_metal') !== undefined;
   if (tab === 'aero') return getCommand('compute_aero_drag') !== undefined;
+  if (tab === 'flow') return getCommand('create_cfd_case') !== undefined;
   if (tab === 'pipestress') return getCommand('analyze_pipe_stress') !== undefined;
   if (tab === 'fasteners') return getCommand('select_fastener') !== undefined;
   return tab !== 'review' || reviewLoaded || getCommand('check_prototype') !== undefined || getCommand('check_assembly') !== undefined;

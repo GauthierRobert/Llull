@@ -23,6 +23,7 @@ import { ManufacturingPanel } from '@ui/panels/manufacturing/ManufacturingPanel'
 import { FastenersPanel } from '@ui/panels/fasteners/FastenersPanel';
 import { AnalysisPanel } from '@ui/panels/analysis/AnalysisPanel';
 import { AeroPanel } from '@ui/panels/aero/AeroPanel';
+import { FlowPanel } from '@ui/panels/flow/FlowPanel';
 import { PipeStressPanel } from '@ui/panels/pipeStress/PipeStressPanel';
 import { ScanPanel } from '@ui/panels/scan/ScanPanel';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
@@ -46,6 +47,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   fasteners: FastenersPanel,
   analysis: AnalysisPanel,
   aero: AeroPanel,
+  flow: FlowPanel,
   pipestress: PipeStressPanel,
   scan: ScanPanel,
   review: ReviewPanel,

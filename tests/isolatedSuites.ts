@@ -54,6 +54,7 @@ export const DOM_ISOLATED_SUITES: readonly string[] = [
   'tests/component/EntitiesMemo.test.tsx',
   'tests/component/EntitiesPlantExclusion.test.tsx',
   'tests/component/ExchangePanel.test.tsx',
+  'tests/component/FlowPanel.test.tsx',
   'tests/component/HostQueryAbort.test.tsx',
   'tests/component/ImplicitGpuHidesMesh.test.tsx',
   'tests/component/ImplicitGpuPreview.test.tsx',
