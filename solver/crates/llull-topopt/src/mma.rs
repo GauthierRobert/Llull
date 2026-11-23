@@ -290,8 +290,8 @@ fn backtrack(a: &Approximation, m: usize, point: &DualPoint, direction: &[f64]) 
 /// Maximises the concave dual over `λ ≥ 0`: projected Newton with Armijo backtracking, from λ = 0. The Newton system is solved on the
 /// free multipliers only (λ_i > 0 or g_i > 0): a multiplier at its bound with a falling dual (an inactive constraint) is held at 0
 /// and neither feeds its Hessian row into the others nor distorts the step. A Newton step the line search rejects is replaced by
-/// a projected-gradient step (with several rows only: the single-row problems of every earlier release end at the rejected step, and their
-/// results stay bit for bit what they were); the loop ends only when that fails too.
+/// a projected-gradient step when m > 1 (for m = 1 the 1-D Newton step always ascends, so its rejections are at the converged floor: the
+/// fallback would only change the results of every earlier single-row run); the loop ends only when that fails too.
 fn solve_dual(a: &Approximation, m: usize) -> Vec<f64> {
     if m == 0 {
         return Vec::new();

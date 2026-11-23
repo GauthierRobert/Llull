@@ -704,8 +704,8 @@ Measured after the fix, MBB 30 × 10 `min_volume` density filter: tip capped at 
 satisfied; a displacement row resumes from a checkpoint bit for bit.
 
 **Constraint tolerance and status.** One named `CONSTRAINT_TOLERANCE` = 1e-4 (relative) decides `satisfied` for every row (volume, compliance,
-displacement) in the solver and in the TS fallback (`defaults.ts`). A run that stops moving with a violated row is never `converged`: the status is
-`max_iterations` and the warning `TOP_CONSTRAINT_UNSATISFIED` names the row (a `min_volume` limit nobody can miss lets the design vanish).
+displacement) in the solver and in the TS fallback (`defaults.ts`). A run that stops moving with a violated row keeps its status `converged` (the design stopped moving) and raises the warning
+`TOP_CONSTRAINT_UNSATISFIED` naming the row; `check_topology` fails it with `TOP_CONSTRAINT_VIOLATED` (a `min_volume` limit nobody can miss lets the design vanish).
 Transport: the host forwards `objective.displacementConstraints` of the job as the `displacementConstraints` of `job.json` and accepts `name:
 'displacement'` rows (`server/src/native/topologyJobFiles.ts`, `topologySolve.ts`).
 

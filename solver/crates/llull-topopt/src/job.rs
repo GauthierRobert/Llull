@@ -75,7 +75,7 @@
 //!
 //! One `progress` per iteration: `{"type":"progress","step":it,"total":maxIterations,"message":"…","it":it,
 //! "compliance":c,"volume":v,"change":Δ}`; `warning` `TOP_GPU_FALLBACK` (GPU asked for but not used, or a GPU solve fell
-//! back to the CPU twin), `TOP_DEADLINE` (checkpointed) or `TOP_CONSTRAINT_UNSATISFIED` (a constraint row ends violated; the status is then `max_iterations`, never `converged`); then `done` with the outputs and their sha256, or `error` with a
+//! back to the CPU twin), `TOP_DEADLINE` (checkpointed) or `TOP_CONSTRAINT_UNSATISFIED` (a constraint row ends violated; the status stays `converged`: the design stopped moving, check_topology fails on the row); then `done` with the outputs and their sha256, or `error` with a
 //! code: `NATIVE_JOB_IO`, `NATIVE_JOB_INPUT`, `TOP_GRID_TOO_LARGE`, `TOP_SOLVER_FAILED` (singular system / PCG not converged).
 //!
 //! # Outputs
@@ -777,7 +777,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
         warnings.push(WarningEntry {
             code: "TOP_CONSTRAINT_UNSATISFIED",
             message: format!(
-                "constraint '{}' ends at {} against its limit {} (status is never `converged` with a violated row)",
+                "constraint '{}' ends at {} against its limit {} (the design stopped moving without meeting it)",
                 row.label.as_deref().unwrap_or(row.name),
                 row.value,
                 row.limit

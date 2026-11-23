@@ -622,8 +622,6 @@ pub fn optimise(
             satisfied: value <= constraint.limit * (1.0 + CONSTRAINT_TOLERANCE),
         });
     }
-    // a run that stopped moving with a row still violated has not converged to a design that answers the problem
-    let status = if status == Status::Converged && constraints.iter().any(|c| !c.satisfied) { Status::MaxIterations } else { status };
     Ok(Outcome {
         volume,
         grey: sum(&grey_terms) / active_count as f64,
