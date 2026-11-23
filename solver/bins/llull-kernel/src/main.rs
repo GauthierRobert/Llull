@@ -8,6 +8,7 @@
 mod exchange;
 mod meshbrep;
 mod queries;
+mod request;
 mod session;
 
 use std::io::{BufRead, Write};
@@ -51,6 +52,16 @@ fn main() -> ExitCode {
         }
     });
 
+    // parsing, evaluating and dropping a request recurse once per nesting level (request.rs): a large stack, not the main thread's
+    let worker =
+        std::thread::Builder::new().name("session".into()).stack_size(request::SESSION_STACK_BYTES).spawn(move || serve(&receiver));
+    match worker.map(std::thread::JoinHandle::join) {
+        Ok(Ok(code)) => code,
+        _ => ExitCode::from(1),
+    }
+}
+
+fn serve(receiver: &mpsc::Receiver<String>) -> ExitCode {
     let mut session = session::Session::new();
     let mut out = std::io::stdout().lock();
     for line in receiver {
