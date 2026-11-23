@@ -40,6 +40,9 @@
 //! - `objective` (default `minCompliance`): `{ "kind": "minCompliance" }` minimises the weighted compliance under
 //!   `Σ xPhys ≤ volumeFraction · active`; `{ "kind": "minVolume", "maxCompliance": c }` minimises the volume fraction under
 //!   `c(x) ≤ maxCompliance` (needs `optimizer: mma`).
+//! - `displacementConstraints` (optional, needs `optimizer: mma`): `[{ "label": "tip", "loadCase": "lc1", "dofs": [2521],
+//!   "maxDisplacement": 0.5 }]` limits the mean displacement of the DOFs (`node·dim + c`) in that load case to ±`maxDisplacement` (one MMA row `ū² / limit² − 1 ≤ 0`, gradient by an adjoint solve); the result lists each as a
+//!   constraint `{ name: "displacement", label, value: |ū|, limit, satisfied }`. A fixed DOF is an input error.
 //! - Masks (`active`, `keepIn`, `keepOut`): optional file names in the job folder, one byte per voxel in voxel order,
 //!   non-zero = set. `active` absent = every voxel active. Inactive voxels are removed from the system (no Emin) and their
 //!   nodes drop out; keep-in / keep-out on an inactive voxel are ignored; a voxel in both keep masks is an input error.
@@ -93,6 +96,7 @@
 //!   `design`, `displacements`, `state`, `fieldSha256`, `warnings`. For the CPU twin every output is byte-identical across
 //!   runs and thread counts.
 
+use crate::displacement::DisplacementConstraint;
 use crate::filter::FilterKind;
 use crate::projection::Projection;
 use crate::simp::{
@@ -154,6 +158,16 @@ pub struct LoadCaseSpec {
     pub forces: Option<String>,
     /// Force per fully solid voxel (`dimension` components).
     pub gravity: Option<Vec<f64>>,
+}
+
+/// One `displacementConstraints` entry: the mean displacement of the DOFs `dofs` in load case `loadCase` stays within ±`maxDisplacement`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DisplacementSpec {
+    pub label: Option<String>,
+    pub load_case: String,
+    pub dofs: Vec<usize>,
+    pub max_displacement: f64,
 }
 
 /// `objective` of `job.json`.
@@ -303,6 +317,8 @@ pub struct JobFile {
     pub volume_fraction: f64,
     #[serde(default = "default_objective")]
     pub objective: ObjectiveSpec,
+    #[serde(default)]
+    pub displacement_constraints: Vec<DisplacementSpec>,
     pub active: Option<String>,
     pub keep_in: Option<String>,
     pub keep_out: Option<String>,
@@ -412,6 +428,8 @@ pub struct ObjectiveInfo {
 #[serde(rename_all = "camelCase")]
 pub struct ConstraintInfo {
     pub name: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     pub value: f64,
     pub limit: f64,
     pub satisfied: bool,
@@ -649,7 +667,16 @@ pub fn problem_of(folder: &Path, job: &JobFile) -> Result<(Problem, Settings, St
         load_cases.push(LoadCase { name: spec.name.clone(), weight: spec.weight, forces, gravity: gravity_of(spec, dim)? });
     }
     let settings = settings_of(&job.settings);
+    let mut displacement_constraints = Vec::with_capacity(job.displacement_constraints.len());
+    for (index, spec) in job.displacement_constraints.iter().enumerate() {
+        let label = spec.label.clone().unwrap_or_else(|| format!("displacement-{}", index + 1));
+        let Some(load_case) = load_cases.iter().position(|c: &LoadCase| c.name == spec.load_case) else {
+            return Err(input(format!("displacement constraint '{label}': unknown load case '{}'", spec.load_case)));
+        };
+        displacement_constraints.push(DisplacementConstraint { label, load_case, dofs: spec.dofs.clone(), limit: spec.max_displacement });
+    }
     let problem = Problem {
+        displacement_constraints,
         grid,
         voxels,
         fixed,
@@ -790,7 +817,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
         constraints: outcome
             .constraints
             .iter()
-            .map(|c| ConstraintInfo { name: c.name, value: c.value, limit: c.limit, satisfied: c.satisfied })
+            .map(|c| ConstraintInfo { name: c.name, label: c.label.clone(), value: c.value, limit: c.limit, satisfied: c.satisfied })
             .collect(),
         optimizer: job.settings.optimizer,
         projection: match (job.settings.projection, outcome.beta) {

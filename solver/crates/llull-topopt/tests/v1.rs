@@ -360,3 +360,100 @@ fn an_extruded_run_resumes_bit_for_bit_from_a_checkpoint() {
     let settings = json!({ "filter": { "kind": "density", "radius": 1.5 }, "extrusion": "z" });
     checkpoint_equals_whole("extrude-resume", cantilever(8, 4, 3, settings), 6, |_| {});
 }
+
+/// DOF of the y component of the top-left node of an `nx x ny` 2D grid (the MBB load point).
+fn tip_dof(nx: usize, ny: usize) -> usize {
+    2 * ((nx + 1) * ny) + 1
+}
+
+fn min_volume_job(nx: usize, ny: usize, limit: f64, constraints: Value) -> Value {
+    let mut job = mbb(nx, ny, json!({ "optimizer": "mma", "filter": { "kind": "density" } }));
+    job["objective"] = json!({ "kind": "minVolume", "maxCompliance": limit });
+    job["displacementConstraints"] = constraints;
+    job
+}
+
+#[test]
+fn displacement_constraint_limits_the_tip_and_costs_material() {
+    let reference = folder("disp-ref");
+    let (oc, _, _) = run(&reference, &mbb(30, 10, json!({ "filter": { "kind": "density" } }))).unwrap();
+    let limit = 1.5 * oc["compliance"].as_f64().unwrap();
+    let free_dir = folder("disp-free");
+    let (free, _, _) = run(&free_dir, &min_volume_job(30, 10, limit, json!([]))).unwrap();
+    assert_eq!(free["constraints"].as_array().unwrap().len(), 1);
+    // the unit tip load does work 1 * |u| = compliance of the single load case: the free layout deflects by about `compliance`
+    let tip = free["compliance"].as_f64().unwrap();
+    let cap = 0.7 * tip;
+    let dir = folder("disp");
+    let constraint = json!([{ "label": "tip", "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": cap }]);
+    let (result, _, _) = run(&dir, &min_volume_job(30, 10, limit, constraint)).unwrap();
+    let rows = result["constraints"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{rows:?}");
+    assert_eq!((rows[1]["name"].as_str(), rows[1]["label"].as_str()), (Some("displacement"), Some("tip")));
+    let value = rows[1]["value"].as_f64().unwrap();
+    eprintln!(
+        "displacement constraint: free volume {}, constrained volume {}, |u| {value} <= {cap} ({} iterations)",
+        free["volumeFraction"], result["volumeFraction"], result["iterations"]
+    );
+    assert_eq!(rows[1]["limit"].as_f64().unwrap(), cap);
+    assert_eq!(rows[1]["satisfied"], true, "|u| {value} above {cap}");
+    assert!(value <= cap * 1.01);
+    // for the unit load the compliance equals the tip displacement: the displacement limit is the tighter one
+    assert!(result["compliance"].as_f64().unwrap() <= cap * 1.01);
+    assert!(result["volumeFraction"].as_f64().unwrap() > free["volumeFraction"].as_f64().unwrap());
+    let again = folder("disp-again");
+    run(&again, &min_volume_job(30, 10, limit, constraint_of(cap))).unwrap();
+    assert_eq!(files(&dir, &["field.bin", "design.f64"]), files(&again, &["field.bin", "design.f64"]));
+    for d in [reference, free_dir, dir, again] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+fn constraint_of(cap: f64) -> Value {
+    json!([{ "label": "tip", "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": cap }])
+}
+
+#[test]
+fn displacement_constraint_rejects_bad_input() {
+    let dir = folder("disp-bad");
+    let ok = |extra: Value| min_volume_job(30, 10, 1000.0, extra);
+    let cases = [
+        (json!([{ "loadCase": "nope", "dofs": [1], "maxDisplacement": 1.0 }]), "unknown load case"),
+        (json!([{ "loadCase": "tip", "dofs": [], "maxDisplacement": 1.0 }]), "at least one DOF"),
+        (json!([{ "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": 0.0 }]), "must be > 0"),
+        (json!([{ "loadCase": "tip", "dofs": [0], "maxDisplacement": 1.0 }]), "is fixed"),
+    ];
+    for (constraints, needle) in cases {
+        let (code, message) = run(&dir, &ok(constraints)).unwrap_err();
+        assert_eq!(code, "NATIVE_JOB_INPUT", "{message}");
+        assert!(message.contains(needle), "{message}");
+    }
+    // OC cannot hold the extra row
+    let mut oc = mbb(30, 10, json!({}));
+    oc["displacementConstraints"] = constraint_of(1.0);
+    let (code, message) = run(&dir, &oc).unwrap_err();
+    assert_eq!(code, "NATIVE_JOB_INPUT");
+    assert!(message.contains("mma"), "{message}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn displacement_constraint_holds_with_a_self_weight_case() {
+    let mut job = mbb(30, 10, json!({ "optimizer": "mma", "filter": { "kind": "density" } }));
+    job["loadCases"][0]["gravity"] = json!([0.0, -0.002]);
+    job["displacementConstraints"] = constraint_of(1.0e9);
+    let loose_dir = folder("disp-gravity-loose");
+    let (loose, _, _) = run(&loose_dir, &job).unwrap();
+    let free_tip = loose["constraints"][1]["value"].as_f64().unwrap();
+    job["displacementConstraints"] = constraint_of(0.8 * free_tip);
+    let dir = folder("disp-gravity");
+    let (result, _, _) = run(&dir, &job).unwrap();
+    let row = &result["constraints"][1];
+    eprintln!("gravity + displacement: free tip {free_tip}, {row}, volume {}", result["volumeFraction"]);
+    assert_eq!(row["satisfied"], true, "{row}");
+    // the adjoint is checked against finite differences in `displacement.rs`; here only the end-to-end contract
+    assert!(row["value"].as_f64().unwrap() <= 0.8 * free_tip * 1.01);
+    for d in [loose_dir, dir] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}

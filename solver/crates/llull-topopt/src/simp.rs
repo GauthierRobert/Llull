@@ -12,6 +12,7 @@
 //! (MMA only).
 
 use crate::design::DesignSpace;
+use crate::displacement::{self, DisplacementConstraint};
 use crate::filter::{Filter, FilterKind};
 use crate::loads::{gravity_work, with_gravity};
 use crate::mma::{Bounds, Mma};
@@ -70,6 +71,8 @@ pub struct Problem {
     pub voxel: f64,
     pub volume_fraction: f64,
     pub objective: Objective,
+    /// Extra constraints `|ū| ≤ limit` (MMA only).
+    pub displacement_constraints: Vec<DisplacementConstraint>,
 }
 
 /// Where the linear solves run.
@@ -169,6 +172,8 @@ pub enum Status {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Constraint {
     pub name: &'static str,
+    /// The label of a displacement constraint.
+    pub label: Option<String>,
     pub value: f64,
     pub limit: f64,
     pub satisfied: bool,
@@ -222,7 +227,7 @@ pub struct TopError {
 /// Smallest grid (DOFs) that `device: auto` sends to a hardware GPU.
 pub const AUTO_GPU_MIN_DOFS: usize = 500_000;
 
-fn element_scales(x_phys: &[f64], voxels: &[Voxel], problem: &Problem, settings: &Settings, geometric: f64) -> Vec<f64> {
+pub(crate) fn element_scales(x_phys: &[f64], voxels: &[Voxel], problem: &Problem, settings: &Settings, geometric: f64) -> Vec<f64> {
     let emin = settings.emin_ratio * problem.e0;
     x_phys
         .par_iter()
@@ -314,6 +319,10 @@ pub fn validate(problem: &Problem, settings: &Settings) -> Result<(), String> {
         if settings.optimizer != Optimizer::Mma {
             return Err("objective minVolume needs optimizer mma (OC handles the volume constraint only)".to_string());
         }
+    }
+    displacement::validate(&problem.displacement_constraints, problem)?;
+    if !problem.displacement_constraints.is_empty() && settings.optimizer != Optimizer::Mma {
+        return Err("displacement constraints need optimizer mma (OC handles the volume constraint only)".to_string());
     }
     if let Some(projection) = settings.projection {
         if settings.filter != FilterKind::Density {
@@ -430,11 +439,12 @@ pub fn optimise(
     let emin = settings.emin_ratio * problem.e0;
     let target = problem.volume_fraction * active_count as f64;
     let limits = Limits { move_limit: settings.move_limit, tolerance: settings.oc_tolerance, target };
+    let rows = 1 + problem.displacement_constraints.len();
     let mut mma = match settings.optimizer {
         Optimizer::Oc => None,
         Optimizer::Mma => Some(match &initial.mma {
-            Some((values, iteration)) => Mma::restore(free.len(), 1, values, *iteration).unwrap_or_else(|| Mma::new(free.len(), 1)),
-            None => Mma::new(free.len(), 1),
+            Some((values, iteration)) => Mma::restore(free.len(), rows, values, *iteration).unwrap_or_else(|| Mma::new(free.len(), rows)),
+            None => Mma::new(free.len(), rows),
         }),
     };
     let mut objective_scale = initial.objective_scale;
@@ -483,6 +493,25 @@ pub fn optimise(
                 dv = filter.density_adjoint(&space.uniform(&dv));
             }
         }
+        let mut extra_rows: Vec<(f64, Vec<f64>)> = Vec::new();
+        for constraint in &problem.displacement_constraints {
+            let u = &solver.warm[constraint.load_case].clone();
+            let (value, limit) = (constraint.value(u), constraint.limit);
+            let raw = displacement::sensitivity(&op, &mut solver, problem, constraint, u, factor, &x_phys, &active, settings.penal)?;
+            let mut d: Vec<f64> =
+                (0..n).map(|e| if design[e] == Design::Free { 2.0 * value / (limit * limit) * raw[e] } else { 0.0 }).collect();
+            match settings.filter {
+                FilterKind::Sensitivity => d = filter.sensitivity(&x, &d),
+                FilterKind::Density => {
+                    if let (Some(projection), Some(beta)) = (settings.projection, beta) {
+                        let slope = projection.derivative(beta, &filtered(&x));
+                        d = d.iter().zip(&slope).map(|(a, s)| a * s).collect();
+                    }
+                    d = filter.density_adjoint(&space.uniform(&d));
+                }
+            }
+            extra_rows.push(((value / limit).powi(2) - 1.0, space.reduce_sum(&d)));
+        }
         let dc_v = space.reduce_sum(&dc);
         let dv_v = space.reduce_sum(&dv);
         let phys = |v: &[f64]| physical(v, beta);
@@ -495,7 +524,7 @@ pub fn optimise(
                 let scale = *objective_scale.get_or_insert(compliance);
                 let pick = |values: &[f64]| -> Vec<f64> { free.iter().map(|&v| values[v]).collect() };
                 let (xf, dc_f, dv_f) = (pick(&vars), pick(&dc_v), pick(&dv_v));
-                let (df0, f, df) = match problem.objective {
+                let (df0, mut f, mut df) = match problem.objective {
                     Objective::MinCompliance => (
                         dc_f.iter().map(|d| d / scale).collect::<Vec<f64>>(),
                         vec![sum(&x_phys) / target - 1.0],
@@ -507,6 +536,10 @@ pub fn optimise(
                         vec![dc_f.iter().map(|d| d / max_compliance).collect::<Vec<f64>>()],
                     ),
                 };
+                for (value, gradient) in &extra_rows {
+                    f.push(*value);
+                    df.push(free.iter().map(|&v| gradient[v]).collect());
+                }
                 let step = mma.step(&xf, &df0, &f, &df, Bounds { xmin: 0.0, xmax: 1.0, move_limit: settings.move_limit });
                 let mut next = vars.clone();
                 for (k, &v) in free.iter().enumerate() {
@@ -558,6 +591,7 @@ pub fn optimise(
             compliance,
             vec![Constraint {
                 name: "volume",
+                label: None,
                 value: volume,
                 limit: problem.volume_fraction,
                 satisfied: volume <= problem.volume_fraction + 1e-9,
@@ -567,12 +601,24 @@ pub fn optimise(
             volume,
             vec![Constraint {
                 name: "compliance",
+                label: None,
                 value: compliance,
                 limit: max_compliance,
                 satisfied: compliance <= max_compliance * (1.0 + 1e-6),
             }],
         ),
     };
+    let mut constraints = constraints;
+    for constraint in &problem.displacement_constraints {
+        let value = constraint.value(&solver.warm[constraint.load_case]).abs();
+        constraints.push(Constraint {
+            name: "displacement",
+            label: Some(constraint.label.clone()),
+            value,
+            limit: constraint.limit,
+            satisfied: value <= constraint.limit * (1.0 + 1e-6),
+        });
+    }
     Ok(Outcome {
         volume,
         grey: sum(&grey_terms) / active_count as f64,
