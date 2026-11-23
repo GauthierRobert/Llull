@@ -275,6 +275,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 - `[TODO]` **S3b** left after S3 (2026-11-07, docs/decisions/S3-hatch-region.md): pick-point hatch over loose lines (planar face finding), hatch import from DXF, more standard hatch patterns (ANSI/ISO), a hatch-edit command, `explode` of a region, associative regions (today editing a source shape does not update the region). _Lane 1+3_
 - `[TODO]` **X3b** left after X3 (2026-11-07, docs/decisions/X3-2d-export.md): per-layer lineweights and linetypes, a real DIMENSION entity with anonymous blocks, exact region curves as edge-path HATCH, HATCH with spline / ellipse edges on import. _Lane 1/3_
+- `[TODO]` **FC-VIEW** desktop viewport draws per-face colours of parametric primitives (`set_face_color`, LIM-1 follow-up): keep coloured primitives out of the shared viewport prototype (`renderPlan.ts:105`, as `plantBatchPlan.ts:29` does for mesh solids) and draw them through `faceColorMesh` + `faceColorTriangles` (`solidMeshes.tsx:107`). _Lane 2_ _deps: LIM-1 follow-ups_
 - `[TODO]` **X4** Import SVG path → 2D profile, STL → `mesh`. _deps: X3_
 - `[TODO]` **EN5** Associative dimensions + dimension styles. _Lane 1+3_
 - `[TODO]` **EN6** Polyline/spline vertex editing, multi-pick offset/trim/extend. _Lane 1+3_
