@@ -49,6 +49,8 @@ function imageProblem(v: Record<string, unknown>): string | null {
 
 /** First structural problem of a saved sweep (path chain + section + SWG fields), or null. */
 function sweepProblem(v: Record<string, unknown>): string | null {
+  if (v['faceLayout'] !== undefined && v['faceLayout'] !== 'joined')
+    return `faceLayout must be 'joined' or absent, got ${JSON.stringify(v['faceLayout'])}`;
   return sweepGeometryProblem(v) ?? (Array.isArray(v['path']) ? sweepDesignProblem(v, v['path'] as CurveSegment<Vec3>[]) : null);
 }
 
@@ -164,11 +166,12 @@ const MAX_FACE_COLORS = 4096;
 
 /** A face signature: a normal of length at most 1, a centre inside the body box (fractions 0..1) and an outward sign of 1 or -1. */
 function validSignature(sig: unknown): boolean {
-  if (!isRecord(sig) || !isVec3(sig['normal']) || !isVec3(sig['centre'])) return false;
+  if (!isRecord(sig) || !isVec3(sig['normal']) || !isVec3(sig['centre']) || !isVec3(sig['span'])) return false;
   const [nx, ny, nz] = sig['normal'];
   return (
     Math.hypot(nx, ny, nz) <= 1.0001 &&
     sig['centre'].every((c) => c >= -0.001 && c <= 1.001) &&
+    sig['span'].every((c) => c >= -0.001 && c <= 1.001) &&
     (sig['outward'] === 1 || sig['outward'] === -1)
   );
 }

@@ -63,12 +63,14 @@ export interface VertexTint {
 
 /**
  * What names a face of a parametric solid independently of its size: the area-weighted mean normal of its patch, the patch centre as fractions
- * of the body's bounding box (0..1 per axis) and the sign of normal . (centre - body middle) (outer or inner wall). A resize keeps all three
+ * of the body's bounding box (0..1 per axis), its own box extents as fractions of the body's, and the sign of normal . (centre - body middle) (outer or inner wall). A resize keeps all three
  * within the tolerances of `faceColors.ts`; two faces of one body never do (their normals or centres differ by 0.5 or more).
  */
 export interface FaceSignature {
   readonly normal: Vec3;
   readonly centre: Vec3;
+  /** Extent of the patch's own box per axis, as fractions of the body's box (separates coaxial walls). */
+  readonly span: Vec3;
   readonly outward: 1 | -1;
 }
 

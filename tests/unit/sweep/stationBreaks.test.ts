@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { type SweepEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { FACE_GROUPS } from '@core/geometry/sweepEval/mergeFaces';
+import { validateEntityValue } from '@core/commands/persistence/guards';
 import { fitSweepFaces, fitToleranceOf, type FittedSweep } from '@core/geometry/sweepEval/fitted';
 
 const PATH = [
@@ -21,6 +22,7 @@ function fitted(stations: ReadonlyArray<Record<string, number>>, extra: Record<s
   return fit;
 }
 
+const RING_EDGES = 24;
 const TAPER = [
   { at: 0, radius: 60 },
   { at: 1, radius: 30 },
@@ -44,5 +46,26 @@ describe('fitted variable sweeps break at their interior stations', () => {
   it('a linear blend (a C0 kink at the station) fits as cheaply', () => {
     const linear = fitted(WAIST, { stationBlend: 'linear' });
     expect(linear.faces).toHaveLength(4 * FACE_GROUPS);
+  });
+
+  it('keeps the per-edge layout for a step replayed without faceLayout (documents made before the joined layout keep their stored face names)', () => {
+    const made = execute(createEmptyDocument(), 'sweep_profile', { path: PATH, smooth: true, stations: WAIST });
+    const id = made.affected[0] as string;
+    expect(made.document.featureHistory[0]?.params).toMatchObject({ faceLayout: 'joined' });
+    expect(made.document.entities[id]).toMatchObject({ faceLayout: 'joined' });
+    const old = {
+      ...made.document,
+      featureHistory: made.document.featureHistory.map((step) => {
+        const { faceLayout: _layout, ...params } = step.params as Record<string, unknown>;
+        return { ...step, params };
+      }),
+    };
+    const replayed = execute(old, 'replay_history', {}).document;
+    const sweep = replayed.entities[id] as SweepEntity;
+    expect(sweep.faceLayout).toBeUndefined();
+    const fit = fitSweepFaces(sweep, fitToleranceOf(sweep));
+    expect('faces' in fit && fit.faces.length).toBe(4 * RING_EDGES);
+    expect(validateEntityValue({ ...made.document.entities[id], faceLayout: 'edges' })).toContain('faceLayout');
+    expect(validateEntityValue(made.document.entities[id])).toBeNull();
   });
 });

@@ -336,7 +336,7 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
 
   it('signatures no face matches and no faceNear: nothing coloured, named; a mesh solid refuses faceSignatures', () => {
     const { doc, id } = redBox();
-    const stale = { normal: [0.3, 0.3, 0.3] as Vec3, centre: [0.5, 0.5, 0.5] as Vec3, outward: -1 as const };
+    const stale = { normal: [0.3, 0.3, 0.3] as Vec3, centre: [0.5, 0.5, 0.5] as Vec3, span: [0.5, 0.5, 0.5] as Vec3, outward: -1 as const };
     expectNoOp(execute(doc, 'set_face_color', { id, faceSignatures: [stale], color: RED }), doc, 'stale face signatures');
     expectNoOp(execute(doc, 'set_face_color', { id }), doc, 'give faceNear');
     const mesh = withMesh();
@@ -381,6 +381,55 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
       );
       expect(Math.min(...radii)).toBeGreaterThan(1.9);
     }
+  });
+
+  const STEPPED = xy(0, 0, 3, 0, 3, 1, 2, 1, 2, 2, 1.5, 2, 1.5, 3, 1, 3, 1, 4, 0, 4);
+  const wallOf = (e: Entity): number[] => {
+    const mesh = faceColorMesh(e);
+    return [
+      ...new Set(
+        paintedTriangles(e).flatMap((t) =>
+          [0, 1, 2].map(
+            (k) =>
+              Math.round(Math.hypot(mesh.positions[(t * 3 + k) * 3] as number, mesh.positions[(t * 3 + k) * 3 + 1] as number) * 100) / 100,
+          ),
+        ),
+      ),
+    ].sort();
+  };
+
+  it('a stepped revolution keeps the r = 1.5 wall when the top step grows, and colours nothing when that step is removed', () => {
+    const base = execute(createEmptyDocument(), 'revolve_profile', { profile: STEPPED, axis: 'z', segments: 32 });
+    const id = base.affected[0] as string;
+    const painted = execute(base.document, 'set_face_color', { id, faceNear: [[1.5, 0, 2.5]], color: RED }).document;
+    expect(wallOf(painted.entities[id] as Entity)).toEqual([1.5]);
+    const grown = edit(painted, 'revolve_profile', {
+      profile: xy(0, 0, 3, 0, 3, 1, 2, 1, 2, 2, 1.5, 2, 1.5, 3, 1, 3, 1, 8, 0, 8),
+      axis: 'z',
+      segments: 32,
+    });
+    expect(wallOf(grown.document.entities[id] as Entity)).toEqual([1.5]);
+    const removed = edit(painted, 'revolve_profile', {
+      profile: xy(0, 0, 3, 0, 3, 1, 2, 1, 2, 3, 1, 3, 1, 4, 0, 4),
+      axis: 'z',
+      segments: 32,
+    });
+    const left = wallOf(removed.document.entities[id] as Entity);
+    expect(left).not.toContain(1);
+    expect(left).not.toContain(2);
+  });
+
+  it('a stored signature no face matches colours nothing (no nearest-point fallback)', () => {
+    const { doc, id } = coloured([0, 0, 2]);
+    const entity = doc.entities[id] as unknown as MeshSolidEntity;
+    const stale = {
+      ...entity,
+      faceColors: entity.faceColors?.map((f) => ({
+        ...f,
+        sig: { normal: [0.1, 0.1, 0.1], centre: [0.9, 0.9, 0.9], span: [0.5, 0.5, 0.5], outward: -1 },
+      })),
+    };
+    expect(paintedTriangles(stale as unknown as Entity)).toEqual([]);
   });
 
   it('an axis sliver does not bridge the top of a revolved cylinder to its bottom', () => {
@@ -485,16 +534,16 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     expect(
       validateEntityValue({
         ...doc.entities[id],
-        faceColors: [{ ...entry, sig: { normal: [0, 0, 1], centre: [0.5, 0.5, 1], outward: 1 } }],
+        faceColors: [{ ...entry, sig: { normal: [0, 0, 1], centre: [0.5, 0.5, 1], span: [0.5, 0.5, 0], outward: 1 } }],
       }),
     ).toBeNull();
     expect(
       validateEntityValue({
         ...doc.entities[id],
-        faceColors: [{ ...entry, sig: { normal: [0, 0, 2], centre: [0.5, 0.5, 1], outward: 1 } }],
+        faceColors: [{ ...entry, sig: { normal: [0, 0, 2], centre: [0.5, 0.5, 1], span: [0.5, 0.5, 0], outward: 1 } }],
       }),
     ).toContain('faceColors');
-    const sig = { normal: [0, 0, 1], centre: [0.5, 0.5, 1], outward: 1 };
+    const sig = { normal: [0, 0, 1], centre: [0.5, 0.5, 1], span: [0.5, 0.5, 0], outward: 1 };
     for (const bad of [
       { ...sig, outward: 0 },
       { ...sig, centre: [0.5, 0.5, 4] },
@@ -531,7 +580,10 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     const tooMany = { ...doc.entities[id], faceColors: Array.from({ length: 4097 }, () => entry) };
     const rectangle = execute(createEmptyDocument(), 'draw_rectangle', { width: 1, height: 1 });
     const flat = { ...rectangle.document.entities[rectangle.affected[0] as string], id: 'flat-1', faceColors: [entry] };
-    const badSig = { ...doc.entities[id], faceColors: [{ ...entry, sig: { normal: [0, 0, 3], centre: [0.5, 0.5, 0.5], outward: 1 } }] };
+    const badSig = {
+      ...doc.entities[id],
+      faceColors: [{ ...entry, sig: { normal: [0, 0, 3], centre: [0.5, 0.5, 0.5], span: [0.5, 0.5, 0.5], outward: 1 } }],
+    };
     for (const bad of [stored(tooMany, id), stored(flat, 'flat-1'), stored(badSig, id)]) {
       const r = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(bad) });
       expect(r.document.entities).toEqual({});

@@ -115,23 +115,31 @@ interface MeshFaces {
   readonly centroid: (triangle: number) => Vec3;
 }
 
-/** Signature tolerances: two patches match when their mean normals differ by less than this (a unit normal vs a face-less 0 differs by 1)... */
-const SIGNATURE_NORMAL_TOLERANCE = 0.5;
-/** ...and their centres, as fractions of the body's box, by less than this (neighbouring faces of a box differ by 0.5 or more). */
+/**
+ * Signature tolerances. Mean normals must differ by less than this: separate patches meet at a crease of 30 degrees or more, so the unit normals of
+ * neighbouring facets differ by at least 2 sin(15 deg) = 0.52, and a whole wall (mean 0) differs from a facet strip (unit) by 1: 0.4 leaves 0.12 of margin.
+ */
+const SIGNATURE_NORMAL_TOLERANCE = 0.4;
+/** Centres, as fractions of the body's box: neighbouring faces of a box differ by 0.5 or more. */
 const SIGNATURE_CENTRE_TOLERANCE = 0.35;
+/** Extents of the patch's own box, as fractions of the body's box: separates coaxial walls of different radius (a step of 1 against 1.5 in a body of 6 is 0.17). */
+const SIGNATURE_SPAN_TOLERANCE = 0.1;
 
-/** Ordinal of the patch whose signature best matches `target` (same outward sign, normals and centres within tolerance), or -1. */
+/**
+ * Ordinal of the patch matching `target` (same outward sign; normal, centre and span within tolerance), or -1 when none does or SEVERAL do: a
+ * second candidate means the signature no longer tells its face from another (stepped coaxial walls), and the caller re-picks or drops.
+ */
 function matchSignature(sigs: ReadonlyArray<FaceSignature | null>, target: FaceSignature): number {
-  let best = -1;
-  let bestScore = Infinity;
+  const found: number[] = [];
   sigs.forEach((sig, ordinal) => {
     if (sig === null || sig.outward !== target.outward) return;
-    const dn = len3(sub3(sig.normal, target.normal));
-    const dc = len3(sub3(sig.centre, target.centre));
-    if (dn > SIGNATURE_NORMAL_TOLERANCE || dc > SIGNATURE_CENTRE_TOLERANCE || dn + dc >= bestScore) return;
-    [best, bestScore] = [ordinal, dn + dc];
+    const within =
+      len3(sub3(sig.normal, target.normal)) <= SIGNATURE_NORMAL_TOLERANCE &&
+      len3(sub3(sig.centre, target.centre)) <= SIGNATURE_CENTRE_TOLERANCE &&
+      len3(sub3(sig.span, target.span)) <= SIGNATURE_SPAN_TOLERANCE;
+    if (within) found.push(ordinal);
   });
-  return best;
+  return found.length === 1 ? (found[0] as number) : -1;
 }
 
 function patchSignatures(tris: IndexedTriangles, owner: readonly number[], count: number): Array<FaceSignature | null> {
@@ -147,6 +155,8 @@ function patchSignatures(tris: IndexedTriangles, owner: readonly number[], count
   const centreSum = Array.from({ length: count }, () => [0, 0, 0]);
   const area = new Array<number>(count).fill(0);
   const outward = new Array<number>(count).fill(0);
+  const boxLo = Array.from({ length: count }, () => [Infinity, Infinity, Infinity]);
+  const boxHi = Array.from({ length: count }, () => [-Infinity, -Infinity, -Infinity]);
   for (let t = 0; t < tris.count; t++) {
     const [a, b, c] = triangleAt(tris, t);
     const doubled = cross3(sub3(b, a), sub3(c, a));
@@ -155,6 +165,11 @@ function patchSignatures(tris: IndexedTriangles, owner: readonly number[], count
     if (size2 === 0) continue;
     const centre: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
     const half = size2 / 2;
+    for (const corner of [a, b, c])
+      for (let k = 0; k < 3; k++) {
+        (boxLo[p] as number[])[k] = Math.min((boxLo[p] as number[])[k] as number, corner[k] as number);
+        (boxHi[p] as number[])[k] = Math.max((boxHi[p] as number[])[k] as number, corner[k] as number);
+      }
     for (let k = 0; k < 3; k++) {
       (areaVector[p] as number[])[k] = ((areaVector[p] as number[])[k] as number) + (doubled[k] as number) / 2;
       (centreSum[p] as number[])[k] = ((centreSum[p] as number[])[k] as number) + (centre[k] as number) * half;
@@ -169,6 +184,9 @@ function patchSignatures(tris: IndexedTriangles, owner: readonly number[], count
     return {
       normal: [(nx as number) / total, (ny as number) / total, (nz as number) / total] as const,
       centre: [centre[0] as number, centre[1] as number, centre[2] as number] as const,
+      span: [0, 1, 2]
+        .map((k) => ((boxHi[p] as number[])[k] as number) - ((boxLo[p] as number[])[k] as number))
+        .map((x, k) => x / (size[k] as number)) as unknown as Vec3,
       outward: (outward[p] as number) >= 0 ? (1 as const) : (-1 as const),
     };
   });
@@ -242,8 +260,9 @@ function meshFaces(mesh: MeshData): MeshFaces {
 function entryTriangles(faces: MeshFaces, parts: () => Parts, entry: FaceColor): Iterable<number> {
   if (entry.sig !== undefined) {
     const { owner, sigs } = parts();
+    // no (or no single) matching face: nothing is coloured; a replayed `set_face_color` re-picks by faceNear and stores a fresh signature
     const ordinal = matchSignature(sigs, entry.sig);
-    if (ordinal >= 0) return owner.flatMap((patchOf, t) => (patchOf === ordinal ? [t] : []));
+    return ordinal < 0 ? [] : owner.flatMap((patchOf, t) => (patchOf === ordinal ? [t] : []));
   }
   return faces.patch(faces.closest(entry.near).triangle);
 }

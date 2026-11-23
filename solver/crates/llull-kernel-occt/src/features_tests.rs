@@ -107,6 +107,30 @@ fn a_sheet_solid_closes_lateral_faces_with_two_caps() {
     assert!(sheet_solid(&[vec![1.0, 2.0]], 1e-6).is_err() || sheet_solid(&[vec![1.0, 2.0]], 1e-6).unwrap().is_none(), "bad data");
 }
 
+/// The adaptive mass rule a fitted sheet solid asks for spreads to the booleans built on it (facade.cxx `volume_props`): a torus and a filleted cube next to it must
+/// still read their closed-form volumes (the rule drifted 1.6e-6 on toroidal faces in a corpus, which this guards at 1e-8).
+#[test]
+fn the_adaptive_rule_of_a_sheet_solid_keeps_toroidal_and_filleted_neighbours_exact() {
+    let _serial = crate::serial_blends();
+    let sides = [
+        prism_side([0.0, 0.0], [2.0, 0.0], 3.0),
+        prism_side([2.0, 0.0], [2.0, 1.5], 3.0),
+        prism_side([2.0, 1.5], [0.0, 1.5], 3.0),
+        prism_side([0.0, 1.5], [0.0, 0.0], 3.0),
+    ];
+    let prism = sheet_solid(&sides, 1e-6).unwrap().unwrap();
+    let (ring, tube) = (3.0, 0.7);
+    let torus = crate::placed(&crate::make_torus(ring, tube).unwrap().unwrap(), [0.0; 3], [20.0, 0.0, 0.0], [0.0; 3]).unwrap().unwrap();
+    let rounded = crate::placed(&fillet(&cube(), &[0], 0.5, None).unwrap().unwrap(), [0.0; 3], [-20.0, 0.0, 0.0], [0.0; 3]).unwrap().unwrap();
+    let both = crate::boolean(crate::BooleanOp::Union, &crate::boolean(crate::BooleanOp::Union, &prism, &torus, true).unwrap().unwrap(), &rounded, true)
+        .unwrap()
+        .unwrap();
+    assert!(crate::test_bridge::refined_mass(&both), "the flag survives the booleans");
+    let pi = std::f64::consts::PI;
+    let expected = 9.0 + 2.0 * pi * pi * ring * tube * tube + (8.0 - 0.25 * (1.0 - pi / 4.0) * 2.0);
+    assert!((volume(&both) - expected).abs() < 1e-8 * expected, "volume {} vs {}", volume(&both), expected);
+}
+
 /// SWG M8: a closed loft (no caps) and a loft closed to a point at one end (one cap) are sewn with the matching number of caps; a wrong count is refused.
 #[test]
 fn a_sheet_solid_takes_the_expected_number_of_caps() {

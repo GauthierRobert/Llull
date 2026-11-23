@@ -68,11 +68,9 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   revolution as well as mesh solids. A face is a smooth patch of the primitive's own tessellation (`geometry/faceColors.ts` `faceColorMesh`).
   Selector (regeneration): a stored `near` point cannot follow a resize (the replayed command no-ops), and a patch ordinal or count renames faces
   when a profile is reordered or a vertex is added. A picked patch is therefore stored as a resize-invariant SIGNATURE (`FaceColor.sig`, recorded
-  by the command as `faceSignatures`): the area-weighted mean normal, the patch centre as fractions of the body's bounding box, and the sign of
+  by the command as `faceSignatures`): the area-weighted mean normal, the patch centre and the patch's own box extents (its `span`) as fractions of the body's bounding box, and the sign of
   normal . (centre - box middle) (outer or inner wall; a full cylinder wall has a zero mean normal and only this sign and the centre tell outer
-  from inner). Resolution picks the patch with the same sign whose normal differs by under 0.5 and centre by under 0.35 (box fractions), best
-  score first: a resize keeps both within a few hundredths, while two faces of one body differ by 0.5 or more in at least one (perpendicular
-  box sides: 1.41 in normal; opposite sides: 1.0 in centre; a unit-normal facet strip vs a whole wall: 1 in normal). Nothing is written back on
+  from inner). Resolution needs EXACTLY ONE patch with the same sign, normals within 0.4, centres within 0.35 and spans within 0.1 (box fractions); several candidates (stepped coaxial walls of a revolution all have mean normal 0) are ambiguous and count as no match. Margins: separate patches meet at a crease of 30 degrees or more, so neighbouring facet normals differ by at least 0.52 (tolerance 0.4); perpendicular box sides differ by 1.41 in normal, opposite sides by 1.0 in centre; a unit-normal strip against a whole wall by 1; coaxial walls of radius 1 and 1.5 in a body of 6 by 0.17 in span. A stored signature that matches nothing colours nothing. Nothing is written back on
   replay. No match (a revolution going from 32 to 6 segments) re-picks by `faceNear` (summary note, result still ok, so later regenerations do
   not fail), and without `faceNear` the step changes nothing, which the replay reports as a step that no longer changes the document. Mesh
   solids keep the `near` pick (their mesh is fixed). Collapsed-edge slivers (a profile touching the axis) may join a patch but never carry it
@@ -95,5 +93,12 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   `tests/unit/sweep/stationBreaks.test.ts`, kernel.evaluate of the boolean): 12.9 / 12.8 / 12.1 s before (96 faces per sweep, 10 748 triangles),
   3.3 / 3.4 / 2.9 s after (8 faces per sweep, 6 824 triangles).
   Not measured: the LLR-845 plan.
+  Names (SC-N1): a sheet solid has no construction roles, so its faces are named `f<k>` by topology index and its edges `e(f<a>|f<b>)`; joining faces
+  renumbers them (an old `e(f0|f1)` would be another edge). A new `faceLayout: 'joined'` field on a fitted sweep (set by `sweep_profile` when the sweep
+  is fitted and recorded in its step) selects the joined layout; a step replayed WITHOUT it (`ctx.replaying`, a document made before) and an entity
+  without it keep the per-edge layout, so stored face / edge names still resolve (`tests/unit/sweep/stationBreaks.test.ts`: replay of a step with the
+  field removed gives 4 x 24 faces). No stored plan or golden in the repo names faces of a fitted sweep, so no replay of one could be shown.
+  The adaptive rule was checked on neighbours it now reaches through booleans: a torus and a filleted cube unioned with a sheet solid read their
+  closed-form volumes to 1e-8 (`features_tests.rs`).
 
 ## Left

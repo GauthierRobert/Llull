@@ -86,6 +86,7 @@ export const setFaceColor = defineCommand({
         z.object({
           normal: vec3('Area-weighted mean normal of the patch.'),
           centre: vec3('Patch centre as fractions of the body bounding box.'),
+          span: vec3('Extent of the patch box as fractions of the body bounding box.'),
           outward: z.union([z.literal(1), z.literal(-1)]).describe('+1 outer wall, -1 inner wall.'),
         }),
       )

@@ -218,7 +218,7 @@ function fitOnce(
           edgeFaces.push(made.face);
           deviation = Math.max(deviation, made.deviation);
         }
-        appendAll(faceSets[set] as NurbsSurfaceData[], mergeEdgeFaces(edgeFaces, scale));
+        appendAll(faceSets[set] as NurbsSurfaceData[], sweep.faceLayout === 'joined' ? mergeEdgeFaces(edgeFaces, scale) : edgeFaces);
       }
     }
     total += run.cells;

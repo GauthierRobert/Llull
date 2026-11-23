@@ -53,12 +53,24 @@ function join(edges: readonly NurbsSurfaceData[], scale: number): NurbsSurfaceDa
   };
 }
 
-/** True when `faces` are the edge faces of a station ring this module can join: at least MIN_EDGES single-span, non-rational cubics. */
+const sameList = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** True when `faces` are the edge faces of a station ring this module can join: at least MIN_EDGES single-span, non-rational cubics over one v structure. */
 function joinable(faces: readonly NurbsSurfaceData[]): boolean {
+  const [first] = faces;
   return (
+    first !== undefined &&
     faces.length >= MIN_EDGES &&
     faces.every(
-      (face) => face.degreeU === CUBIC && face.weights === undefined && face.knotsU.length === 2 && face.poles.length === CUBIC + 1,
+      (face) =>
+        face.degreeU === CUBIC &&
+        face.weights === undefined &&
+        face.knotsU.length === 2 &&
+        face.poles.length === CUBIC + 1 &&
+        face.degreeV === first.degreeV &&
+        sameList(face.knotsV, first.knotsV) &&
+        sameList(face.multiplicitiesV, first.multiplicitiesV) &&
+        face.poles[0]?.length === first.poles[0]?.length,
     )
   );
 }
