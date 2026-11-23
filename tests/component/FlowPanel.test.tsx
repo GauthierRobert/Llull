@@ -370,6 +370,26 @@ describe('FlowPanel state per case and stale layers', () => {
     expect(screen.getByTestId('flow-progress')).toBeTruthy();
   });
 
+  it('derives the elapsed time from the stored start, so closing and reopening the panel keeps it right', () => {
+    load();
+    useStore.setState({ liveStatus: 'connected' });
+    useFlowViewStore.getState().setSolve('c1', { state: { status: 'running', startedAt: Date.now() - 42_000, gridStudy: false } });
+    const view = render(<FlowPanel />);
+    expect(screen.getByTestId('flow-progress').textContent).toMatch(/4[23] s elapsed/);
+    view.unmount();
+    render(<FlowPanel />);
+    expect(screen.getByTestId('flow-progress').textContent).toMatch(/4[23] s elapsed/);
+  });
+
+  it('forgets the solve state of cases that no longer exist', () => {
+    load();
+    const done = { state: { status: 'done', summary: 'ok' } } as const;
+    useFlowViewStore.getState().setSolve('c1', done);
+    useFlowViewStore.getState().setSolve('deleted', done);
+    render(<FlowPanel />);
+    expect(Object.keys(useFlowViewStore.getState().solves)).toEqual(['c1']);
+  });
+
   const slice = {
     caseId: 'c1',
     file: {

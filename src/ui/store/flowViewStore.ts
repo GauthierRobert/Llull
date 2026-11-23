@@ -27,7 +27,11 @@ export interface StreamlinesLayer {
 
 export type FlowSolveState =
   | { readonly status: 'idle' }
-  | { readonly status: 'running'; readonly elapsedS: number; readonly gridStudy: boolean }
+  | {
+      readonly status: 'running';
+      /** `Date.now()` when the solve started: elapsed time is derived from it, so it stays right while the panel is closed. */ readonly startedAt: number;
+      readonly gridStudy: boolean;
+    }
   | { readonly status: 'done'; readonly summary: string }
   | { readonly status: 'cancelled'; readonly summary: string }
   | { readonly status: 'failed'; readonly summary: string; readonly code: string | null; readonly remediation: string }
@@ -45,6 +49,8 @@ interface FlowViewState {
   /** Solve state by case id. */
   solves: Readonly<Record<string, FlowSolveEntry>>;
   setSolve(caseId: string, entry: Partial<FlowSolveEntry>): void;
+  /** Forgets the solve state of every case not in `caseIds` (deleted cases). */
+  pruneSolves(caseIds: readonly string[]): void;
   /** Case drawn on the model; null while the Flow panel is closed. */
   caseId: string | null;
   showSlice: boolean;
@@ -62,6 +68,11 @@ const IDLE = { status: 'idle' } as const;
 
 export const useFlowViewStore = create<FlowViewState>()((set, get) => ({
   solves: {},
+  pruneSolves: (caseIds) =>
+    set((state) => {
+      const kept = Object.entries(state.solves).filter(([id]) => caseIds.includes(id));
+      return kept.length === Object.keys(state.solves).length ? state : { solves: Object.fromEntries(kept) };
+    }),
   setSolve: (caseId, entry) =>
     set((state) => ({ solves: { ...state.solves, [caseId]: { ...(state.solves[caseId] ?? NO_SOLVE), ...entry } } })),
   caseId: null,

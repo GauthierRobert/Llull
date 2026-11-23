@@ -44,6 +44,10 @@ export function FlowPanel({ className }: { className?: string }): React.ReactEle
     } else if (selectedId !== picked && pending.current === null) setCase(selectedId);
   }, [cases, picked, selectedId, setCase]);
   useEffect(() => () => useFlowViewStore.getState().setCase(null), []);
+  const caseKey = Object.keys(cases).join('|');
+  useEffect(() => {
+    useFlowViewStore.getState().pruneSolves(caseKey === '' ? [] : caseKey.split('|'));
+  }, [caseKey]);
   const onCreated = (caseId: string): void => {
     if (Object.hasOwn(cases, caseId)) setCase(caseId);
     else pending.current = caseId;

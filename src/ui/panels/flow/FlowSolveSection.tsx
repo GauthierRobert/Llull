@@ -13,7 +13,7 @@ const DEVICE_TEXT: Readonly<Record<FlowSolveOptions['device'], string>> = {
 };
 
 export function FlowSolveSection({ caseId }: { caseId: string }): React.ReactElement {
-  const { state, disabledReason, stopNote, start, stop } = useFlowSolve(caseId);
+  const { state, elapsedS, disabledReason, stopNote, start, stop } = useFlowSolve(caseId);
   const [gridStudy, setGridStudy] = useState(false);
   const [device, setDevice] = useState<FlowSolveOptions['device']>('cpu');
   const running = state.status === 'running';
@@ -68,8 +68,7 @@ export function FlowSolveSection({ caseId }: { caseId: string }): React.ReactEle
         <div data-testid="flow-progress">
           <progress className="flow__progress" aria-label="Flow solve in progress" />
           <p className="analysis__hint">
-            {state.gridStudy ? 'Solving three grids' : 'Solving'}, {state.elapsedS} s elapsed. The panel updates when the result is
-            recorded.
+            {state.gridStudy ? 'Solving three grids' : 'Solving'}, {elapsedS} s elapsed. The panel updates when the result is recorded.
           </p>
         </div>
       )}

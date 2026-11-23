@@ -2,7 +2,7 @@
 // the answer arrives when it ends, so the panel shows the elapsed time meanwhile; the result is recorded by the transport. The state lives
 // in the flow view store, per case, so it survives picking another case.
 
-import { useEffect } from 'react';
+import { useEffect, useReducer } from 'react';
 import { useStore } from '@ui/store';
 import { useFlowViewStore, type FlowSolveEntry, type FlowSolveState } from '@ui/store/flowViewStore';
 import { callFlowTool, OFFLINE } from './flowTransport';
@@ -14,6 +14,8 @@ export interface FlowSolveOptions {
 
 interface FlowSolve {
   readonly state: FlowSolveState;
+  /** Seconds since the running solve started (0 when none runs). */
+  readonly elapsedS: number;
   /** Why a solve cannot start; null when it can. */
   readonly disabledReason: string | null;
   /** Answer of the last `cfd_stop`, shown while the solve winds down. */
@@ -29,19 +31,17 @@ export function useFlowSolve(caseId: string): FlowSolve {
   const { state, stopNote } = useFlowViewStore((s) => s.solves[caseId] ?? IDLE);
   const running = state.status === 'running';
 
+  // A tick per second re-renders the elapsed time while running; the time itself comes from the stored start.
+  const [, tick] = useReducer((count: number) => count + 1, 0);
   useEffect(() => {
     if (!running) return;
-    const timer = setInterval(() => {
-      const current = useFlowViewStore.getState().solves[caseId]?.state;
-      if (current?.status === 'running')
-        useFlowViewStore.getState().setSolve(caseId, { state: { ...current, elapsedS: current.elapsedS + 1 } });
-    }, 1000);
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [running, caseId]);
+  }, [running]);
 
   const start = (options: FlowSolveOptions): void => {
     const { setSolve } = useFlowViewStore.getState();
-    setSolve(caseId, { state: { status: 'running', elapsedS: 0, gridStudy: options.gridStudy }, stopNote: '' });
+    setSolve(caseId, { state: { status: 'running', startedAt: Date.now(), gridStudy: options.gridStudy }, stopNote: '' });
     const params = {
       caseId,
       ...(options.gridStudy ? { gridStudy: true } : {}),
@@ -64,5 +64,6 @@ export function useFlowSolve(caseId: string): FlowSolve {
   };
 
   const disabledReason = !online ? OFFLINE : state.status === 'missing' ? state.reason : running ? 'Solving…' : null;
-  return { state, disabledReason, stopNote, start, stop };
+  const elapsedS = state.status === 'running' ? Math.max(0, Math.round((Date.now() - state.startedAt) / 1000)) : 0;
+  return { state, elapsedS, disabledReason, stopNote, start, stop };
 }

@@ -4,6 +4,7 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext, CommandResult } from '@core/commands/types';
 import type { CfdResultPort } from '@core/model/cfdResult';
 import type { CfdCase, CfdGridStudy } from '@aero/cfd/types';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { gciTriplet } from '@lib/convergence';
 import { cfdDocument } from '@aero/cfd/document';
 import { caseHashOf } from '@aero/cfd/caseDoc';
@@ -172,9 +173,30 @@ describe('record_cfd_grid_study', () => {
     expect(Object.keys(second.document.cfd?.studies ?? {})).toEqual(['c1']);
   });
 
-  it('runs without a kernel and with one (surface staleness)', () => {
+  it('runs without a kernel and with the Manifold kernel (surface staleness)', async () => {
     expect(study(recorded.doc, {}, { ...ctx, kernel: null }).rejected).not.toBe(true);
-    expect(study(recorded.doc, {}, ctx).rejected).not.toBe(true);
+    const kernel = await createManifoldKernel();
+    const withKernel = recordedSphere({}, kernel);
+    const levels = [0.05, 0.1, 0.2].map((h) =>
+      level(h, drag(h), { geometryHash: withKernel.artifact.geometryHash, kernel: withKernel.artifact.kernel }),
+    );
+    const result = execute(
+      withKernel.doc,
+      'record_cfd_grid_study',
+      { caseId: 'c1', resultsHashes: levels.map((entry) => entry.hash) },
+      { ...withKernel.ctx, cfdResults: portOf(levels) },
+    );
+    expect(result.rejected, result.summary).not.toBe(true);
+    expect(result.document.cfd?.studies?.['c1']?.levels).toHaveLength(3);
+    // the same bundles are stale once the body moved: the surface is re-prepared through the kernel
+    const moved = execute(withKernel.doc, 'move_entities', { ids: [withKernel.ballId], delta: [0.5, 0, 0] }, withKernel.ctx).document;
+    const stale = execute(
+      moved,
+      'record_cfd_grid_study',
+      { caseId: 'c1', resultsHashes: levels.map((entry) => entry.hash) },
+      { ...withKernel.ctx, cfdResults: portOf(levels) },
+    );
+    expect(stale.error?.code).toBe('CFD_INPUT_STALE');
   });
 
   it('accepts the resolution-only hash only for the matching grid: wrong cells or another quality are stale', () => {
