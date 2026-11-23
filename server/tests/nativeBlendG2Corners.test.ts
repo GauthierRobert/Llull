@@ -57,45 +57,27 @@ describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OC
   const check = (doc: CadDocument, id: string, require: 'G1' | 'G2'): Checked =>
     execute(doc, 'check_blends', { ids: [id], require }).data as Checked;
 
-  it('a curvature-profile cube has no failing finding under check_blends require G2; the seams of its corner stars warn BLD_CHECK_SPOKE_G2', () => {
+  it('a curvature-profile cube has vertex fans (13.45, the default since 13.46): its spokes are curvature-continuous to the vertices and check_blends require G2 raises no finding', () => {
     const { doc, id, notes } = rounded({ type: 'curvature', shape: 0.5 });
     expect(notes.corners).toHaveLength(8);
     for (const corner of notes.corners ?? []) {
-      expect([corner.continuity, corner.spokes, corner.spokeReach]).toEqual(['G2', 'G2-beyond-reach', 0.2]);
-      // measured on the built sub-patches: G2 (under the 0.02 build gate) beyond the stretch, an honest relative jump within it, 50 times under the 0.83 of the G1 seams in absolute terms
-      expect(corner.spokeRelative).toBeLessThan(0.02);
-      expect(corner.spokeVertexRelative).toBeGreaterThan(0.1);
-      expect(corner.spokeJump).toBeLessThan(0.03);
+      expect([corner.continuity, corner.spokes, corner.spokeReach]).toEqual(['G2', 'G2-fan', 0]);
+      // measured on the fan seams (the build gate is 0.02 relative + a floor per length, so a small curvature may read up to a few per cent): under 0.1 everywhere, the absolute jump a few per mille (the 13.38 spokes read 0.83 at the vertex)
+      expect(corner.spokeRelative).toBeLessThan(0.1);
+      expect(corner.spokeVertexRelative).toBeLessThan(0.1);
+      expect(corner.spokeJump).toBeLessThan(5e-3);
     }
     const checked = check(doc, id, 'G2');
-    expect(checked.status).toBe('warn');
     expect(checked.findings.filter((found) => found.severity === 'fail')).toEqual([]);
+    // 6 trimmed sub-patches and 12 fans per corner, each with one contact with a blend or flat face or a seam
     const corners = checked.blends.filter((row) => row.kind === 'corner');
-    expect(corners).toHaveLength(48);
-    // every sub-patch has one contact with a blend or flat face (order G2, curvature jump under the blend-scale floor) and two spokes (G1 seams)
+    expect(corners).toHaveLength(8 * 18);
     const contacts = corners.flatMap((row) => row.contacts);
-    const seams = contacts.filter((contact) => contact.order !== 'G2');
-    expect(contacts.filter((contact) => contact.order === 'G2').length).toBeGreaterThanOrEqual(48);
-    expect(seams.length).toBeGreaterThan(0);
-    for (const seam of seams) expect(seam.order).toBe('G1');
     for (const contact of contacts) expect(contact.g1AngleRad).toBeLessThan(1e-3);
-    // the seams are warned under their own code, and nothing is a BLD_CHECK_G2_JUMP
-    const spokes = checked.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2');
-    expect(spokes.length).toBeGreaterThan(0);
-    for (const found of spokes) {
-      // by value: above the limit, within the declared stretch (named in the message), a warn
-      expect(found.severity).toBe('warn');
-      expect(Number(found.value)).toBeGreaterThan(Number(found.limit));
-      expect(found.message).toContain('spokeReach 0.2');
-    }
-    // the worst reading is the near-vertex relative jump at check_blends' own samples (0.285 here; the build's finer samples read 1.74 at a sign change of the curvature), well over g2Rel 0.1 and
-    // nothing like the G1 seams' 0.83 per mm: it is a ratio, and it sits inside the declared stretch
-    const worst = Math.max(...spokes.map((found) => Number(found.value)));
-    expect(worst).toBeGreaterThan(0.2);
-    expect(worst).toBeLessThan(2);
-    // beyond the declared stretch the seams are curvature-continuous: no lost-correction failure
     expect(checked.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toBe(false);
     expect(checked.findings.some((found) => found.code === 'BLD_CHECK_G2_JUMP')).toBe(false);
+    expect(checked.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toEqual([]);
+    expect(checked.status).toBe('pass');
   }, 120_000);
 
   it('the conic cube keeps the G1 star: require G2 fails at its corner contacts', () => {

@@ -23,6 +23,8 @@ struct SpokeReading {
   double relative = 0;         // largest share of the larger of the two curvatures beyond the stretch (the whole spoke when reach is 0)
   double vertex_relative = 0;  // the same within the stretch next to the vertices
   std::string refused;         // G1 spokes of a G2 star: why the G2 spokes were refused (the measure against the gate)
+  bool fan = false;            // the vertex fans of 13.45: the spokes are curvature-continuous all the way to the vertices (reach 0; relative / vertex_relative are read over the fans)
+  std::string fan_refused;     // G2-beyond-reach spokes: why the vertex fans were not built (the measure against their gates)
 };
 
 struct Patches {
@@ -43,8 +45,9 @@ struct Patches {
 // The loop (ordered, closed) with the support face of each edge (`supports[k]` carries `loop[k]`; the faces are the outward ones of the split solid). False with `why` when the
 // construction is refused or its own measures exceed `max_gap` / `max_angle`; the caller falls back to another fill.
 // `allow_crease`: one vertex of the loop may join two supports that are NOT tangent (an unrounded edge of the part enters the hole there, 13.33.2); its spoke is a crease.
+// `allow_fans`: false never builds the vertex fans of 13.45 (the 13.38 spokes), whatever the hook says.
 // `g2`: the patch is also curvature-continuous to its supports across every loop edge (13.36): refused (with `why`) at a chain with a joint, a crease vertex, or when the measured jump stays over the gate.
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false, bool gate_crease = true, bool c0_knots_only = false, bool allow_crease = false, bool g2 = false, double tangent_scale = 1.0);
+           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false, bool gate_crease = true, bool c0_knots_only = false, bool allow_crease = false, bool g2 = false, double tangent_scale = 1.0, bool allow_fans = true);
 
 }  // namespace llull::corner_exact

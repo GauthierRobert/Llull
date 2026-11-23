@@ -49,6 +49,7 @@
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepLib.hxx>
 #include <BRepOffsetAPI_MakeFilling.hxx>
 #include <BRep_Tool.hxx>
@@ -137,6 +138,8 @@ struct Mode {
   double param = 0.0;
   bool automatic = false;
   double factor = 2.0;  // automatic corners: setback relative to the least one the neighbouring blends allow
+  std::string fans_note;  // why the step was rebuilt without vertex fans: spokeFanRefused of the corners that kept the 13.38 spokes
+  bool no_fans = false;   // no vertex fans (13.45): the 13.38 spokes (a step whose fans failed after the sewing, 13.46)
   bool no_g2 = false;     // the G1 star only (a curvature step whose G2 star failed after the sewing, 13.36)
   std::string downgrade;  // why the step was built with a lesser patch than the G2 star: recorded as g2Refused of every curvature corner
 };
@@ -835,7 +838,7 @@ double lower_diagonal(const std::vector<TopoDS_Face> &members, size_t patch_coun
 
 double volume_of(const TopoDS_Shape &shape) {
   GProp_GProps props;
-  BRepGProp::VolumeProperties(shape, props);
+  llull::query::volume_properties(shape, props);
   return props.Mass();
 }
 
@@ -860,6 +863,7 @@ struct FillJob {
   bool hinted = false;                // the centre of the star was taken from the replaced surface
   int convexity = 0;                  // 0 every edge at the vertex convex, 1 concave, 2 mixed (13.41)
   bool use_hint = true;               // false: the centre of the star is the 3/8 rule even where the replaced surface knows one (13.41)
+  bool fans = true;                   // the vertex fans of 13.45 may be built (false: the retry after a step with fans failed)
   double tangent_scale = 1;           // the spoke tangents of the star as a share of the chord to the centre (13.41)
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
   bool g2 = false;                    // the star should be curvature-continuous to its supports (a curvature profile, 13.36)
@@ -970,7 +974,7 @@ bool fill_exact(FillJob &job, double diagonal) {
     };
   const auto make = [&](bool g2) {
     exact = corner_exact::Patches();
-    return corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load(), job.creased, g2, job.tangent_scale);
+    return corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load(), job.creased, g2, job.tangent_scale, job.fans);
   };
   // a curvature profile: the G2 star first, the G1 star (with the reason) when the G2 one is refused
   if (job.g2 && g_g2_star.load()) {
@@ -1621,7 +1625,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     // the box around the vertex has faces too, far from the solid: they carry no piece of it
     if (on_planes.empty()) return false;
     GProp_GProps props;
-    BRepGProp::SurfaceProperties(face, props);
+    llull::query::surface_properties(face, props);
     gp_Pnt inside_point = props.CentreOfMass();
     for (TopExp_Explorer it(face, TopAbs_EDGE); it.More(); it.Next()) {
       const BRepAdaptor_Curve curve(TopoDS::Edge(it.Current()));
@@ -1801,7 +1805,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       std::vector<size_t> order(job.patch_loop.size());
       for (size_t k = 0; k < order.size(); ++k) order[k] = k;
       const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
-      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) != key_of(b) ? key_of(a) < key_of(b) : a < b; });
       for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
     }
     for (size_t k = 0; k < job.patches.size(); ++k) {
@@ -1943,7 +1947,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
 }
 
 std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
-                                          bool &fill_failed, std::string &corners_json, std::string &why, bool allow_star, bool &star_used) {
+                                          bool &fill_failed, std::string &corners_json, std::string &why, bool allow_star, bool &star_used, bool &fans_used) {
   fill_failed = false;
   std::map<int, Taper> radius;
   std::vector<Corner> corners;
@@ -2246,6 +2250,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     job.mixed = plan.mixed[c];
     job.creased = plan.sharp[c] >= 0;
     job.g2 = mode.kind == 1 && !mode.no_g2;
+    job.fans = !mode.no_fans;
     TopTools_IndexedMapOfShape removed;
     const TopoDS_Vertex apex = vertex_at(split, corners[c].at, vertex_tolerance);
     if (apex.IsNull()) {
@@ -2313,7 +2318,9 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   // test hooks: 3 = a step with a star fails after the fills (the plate pass must then build it), 4 = every step fails there (the message names both reasons)
   // 7 = a step with a G2 star fails there (the G1 star pass must then build it)
   const bool g2_star_used = std::any_of(jobs.begin(), jobs.end(), [](const FillJob &job) { return job.g2_built; });
-  if ((g_exact_mode.load() == 3 && star_used) || (g_exact_mode.load() == 7 && g2_star_used) || g_exact_mode.load() == 4) {
+  fans_used = std::any_of(jobs.begin(), jobs.end(), [](const FillJob &job) { return job.spokes.fan; });
+  // 8 = a step with vertex fans fails there (the pass without fans must then build it)
+  if ((g_exact_mode.load() == 8 && fans_used) || (g_exact_mode.load() == 3 && star_used) || (g_exact_mode.load() == 7 && g2_star_used) || g_exact_mode.load() == 4) {
     fill_failed = true;
     why = std::string(kFailed) + "forced by the test hook after the fills";
     return nullptr;
@@ -2334,7 +2341,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     {
       // A convex corner removes material, a concave one adds it: the centre of the patch lies IN the source solid for the first, OUT of it for the second.
       GProp_GProps props;
-      if (!job.has_centre) BRepGProp::SurfaceProperties(job.patches.front(), props);
+      if (!job.has_centre) llull::query::surface_properties(job.patches.front(), props);
       BRepClass3d_SolidClassifier classifier(shape);
       classifier.Perform(job.has_centre ? job.centre : props.CentreOfMass(), std::max(blend::kInsideTolerance, 1e-9 * diagonal));
       const TopAbs_State expected = plan.concave[c] ? TopAbs_OUT : TopAbs_IN;
@@ -2353,7 +2360,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       std::vector<size_t> order(job.patch_loop.size());
       for (size_t k = 0; k < order.size(); ++k) order[k] = k;
       const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
-      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) != key_of(b) ? key_of(a) < key_of(b) : a < b; });
       for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
     }
     for (size_t k = 0; k < job.patches.size(); ++k) {
@@ -2481,9 +2488,11 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       if (!patch_continuity[c].empty()) log.key("continuity").string(patch_continuity[c]);
       if (patch_continuity[c] == "G2") {
         const corner_exact::SpokeReading &spokes = patch_spokes[c];
-        log.key("spokes").string(spokes.reach > 0 ? "G2-beyond-reach" : "G1").key("spokeJump").number(spokes.jump);
-        if (spokes.reach > 0) log.key("spokeReach").number(spokes.reach).key("spokeRelative").number(spokes.relative).key("spokeVertexRelative").number(spokes.vertex_relative);
+        log.key("spokes").string(spokes.fan ? "G2-fan" : spokes.reach > 0 ? "G2-beyond-reach" : "G1").key("spokeJump").number(spokes.jump);
+        if (spokes.reach > 0 || spokes.fan) log.key("spokeReach").number(spokes.reach).key("spokeRelative").number(spokes.relative).key("spokeVertexRelative").number(spokes.vertex_relative);
         if (!spokes.refused.empty()) log.key("spokeRefused").string(spokes.refused);
+        if (!spokes.fan_refused.empty()) log.key("spokeFanRefused").string(spokes.fan_refused);
+        else if (mode.no_fans && !spokes.fan && spokes.reach > 0) log.key("spokeFanRefused").string(mode.fans_note);
       }
       if (!patch_g2[c].empty()) log.key("g2Refused").string(patch_g2[c]);
       log.key("setbacks").begin_array();
@@ -2499,11 +2508,21 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
 // with the plate patches only, and if that also fails the reason of the star is appended to the plate's.
 std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
                                      bool &fill_failed, std::string &corners_json, std::string &why) {
-  bool star_used = false;
-  std::unique_ptr<Shape> built = build_setback_pass(source, edge_raw, corner_raw, mode, fill_failed, corners_json, why, true, star_used);
+  bool star_used = false, fans_used = false;
+  std::unique_ptr<Shape> built = build_setback_pass(source, edge_raw, corner_raw, mode, fill_failed, corners_json, why, true, star_used, fans_used);
   if (built != nullptr || !star_used) return built;
   std::string star_why = why;
-  bool unused = false;
+  bool unused = false, unused_fans = false;
+  // vertex fans in a step that fails after the sewing: the same step with the 13.38 spokes before any lesser star
+  if (fans_used && !mode.no_fans) {
+    Mode plain = mode;
+    plain.no_fans = true;
+    plain.fans_note = "the step with the vertex fans failed after the sewing (" + star_why + "): built with the 13.38 spokes";
+    why.clear();
+    built = build_setback_pass(source, edge_raw, corner_raw, plain, fill_failed, corners_json, why, true, unused, unused_fans);
+    if (built != nullptr) return built;
+    star_why += "; without the fans: " + why;
+  }
   why.clear();
   // a curvature step: the G1 star before the plate
   if (mode.kind == 1 && mode.automatic) {
@@ -2511,7 +2530,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     g1_mode.no_g2 = true;
     g1_mode.downgrade = "the step with the G2 stars failed after the sewing (" + star_why + "): built with the G1 stars";
     why.clear();
-    built = build_setback_pass(source, edge_raw, corner_raw, g1_mode, fill_failed, corners_json, why, true, unused);
+    built = build_setback_pass(source, edge_raw, corner_raw, g1_mode, fill_failed, corners_json, why, true, unused, unused_fans);
     if (built != nullptr) return built;
     star_why += "; the G1 stars: " + why;
   }
@@ -2520,7 +2539,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
   plate_mode.no_g2 = true;
   plate_mode.downgrade = "the step with the stars failed after the sewing (" + star_why + "): built with the plate patches";
   why.clear();
-  built = build_setback_pass(source, edge_raw, corner_raw, plate_mode, fill_failed, corners_json, why, false, unused);
+  built = build_setback_pass(source, edge_raw, corner_raw, plate_mode, fill_failed, corners_json, why, false, unused, unused_fans);
   if (built == nullptr) why += " (the exact-boundary patch was refused: " + star_why + ")";
   return built;
 }

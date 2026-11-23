@@ -22,14 +22,15 @@ export interface ProfileData {
   readonly corners?: ReadonlyArray<{
     readonly vertex: readonly [number, number, number];
     readonly patch?: 'exact' | 'plate';
-    /** "G2": the star is curvature-continuous to the blend and flat faces it meets (its `spokes`, the seams between its sub-patches, are "G2-beyond-reach", tangent only within `spokeReach` of each spoke from its vertex, or "G1"); "G1": tangent only. */
+    /** "G2": the star is curvature-continuous to the blend and flat faces it meets (its `spokes`, the seams between its sub-patches, are "G2-fan", curvature-continuous all the way to the vertices, "G2-beyond-reach", tangent only within `spokeReach` of each spoke from its vertex, or "G1"); "G1": tangent only. */
     readonly continuity?: 'G1' | 'G2';
-    readonly spokes?: 'G1' | 'G2-beyond-reach';
+    readonly spokes?: 'G1' | 'G2-beyond-reach' | 'G2-fan';
     readonly spokeJump?: number;
     readonly spokeReach?: number;
     readonly spokeRelative?: number;
     readonly spokeVertexRelative?: number;
     readonly spokeRefused?: string;
+    readonly spokeFanRefused?: string;
     readonly g2Refused?: string;
     readonly overshoot?: number;
     readonly shape?: { readonly maxCurvature: number; readonly maxNormalTurn: number; readonly curvatureRatio: number };
@@ -44,6 +45,49 @@ export function readProfileNotes(kernel: GeometryKernel, recipe: ShapeRecipe): B
 
 const nameOf = (topology: ShapeTopology | null, edge: number): string => topology?.edges[edge]?.name ?? `edge ${edge}`;
 
+type CornerNote = NonNullable<BlendBuildNotes['corners']>[number];
+
+/** The `data` of one corner star; its setback edges are named from `topology`. */
+function cornerData(corner: CornerNote, topology: ShapeTopology | null): NonNullable<ProfileData['corners']>[number] {
+  return {
+    vertex: corner.vertex,
+    ...(corner.patch === undefined ? {} : { patch: corner.patch }),
+    ...(corner.continuity === undefined ? {} : { continuity: corner.continuity }),
+    ...(corner.spokes === undefined ? {} : { spokes: corner.spokes }),
+    ...(corner.spokeJump === undefined ? {} : { spokeJump: corner.spokeJump }),
+    ...(corner.spokeReach === undefined ? {} : { spokeReach: corner.spokeReach }),
+    ...(corner.spokeRelative === undefined ? {} : { spokeRelative: corner.spokeRelative }),
+    ...(corner.spokeVertexRelative === undefined ? {} : { spokeVertexRelative: corner.spokeVertexRelative }),
+    ...(corner.spokeRefused === undefined ? {} : { spokeRefused: corner.spokeRefused }),
+    ...(corner.spokeFanRefused === undefined ? {} : { spokeFanRefused: corner.spokeFanRefused }),
+    ...(corner.g2Refused === undefined ? {} : { g2Refused: corner.g2Refused }),
+    ...(corner.overshoot === undefined ? {} : { overshoot: corner.overshoot }),
+    ...(corner.shape === undefined ? {} : { shape: corner.shape }),
+    setbacks: corner.setbacks.map((entry) => ({ edge: nameOf(topology, entry.edge), distance: entry.distance })),
+  };
+}
+
+/** The sentence on the G2 corner stars of `corners` and their spokes, or undefined without any. */
+function describeStars(corners: readonly CornerNote[]): string | undefined {
+  const stars = corners.filter((corner) => corner.continuity === 'G2').length;
+  const fanSpokes = corners.filter((corner) => corner.continuity === 'G2' && corner.spokes === 'G2-fan').length;
+  const g2Spokes = corners.filter((corner) => corner.continuity === 'G2' && corner.spokes === 'G2-beyond-reach').length;
+  if (stars > 0) {
+    const beyond =
+      g2Spokes === 0
+        ? ''
+        : `, ${g2Spokes} of them with curvature-continuous seams between their sub-patches beyond the first ${
+            corners.find((corner) => corner.spokes === 'G2-beyond-reach' && corner.spokeReach !== undefined)?.spokeReach ?? 0
+          } of each spoke from its vertex (spokes "G2-beyond-reach", tangent only within that stretch)`;
+    const fan =
+      fanSpokes === 0
+        ? ''
+        : `, ${fanSpokes} of them with curvature-continuous seams all the way to the vertices (spokes "G2-fan": a small polar fan of faces at each vertex)`;
+    return `${stars} corner star(s) G2 to their blends and flat faces (continuity "G2")${fan}${beyond}, ${stars - g2Spokes - fanSpokes} with G1 seams (spokes "G1")`;
+  }
+  return undefined;
+}
+
 /** The summary sentences and the `data` for `notes`; edges are named from `topology` (the source solid). */
 export function describeProfileNotes(
   notes: BlendBuildNotes,
@@ -54,21 +98,7 @@ export function describeProfileNotes(
     notes.fallback === undefined
       ? undefined
       : { edges: notes.fallback.edges.map((edge) => nameOf(topology, edge)), reason: notes.fallback.reason };
-  const corners = notes.corners?.map((corner) => ({
-    vertex: corner.vertex,
-    ...(corner.patch === undefined ? {} : { patch: corner.patch }),
-    ...(corner.continuity === undefined ? {} : { continuity: corner.continuity }),
-    ...(corner.spokes === undefined ? {} : { spokes: corner.spokes }),
-    ...(corner.spokeJump === undefined ? {} : { spokeJump: corner.spokeJump }),
-    ...(corner.spokeReach === undefined ? {} : { spokeReach: corner.spokeReach }),
-    ...(corner.spokeRelative === undefined ? {} : { spokeRelative: corner.spokeRelative }),
-    ...(corner.spokeVertexRelative === undefined ? {} : { spokeVertexRelative: corner.spokeVertexRelative }),
-    ...(corner.spokeRefused === undefined ? {} : { spokeRefused: corner.spokeRefused }),
-    ...(corner.g2Refused === undefined ? {} : { g2Refused: corner.g2Refused }),
-    ...(corner.overshoot === undefined ? {} : { overshoot: corner.overshoot }),
-    ...(corner.shape === undefined ? {} : { shape: corner.shape }),
-    setbacks: corner.setbacks.map((entry) => ({ edge: nameOf(topology, entry.edge), distance: entry.distance })),
-  }));
+  const corners = notes.corners?.map((corner) => cornerData(corner, topology));
   const data: ProfileData = {
     builder: notes.builder,
     unit,
@@ -101,15 +131,11 @@ export function describeProfileNotes(
     parts.push(`blends of a chain meet at up to ${notes.junctionG1.toPrecision(3)} rad (limit 0.0095)`);
   if (notes.factor !== undefined && notes.corners !== undefined)
     parts.push(`${notes.corners.length} corner patch(es), setback ${notes.factor} x the least distance`);
-  const stars = notes.corners?.filter((corner) => corner.continuity === 'G2').length ?? 0;
+  const starSentence = describeStars(notes.corners ?? []);
+  if (starSentence !== undefined) parts.push(starSentence);
   const refused = notes.corners?.find((corner) => corner.g2Refused !== undefined);
-  const g2Spokes = notes.corners?.filter((corner) => corner.continuity === 'G2' && corner.spokes === 'G2-beyond-reach').length ?? 0;
-  if (stars > 0)
-    parts.push(
-      `${stars} corner star(s) G2 to their blends and flat faces (continuity "G2"), ${g2Spokes} of them with curvature-continuous seams between their sub-patches beyond the first ${
-        notes.corners?.find((corner) => corner.spokeReach !== undefined)?.spokeReach ?? 0
-      } of each spoke from its vertex (spokes "G2-beyond-reach", tangent only within that stretch), ${stars - g2Spokes} with G1 seams (spokes "G1")`,
-    );
+  const fanRefused = notes.corners?.find((corner) => corner.spokeFanRefused !== undefined)?.spokeFanRefused;
+  if (fanRefused !== undefined) parts.push(`vertex fans refused, "G2-beyond-reach" spokes built: ${fanRefused}`);
   const spokeRefused = notes.corners?.find((corner) => corner.spokeRefused !== undefined)?.spokeRefused;
   if (spokeRefused !== undefined) parts.push(`G2 spokes refused, G1 spokes built: ${spokeRefused}`);
   if (refused?.g2Refused !== undefined) parts.push(`G2 corner star refused, G1 star built: ${refused.g2Refused}`);

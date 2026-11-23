@@ -497,6 +497,28 @@ describe('describeProfileNotes', () => {
     expect(both.text).toContain('G2 spokes refused, G1 spokes built: the curvature jump across the spokes stays over the gate');
   });
 
+  it('a star with vertex fans reports spokes "G2-fan" with no stretch, and a refused fan says why', () => {
+    const star = {
+      vertex: [0, 0, 0] as [number, number, number],
+      patch: 'exact' as const,
+      continuity: 'G2' as const,
+      setbacks: [{ edge: 0, distance: 2 }],
+    };
+    const fan = { ...star, spokes: 'G2-fan' as const, spokeJump: 1e-4, spokeReach: 0, spokeRelative: 0.003, spokeVertexRelative: 0.05 };
+    const beyond = {
+      ...star,
+      spokes: 'G2-beyond-reach' as const,
+      spokeReach: 0.2,
+      spokeFanRefused: 'the corner triangles of a sub-patch overlap',
+    };
+    const notes = describeProfileNotes({ builder: 'corners', factor: 2, corners: [fan, beyond] }, TOPOLOGY, 'mm');
+    expect(notes.text).toContain('1 of them with curvature-continuous seams all the way to the vertices (spokes "G2-fan"');
+    expect(notes.text).toContain('1 of them with curvature-continuous seams between their sub-patches beyond the first 0.2');
+    expect(notes.text).toContain('vertex fans refused, "G2-beyond-reach" spokes built: the corner triangles of a sub-patch overlap');
+    expect(notes.data.corners?.[0]).toMatchObject({ spokes: 'G2-fan', spokeReach: 0, spokeRelative: 0.003 });
+    expect(notes.data.corners?.[1]).toMatchObject({ spokeFanRefused: 'the corner triangles of a sub-patch overlap' });
+  });
+
   it('a mitred chain reports its crease and says the blends meet at that angle where each touches its own support', () => {
     const { text, data } = describeProfileNotes(
       { builder: 'rails', gap: 4e-14, gapLimit: 6.8e-4, junctionG1: 0.0982, creaseRad: 0.0982 },

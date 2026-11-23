@@ -44,12 +44,36 @@ mod ffi {
         fn set_corner_g2_star(on: bool);
         /// The share of the contact gate the curvature jump across a spoke of a G2 star may use (1: default; 0: never met, so the spokes stay G1).
         fn set_corner_spoke_gate(scale: f64);
+        /// The vertex fans of a G2 star (BLD 13.45): 1 (default) built when they meet their gates, 0 never, 2 always refused (the G2-beyond-reach spokes).
+        fn set_corner_fan(mode: i32);
+        /// The face graph projects the midpoint of an edge on its faces instead of reading the pcurve (BLD 13.46).
+        fn set_face_graph_projection(on: bool);
         /// Every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
         fn set_law_inversion_fault(after: i32);
         /// The most nodes a stretch of a radius law on an uneven edge may take (0: the default, 128).
         fn set_law_node_cap(nodes: i32);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
+        /// The strip integrator against BRepGProp's fixed rule on the whole shape (mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape rotated and translated far from the origin, 5 volume and 7 area translated only, 6 volume rotated only): `[faces taken, 10 numbers, 10 numbers]` (mass, centre, inertia about the origin xx yy zz xy xz yz), empty when no face is taken.
+        fn patch_properties_probe(shape: &Shape, mode: i32) -> Vec<f64>;
+        /// The strip integrator on (default) or off (every face by BRepGProp).
+        /// The same on a synthetic B-spline face (`cpp/mass_patch_probe.cxx`: kinds 0 to 8, plus 16 for the reversed face).
+        fn patch_synthetic_probe(kind: i32, volume: i32) -> Vec<f64>;
+        fn set_patch_integrator(on: bool);
+        /// The Gauss order of the strip integrator in both directions (0: from the degree).
+        fn set_patch_order(order: i32);
+        /// The agreement the order search asks for (0: the default); a negative tolerance sends every face to BRepGProp at once.
+        fn set_patch_agreement(tolerance: f64);
+        /// Caps the samples per interval of a curved pcurve (0: no cap): the guards decide what sparse sampling misses.
+        fn set_patch_sampling_cap(samples: i32);
+        /// Every n-th face the strips would take is refused (0: none): a shell of strip faces and BRepGProp faces.
+        fn set_patch_refuse_every(n: i32);
+        /// `[area of synthetic face `kind` by the helper production uses, BRepGProp alone]`.
+        fn patch_synthetic_helper_probe(kind: i32) -> Vec<f64>;
+        /// Why the last face was left to BRepGProp (1 boundary, 2 integration, 3 orders did not agree, 4 parameter domain).
+        fn last_patch_refusal() -> i32;
+        /// The relative mismatch of the two parameter-domain areas of the last face.
+        fn last_domain_gap() -> f64;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
         fn oriented_angle_probe(shape: &Shape, face: i32, reverse: bool) -> f64;
         /// The same for a creased star: every B-spline face is a sub-patch, `sharp_edge` the unrounded edge it continues.
@@ -60,6 +84,7 @@ mod ffi {
         fn boundary_angle_probe(shape: &Shape, face: i32, drop_one: bool) -> f64;
         /// `[Bezier-patch box, AddOptimal box, dense sample box]` (6 numbers each) of a synthetic many-patch B-spline face; the first box is zeros when the fast path refuses the face.
         fn spline_bounds_probe(kind: i32) -> Vec<f64>;
+        fn trimmed_shape_bounds_probe(contained: i32) -> Vec<f64>;
     }
 }
 
@@ -73,6 +98,66 @@ pub fn oriented_angle(shape: &Shape, face: i32, reverse: bool) -> f64 {
 
 pub fn boundary_angle(shape: &Shape, face: i32, drop_one: bool) -> f64 {
     ffi::boundary_angle_probe(crate::inner(shape).expect("a shape"), face, drop_one)
+}
+
+/// `None` when the strip integrator takes no face of the shape; else (faces taken, strip numbers, BRepGProp numbers, seconds of each).
+pub fn patch_properties(shape: &Shape, volume: bool) -> Option<PatchProperties> {
+    patch_properties_mode(shape, i32::from(volume))
+}
+
+pub fn patch_properties_mode(shape: &Shape, mode: i32) -> Option<PatchProperties> {
+    unpack(&ffi::patch_properties_probe(crate::inner(shape).expect("a shape"), mode))
+}
+
+pub type PatchProperties = (usize, [f64; 10], [f64; 10], [f64; 2]);
+
+fn unpack(found: &[f64]) -> Option<PatchProperties> {
+    if found.is_empty() {
+        return None;
+    }
+    let (mut strips, mut fixed) = ([0.0; 10], [0.0; 10]);
+    strips.copy_from_slice(&found[1..11]);
+    fixed.copy_from_slice(&found[11..21]);
+    Some((found[0] as usize, strips, fixed, [found[21], found[22]]))
+}
+
+/// The same for the synthetic face `kind`.
+pub fn patch_synthetic(kind: i32, volume: bool) -> Option<PatchProperties> {
+    unpack(&ffi::patch_synthetic_probe(kind, i32::from(volume)))
+}
+
+pub fn set_patch_integrator(on: bool) {
+    ffi::set_patch_integrator(on);
+}
+
+pub fn last_domain_gap() -> f64 {
+    ffi::last_domain_gap()
+}
+
+pub fn last_patch_refusal() -> i32 {
+    ffi::last_patch_refusal()
+}
+
+pub fn set_patch_sampling_cap(samples: i32) {
+    ffi::set_patch_sampling_cap(samples);
+}
+
+pub fn set_patch_refuse_every(n: i32) {
+    ffi::set_patch_refuse_every(n);
+}
+
+/// `(area by the production helper, area by BRepGProp alone)` of the synthetic face `kind`.
+pub fn patch_synthetic_helper(kind: i32) -> (f64, f64) {
+    let found = ffi::patch_synthetic_helper_probe(kind);
+    (found[0], found[1])
+}
+
+pub fn set_patch_agreement(tolerance: f64) {
+    ffi::set_patch_agreement(tolerance);
+}
+
+pub fn set_patch_order(order: i32) {
+    ffi::set_patch_order(order);
 }
 
 pub fn span_cut_count(shape: &Shape) -> i32 {
@@ -125,6 +210,15 @@ pub fn set_corner_spoke_gate(scale: f64) {
     ffi::set_corner_spoke_gate(scale);
 }
 
+/// Test hook: the vertex fans of a G2 star (BLD 13.45): 1 (default) built when they meet their gates, 0 never, 2 always refused with a named reason, 3 an OCCT exception thrown inside the construction.
+pub fn set_face_graph_projection(on: bool) {
+    ffi::set_face_graph_projection(on);
+}
+
+pub fn set_corner_fan(mode: i32) {
+    ffi::set_corner_fan(mode);
+}
+
 pub fn set_corner_crease_gate(on: bool) {
     ffi::set_corner_crease_gate(on);
 }
@@ -151,6 +245,10 @@ pub fn last_shell_star_poles() -> i32 {
 
 pub fn adaptive_rule(shape: &Shape) -> bool {
     ffi::adaptive_rule(crate::inner(shape).expect("a shape"))
+}
+
+pub fn trimmed_shape_bounds(contained: i32) -> Vec<f64> {
+    ffi::trimmed_shape_bounds_probe(contained)
 }
 
 pub fn spline_bounds(kind: i32) -> Vec<f64> {

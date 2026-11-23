@@ -7,9 +7,11 @@
 // that it is, which is why every vertex of the loop gets a spoke. Each sub-patch is sampled and interpolated by a degree-5 B-spline (the boundary data are smooth: the interpolation
 // error is of the order of h^6), the shared spokes being the same quintic polynomial from both sides.
 #include "llull-kernel-occt/cpp/blend_corner_exact.hxx"
+#include "llull-kernel-occt/cpp/blend_corner_fan.hxx"
 
 #include <algorithm>
 #include <cmath>
+
 #include <array>
 #include <cassert>
 #include <thread>
@@ -35,9 +37,12 @@ namespace llull {
 namespace {
 // Test hook (set_corner_spoke_gate): the share of the contact gate the curvature jump across a spoke may use (1: as the contacts; 0: none, so the G2 spokes are always refused).
 std::atomic<double> g_spoke_gate{1.0};
+// Hook (set_corner_fan): 1 (default): a G2 star gets the vertex fans of 13.45 when they meet their gates; 0: never (the 13.38 spokes); 2: always refused (the fallback to the G2-beyond-reach spokes); 3: an OCCT exception thrown inside make_fans (the same fallback).
+std::atomic<int> g_fan_mode{1};
 }  // namespace
 
 void set_corner_spoke_gate(double scale) { g_spoke_gate.store(scale); }
+void set_corner_fan(int32_t mode) { g_fan_mode.store(mode); }
 
 }  // namespace llull
 
@@ -841,7 +846,7 @@ double joint_crease(const Handle(Geom_BSplineSurface) &surface, const std::vecto
 // The curvature jump across the spokes between neighbouring sub-patches (13.38): along every spoke at 101 samples up to 0.97 (the pole is degenerate), the normal curvature of each side in the
 // direction across the spoke. `jump` is the largest difference over the whole spoke; `relative` the largest share of the larger curvature beyond the stretch `reach` (all of it for 0), and
 // `vertex_relative` the same within the stretch. `excess` is how far beyond the stretch the jump is over the gate of the contacts (0: met).
-SpokeReading read_spokes(const Star &star, const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double reach, double mean_length, double &excess) {
+SpokeReading read_spokes(const Star &star, const std::vector<Handle(Geom_BSplineSurface)> &surfaces, double reach, double mean_length, double &excess, double from = 0.0) {
   SpokeReading reading;
   reading.reach = reach;
   const size_t m = surfaces.size();
@@ -850,6 +855,7 @@ SpokeReading read_spokes(const Star &star, const std::vector<Handle(Geom_BSpline
     for (int s = 0; s <= kCheckSamples; ++s) {
       const double t = static_cast<double>(s) / kCheckSamples;
       if (t > kSpokeLastSample) break;
+      if (t < from) continue;
       Vec n;
       Vec across = Vec(0, 0, 0);
       if (star.spoke_normal(k, t, n)) across = n ^ star.spokes[k].at(t, 1);
@@ -882,7 +888,7 @@ SpokeReading read_spokes(const Star &star, const std::vector<Handle(Geom_BSpline
 }  // namespace
 
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease, bool g2, double tangent_scale) {
+           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease, bool g2, double tangent_scale, bool allow_fans) {
   const size_t raw_count = loop.size();
   if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
@@ -1302,6 +1308,49 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     if (others_met && spoke_excess <= 0) {
       out.g2_built = g2;
       if (attempt.reach == 0.0) out.spokes.refused = spokes_refused;
+      const int fan_mode = allow_fans ? g_fan_mode.load() : 0;
+      if (g2 && attempt.reach > 0 && fan_mode != 0) {
+        Fans fans;
+        double fan_length = 0;
+        for (const Side &side : star.sides) fan_length += side.length / static_cast<double>(m);
+        if (fan_mode == 2) why = "refused by the test hook";
+        const size_t kept = out.faces.size();
+        const SpokeReading saved = out.spokes;
+        // the whole fan branch, the spoke reading included, falls back to the 13.38 spokes on an exception (hook 3: OCCT, 4: std::exception, 5: a rung whose faces fail, 6: after the fans are built)
+        try {
+          if (fan_mode != 2 && make_fans(surfaces, max_gap, fan_length, fan_mode >= 3 && fan_mode <= 5 ? fan_mode - 2 : 0, fans, why)) {
+            if (fan_mode == 6) throw Standard_Failure("fault injected after the fans");
+            double unused = 0;
+            const SpokeReading beyond = read_spokes(star, surfaces, attempt.reach, fan_length, unused, kFanSpan);
+            out.spokes.fan = true;
+            out.spokes.reach = 0;
+            out.spokes.jump = std::max(beyond.jump, fans.seam_jump);
+            out.spokes.relative = std::max(beyond.relative, fans.seam_relative);
+            out.spokes.vertex_relative = *std::max_element(fans.marks.begin(), fans.marks.end());
+            for (size_t k = 0; k < fans.trimmed.size(); ++k) {
+              out.faces.push_back(fans.trimmed[k]);
+              out.loop_index.push_back(star.sides[k].source);
+              out.part.push_back(star.sides[k].part);
+            }
+            for (size_t k = 0; k < fans.fans.size(); ++k) {
+              out.faces.push_back(fans.fans[k]);
+              const size_t owner = (k / 2 + (k % 2 == 1 ? fans.trimmed.size() - 1 : 0)) % fans.trimmed.size();  // the second fan of vertex k lies on sub-patch k - 1
+              out.loop_index.push_back(star.sides[owner].source);
+              out.part.push_back(star.sides[owner].part);
+            }
+            return true;
+          }
+        } catch (const Standard_Failure &failure) {
+          why = std::string("an OCCT exception while the vertex fans were read: ") + failure.DynamicType()->Name();
+        } catch (const std::exception &failure) {
+          why = std::string("an exception while the vertex fans were read: ") + failure.what();
+        }
+        out.faces.resize(kept);
+        out.loop_index.resize(kept);
+        out.part.resize(kept);
+        out.spokes = saved;
+        out.spokes.fan_refused = why;
+      }
       for (const Handle(Geom_BSplineSurface) &surface : surfaces) {
         BRepBuilderAPI_MakeFace maker(surface, 0.0, 1.0, 0.0, 1.0, 1e-7);
         if (!maker.IsDone()) {

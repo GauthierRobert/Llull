@@ -8,6 +8,7 @@
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepLib.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
@@ -58,9 +59,14 @@ inline TopoDS_Solid solid_of_shells(const TopoDS_Shape &sewn, std::string &why) 
     BRepBuilderAPI_MakeSolid maker(shell);
     TopoDS_Solid solid = maker.Solid();
     BRepLib::OrientClosedSolid(solid);
-    GProp_GProps properties;
-    BRepGProp::VolumeProperties(solid, properties);
-    pieces.push_back({solid, properties.Mass()});
+    // the volume only tells the outer shell from the voids: one shell needs none (an integral over every face, seconds on a corner star with vertex fans)
+    double volume = 0;
+    if (shells.size() > 1) {
+      GProp_GProps properties;
+      llull::query::volume_properties(solid, properties);
+      volume = properties.Mass();
+    }
+    pieces.push_back({solid, volume});
   }
   if (pieces.size() == 1) return pieces[0].solid;
   const auto outer = std::max_element(pieces.begin(), pieces.end(), [](const Piece &a, const Piece &b) { return a.volume < b.volume; });

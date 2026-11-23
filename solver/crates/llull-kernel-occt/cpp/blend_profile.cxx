@@ -23,6 +23,7 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
@@ -92,7 +93,7 @@ gp_Vec normal_of(const TopoDS_Face &face) {
 gp_Vec outward_normal(const TopoDS_Shape &shape, const TopoDS_Face &face) {
   const gp_Vec normal = normal_of(face);
   GProp_GProps props;
-  BRepGProp::SurfaceProperties(face, props);
+  llull::query::surface_properties(face, props);
   const gp_Pnt centre = props.CentreOfMass();
   if (!inside(face, centre)) return normal;
   BRepClass3d_SolidClassifier classifier(shape);
@@ -433,7 +434,7 @@ static double notched_volume(const TopoDS_Shape &solid, const TopoDS_Shape &tool
     BRepAlgoAPI_Common meeting(beyond.Shape(), solid);
     if (!meeting.IsDone() || meeting.HasErrors()) return -1.0;
     GProp_GProps props;
-    BRepGProp::VolumeProperties(meeting.Shape(), props);
+    llull::query::volume_properties(meeting.Shape(), props);
     notched += std::fabs(props.Mass());
   }
   return notched;
@@ -680,13 +681,13 @@ static std::unique_ptr<Shape> build_profile(const Shape &source, rust::Slice<con
   naming::Named current = input;
   const double volume_before = [&] {
     GProp_GProps props;
-    BRepGProp::VolumeProperties(source.shape, props);
+    llull::query::volume_properties(source.shape, props);
     return props.Mass();
   }();
   if (!apply_tools(current, tools, why)) return nullptr;
   if (std::any_of(tools.begin(), tools.end(), [](const Tool &tool) { return tool.trimmed; })) merge_tool_caps(current);
   GProp_GProps props;
-  BRepGProp::VolumeProperties(current.shape, props);
+  llull::query::volume_properties(current.shape, props);
   if (!(std::fabs(props.Mass() - volume_before) > 0)) {
     why = "the blend removed or added no material";
     return nullptr;

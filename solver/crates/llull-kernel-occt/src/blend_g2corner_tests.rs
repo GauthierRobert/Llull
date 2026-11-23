@@ -23,7 +23,7 @@ fn profile_cube(size: f64, kind: f64, param: f64) -> Shape {
 }
 
 /// What each corner of the step got: the continuity of its star and, when the G2 star was refused, why.
-fn corners_of(shape: &Shape) -> Vec<(String, String)> {
+pub(crate) fn corners_of(shape: &Shape) -> Vec<(String, String)> {
     let notes: Value = serde_json::from_str(&shape_notes(shape).unwrap()).unwrap();
     notes["corners"]
         .as_array()
@@ -34,29 +34,29 @@ fn corners_of(shape: &Shape) -> Vec<(String, String)> {
 }
 
 /// The `spokes` note of each corner ("G2-beyond-reach" or "G1" for a G2 star, absent otherwise).
-fn spokes_of(shape: &Shape) -> Vec<String> {
+pub(crate) fn spokes_of(shape: &Shape) -> Vec<String> {
     let notes: Value = serde_json::from_str(&shape_notes(shape).unwrap()).unwrap();
     notes["corners"].as_array().unwrap().iter().map(|corner| corner["spokes"].as_str().unwrap_or("").to_string()).collect()
 }
 
 /// A number of the corner notes (`spokeJump`, `spokeReach`, `spokeRelative`, `spokeVertexRelative`) of every corner.
-fn spoke_note(shape: &Shape, key: &str) -> Vec<f64> {
+pub(crate) fn spoke_note(shape: &Shape, key: &str) -> Vec<f64> {
     let notes: Value = serde_json::from_str(&shape_notes(shape).unwrap()).unwrap();
     notes["corners"].as_array().unwrap().iter().map(|corner| corner[key].as_f64().unwrap_or(f64::NAN)).collect()
 }
 
-fn all(continuity: &str) -> Vec<(String, String)> {
+pub(crate) fn all(continuity: &str) -> Vec<(String, String)> {
     vec![(continuity.to_string(), String::new()); 8]
 }
 
 /// The worst readings over the interior samples (21 per edge) of the edges that border a corner patch: `spokes` between two sub-patches, `contacts` between a sub-patch and a blend or
 /// flat face. Each is (g1 angle in radians, jump of the normal curvature across the edge in 1/length).
-struct Readings {
-    spokes: (f64, f64),
-    contacts: (f64, f64),
+pub(crate) struct Readings {
+    pub spokes: (f64, f64),
+    pub contacts: (f64, f64),
 }
 
-fn readings(shape: &Shape) -> Readings {
+pub(crate) fn readings(shape: &Shape) -> Readings {
     let topo = topology(shape).unwrap();
     let names: Vec<String> = topo["faces"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap_or("").to_string()).collect();
     let graph = face_graph(shape).unwrap();
@@ -79,7 +79,7 @@ fn readings(shape: &Shape) -> Readings {
     worst
 }
 
-fn volume(shape: &Shape) -> f64 {
+pub(crate) fn volume(shape: &Shape) -> f64 {
     mass_properties(shape).unwrap().volume
 }
 
@@ -101,6 +101,8 @@ fn patch_degrees(shape: &Shape) -> Vec<(u64, u64)> {
 fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
+    // pins the 13.38 spokes: the vertex fans (the default since 13.46) are off here
+    crate::test_bridge::set_corner_fan(0);
     let shape = profile_cube(1.0, 1.0, 0.5);
     assert!(analyze(&shape).unwrap().valid);
     assert_eq!(corners_of(&shape), all("G2"));
@@ -142,6 +144,9 @@ fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes(
 #[test]
 fn unequal_sizes_other_shape_factors_and_a_larger_blend_stay_g2() {
     let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    // pins the 13.38 spokes: the vertex fans (the default since 13.46) are off here
+    crate::test_bridge::set_corner_fan(0);
     let uneven = make_box([0.0; 3], [10.0, 7.0, 5.0]).unwrap().unwrap();
     let count = topology(&uneven).unwrap()["edges"].as_array().unwrap().len();
     let specs: Vec<f64> = (0..count).flat_map(|edge| [edge as f64, 1.0, 0.5, 0.8 + 0.1 * (edge % 4) as f64, NAN, -1.0, 0.0]).collect();

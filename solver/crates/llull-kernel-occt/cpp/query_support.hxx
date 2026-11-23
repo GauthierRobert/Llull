@@ -4,7 +4,9 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <optional>
+#include <vector>
 #include <sstream>
 #include <string>
 
@@ -23,7 +25,9 @@
 #include <TopoDS_Face.hxx>
 #include <gp_Pnt2d.hxx>
 
+#include "llull-kernel-occt/cpp/facade.hxx"
 #include "llull-kernel-occt/cpp/json_writer.hxx"
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include "llull-kernel-occt/cpp/mass_spans.hxx"
 
 namespace llull {
@@ -103,7 +107,7 @@ inline std::string guard_note(double worst) {
 // occtFaceMetrics.ts: BRepGProp surface properties of one face. `refined` (Shape::refined_mass and a freeform face: `adaptive_rule`): the adaptive
 // rule when its own error estimate is within kRefinedFaceDrift, else the fixed Gauss rule (that rule is wrong across a C0 knot of a boundary, a
 // straight radius law with a kink); a tripped guard raises `*tripped` (may be null) to its estimate.
-inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, double *tripped = nullptr) {
+inline FaceMetric face_metric_uncached(const TopoDS_Face &face, bool refined, double *tripped) {
   GProp_GProps props;
   if (refined) {
     GProp_GProps adaptive;
@@ -116,8 +120,28 @@ inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, dou
   // the fixed rule too: by knot span when the face is a graded full B-spline patch (mass_spans.hxx)
   int cut = 0;
   const TopoDS_Compound spans = span_faces(face, cut, false);
+  if (!refined && cut == 0) {
+    GProp_GProps strips;
+    if (fast_surface_properties(face, strips)) return {strips.Mass(), strips.CentreOfMass()};
+  }
   BRepGProp::SurfaceProperties(cut > 0 ? static_cast<TopoDS_Shape>(spans) : static_cast<TopoDS_Shape>(face), props, Standard_False, Standard_False);
   return {props.Mass(), props.CentreOfMass()};
+}
+
+// The metric of face number `index` of `shape` again (topology, the face graph, a second read of the same shape): the integral costs 0.1 s on a B-spline face of a corner star (BLD 13.46). The cache lives
+// in the Shape wrapper (`Shape::face_metrics`), so it dies with the shape and never crosses documents; an entry is used only while it holds the same face (TShape and location) and rule. The guard
+// estimate is kept with the metric and raised again on a hit. A Shape is never edited after it is built (an edit makes a new wrapper), so no stale pcurve is read.
+inline FaceMetric face_metric_of(const Shape &shape, int index, const TopoDS_Face &face, bool refined, double *tripped) {
+  const auto found = shape.face_metrics.find(index);
+  if (found != shape.face_metrics.end() && found->second.refined == refined && found->second.face.IsSame(face)) {
+    if (tripped != nullptr && std::isfinite(found->second.worst) && !(*tripped >= found->second.worst)) *tripped = found->second.worst;
+    return {found->second.area, found->second.centroid};
+  }
+  double worst = std::numeric_limits<double>::quiet_NaN();
+  const FaceMetric metric = face_metric_uncached(face, refined, &worst);
+  if (tripped != nullptr && std::isfinite(worst) && !(*tripped >= worst)) *tripped = worst;
+  shape.face_metrics[index] = {face, refined, metric.area, metric.centroid, worst};
+  return metric;
 }
 
 // `[uMin, uMax, vMin, vMax]` of an adaptor restricted to its face (occtFaceSurface.ts uvRange).

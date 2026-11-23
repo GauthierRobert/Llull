@@ -2,6 +2,8 @@
 // builders, same placement order, same post-boolean unify.
 #include "llull-kernel-occt/cpp/facade.hxx"
 
+#include <chrono>
+
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -129,15 +131,18 @@ std::unique_ptr<Shape> with_roles(const TopoDS_Shape &shape, bool axial) {
 }
 
 // Tight box from the exact geometry: BRepBndLib::Add bounds curved faces by their control polygons and widens by the tolerances.
-// A full-patch B-spline face with many patches (a blend face of a long chain) is bounded by Bezier patch (surface_bounds.hxx: the exact box to 1e-9 of its diagonal, 40x faster than AddOptimal); every other
+// A B-spline face with many patches (a blend face of a long chain; a trimmed one only when its rectangle box is proved equal to its own) is bounded by Bezier patch (surface_bounds.hxx: the exact box to 1e-9 of its diagonal, 40x faster than AddOptimal); every other
 // shape keeps AddOptimal unchanged.
 Bnd_Box bounds_of(const TopoDS_Shape &shape) {
   Bnd_Box box;
   std::vector<TopoDS_Face> others;
+  std::vector<std::pair<TopoDS_Face, Bnd_Box>> deferred;  // trimmed faces: only the box of their rectangle is known
   bool split = false;
   for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
     const TopoDS_Face face = TopoDS::Face(faces.Current());
-    if (query::add_spline_bounds(face, box)) split = true;
+    Bnd_Box outer;
+    if (query::add_spline_bounds(face, box, query::kBoundsMaxDepth, &outer)) split = true;
+    else if (!outer.IsVoid()) deferred.push_back({face, outer});
     else others.push_back(face);
   }
   if (!split) {
@@ -146,6 +151,15 @@ Bnd_Box bounds_of(const TopoDS_Shape &shape) {
     return box;
   }
   for (const TopoDS_Face &face : others) BRepBndLib::AddOptimal(face, box, Standard_False, Standard_False);
+  // a trimmed face lies in the box of its rectangle: when the box gathered so far already holds that, the face adds nothing (the cut-off corners of a corner star's sub-patches lie in its vertex fans)
+  for (const auto &[face, outer] : deferred) {
+    double a0, b0, c0, a1, b1, c1, x0, y0, z0, x1, y1, z1;
+    box.Get(a0, b0, c0, a1, b1, c1);
+    outer.Get(x0, y0, z0, x1, y1, z1);
+    const double slack = 3e-9 * std::max(std::sqrt((a1 - a0) * (a1 - a0) + (b1 - b0) * (b1 - b0) + (c1 - c0) * (c1 - c0)), 1e-12);
+    if (x0 >= a0 - slack && y0 >= b0 - slack && z0 >= c0 - slack && x1 <= a1 + slack && y1 <= b1 + slack && z1 <= c1 + slack) box.Add(outer);  // holds it to 3e-9 of the diagonal: enclose it
+    else BRepBndLib::AddOptimal(face, box, Standard_False, Standard_False);
+  }
   for (TopExp_Explorer edges(shape, TopAbs_EDGE, TopAbs_FACE); edges.More(); edges.Next()) BRepBndLib::AddOptimal(edges.Current(), box, Standard_False, Standard_False);
   for (TopExp_Explorer vertices(shape, TopAbs_VERTEX, TopAbs_EDGE); vertices.More(); vertices.Next()) BRepBndLib::AddOptimal(vertices.Current(), box, Standard_False, Standard_False);
   return box;
@@ -395,7 +409,19 @@ MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_
 constexpr double kRefinedEps = 1e-9;
 constexpr double kRefinedDrift = 1e-5;
 
+GProp_GProps volume_props_uncached(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error, double *tripped);
+
 GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error, double *tripped) {
+  // the fixed rule touches neither `rel_error` nor `tripped`, so a hit is the same call; a refined shape (adaptive rule, with its estimates) is not cached
+  if (shape.refined_mass) return volume_props_uncached(shape, piece, only_closed, rel_error, tripped);
+  for (const Shape::VolumeEntry &entry : shape.volumes)
+    if (entry.only_closed == only_closed && entry.piece.IsSame(piece)) return entry.props;
+  GProp_GProps props = volume_props_uncached(shape, piece, only_closed, rel_error, tripped);
+  shape.volumes.push_back({piece, only_closed, props});
+  return props;
+}
+
+GProp_GProps volume_props_uncached(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error, double *tripped) {
   // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
   // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
   const auto fixed = [&]() {
@@ -416,6 +442,9 @@ GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool on
         BRepGProp::VolumeProperties(pieces, by_span, Standard_False, Standard_False, Standard_False);
         return by_span;
       }
+      // a B-spline face of many knot cells is integrated by strips (mass_patch.hxx): the same value as the fixed rule to its own error, several times faster
+      GProp_GProps strips;
+      if (query::fast_volume_properties(piece, strips)) return strips;
     }
     return fixed();
   }
@@ -435,6 +464,55 @@ GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool on
 bool adaptive_rule(const Shape &shape) { return shape.refined_mass && has_freeform_face(shape.shape); }
 
 bool refined_mass_flag(const Shape &shape) { return shape.refined_mass; }
+
+rust::Vec<double> patch_properties_probe(const Shape &shape, int32_t mode) {
+  // mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape moved by a rotation (0.7 rad about an axis through (1, 2, 3)) and a translation (1000, -500, 250) put into its faces' locations,
+  // 5 volume and 7 area of the shape translated only, 6 volume of the shape rotated only.
+  // [faces taken, strips: mass, centre x y z, central inertia xx yy zz xy xz yz, BRepGProp fixed rule: the same ten, seconds of each]
+  const auto push = [](rust::Vec<double> &out, const GProp_GProps &props) {
+    out.push_back(props.Mass());
+    const gp_Pnt centre = props.CentreOfMass();
+    out.push_back(centre.X()), out.push_back(centre.Y()), out.push_back(centre.Z());
+    const gp_Mat about_centre = props.MatrixOfInertia();
+    const int pairs[6][2] = {{0, 0}, {1, 1}, {2, 2}, {0, 1}, {0, 2}, {1, 2}};
+    for (const auto &pair : pairs) out.push_back(about_centre.Value(pair[0] + 1, pair[1] + 1));
+  };
+  const bool volume = mode == 1 || mode == 2 || mode == 3 || mode == 5 || mode == 6;
+  TopoDS_Shape target = shape.shape;
+  if (mode == 2) target = target.Reversed();
+  if (mode >= 3) {
+    gp_Trsf turn, shift;
+    turn.SetRotation(gp_Ax1(gp_Pnt(1, 2, 3), gp_Dir(1, 2, 2)), mode == 5 || mode == 7 ? 0.0 : 0.7);
+    shift.SetTranslation(gp_Vec(mode == 6 ? 0 : 1000, mode == 6 ? 0 : -500, mode == 6 ? 0 : 250));
+    target = target.Moved(TopLoc_Location(shift * turn));
+  }
+  rust::Vec<double> out;
+  out.push_back(query::eligible_patch_faces(target));
+  GProp_GProps strips, fixed;
+  const auto started = std::chrono::steady_clock::now();
+  const bool taken = volume ? query::fast_volume_properties(target, strips) : query::fast_surface_properties(target, strips);
+  if (!taken) {
+    out.clear();
+    return out;
+  }
+  const auto middle = std::chrono::steady_clock::now();
+  if (volume) BRepGProp::VolumeProperties(target, fixed, Standard_False, Standard_False, Standard_False);
+  else BRepGProp::SurfaceProperties(target, fixed, Standard_False, Standard_False);
+  const auto finished = std::chrono::steady_clock::now();
+  push(out, strips);
+  push(out, fixed);
+  out.push_back(std::chrono::duration<double>(middle - started).count());
+  out.push_back(std::chrono::duration<double>(finished - middle).count());
+  return out;
+}
+
+void set_patch_integrator(bool on) { query::set_patch_integrator(on); }
+void set_patch_order(int32_t order) { query::set_patch_order(order); }
+void set_patch_agreement(double tolerance) { query::set_patch_agreement(tolerance); }
+int32_t last_patch_refusal() { return query::last_patch_refusal(); }
+void set_patch_sampling_cap(int32_t samples) { query::set_patch_sampling_cap(samples); }
+void set_patch_refuse_every(int32_t n) { query::set_patch_refuse_every(n); }
+double last_domain_gap() { return query::last_domain_gap(); }
 
 int32_t span_cut_count(const Shape &shape) {
   int cut = 0;
@@ -457,6 +535,8 @@ GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double
         BRepGProp::SurfaceProperties(pieces, by_span, Standard_False, Standard_False);
         return by_span;
       }
+      GProp_GProps strips;
+      if (query::fast_surface_properties(piece, strips)) return strips;
     }
     return fixed();
   }
@@ -470,14 +550,19 @@ GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double
   return fixed();
 }
 
+const Bnd_Box &bounds_cached(const Shape &shape) {
+  if (!shape.bounds_cache) shape.bounds_cache = bounds_of(shape.shape);
+  return *shape.bounds_cache;
+}
+
 double bounding_diagonal(const Shape &shape) {
-  const Bnd_Box box = bounds_of(shape.shape);
+  const Bnd_Box &box = bounds_cached(shape);
   if (box.IsVoid() || box.IsOpen()) return 0.0;
   return box.CornerMin().Distance(box.CornerMax());
 }
 
 rust::Vec<double> shape_bounds(const Shape &shape) {
-  const Bnd_Box box = bounds_of(shape.shape);
+  const Bnd_Box &box = bounds_cached(shape);
   rust::Vec<double> out;
   if (box.IsVoid() || box.IsOpen()) return out;
   push_bounds(out, box);
@@ -486,7 +571,7 @@ rust::Vec<double> shape_bounds(const Shape &shape) {
 
 MassOut mass_properties(const Shape &shape) {
   // Part frame (TR-KRN-41): integrate about the bounding-box centre rounded to 1 mm, then shift the centroid back.
-  const Bnd_Box box = bounds_of(shape.shape);
+  const Bnd_Box &box = bounds_cached(shape);
   const gp_Pnt min = box.CornerMin();
   const gp_Pnt max = box.CornerMax();
   const double origin[3] = {std::round((min.X() + max.X()) / 2) + 0.0, std::round((min.Y() + max.Y()) / 2) + 0.0,
@@ -537,7 +622,7 @@ AnalysisOut analyze(const Shape &shape) {
     const GProp_GProps area = surface_props(shape, solids(i));
     out.lumps.push_back(std::fabs(volume.Mass()));
     out.lumps.push_back(area.Mass());
-    push_bounds(out.lumps, bounds_of(solids(i)));
+    push_bounds(out.lumps, is_the_solid ? bounds_cached(shape) : bounds_of(solids(i)));
     whole_area = area.Mass();
   }
   out.area = is_the_solid ? whole_area : surface_props(shape, shape.shape).Mass();

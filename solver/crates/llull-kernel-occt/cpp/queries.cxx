@@ -179,7 +179,7 @@ rust::String topology_json(const Shape &shape) {
     const BRepAdaptor_Surface adaptor(face, Standard_True);
     out.begin_object().key("index").integer(f - 1).key("name").string(face_names[static_cast<size_t>(f - 1)]);
     out.key("surface").string(query::surface_kind(adaptor.GetType()));
-    out.key("area").number(query::face_metric(face, adaptive, &tripped).area);
+    out.key("area").number(query::face_metric_of(shape, f - 1, face, adaptive, &tripped).area);
     write_face_geometry(out, face, adaptor);
     out.end_object();
   }

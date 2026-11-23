@@ -1,6 +1,9 @@
 // Face-query port (01 §5.9) of the native kernel, following occtFaceQuery.ts and occtFaceGraph.ts of the retired opencascade.js kernel
-// (same OCC algorithms, same sample grids, same arithmetic order). Index rule: queries.hxx.
+// (same OCC algorithms and sample grids; the edge convexity reads (u, v) off the pcurve of the edge, BLD 13.46, where the port projected the point). Index rule: queries.hxx.
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <cmath>
 #include <limits>
 #include <set>
 #include <stdexcept>
@@ -10,6 +13,7 @@
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Tool.hxx>
+#include <Geom2d_Curve.hxx>
 #include <GeomConvert.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
@@ -17,6 +21,7 @@
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Cone.hxx>
+#include <gp_Pnt2d.hxx>
 #include <gp_Cylinder.hxx>
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
@@ -89,10 +94,10 @@ void write_interior_samples(JsonWriter &out, const TopoDS_Face &face, const BRep
   out.end_array();
 }
 
-void write_face_detail(JsonWriter &out, const TopoDS_Face &face, int index, int samples, bool refined) {
+void write_face_detail(JsonWriter &out, const Shape &shape, const TopoDS_Face &face, int index, int samples, bool refined) {
   const BRepAdaptor_Surface adaptor(face, Standard_True);
   double tripped = std::numeric_limits<double>::quiet_NaN();
-  const query::FaceMetric metric = query::face_metric(face, refined, &tripped);
+  const query::FaceMetric metric = query::face_metric_of(shape, index, face, refined, &tripped);
   out.begin_object().key("index").integer(index).key("surface").string(query::surface_kind(adaptor.GetType()));
   out.key("area").number(metric.area).key("centroid").point(metric.centroid);
   switch (adaptor.GetType()) {
@@ -204,12 +209,30 @@ std::vector<std::vector<EdgeUse>> face_loops(const TopoDS_Face &face, const TopT
   return outer_loops;
 }
 
+// (u, v) of `point` (a point of `edge` at its parameter `at`) on `face`: read off the pcurve of the edge when it lies on the surface there (a projection with ShapeAnalysis_Surface builds a search net
+// of the whole surface per call, 0.1 s on the B-spline faces of a corner star, BLD 13.46), else projected.
+std::atomic<bool> g_projection_only{false};  // test hook (set_face_graph_projection): never read the pcurve
+
+std::array<double, 2> uv_of_edge_point(const TopoDS_Edge &edge, const TopoDS_Face &face, const BRepAdaptor_Surface &adaptor, double at, const gp_Pnt &point) {
+  double first = 0, last = 0;
+  const Handle(Geom2d_Curve) pcurve = BRep_Tool::CurveOnSurface(edge, face, first, last);
+  if (!g_projection_only.load() && !pcurve.IsNull() && at >= first && at <= last) {
+    const gp_Pnt2d uv = pcurve->Value(at);
+    const auto range = query::uv_range(adaptor);
+    const double slack = 1e-9 * std::max({1.0, std::fabs(range[1] - range[0]), std::fabs(range[3] - range[2])});
+    const bool inside = uv.X() >= range[0] - slack && uv.X() <= range[1] + slack && uv.Y() >= range[2] - slack && uv.Y() <= range[3] + slack;
+    if (inside && adaptor.Value(uv.X(), uv.Y()).Distance(point) <= 1e-6 * std::max(1.0, point.XYZ().Modulus())) return {uv.X(), uv.Y()};
+  }
+  return query::uv_of_point(face, adaptor, point);
+}
+
 const char *convexity_at(const TopoDS_Edge &edge, const TopoDS_Face &face_a, const TopoDS_Face &face_b, bool reversed_in_a) {
   if (BRep_Tool::Degenerated(edge)) return "unknown";
   const BRepAdaptor_Curve curve(edge);
   gp_Pnt mid;
   gp_Vec derivative;
-  curve.D1((curve.FirstParameter() + curve.LastParameter()) / 2, mid, derivative);
+  const double at = (curve.FirstParameter() + curve.LastParameter()) / 2;
+  curve.D1(at, mid, derivative);
   const double length = derivative.Magnitude();
   if (!(length > 0)) return "unknown";
   const gp_Vec tangent = derivative * (1 / length);
@@ -217,7 +240,7 @@ const char *convexity_at(const TopoDS_Edge &edge, const TopoDS_Face &face_a, con
   const TopoDS_Face *faces[2] = {&face_a, &face_b};
   for (int k = 0; k < 2; ++k) {
     const BRepAdaptor_Surface adaptor(*faces[k], Standard_True);
-    const auto uv = query::uv_of_point(*faces[k], adaptor, mid);
+    const auto uv = uv_of_edge_point(edge, *faces[k], adaptor, at, mid);
     const auto local = query::point_and_normal(adaptor, query::is_reversed(*faces[k]), uv[0], uv[1]);
     if (!local) return "unknown";
     normals[k] = as_vec(local->normal);
@@ -238,7 +261,7 @@ rust::String face_details_json(const Shape &shape, int32_t samples) {
   const bool adaptive = adaptive_rule(shape);
   JsonWriter out;
   out.begin_array();
-  for (int f = 1; f <= faces.Extent(); ++f) write_face_detail(out, TopoDS::Face(faces(f)), f - 1, std::max(0, samples), adaptive);
+  for (int f = 1; f <= faces.Extent(); ++f) write_face_detail(out, shape, TopoDS::Face(faces(f)), f - 1, std::max(0, samples), adaptive);
   out.end_array();
   return text_of(out);
 }
@@ -393,7 +416,7 @@ rust::String face_graph_json(const Shape &shape) {
     const BRepAdaptor_Surface adaptor(faces[f], Standard_True);
     out.begin_object().key("index").integer(static_cast<long long>(f)).key("surface");
     query::write_surface_params(out, adaptor);
-    out.key("reversed").boolean(query::is_reversed(faces[f])).key("area").number(query::face_metric(faces[f], adaptive, &tripped).area);
+    out.key("reversed").boolean(query::is_reversed(faces[f])).key("area").number(query::face_metric_of(shape, static_cast<int>(f), faces[f], adaptive, &tripped).area);
     out.key("loops").begin_array();
     for (const auto &loop : uses[f]) {
       std::vector<int> seen;
@@ -450,5 +473,7 @@ rust::String face_graph_json(const Shape &shape) {
   out.end_object();
   return text_of(out);
 }
+
+void set_face_graph_projection(bool on) { g_projection_only.store(on); }
 
 }  // namespace llull

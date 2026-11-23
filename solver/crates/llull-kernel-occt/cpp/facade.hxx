@@ -3,14 +3,19 @@
 // OCCT's Standard_Failure (not a std::exception), into a Rust Err instead of std::terminate.
 #pragma once
 
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
+#include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <gp_Pnt.hxx>
 
 #include "rust/cxx.h"
 
@@ -48,6 +53,24 @@ class Shape {
   bool refined_mass = false;
   // What the builder of this shape reports about how it was made (a JSON object; blend builders: builder, measured gap, fallback, corner setbacks).
   std::string notes;
+  // Per-face area and centre already integrated for this shape, by face number (query_support.hxx `face_metric_of`); filled by the read-only queries.
+  struct FaceMetricEntry {
+    TopoDS_Face face;
+    bool refined;
+    double area;
+    gp_Pnt centroid;
+    double worst;
+  };
+  mutable std::map<int, FaceMetricEntry> face_metrics;
+  // The box of the shape (bounds_of), computed once: mass_properties, analyze, shape_bounds and bounding_diagonal all read it (a Shape is never edited after it is built).
+  mutable std::optional<Bnd_Box> bounds_cache;
+  // Volume integrals of this shape under the fixed rule (not for a refined shape), by piece: `topology` and `analyze` integrate the same solid (volume_props).
+  struct VolumeEntry {
+    TopoDS_Shape piece;
+    bool only_closed;
+    GProp_GProps props;
+  };
+  mutable std::vector<VolumeEntry> volumes;
 };
 
 class StepWriter {
@@ -76,6 +99,9 @@ void set_corner_crease_gate(bool on);
 void set_corner_c0_knots(bool on);
 void set_corner_g2_star(bool on);
 void set_corner_spoke_gate(double scale);
+void set_corner_fan(int32_t mode);
+// Test-only hook: the face graph projects the midpoint of an edge on each face instead of reading the pcurve (face_queries.cxx).
+void set_face_graph_projection(bool on);
 // Test-only hook (law_fillet.cxx): every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
 void set_law_inversion_fault(int32_t after);
 void set_law_node_cap(int32_t nodes);
@@ -86,6 +112,18 @@ void set_shell_fault(int32_t fault);
 int32_t last_shell_star_poles();
 // Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
 int32_t span_cut_count(const Shape &shape);
+// Test-only: the strip integrator (mass_patch.hxx) against BRepGProp's fixed rule on the whole shape, area (0) or volume (1): [faces taken, 10 numbers, 10 numbers]; empty when no face is taken.
+rust::Vec<double> patch_properties_probe(const Shape &shape, int32_t mode);
+rust::Vec<double> patch_synthetic_probe(int32_t kind, int32_t volume);
+void set_patch_integrator(bool on);
+void set_patch_order(int32_t order);
+void set_patch_agreement(double tolerance);
+void set_patch_sampling_cap(int32_t samples);
+void set_patch_refuse_every(int32_t n);
+// Test-only: [the area of synthetic face `kind` by the helper production uses (strips when taken, else BRepGProp), BRepGProp alone].
+rust::Vec<double> patch_synthetic_helper_probe(int32_t kind);
+int32_t last_patch_refusal();
+double last_domain_gap();
 // Test-only seams of the mixed corner guards (blend_corner.cxx): the oriented patch angle of face `face` (optionally reversed in a rebuilt shell) and the boundary angle against its neighbours (-1: not measured).
 double oriented_angle_probe(const Shape &shape, int32_t face, bool reverse);
 double oriented_angle_creased_probe(const Shape &shape, int32_t face, bool reverse, int32_t sharp_edge);
@@ -94,6 +132,8 @@ double boundary_angle_probe(const Shape &shape, int32_t face, bool drop_one);
 
 // Test-only probe of surface_bounds.hxx: [Bezier-patch box, AddOptimal box, dense sample box] of a synthetic many-patch B-spline face (cpp/surface_bounds_probe.cxx).
 rust::Vec<double> spline_bounds_probe(int32_t kind);
+// Test-only: shape_bounds and AddOptimal of a compound with a trimmed face whose rectangle box is contained (1) or not (0) in the others' box (cpp/surface_bounds_probe.cxx).
+rust::Vec<double> trimmed_shape_bounds_probe(int32_t contained);
 
 void init_runtime();
 rust::String occt_version();

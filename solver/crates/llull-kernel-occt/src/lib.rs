@@ -42,6 +42,8 @@ mod blend_end_tests;
 #[cfg(test)]
 mod blend_g2corner_tests;
 #[cfg(test)]
+mod blend_g2fan_tests;
+#[cfg(test)]
 mod blend_g2vertex_probe_tests;
 #[cfg(test)]
 mod blend_joint_tests;
@@ -87,6 +89,8 @@ mod edge_fold_tests;
 mod features_tests;
 #[cfg(test)]
 mod many_tests;
+#[cfg(test)]
+mod mass_patch_tests;
 #[cfg(test)]
 mod mesh_tests;
 #[cfg(test)]

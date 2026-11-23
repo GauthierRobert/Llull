@@ -47,9 +47,9 @@ export const REMEDIATION = {
   BLD_CHECK_G1_ANGLE: 'the blend is not tangent to a support face: rebuild the fillet with a smaller radius or fewer edges per step',
   BLD_CHECK_G2_JUMP: 'a circular fillet is never G2 to a plane: use a curvature-continuous profile when G2 is required',
   BLD_CHECK_SPOKE_G2_LOST:
-    'the corner star declared curvature-continuous seams beyond the stretch next to its vertices (data.profile.corners[].spokeReach) but the kernel reads a jump there: rebuild the fillet and report the part',
+    'the corner star declared curvature-continuous seams beyond the stretch next to its vertices (data.profile.corners[].spokeReach; no stretch at all for spokes "G2-fan", the default build) but the kernel reads a jump there: rebuild the fillet and report the part',
   BLD_CHECK_SPOKE_G2:
-    'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G2 beyond the first fifth of each spoke from its vertex (data.profile.corners[].spokes "G2-beyond-reach", spokeReach) and with G1 within that stretch next to the vertices (or all along a spoke when the build could not meet its gate: spokes "G1", spokeRefused); its contacts with the blend and flat faces are G2',
+    'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G2 beyond the first fifth of each spoke from its vertex (data.profile.corners[].spokes "G2-beyond-reach", spokeReach; spokes "G2-fan", the default build, are curvature-continuous all the way to the vertices, with "G2-beyond-reach" where the fans missed a gate: data.profile.corners[].spokeFanRefused) and with G1 within that stretch next to the vertices (or all along a spoke when the build could not meet its gate: spokes "G1", spokeRefused); its contacts with the blend and flat faces are G2',
   BLD_CHECK_CORNER_OVERSHOOT:
     'none needed below the build gate: a trimmed corner star (rolling-ball builder) stands that far on the wrong side of the part (outside it for a convex corner, inside for a concave one), as measured at the build; if it matters, use a smaller setback ball or a smaller radius at the vertex, or report the part',
   BLD_CHECK_CORNER_SHAPE:
@@ -138,7 +138,7 @@ const SPOKE_LAST_SAMPLE = 0.97;
 /**
  * The findings for the curvature jump across a spoke (an edge between two sub-patches) of a corner star whose contacts with the blend and flat faces are G2 (06 BLD 13.36, 13.38).
  * `reach` > 0: the star declares curvature-continuous spokes beyond that share of each spoke from its vertex (`fromVertex`: the samples' t counts from the vertex): a jump above g2Rel
- * within the stretch is a warn BLD_CHECK_SPOKE_G2 (declared), beyond it a FAIL BLD_CHECK_SPOKE_G2_LOST (the correction was lost). `reach` 0: the spokes are G1 seams, one warn on the whole seam.
+ * within the stretch is a warn BLD_CHECK_SPOKE_G2 (declared), beyond it a FAIL BLD_CHECK_SPOKE_G2_LOST (the correction was lost). `fans`: vertex fans, no tangent-only stretch, the whole seam is judged (FAIL). `reach` 0 without fans: the spokes are G1 seams, one warn on the whole seam.
  * @failure no samples beyond the stretch -> nothing for it
  */
 export function spokeFinding(
@@ -147,6 +147,7 @@ export function spokeFinding(
   edge: number,
   samples: readonly ContactSample[],
   reach: number,
+  fans: boolean,
   fromVertex: boolean,
   tolerances: Tolerances,
   unit: string,
@@ -154,7 +155,7 @@ export function spokeFinding(
   const where = (sample: ContactSample): number => (fromVertex ? sample.t : 1 - sample.t);
   const seam = (kept: readonly ContactSample[]): NonNullable<ReturnType<typeof measureContact>> | null => measureContact(kept, tolerances);
   const readings =
-    reach > 0
+    reach > 0 || fans
       ? [
           {
             code: 'BLD_CHECK_SPOKE_G2',
@@ -166,7 +167,10 @@ export function spokeFinding(
             code: 'BLD_CHECK_SPOKE_G2_LOST',
             severity: 'fail' as const,
             measure: seam(samples.filter((sample) => where(sample) >= reach && where(sample) <= SPOKE_LAST_SAMPLE)),
-            place: `beyond the declared stretch of ${sig(reach)} next to the vertex, where the corner was built curvature-continuous`,
+            place:
+              fans && reach <= 0
+                ? 'all along the seam, where the vertex fans built the corner curvature-continuous up to the vertex'
+                : `beyond the declared stretch of ${sig(reach)} next to the vertex, where the corner was built curvature-continuous`,
           },
         ]
       : [{ code: 'BLD_CHECK_SPOKE_G2', severity: 'warn' as const, measure: seam(samples), place: 'all along the seam' }];

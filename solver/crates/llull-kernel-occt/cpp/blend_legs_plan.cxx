@@ -19,6 +19,7 @@
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepGProp.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <BRep_Tool.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <GProp_GProps.hxx>
@@ -96,7 +97,7 @@ namespace legs {
 
 double volume_of(const TopoDS_Shape &shape) {
   GProp_GProps props;
-  BRepGProp::VolumeProperties(shape, props);
+  llull::query::volume_properties(shape, props);
   return props.Mass();
 }
 
