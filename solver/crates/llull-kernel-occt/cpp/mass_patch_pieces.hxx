@@ -8,6 +8,7 @@
 #include <gp_Vec2d.hxx>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -16,6 +17,9 @@
 
 namespace llull {
 namespace query {
+
+// Test hook: when positive, the samples per interval of a curved pcurve (and twice that many for the monotone check) are capped to this, to show that the guards catch what sparse sampling misses.
+inline std::atomic<int> g_sampling_cap{0};
 
 // A boundary piece of the face in (u, v), monotone in both: a straight segment (closed form) or a part of a curve (inverted by a safeguarded Newton). `t0` is the end with the lower u.
 struct Piece {
@@ -160,9 +164,10 @@ inline bool add_pieces(const std::shared_ptr<BRepAdaptor_Curve2d> &curve, double
   const int intervals = curve->NbIntervals(GeomAbs_C2);
   TColStd_Array1OfReal ends(1, intervals + 1);
   curve->Intervals(ends, GeomAbs_C2);
-  // samples: 16 per interval, and 6 per knot span of a spline pcurve (the derivative of a cubic span has two roots)
+  // samples per interval: max(16, 6 x the knot spans of the whole curve) (the derivative of a cubic span has two roots), 8 per span for the monotone check
   const int spans = curve->GetType() == GeomAbs_BSplineCurve ? curve->NbKnots() - 1 : curve->GetType() == GeomAbs_BezierCurve ? 1 : 0;
-  const int per_interval = std::max(16, 6 * spans), check_samples = std::max(64, 8 * spans);
+  int per_interval = std::max(16, 6 * spans), check_samples = std::max(64, 8 * spans);
+  if (g_sampling_cap.load() > 0) per_interval = g_sampling_cap.load(), check_samples = 2 * g_sampling_cap.load();
   std::vector<double> cuts{first, last};
   for (int i = 1; i <= intervals + 1; ++i)
     if (ends(i) > first && ends(i) < last) cuts.push_back(ends(i));

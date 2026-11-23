@@ -4,7 +4,8 @@ use crate::blend_corner_tests::{cube, CornerHooks};
 use crate::blend_g2corner_tests::profile_of;
 use crate::queries::topology;
 use crate::test_bridge::{
-    patch_properties, patch_properties_mode, patch_synthetic, set_patch_agreement, set_patch_integrator, set_patch_order,
+    patch_properties, patch_properties_mode, patch_synthetic, patch_synthetic_helper, set_patch_agreement, set_patch_integrator,
+    set_patch_order, set_patch_refuse_every, set_patch_sampling_cap,
 };
 use crate::{boolean, make_box, make_cylinder, mass_properties, BooleanOp, Shape};
 use std::f64::consts::PI;
@@ -27,6 +28,8 @@ impl Drop for PatchHooks {
         set_patch_integrator(true);
         set_patch_order(0);
         set_patch_agreement(0.0);
+        set_patch_sampling_cap(0);
+        set_patch_refuse_every(0);
     }
 }
 
@@ -148,6 +151,34 @@ fn reversed_moved_and_non_converging_faces() {
     assert_eq!(taken, 144);
     assert!(reversed[0] < 0.0 && rel(reversed[0], -upright[0]) < 1e-12, "reversed volume {} against {}", reversed[0], upright[0]);
     assert!(worst(&reversed, &fixed) < 1e-11, "reversed: {reversed:?} against {fixed:?}");
+    // translated only (mode 5 volume, 7 area): everything the same as unmoved but the centre, to rounding
+    for (mode, base) in [(5, &upright), (7, &flat)] {
+        let (_, translated, _, _) = patch_properties_mode(&shape, mode).unwrap();
+        let moment = base[4].max(base[5]).max(base[6]);
+        assert!(rel(translated[0], base[0]) < 1e-11, "mode {mode}: mass {} against {}", translated[0], base[0]);
+        for (k, shift) in [1000.0, -500.0, 250.0].into_iter().enumerate() {
+            assert!(
+                (translated[1 + k] - base[1 + k] - shift).abs() < 1e-10,
+                "mode {mode}: centre {k}: {} against {} + {shift}",
+                translated[1 + k],
+                base[1 + k]
+            );
+        }
+        for k in 4..10 {
+            assert!((translated[k] - base[k]).abs() < 1e-10 * moment, "mode {mode}: inertia {k}: {} against {}", translated[k], base[k]);
+        }
+    }
+    // rotated and translated (3, 4): the mass and the trace of the central inertia (rotation invariants) equal the unmoved ones
+    for (mode, base) in [(3, &upright), (4, &flat), (6, &upright)] {
+        let (_, moved, _, _) = patch_properties_mode(&shape, mode).unwrap();
+        let (trace, base_trace) = (moved[4] + moved[5] + moved[6], base[4] + base[5] + base[6]);
+        assert!(
+            rel(moved[0], base[0]) < 1e-11 && rel(trace, base_trace) < 1e-11,
+            "mode {mode}: mass {} against {}, trace {trace} against {base_trace}",
+            moved[0],
+            base[0]
+        );
+    }
     for (mode, mass) in [(3, upright[0]), (4, flat[0])] {
         let (taken, moved, fixed, _) = patch_properties_mode(&shape, mode).unwrap();
         assert_eq!(taken, 144, "mode {mode}");
@@ -162,6 +193,64 @@ fn reversed_moved_and_non_converging_faces() {
     set_patch_integrator(false);
     let plain = mass_properties(&profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap()).unwrap();
     assert_eq!((fallback.volume, fallback.area), (plain.volume, plain.area), "every face fell back to BRepGProp");
+}
+
+/// The guards, with sampling so sparse that they are what decides: the double bump of kind 8 has two extrema of u between two samples of the capped sampling (4 per interval, 8 for the monotone check), so
+/// the monotone check or the parameter-domain check must refuse the face (refusal 1 or 4), and the production helper then gives BRepGProp's number bit for bit. Without the cap the face is read right.
+#[test]
+fn the_guards_refuse_what_sparse_sampling_would_misread() {
+    let _serial = crate::serial_blends();
+    let _hooks = PatchHooks;
+    assert!(patch_synthetic(8, false).is_some(), "dense sampling: taken");
+    let (helper, plain) = patch_synthetic_helper(8);
+    assert!(rel(helper, 64.0) < 1e-10 && rel(plain, 64.0) > 1e-5, "strips by the helper {helper}, BRepGProp {plain}");
+    set_patch_sampling_cap(4);
+    assert!(patch_synthetic(8, false).is_none(), "refused with the capped sampling");
+    let refusal = crate::test_bridge::last_patch_refusal();
+    assert!(refusal == 1 || refusal == 4, "refused by the monotone check or the domain check, not by chance: {refusal}");
+    let (helper, plain) = patch_synthetic_helper(8);
+    assert_eq!(helper.to_bits(), plain.to_bits(), "the fallback is BRepGProp's number");
+    // the flat square (line pcurves) is read as before under the cap
+    set_patch_sampling_cap(0);
+    let (helper, plain) = patch_synthetic_helper(0);
+    assert!(rel(helper, 100.0) < 1e-12 && rel(plain, 100.0) < 1e-12);
+}
+
+/// A shell in which some faces take the strips and the others genuinely fall back (every second face refused by the test hook, the others integrated, the refused ones by BRepGProp_Vinert about the same apex):
+/// volume, area, centroid and inertia against BRepGProp and against the integrator off.
+#[test]
+fn a_shell_of_strip_faces_and_fallback_faces_reads_like_brepgprop() {
+    let _serial = crate::serial_blends();
+    let _hooks = PatchHooks;
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_fan(1);
+    let shape = profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap();
+    for n in [2, 3] {
+        set_patch_refuse_every(n);
+        for mode in [1, 0, 3] {
+            let (_, mixed, fixed, _) =
+                patch_properties_mode(&shape, mode).unwrap_or_else(|| panic!("every n-th face refused, n {n}: some are taken"));
+            assert_eq!(crate::test_bridge::last_patch_refusal(), 5, "n {n}: the hook refused faces");
+            assert!(worst(&mixed, &fixed) < 1e-11, "n {n} mode {mode}: {mixed:?} against {fixed:?}");
+        }
+    }
+    set_patch_refuse_every(2);
+    let mixed = mass_properties(&profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap()).unwrap();
+    set_patch_refuse_every(0);
+    set_patch_integrator(false);
+    let off = mass_properties(&profile_of(&cube(10.0), 1.0, 1.0, 0.5).unwrap()).unwrap();
+    assert!(
+        rel(mixed.volume, off.volume) < 1e-11 && rel(mixed.area, off.area) < 3e-11,
+        "volume {} against {}, area {} against {}",
+        mixed.volume,
+        off.volume,
+        mixed.area,
+        off.area
+    );
+    for k in 0..3 {
+        assert!((mixed.centroid[k] - off.centroid[k]).abs() < 1e-9, "centroid {k}");
+        assert!(rel(mixed.inertia[k], off.inertia[k]) < 3e-11, "inertia {k}: {} against {}", mixed.inertia[k], off.inertia[k]);
+    }
 }
 
 /// The setback cube with its plate patches and with its exact stars (the two blend_corner tests that failed on the first version: the faces the strips leave to BRepGProp were summed with another apex): the volume
@@ -195,6 +284,14 @@ fn the_plate_and_the_star_read_the_same_with_the_integrator_on_and_off() {
         set_patch_integrator(true);
         assert!(rel(on.volume, off.volume) < 1e-7, "exact {exact}: volume {} against {}", on.volume, off.volume);
         assert!(rel(on.area, off.area) < 1e-7, "exact {exact}: area {} against {}", on.area, off.area);
+        for k in 0..3 {
+            assert!(
+                (on.centroid[k] - off.centroid[k]).abs() < 1e-6,
+                "exact {exact}: centroid {k}: {} against {}",
+                on.centroid[k],
+                off.centroid[k]
+            );
+        }
     }
 }
 

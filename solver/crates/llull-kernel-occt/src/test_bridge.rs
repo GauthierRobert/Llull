@@ -54,7 +54,7 @@ mod ffi {
         fn set_law_node_cap(nodes: i32);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
-        /// The strip integrator against BRepGProp's fixed rule on the whole shape (mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape moved far from the origin): `[faces taken, 10 numbers, 10 numbers]` (mass, centre, inertia about the origin xx yy zz xy xz yz), empty when no face is taken.
+        /// The strip integrator against BRepGProp's fixed rule on the whole shape (mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape rotated and translated far from the origin, 5 volume and 7 area translated only, 6 volume rotated only): `[faces taken, 10 numbers, 10 numbers]` (mass, centre, inertia about the origin xx yy zz xy xz yz), empty when no face is taken.
         fn patch_properties_probe(shape: &Shape, mode: i32) -> Vec<f64>;
         /// The strip integrator on (default) or off (every face by BRepGProp).
         /// The same on a synthetic B-spline face (`cpp/mass_patch_probe.cxx`: kinds 0 to 8, plus 16 for the reversed face).
@@ -64,6 +64,12 @@ mod ffi {
         fn set_patch_order(order: i32);
         /// The agreement the order search asks for (0: the default); a negative tolerance sends every face to BRepGProp at once.
         fn set_patch_agreement(tolerance: f64);
+        /// Caps the samples per interval of a curved pcurve (0: no cap): the guards decide what sparse sampling misses.
+        fn set_patch_sampling_cap(samples: i32);
+        /// Every n-th face the strips would take is refused (0: none): a shell of strip faces and BRepGProp faces.
+        fn set_patch_refuse_every(n: i32);
+        /// `[area of synthetic face `kind` by the helper production uses, BRepGProp alone]`.
+        fn patch_synthetic_helper_probe(kind: i32) -> Vec<f64>;
         /// Why the last face was left to BRepGProp (1 boundary, 2 integration, 3 orders did not agree, 4 parameter domain).
         fn last_patch_refusal() -> i32;
         /// The relative mismatch of the two parameter-domain areas of the last face.
@@ -130,6 +136,20 @@ pub fn last_domain_gap() -> f64 {
 
 pub fn last_patch_refusal() -> i32 {
     ffi::last_patch_refusal()
+}
+
+pub fn set_patch_sampling_cap(samples: i32) {
+    ffi::set_patch_sampling_cap(samples);
+}
+
+pub fn set_patch_refuse_every(n: i32) {
+    ffi::set_patch_refuse_every(n);
+}
+
+/// `(area by the production helper, area by BRepGProp alone)` of the synthetic face `kind`.
+pub fn patch_synthetic_helper(kind: i32) -> (f64, f64) {
+    let found = ffi::patch_synthetic_helper_probe(kind);
+    (found[0], found[1])
 }
 
 pub fn set_patch_agreement(tolerance: f64) {

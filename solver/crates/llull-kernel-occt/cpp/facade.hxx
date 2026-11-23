@@ -118,6 +118,10 @@ rust::Vec<double> patch_synthetic_probe(int32_t kind, int32_t volume);
 void set_patch_integrator(bool on);
 void set_patch_order(int32_t order);
 void set_patch_agreement(double tolerance);
+void set_patch_sampling_cap(int32_t samples);
+void set_patch_refuse_every(int32_t n);
+// Test-only: [the area of synthetic face `kind` by the helper production uses (strips when taken, else BRepGProp), BRepGProp alone].
+rust::Vec<double> patch_synthetic_helper_probe(int32_t kind);
 int32_t last_patch_refusal();
 double last_domain_gap();
 // Test-only seams of the mixed corner guards (blend_corner.cxx): the oriented patch angle of face `face` (optionally reversed in a rebuilt shell) and the boundary angle against its neighbours (-1: not measured).

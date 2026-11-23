@@ -5,7 +5,10 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepGProp.hxx>
 #include <BRepLib.hxx>
+#include <GProp_GProps.hxx>
+#include "llull-kernel-occt/cpp/mass_patch.hxx"
 #include <Geom2d_Circle.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
 #include <Geom2d_BSplineCurve.hxx>
@@ -136,6 +139,21 @@ rust::Vec<double> patch_synthetic_probe(int32_t kind, int32_t volume) {
   }
   if (reversed) face.Reverse();
   return patch_properties_probe(Shape{face}, volume);
+}
+
+rust::Vec<double> patch_synthetic_helper_probe(int32_t kind) {
+  const bool reversed = kind >= 16;
+  const int which = kind % 16;
+  const Handle(Geom_BSplineSurface) surface = make_surface(which == 4 ? 18 : which == 6 ? 16 : 17, which == 6 ? 6 : 7, which != 0 && which != 3 && which != 5 && which < 7);
+  TopoDS_Face face = which == 8 ? wiggly_face(surface) : make_face(surface, {}, {});
+  if (reversed) face.Reverse();
+  GProp_GProps helper, plain;
+  query::surface_properties(face, helper);
+  BRepGProp::SurfaceProperties(face, plain);
+  rust::Vec<double> out;
+  out.push_back(helper.Mass());
+  out.push_back(plain.Mass());
+  return out;
 }
 
 }  // namespace llull

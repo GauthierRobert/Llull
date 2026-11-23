@@ -466,7 +466,8 @@ bool adaptive_rule(const Shape &shape) { return shape.refined_mass && has_freefo
 bool refined_mass_flag(const Shape &shape) { return shape.refined_mass; }
 
 rust::Vec<double> patch_properties_probe(const Shape &shape, int32_t mode) {
-  // mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape moved (a rotation and a translation of about 1100 into its faces' locations).
+  // mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape moved by a rotation (0.7 rad about an axis through (1, 2, 3)) and a translation (1000, -500, 250) put into its faces' locations,
+  // 5 volume and 7 area of the shape translated only, 6 volume of the shape rotated only.
   // [faces taken, strips: mass, centre x y z, central inertia xx yy zz xy xz yz, BRepGProp fixed rule: the same ten, seconds of each]
   const auto push = [](rust::Vec<double> &out, const GProp_GProps &props) {
     out.push_back(props.Mass());
@@ -509,6 +510,8 @@ void set_patch_integrator(bool on) { query::set_patch_integrator(on); }
 void set_patch_order(int32_t order) { query::set_patch_order(order); }
 void set_patch_agreement(double tolerance) { query::set_patch_agreement(tolerance); }
 int32_t last_patch_refusal() { return query::last_patch_refusal(); }
+void set_patch_sampling_cap(int32_t samples) { query::set_patch_sampling_cap(samples); }
+void set_patch_refuse_every(int32_t n) { query::set_patch_refuse_every(n); }
 double last_domain_gap() { return query::last_domain_gap(); }
 
 int32_t span_cut_count(const Shape &shape) {

@@ -40,7 +40,9 @@ std::atomic<bool> g_patch_integrator{true};
 std::atomic<int> g_order_override{0};
 std::atomic<double> g_agree_override{0.0};
 std::atomic<double> g_domain_gap{0.0};
-std::atomic<int> g_refusal{0};  // why the last face was left to BRepGProp: 1 boundary, 2 integrate, 3 no convergence, 4 parameter domain
+std::atomic<int> g_refusal{0};  // why the last face was left to BRepGProp: 1 boundary, 2 integrate, 3 no convergence, 4 parameter domain, 5 test hook
+std::atomic<int> g_refuse_every{0};  // test hook: every n-th face is refused (0: none)
+std::atomic<int> g_face_counter{0};
 
 // An eligible face has at least this many knot cells: below it BRepGProp is as fast and the small faces stay on the rule every golden value was made with.
 constexpr size_t kMinCells = 64;
@@ -51,11 +53,12 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr int kMaxOrder = 61;
 constexpr int kOrders[] = {4, 5, 6, 8, 12, 16, 24, 32, 48};
 constexpr double kAgree = 1e-11;
-// the parameter-domain area of the strips (order 32) against Green's theorem along the boundary: a dropped or mispaired piece is far above this
+// the parameter-domain area of the strips (order 16 with a curved piece, 4 with straight ones) against Green's theorem along the boundary: a dropped or mispaired piece is far above this
 constexpr double kDomain = 1e-11;
 
 struct Sums {
   double m0 = 0, m1[3] = {0, 0, 0}, m2[6] = {0, 0, 0, 0, 0, 0};  // m2: xx yy zz xy xz yz
+  double abs0 = 0;                                                  // the integral of |f|: the scale of the agreement test
 };
 
 // `s` is the point relative to the reference point of the shape: the cones of a closed shell are valid from any apex, and the moments about a point near the shape do not cancel.
@@ -63,6 +66,7 @@ inline void accumulate(Sums &sums, bool volume, double weight, const double *s, 
   const double nx = su[1] * sv[2] - su[2] * sv[1], ny = su[2] * sv[0] - su[0] * sv[2], nz = su[0] * sv[1] - su[1] * sv[0];
   const double f = weight * (volume ? s[0] * nx + s[1] * ny + s[2] * nz : std::sqrt(nx * nx + ny * ny + nz * nz));
   sums.m0 += f;
+  sums.abs0 += std::fabs(f);
   for (int k = 0; k < 3; ++k) sums.m1[k] += f * s[k];
   sums.m2[0] += f * s[0] * s[0], sums.m2[1] += f * s[1] * s[1], sums.m2[2] += f * s[2] * s[2];
   sums.m2[3] += f * s[0] * s[1], sums.m2[4] += f * s[0] * s[2], sums.m2[5] += f * s[1] * s[2];
@@ -136,11 +140,14 @@ struct Integrator {
       for (size_t k = 0; k < pairs.size(); ++k) {
         const int cl = pairs[k].low_cell, ch = pairs[k].high_cell;
         const double raw_low = v_at(*bounds[2 * k], x, ok), raw_high = v_at(*bounds[2 * k + 1], x, ok);
-        if (!ok) return false;
+        if (!ok || !std::isfinite(raw_low) || !std::isfinite(raw_high)) return false;
         if (width_only) {
           uv_area += weight_u * (raw_high - raw_low);
           continue;
         }
+        // a limit outside the cells it was assigned to would be clamped silently: refuse instead (the strips would then disagree with the domain)
+        const double slack = 1e-12 * (surf.v.knots.back() - surf.v.knots.front());
+        if (raw_low < surf.v.knots[cl] - slack || raw_high > surf.v.knots[ch + 1] + slack) return false;
         const double low = std::max(raw_low, surf.v.knots[cl]), high = std::min(raw_high, surf.v.knots[ch + 1]);
         for (int c = cl; c <= ch; ++c) {
           const double from = c == cl ? low : surf.v.knots[c], to = c == ch ? high : surf.v.knots[c + 1];
@@ -177,6 +184,7 @@ bool integrate(Integrator &integrator, const std::vector<Piece> &pieces) {
     const double mid = 0.5 * (a + b);
     std::vector<std::pair<double, const Piece *>> keyed;
     for (const Piece *piece : active) keyed.push_back({v_at(*piece, mid, ok), piece});
+    for (const auto &key : keyed) ok = ok && std::isfinite(key.first);
     if (!ok) return false;
     std::sort(keyed.begin(), keyed.end(), [](const auto &x, const auto &y) { return x.first < y.first; });
     for (size_t k = 0; k < keyed.size(); ++k) active[k] = keyed[k].second;
@@ -222,9 +230,9 @@ bool eligible(const TopoDS_Face &face, Surf &surf) {
   return load_surface(spline, surf);
 }
 
-// The largest disagreement of two sets of moments, each term scaled by what it measures (mass, mass x reach, mass x reach^2) and a floor of rounding.
+// The largest disagreement of two sets of moments, each term scaled by what it measures (the integral of |f|, times reach, times reach^2) and a floor of rounding.
 double disagreement(const Sums &x, const Sums &y, double reach, bool volume) {
-  const double unit = std::fabs(x.m0) + 1e-15 * (volume ? reach * reach * reach : reach * reach);
+  const double unit = std::fabs(x.abs0) + 1e-15 * (volume ? reach * reach * reach : reach * reach);
   double worst = std::fabs(x.m0 - y.m0) / unit;
   for (int k = 0; k < 3; ++k) worst = std::max(worst, std::fabs(x.m1[k] - y.m1[k]) / (unit * reach));
   for (int k = 0; k < 6; ++k) worst = std::max(worst, std::fabs(x.m2[k] - y.m2[k]) / (unit * reach * reach));
@@ -256,6 +264,7 @@ bool face_sums(const TopoDS_Face &face, bool volume, const Surf &surf, const dou
   if (!boundary_of(face, pieces)) return g_refusal = 1, false;
   // Orders 4, 6, 8, 12, ... are run in turn until three successive ones agree pairwise to kAgree on every moment (Gauss errors fall faster than geometrically, so the error of the highest is then far below the
   // differences; two orders alone can agree by chance). A smooth face such as a vertex fan agrees from 4 (1e-13 measured, 13.48); a rough or trimmed one climbs; a face that has not agreed by the last order is left to BRepGProp.
+  if (!domain_is_consistent(surf, pieces)) return g_refusal = 4, false;
   double reach = 0;
   for (size_t i = 0; i + 2 < surf.poles.size(); i += 3)
     for (int k = 0; k < 3; ++k) reach = std::max(reach, std::fabs(surf.poles[i + k] - ref[k]));
@@ -288,7 +297,6 @@ bool face_sums(const TopoDS_Face &face, bool volume, const Surf &surf, const dou
     }
     if (!converged) return g_refusal = 3, false;
   }
-  if (!domain_is_consistent(surf, pieces)) return g_refusal = 4, false;
   const double sign = volume && face.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0;
   const double scale[3] = {volume ? 1.0 / 3 : 1.0, volume ? 1.0 / 4 : 1.0, volume ? 1.0 / 5 : 1.0};
   total.m0 += sign * scale[0] * sums.m0;
@@ -301,7 +309,10 @@ bool face_sums(const TopoDS_Face &face, bool volume, const Surf &surf, const dou
 bool face_sums_guarded(const TopoDS_Face &face, bool volume, const double *ref, Sums &total) {
   try {
     Surf surf;
-    return eligible(face, surf) && face_sums(face, volume, surf, ref, total);
+    if (!eligible(face, surf)) return false;
+    const int every = g_refuse_every.load();
+    if (every > 0 && g_face_counter.fetch_add(1) % every == 0) return g_refusal = 5, false;
+    return face_sums(face, volume, surf, ref, total);
   } catch (const Standard_Failure &) {
     return false;
   } catch (const std::exception &) {
@@ -322,7 +333,7 @@ class MomentProps : public GProp_GProps {
 // The matrix of inertia about the reference point from the second moments xx yy zz xy xz yz.
 gp_Mat inertia_of(const double *q) { return gp_Mat(q[1] + q[2], -q[3], -q[4], -q[3], q[0] + q[2], -q[5], -q[4], -q[5], q[0] + q[1]); }
 
-bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) {
+bool fast_properties_unguarded(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) {
   if (volume && !all_shells_closed(shape)) return false;
   // the reference point: the centre of the poles of the first eligible face (near the shape, whatever the shape's place)
   double ref[3] = {0, 0, 0};
@@ -360,9 +371,14 @@ bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) 
       for (TopExp_Explorer faces(rest, TopAbs_FACE); faces.More(); faces.Next()) {
         const TopoDS_Face face = TopoDS::Face(faces.Current());
         BRepGProp_Face surface;
-        BRepGProp_Domain domain(face);
         surface.Load(face);
-        result.Add(BRepGProp_Vinert(surface, domain, centre));
+        // as BRepGProp: an untrimmed face is integrated over its natural bounds, a trimmed one over its edges
+        if (surface.NaturalRestriction()) {
+          result.Add(BRepGProp_Vinert(surface, centre));
+        } else {
+          BRepGProp_Domain domain(face);
+          result.Add(BRepGProp_Vinert(surface, domain, centre));
+        }
       }
     } else {
       GProp_GProps others;
@@ -374,6 +390,17 @@ bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) 
   return true;
 }
 
+// Any failure of OCCT or of the standard library anywhere in the shape answers "not taken": the caller runs BRepGProp as it always did.
+bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) {
+  try {
+    return fast_properties_unguarded(shape, out, volume);
+  } catch (const Standard_Failure &) {
+    return false;
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
 }  // namespace
 
 void set_patch_integrator(bool on) { g_patch_integrator.store(on); }
@@ -381,6 +408,13 @@ void set_patch_integrator(bool on) { g_patch_integrator.store(on); }
 void set_patch_order(int order) { g_order_override.store(order); }
 
 void set_patch_agreement(double tolerance) { g_agree_override.store(tolerance); }
+
+void set_patch_sampling_cap(int samples) { g_sampling_cap.store(samples); }
+
+void set_patch_refuse_every(int n) {
+  g_refuse_every.store(n);
+  g_face_counter.store(0);
+}
 
 int last_patch_refusal() { return g_refusal.load(); }
 
