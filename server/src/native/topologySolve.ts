@@ -60,7 +60,8 @@ interface ParsedResult extends Omit<TopologySolveOutput, 'status'> {
 
 const isConstraint = (value: unknown): value is TopologyConstraint =>
   isRecord(value) &&
-  (value['name'] === 'volume' || value['name'] === 'compliance') &&
+  (value['name'] === 'volume' || value['name'] === 'compliance' || value['name'] === 'displacement') &&
+  (value['label'] === undefined || typeof value['label'] === 'string') &&
   typeof value['value'] === 'number' &&
   typeof value['limit'] === 'number' &&
   typeof value['satisfied'] === 'boolean';
