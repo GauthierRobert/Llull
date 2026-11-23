@@ -1354,6 +1354,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "llull-kernel-occt",
+ "serde",
  "serde_json",
 ]
 
