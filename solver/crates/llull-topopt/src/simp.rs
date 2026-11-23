@@ -187,6 +187,10 @@ pub struct OptimizerState {
     pub projection_level: u32,
     /// The compliance the MMA objective is normalised by (the first iteration's).
     pub objective_scale: Option<f64>,
+    /// minVolume MMA: collapsed steps taken back so far (all runs of this design).
+    pub backtracks: usize,
+    /// minVolume MMA: the compliance of the last accepted (not backtracked) design.
+    pub accepted_compliance: Option<f64>,
 }
 
 /// Result of a run.
@@ -227,8 +231,36 @@ pub struct TopError {
 /// Relative slack a constraint row may exceed its limit by and still count as satisfied (every row, the host's `check_topology` too).
 pub const CONSTRAINT_TOLERANCE: f64 = 1e-4;
 
-/// A minVolume design whose compliance exceeds this multiple of max(limit, the first iteration's compliance) is a collapse (a broken load path).
+/// Compliance growth over the last accepted minVolume design that, with the limit violated, is a collapse.
 const COLLAPSE_FACTOR: f64 = 100.0;
+
+/// The smaller jump that counts once the compliance is also `COLLAPSE_FACTOR` times the limit.
+const COLLAPSE_FACTOR_FAR: f64 = 10.0;
+
+/// Takes the last MMA step back when its design collapsed: the compliance violates the limit and jumped past `COLLAPSE_FACTOR` times
+/// the last accepted design's (a broken load path, not a gradual violation). Writes the previous design into `vars`; false = accept.
+fn collapse_backtrack(
+    mma: &mut Mma,
+    free: &[usize],
+    vars: &mut [f64],
+    compliance: f64,
+    accepted: Option<f64>,
+    max_compliance: f64,
+) -> bool {
+    let jumped = accepted.is_some_and(|previous| {
+        let (jump, excess) = (compliance / previous, compliance / max_compliance);
+        !compliance.is_finite() || (excess > 1.0 && (jump > COLLAPSE_FACTOR || (jump > COLLAPSE_FACTOR_FAR && excess > COLLAPSE_FACTOR)))
+    });
+    if !jumped {
+        return false;
+    }
+    let current: Vec<f64> = free.iter().map(|&v| vars[v]).collect();
+    let Some(previous) = mma.rewind(&current) else { return false };
+    for (k, &v) in free.iter().enumerate() {
+        vars[v] = previous[k];
+    }
+    true
+}
 
 /// Smallest grid (DOFs) that `device: auto` sends to a hardware GPU.
 pub const AUTO_GPU_MIN_DOFS: usize = 500_000;
@@ -454,7 +486,9 @@ pub fn optimise(
         }),
     };
     let mut objective_scale = initial.objective_scale;
-    let mut backtracks = 0usize;
+    let mut backtracks = initial.backtracks;
+    let (mut run_backtracks, mut first_backtrack) = (0usize, 0usize);
+    let mut accepted_compliance = initial.accepted_compliance;
     let started = Instant::now();
     let mut history = Vec::new();
     let mut iterations = 0;
@@ -469,30 +503,23 @@ pub fn optimise(
         solver.set_scale(&op);
         let analysis = analyse(&op, &mut solver, problem, &x_phys, &active)?;
         let compliance = analysis.compliance;
-        // a minVolume step that disconnects the design (compliance far past the limit and past the start's) is taken back
+        // a minVolume step that disconnects the design is taken back (over the limit and a jump of 100x on the last accepted design's compliance, or 10x when also 100x the limit)
         if let (Some(mma), Objective::MinVolume { max_compliance }) = (&mut mma, problem.objective) {
-            let scale = *objective_scale.get_or_insert(compliance);
-            if compliance.is_nan() || compliance > COLLAPSE_FACTOR * max_compliance.max(scale) {
-                let current: Vec<f64> = free.iter().map(|&v| vars[v]).collect();
-                if let Some(previous) = mma.rewind(&current) {
-                    for (k, &v) in free.iter().enumerate() {
-                        vars[v] = previous[k];
-                    }
-                    if backtracks == 0 {
-                        solver.warnings.push(format!(
-                            "{BACKTRACK_PREFIX}iteration {iterations}: the step disconnected the design (compliance {compliance:.4e} against the limit {max_compliance:.4e}); it was taken back and the moves are shortened"
-                        ));
-                    }
-                    backtracks += 1;
-                    let change = max_abs(&vars.iter().zip(&x).map(|(a, b)| a - b).collect::<Vec<f64>>());
-                    x = expand(&vars);
-                    x_phys = physical(&vars, beta);
-                    let row = HistoryRow { it: iterations, compliance, volume: sum(&x_phys) / active_count as f64, change };
-                    progress(&row);
-                    history.push(row);
-                    continue;
+            objective_scale.get_or_insert(compliance);
+            if collapse_backtrack(mma, &free, &mut vars, compliance, accepted_compliance, max_compliance) {
+                if run_backtracks == 0 {
+                    first_backtrack = settings.start_iteration + iterations;
                 }
+                (backtracks, run_backtracks) = (backtracks + 1, run_backtracks + 1);
+                let change = max_abs(&vars.iter().zip(&x).map(|(a, b)| a - b).collect::<Vec<f64>>());
+                x = expand(&vars);
+                x_phys = physical(&vars, beta);
+                let row = HistoryRow { it: iterations, compliance, volume: sum(&x_phys) / active_count as f64, change };
+                progress(&row);
+                history.push(row);
+                continue;
             }
+            accepted_compliance = Some(compliance);
         }
         let factor = -settings.penal * (problem.e0 - emin) * geometric;
         let has_gravity = !analysis.gravity.is_empty();
@@ -610,6 +637,11 @@ pub fn optimise(
             break Status::Checkpoint;
         }
     };
+    if run_backtracks > 0 {
+        solver.warnings.push(format!(
+            "{BACKTRACK_PREFIX}backtracked {run_backtracks} time(s) in this run ({backtracks} in all; first of this run at iteration {first_backtrack}): a step disconnected the design (compliance 100x past the last accepted design's and over the limit); it was taken back and the moves shortened",
+        ));
+    }
     // the warm start of the next iteration: what a resumed run needs to continue bit for bit
     let displacements = solver.warm.clone();
     op.set_scale(element_scales(&x_phys, voxels, problem, settings, geometric));
@@ -668,6 +700,12 @@ pub fn optimise(
         objective_value,
         constraints,
         beta,
-        state: OptimizerState { mma: mma.as_ref().map(Mma::state), projection_level: level, objective_scale },
+        state: OptimizerState {
+            mma: mma.as_ref().map(Mma::state),
+            projection_level: level,
+            objective_scale,
+            backtracks,
+            accepted_compliance,
+        },
     })
 }

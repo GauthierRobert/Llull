@@ -84,7 +84,7 @@
 //! - `design.f64`: the design variables x as little-endian f64 (pass it back as `startDesign` to resume).
 //! - `displacements.f64`: per load case (in `loadCases` order) the displacements of the last iteration's solve, which every
 //!   solve starts from (warm start), little-endian f64, load cases × DOFs (pass it back as `startDisplacements`).
-//! - `state.json`: `{ iteration, projectionLevel, objectiveScale, mma: { file: "mma.f64", iteration } | null }` (pass it back
+//! - `state.json`: `{ iteration, projectionLevel, objectiveScale, mma: { file: "mma.f64", iteration } | null, backtracks?, acceptedCompliance? }` (pass it back
 //!   as `startState`, with `mma.f64` — 4 × free variables little-endian f64 — beside it).
 //! - `result.json`: [`ResultFile`] (camelCase): `version`, `status` (`converged | max_iterations | checkpoint`), `iterations`,
 //!   `compliance` (weighted, of the final xPhys), `lastIterationCompliance` (the last history row, top88's printed value),
@@ -362,6 +362,16 @@ pub struct StateFile {
     pub objective_scale: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mma: Option<MmaStateInfo>,
+    /// minVolume MMA: collapsed steps taken back so far.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub backtracks: usize,
+    /// minVolume MMA: the compliance of the last accepted design.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepted_compliance: Option<f64>,
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -617,7 +627,13 @@ fn state_of(folder: &Path, name: &str) -> Result<OptimizerState, TopError> {
         Some(info) => Some((read_f64s(folder, &info.file, info.length)?, info.iteration)),
         None => None,
     };
-    Ok(OptimizerState { mma, projection_level: state.projection_level, objective_scale: state.objective_scale })
+    Ok(OptimizerState {
+        mma,
+        projection_level: state.projection_level,
+        objective_scale: state.objective_scale,
+        backtracks: state.backtracks,
+        accepted_compliance: state.accepted_compliance,
+    })
 }
 
 /// Builds the problem, settings and optional start files from a parsed job.
@@ -812,6 +828,8 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
             iteration: *iteration,
             length: values.len(),
         }),
+        backtracks: outcome.state.backtracks,
+        accepted_compliance: outcome.state.accepted_compliance,
     };
     let mut state_json = serde_json::to_vec(&state).map_err(|error| input(format!("state.json: {error}")))?;
     state_json.push(b'\n');
