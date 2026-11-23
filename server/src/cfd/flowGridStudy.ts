@@ -19,6 +19,7 @@ import {
   buildSolveJob,
   failure,
   recordSolve,
+  warningsOf,
   runSolveJob,
   TOOL,
   type ActiveStudy,
@@ -92,10 +93,18 @@ async function runLevels(
   return stored;
 }
 
+/** The refusal code a host result carries: the command's own (`data.code`, else the first CFD_* code named in its summary). */
+const codeOf = (result: FeaToolResult): string => {
+  const data = result.data as { code?: unknown } | undefined;
+  return typeof data?.code === 'string' ? data.code : (/CFD_[A-Z_]+/.exec(result.summary)?.[0] ?? 'CFD_RECORD_REFUSED');
+};
+
 /**
  * @failure unknown case -> CFD_CASE_NOT_FOUND; a level out of 8..2048 or not an integer (the case's n not a multiple of 4) -> CFD_PARAM_INVALID
  *   (data.gridStudy); any level's preparation / memory refusal -> its code, before anything runs; a failed or cancelled level (cfd_stop,
- *   the caller's signal) -> its code and nothing is recorded; record refusals -> their code
+ *   the caller's signal) -> its code and nothing is recorded; the refusal of `record_cfd_grid_study` over the stored bundles (CFD_INPUT_STALE when
+ *   the case or the geometry changed while solving, ...) -> that command's own code, found by a dry run BEFORE anything is dispatched, so a
+ *   refused study leaves the document untouched; a refusal of `record_cfd_results` -> its code
  */
 export async function runCfdGridStudy(caseId: string, options: CfdSolveOptions, host: FeaHost, deps: NativeDeps): Promise<FeaToolResult> {
   const cfdCase = cfdCaseOf(host.getDoc(), caseId);
@@ -116,8 +125,11 @@ export async function runCfdGridStudy(caseId: string, options: CfdSolveOptions, 
   if (finest === undefined) return failure('CFD_SOLVER_FAILED', 'the grid study produced no result', [caseId]);
   if (study.stopped) return cancelled(caseId, 'stopped by cfd_stop');
 
-  const { recorded } = recordSolve(host, cfdCase, finest);
   const resultsHashes = solves.map((entry) => entry.resultsHash);
+  const warnings = solves.flatMap((entry, index) =>
+    warningsOf(entry.solved).map((warning) => ({ level: levels[index]?.cells, code: warning.code, message: warning.message })),
+  );
+  const notes = warnings.map((entry) => `level ${entry.level}: ${entry.code}: ${entry.message}`).join('; ');
   const rows = solves.map((entry, index) => ({
     cells: levels[index]?.cells,
     cellM: entry.solved.artifact.grid.cellM,
@@ -126,24 +138,39 @@ export async function runCfdGridStudy(caseId: string, options: CfdSolveOptions, 
     steps: entry.solved.artifact.steps,
     elapsedMs: entry.solved.elapsedMs,
   }));
-  const base = { caseId, resultsHash: finest.resultsHash, resultsHashes, levels: rows, record: recorded.data };
+  const base = { caseId, resultsHash: finest.resultsHash, resultsHashes, levels: rows, ...(warnings.length > 0 ? { warnings } : {}) };
+
+  // The study command runs first, as a dry run over the document the host holds now and the port its own commands use: a refusal (stale
+  // case or geometry, a bundle that does not belong) leaves nothing recorded. Its study is passed back so a replay without the store keeps it.
+  const params = { caseId, resultsHashes };
+  const dry = execute(host.getDoc(), 'record_cfd_grid_study', params, {
+    ...defaultContext(),
+    cfdResults: deps.cfdResults ?? cfdResultPort(deps.store),
+  });
+  if (dry.rejected === true)
+    return {
+      summary: `${TOOL} gridStudy: nothing was recorded: ${dry.summary}`,
+      affected: dry.affected,
+      isError: true,
+      data: { ...base, code: dry.error?.code ?? 'CFD_RECORD_REFUSED' },
+    };
+  const given = (dry.data as { study?: unknown } | undefined)?.study;
+
+  const { recorded } = recordSolve(host, cfdCase, finest);
   if (recorded.isError)
     return {
       summary: `${TOOL} gridStudy: ${recorded.summary}`,
       affected: recorded.affected,
       isError: true,
-      data: { ...base, code: 'CFD_RECORD_REFUSED' },
+      data: { ...base, code: codeOf(recorded), record: recorded.data },
     };
-
-  // The study the command computes from the stored bundles is passed back so a replay without the store keeps it (flagged unverified).
-  const params = { caseId, resultsHashes };
-  const dry = execute(host.getDoc(), 'record_cfd_grid_study', params, { ...defaultContext(), cfdResults: cfdResultPort(deps.store) });
-  const given = dry.rejected === true ? undefined : (dry.data as { study?: unknown } | undefined)?.study;
-  const study2 = host.applyCommand('record_cfd_grid_study', given === undefined ? params : { ...params, study: given });
+  const studied = host.applyCommand('record_cfd_grid_study', given === undefined ? params : { ...params, study: given });
   return {
-    summary: `${TOOL} gridStudy: ${levels.map((level) => level.cells).join(' / ')} cells per reference length solved. ${recorded.summary} ${study2.summary}`,
-    affected: [...new Set([...recorded.affected, ...study2.affected])],
-    isError: study2.isError,
-    data: { ...base, gridStudy: study2.data },
+    summary:
+      `${TOOL} gridStudy: ${levels.map((level) => level.cells).join(' / ')} cells per reference length solved` +
+      `${notes === '' ? '' : ` [${notes}]`}. ${recorded.summary} ${studied.summary}`,
+    affected: [...new Set([...recorded.affected, ...studied.affected])],
+    isError: studied.isError,
+    data: { ...base, ...(studied.isError ? { code: codeOf(studied) } : {}), record: recorded.data, gridStudy: studied.data },
   };
 }

@@ -320,6 +320,17 @@ export async function runSolveJob(
   }
 }
 
+/** The warnings of one finished solve: the job's own, the bundle's not already named, and the step-limit one when it did not converge. */
+export function warningsOf(solved: Solved): readonly { readonly code: string; readonly message: string }[] {
+  return [
+    ...solved.warnings,
+    ...solved.artifact.warnings.filter((entry) => !solved.warnings.some((seen) => seen.code === entry.code)),
+    ...(solved.artifact.converged
+      ? []
+      : [{ code: 'CFD_NOT_CONVERGED', message: `the step limit (${solved.artifact.steps}) was reached before the drag settled` }]),
+  ];
+}
+
 /** `record_cfd_results` for a stored solve (a no-op summary when a concurrent caller of the same run recorded it already). */
 export function recordSolve(
   host: FeaHost,
@@ -361,13 +372,7 @@ export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host
   const { solved, resultsHash } = stored;
   const { artifact } = solved;
   const { summary, recorded } = recordSolve(host, cfdCase, stored);
-  const warnings = [
-    ...solved.warnings,
-    ...artifact.warnings.filter((entry) => !solved.warnings.some((seen) => seen.code === entry.code)),
-    ...(artifact.converged
-      ? []
-      : [{ code: 'CFD_NOT_CONVERGED', message: `the step limit (${artifact.steps}) was reached before the drag settled` }]),
-  ];
+  const warnings = warningsOf(solved);
   const notes = warnings.map((entry) => `${entry.code}: ${entry.message}`).join('; ');
   return {
     summary:

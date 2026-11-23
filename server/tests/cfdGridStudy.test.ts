@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
-import { _stopAllCfdSolves, runCfdStop } from '../src/cfd/flowSolve';
+import { _stopAllCfdSolves, activeStudies, runCfdStop } from '../src/cfd/flowSolve';
 import { runCfdGridStudy } from '../src/cfd/flowGridStudy';
 import { runCfdTool } from '../src/cfd/cfdTools';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
@@ -107,26 +107,84 @@ describe('cfd_solve gridStudy', () => {
     expect(runCfdStop('re100').data).toMatchObject({ code: 'CFD_NOT_RUNNING' });
   });
 
-  it('stops between two levels when cfd_stop lands in the gap, and on the caller signal', async () => {
+  it('stops in the gap between two solves (cfd_stop after level 1 is stored, before level 2 starts)', async () => {
     const model = modelAt(32);
     const host = hostOf(model, store);
     const runner = fakeRunner({ byGrid: (h) => 0.5 + 8 * h * h });
-    // cfd_stop right after the first level's bundle is stored: no solve is running, the study is
-    const gap = runCfdGridStudy('re100', {}, host, {
+    let stopped: ReturnType<typeof runCfdStop> | undefined;
+    const gapStore: FeArtifactCache = {
+      ...store,
+      put: (artifact) => {
+        const hash = store.put(artifact);
+        stopped ??= runCfdStop('re100');
+        return hash;
+      },
+    };
+    const result = await runCfdGridStudy('re100', {}, host, { store: gapStore, runner });
+    expect(result).toMatchObject({ isError: true, data: { code: 'CFD_CANCELLED' } });
+    expect(runner.calls).toHaveLength(1);
+    expect(stopped).toMatchObject({ isError: false, data: { stopped: [], studies: 1 } });
+    expect(host.current()).toBe(model.doc);
+    expect(activeStudies.size).toBe(0);
+  });
+
+  it('cancels mid-solve on the caller signal: one call, no study left registered, nothing to stop', async () => {
+    const model = modelAt(32);
+    const host = hostOf(model, store);
+    const runner = fakeRunner({ hold: true });
+    const controller = new AbortController();
+    const solving = runCfdGridStudy('re100', { signal: controller.signal }, host, { store, runner });
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1));
+    expect(activeStudies.size).toBe(1);
+    controller.abort();
+    expect(await solving).toMatchObject({ isError: true, data: { code: 'CFD_CANCELLED' } });
+    expect(runner.calls).toHaveLength(1);
+    expect(activeStudies.size).toBe(0);
+    expect(runCfdStop('re100').data).toMatchObject({ code: 'CFD_NOT_RUNNING' });
+    expect(host.current()).toBe(model.doc);
+  });
+
+  it('refuses an already aborted caller before any level starts', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const runner = fakeRunner();
+    const aborted = await runCfdGridStudy('re100', { signal: controller.signal }, hostOf(modelAt(32), store), { store, runner });
+    expect(aborted).toMatchObject({ isError: true, data: { code: 'CFD_CANCELLED' } });
+    expect(aborted.summary).toContain('cancelled by its caller');
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it('records nothing and passes the study refusal through when the body moves during the solves (CFD_INPUT_STALE)', async () => {
+    const model = modelAt(32);
+    const host = hostOf(model, store);
+    let moved: CadDocument | undefined;
+    const runner = fakeRunner({ byGrid: (h) => 0.5 + 8 * h * h });
+    const result = await runCfdGridStudy('re100', {}, host, {
       store,
       runner,
       onProgress: () => {
-        queueMicrotask(() => runCfdStop('re100'));
+        if (moved !== undefined) return;
+        moved = execute(model.doc, 'move_entities', { ids: [model.ballId], delta: [0.25, 0, 0] }).document;
+        host.set(moved);
       },
     });
-    expect(await gap).toMatchObject({ isError: true, data: { code: 'CFD_CANCELLED' } });
-    expect(host.current()).toBe(model.doc);
+    expect(runner.calls).toHaveLength(3);
+    expect(result).toMatchObject({ isError: true, data: { code: 'CFD_INPUT_STALE' } });
+    expect(result.summary).toContain('nothing was recorded');
+    // atomic: the three good solves left no result and no study in the document
+    expect(host.current()).toBe(moved);
+  });
 
-    const controller = new AbortController();
-    controller.abort();
-    const aborted = await runCfdGridStudy('re100', { signal: controller.signal }, host, { store, runner: fakeRunner() });
-    expect(aborted).toMatchObject({ isError: true, data: { code: 'CFD_CANCELLED' } });
-    expect(aborted.summary).toContain('cancelled by its caller');
+  it('collects the warnings of every level, tagged by level, into the summary and data.warnings', async () => {
+    const host = hostOf(modelAt(32), store);
+    const warnings = [{ code: 'CFD_GPU_UNAVAILABLE', message: 'no usable GPU adapter' }];
+    const runner = fakeRunner({ converged: false, warnings, byGrid: (h) => 0.5 + 8 * h * h });
+    const solved = await runCfdGridStudy('re100', { maxSteps: 50 }, host, { store, runner });
+    expect(solved.isError, solved.summary).toBe(false);
+    const found = (solved.data as { warnings: { level: number; code: string }[] }).warnings;
+    expect(found.filter((entry) => entry.code === 'CFD_NOT_CONVERGED').map((entry) => entry.level)).toEqual([32, 16, 8]);
+    expect(found.filter((entry) => entry.code === 'CFD_GPU_UNAVAILABLE')).toHaveLength(3);
+    expect(solved.summary).toContain('level 8: CFD_NOT_CONVERGED');
   });
 
   it('names the failing level and records nothing when a solve fails', async () => {
