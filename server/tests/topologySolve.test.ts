@@ -66,6 +66,8 @@ interface FakeOptions {
   readonly mma?: Float64Array;
   readonly status?: 'converged' | 'max_iterations' | 'checkpoint';
   readonly progress?: readonly Record<string, unknown>[];
+  /** Replaces the `constraints` rows of `result.json`. */
+  readonly constraints?: readonly unknown[];
 }
 
 /** A runner whose `topopt` reads the job folder, records it and writes plausible outputs (every voxel 0.5, compliance 5). */
@@ -99,7 +101,7 @@ function fakeRunner(options: FakeOptions = {}): ComputeRunner & { readonly calls
           device: 'cpu',
           deterministic: true,
           optimizer: options.mma === undefined ? 'oc' : 'mma',
-          constraints: [{ name: 'volume', value: 0.5, limit: 0.5, satisfied: true }],
+          constraints: options.constraints ?? [{ name: 'volume', value: 0.5, limit: 0.5, satisfied: true }],
         }),
       );
       const outputs: Record<string, Buffer> = { 'field.bin': field, 'design.f64': design, 'result.json': result };
@@ -222,6 +224,45 @@ describe('topology_solve with a fake job runner', () => {
       objective: { kind: 'minVolume', maxCompliance: 250 },
       settings: { optimizer: 'mma', projection: { beta: 8, eta: 0.5, betaStart: 1, betaEvery: 50 }, extrusion: 'x', deadlineS: 1620 },
     });
+  });
+
+  it("forwards displacement constraints to job.json and keeps the solver's displacement row with its label in the artifact", async () => {
+    const model = mbbModel();
+    const set = execute(model.doc, 'set_topology_objective', {
+      studyId: model.studyId,
+      objective: {
+        kind: 'min_volume',
+        maxCompliance: 250,
+        displacementConstraints: [
+          { label: 'tip', target: { entityId: model.entityId, pointsNear: [[0, 20, 0]] }, component: 'uy', maxDisplacement: 0.5 },
+        ],
+      },
+    });
+    const rows = [
+      { name: 'compliance', value: 200, limit: 250, satisfied: true },
+      { name: 'displacement', label: 'tip', value: 0.4, limit: 0.5, satisfied: true },
+    ];
+    const runner = fakeRunner({ constraints: rows, mma: new Float64Array(4) });
+    const host = hostOf({ ...model, doc: set.document });
+    await runTopologySolve(model.studyId, {}, host, { store, runner });
+    expect(JSON.parse(runner.calls[0]?.files['job.json']?.toString() ?? '{}')).toMatchObject({
+      objective: { kind: 'minVolume', maxCompliance: 250 },
+      displacementConstraints: [{ label: 'tip', loadCase: 'LC1', dofs: [2 * 61 * 20 + 1], maxDisplacement: 0.5 }],
+    });
+    expect(studyOf(host.current(), model.analysisId, model.studyId).result?.constraints).toEqual(rows);
+    // a study without them writes no such key
+    const plain = fakeRunner();
+    await runTopologySolve(model.studyId, {}, hostOf(model), { store, runner: plain });
+    expect(JSON.parse(plain.calls[0]?.files['job.json']?.toString() ?? '{}')).not.toHaveProperty('displacementConstraints');
+  });
+
+  it('does not take a malformed displacement row into the artifact (the record falls back to the derived volume constraint)', async () => {
+    const model = mbbModel();
+    const host = hostOf(model);
+    const runner = fakeRunner({ constraints: [{ name: 'displacement', label: 7, value: 0.4, limit: 0.5, satisfied: true }] });
+    await runTopologySolve(model.studyId, {}, host, { store, runner });
+    const constraints = studyOf(host.current(), model.analysisId, model.studyId).result?.constraints;
+    expect(constraints?.map((row) => row.name)).toEqual(['volume']);
   });
 
   it('keeps a checkpointed run as TOP_SOLVER_TIMEOUT (resumable) and resumes it with its optimiser state', async () => {

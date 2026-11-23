@@ -114,6 +114,11 @@ impl Solver<'_> {
         }
     }
 
+    /// Solves `K x = b` from zero (adjoint systems: no warm start, so a resumed run is unaffected).
+    pub(crate) fn solve_cold(&mut self, op: &Operator, b: &[f64]) -> Result<Vec<f64>, TopError> {
+        self.solve_from(op, b, vec![0.0; b.len()])
+    }
+
     fn solve_from(&mut self, op: &Operator, b: &[f64], start: Vec<f64>) -> Result<Vec<f64>, TopError> {
         self.refresh_multigrid(op);
         match &self.backend {

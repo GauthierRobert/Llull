@@ -105,9 +105,12 @@ export const checkTopology = defineCommand({
       for (const constraint of summary.constraints)
         if (!constraint.satisfied)
           items.push(
-            entry('TOP_CONSTRAINT_VIOLATED', 'fail', `${constraint.name} ${constraint.value} exceeds its limit ${constraint.limit}`, [
-              studyId,
-            ]),
+            entry(
+              'TOP_CONSTRAINT_VIOLATED',
+              'fail',
+              `${constraint.name}${constraint.label === undefined ? '' : ` '${constraint.label}'`} ${constraint.value} exceeds its limit ${constraint.limit}`,
+              [studyId],
+            ),
           );
       const rebuilds = rebuildEntityIds ?? [];
       if (rebuilds.length === 0)

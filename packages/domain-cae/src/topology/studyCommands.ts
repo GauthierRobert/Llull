@@ -18,7 +18,7 @@ import { caseOf } from '../shared/access';
 import { refuseTopology } from './codes';
 import { COMPLIANCE_UNIT, defaultProjection, defaultSettings, MIN_MEMBER_VOXELS } from './defaults';
 import { findStudy, withStudy, withoutStudy } from './model';
-import { badWeight, objectiveSchema, regionSchema, studyIdSchema, toObjective, toRegion } from './schemas';
+import { badWeight, displacementProblem, objectiveSchema, regionSchema, studyIdSchema, toObjective, toRegion } from './schemas';
 import { regionMasks } from './regions';
 import { domainTriangles, gridOver, insideMask, isGridRefusal } from './voxel';
 
@@ -83,6 +83,8 @@ export const createTopologyStudy = defineCommand({
       return fail('TOP_SETUP_INVALID', `load case weight '${weight[0]}' = ${weight[1]} must be > 0`, [], ['objective.loadCaseWeights']);
     if (objectiveInput.kind === 'min_volume' && !(objectiveInput.maxCompliance > 0 && Number.isFinite(objectiveInput.maxCompliance)))
       return fail('TOP_SETUP_INVALID', `maxCompliance ${objectiveInput.maxCompliance} must be > 0`, [], ['objective.maxCompliance']);
+    const displacement = displacementProblem(objectiveInput, params.designDomain);
+    if (displacement !== undefined) return fail('TOP_SETUP_INVALID', displacement.message, [], [displacement.path]);
     const notParts = params.designDomain.filter((id) => !Object.hasOwn(analysisCase.parts, id));
     if (params.designDomain.length === 0 || notParts.length > 0)
       return fail(
@@ -117,7 +119,7 @@ export const createTopologyStudy = defineCommand({
     const size = grid.dimension === 2 ? `${grid.nx} x ${grid.ny}` : `${grid.nx} x ${grid.ny} x ${grid.nz}`;
     const goal =
       objective.kind === 'min_volume'
-        ? `objective min_volume with compliance <= ${objective.maxCompliance} ${objective.unit} (optimizer mma)`
+        ? `objective min_volume with compliance <= ${objective.maxCompliance} ${objective.unit}${objective.displacementConstraints === undefined ? '' : ` and ${objective.displacementConstraints.length} displacement constraint(s)`} (optimizer mma)`
         : 'objective min_compliance';
     return changed(
       withStudy(doc, study),

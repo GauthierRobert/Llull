@@ -13,6 +13,7 @@ import { is3D, type CadDocument } from '@core/model/types';
 import { analysisLengthMetres } from '../shared/defaults';
 import { caseOf } from '../shared/access';
 import { stressPerMpa } from '../decks/units';
+import { displacementRows, type JobDisplacement } from './displacementJob';
 import { topologyInputHash, topologySettingsHash } from './hash';
 import { forceLoad, gravityPerVoxel, pressureLoad } from './loads';
 import { dofComponents, isMappingFailure, mapTarget, nodeSets, type MappedTarget } from './mapping';
@@ -60,7 +61,14 @@ export interface TopologyJob {
   readonly thickness: number;
   readonly volumeFraction: number;
   /** `maxCompliance` in the force x length unit of `unitSystem`. */
-  readonly objective: { readonly kind: 'min_compliance' } | { readonly kind: 'min_volume'; readonly maxCompliance: number };
+  readonly objective:
+    | { readonly kind: 'min_compliance' }
+    | {
+        readonly kind: 'min_volume';
+        readonly maxCompliance: number;
+        /** Extra constraints `|mean u| <= max` (analysis length unit); absent without any. */
+        readonly displacementConstraints?: readonly JobDisplacement[];
+      };
   /** Solver settings; lengths are in voxels. */
   readonly settings: {
     readonly penal: number;
@@ -347,6 +355,16 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
   const keepOutFinal = Uint8Array.from(keepOut);
   const count = (mask: Uint8Array): number => mask.reduce((sum, flag) => sum + flag, 0);
   const loadCases = loadCasesOf(byCase, study.objective.loadCaseWeights);
+  const displacement = displacementRows(
+    study,
+    grid,
+    sets,
+    lengthFactor,
+    loadCases.map((loadCase) => loadCase.name),
+    (entityId) => trianglesOf(doc, entityId),
+    fixed,
+  );
+  if ('ok' in displacement) return displacement;
   const minMemberSize = study.manufacturing.minMemberSize;
   const radiusDoc = minMemberSize === undefined ? settings.filter.radius.value : Math.max(settings.filter.radius.value, minMemberSize / 2);
   const radiusVoxels = radiusDoc / study.voxel;
@@ -373,7 +391,11 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
       volumeFraction: study.volumeFraction,
       objective:
         study.objective.kind === 'min_volume'
-          ? { kind: 'min_volume', maxCompliance: study.objective.maxCompliance }
+          ? {
+              kind: 'min_volume',
+              maxCompliance: study.objective.maxCompliance,
+              ...(displacement.length === 0 ? {} : { displacementConstraints: displacement }),
+            }
           : { kind: 'min_compliance' },
       settings: settingsOf(study, extrusion, radiusVoxels),
       inputHash: topologyInputHash(doc, study),

@@ -59,6 +59,37 @@ const isNamed = (value: unknown): boolean =>
 
 const SETTING_KEYS = ['penal', 'eminRatio', 'move', 'changeTol', 'maxIterations', 'threshold', 'greyLimit'];
 
+const isVec3 = (value: unknown): boolean =>
+  Array.isArray(value) && value.length === 3 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+
+/** A target: an entity id and non-empty lists of finite [x, y, z] points for the selectors it has (at least one selector). */
+const validTarget = (value: unknown): boolean => {
+  if (!isRecord(value) || typeof value['entityId'] !== 'string') return false;
+  const lists = ['facesNear', 'edgesNear', 'pointsNear'].map((key) => value[key]).filter((list) => list !== undefined);
+  return lists.length > 0 && lists.every((list) => Array.isArray(list) && list.length > 0 && list.every(isVec3));
+};
+
+const validDisplacement = (value: unknown, domain: unknown): boolean =>
+  isRecord(value) &&
+  typeof value['label'] === 'string' &&
+  value['label'] !== '' &&
+  ['ux', 'uy', 'uz'].includes(String(value['component'])) &&
+  typeof value['maxDisplacement'] === 'number' &&
+  value['maxDisplacement'] > 0 &&
+  Number.isFinite(value['maxDisplacement']) &&
+  validTarget(value['target']) &&
+  Array.isArray(domain) &&
+  domain.includes((value['target'] as Record<string, unknown>)['entityId']) &&
+  (value['loadCase'] === undefined || typeof value['loadCase'] === 'string');
+
+/** The optional `displacementConstraints` of a min_volume objective (studies written before them have none): shape, positive limits, unique labels, targets in the domain. */
+const displacementErrors = (objective: unknown, domain: unknown): boolean => {
+  if (!isRecord(objective) || objective['displacementConstraints'] === undefined) return true;
+  const rows = objective['displacementConstraints'];
+  if (objective['kind'] !== 'min_volume' || !Array.isArray(rows) || !rows.every((row) => validDisplacement(row, domain))) return false;
+  return new Set(rows.map((row) => (row as Record<string, unknown>)['label'])).size === rows.length;
+};
+
 function studyErrors(where: string, key: string, study: unknown): string[] {
   const bad = (why: string): string[] => [`${where}: ${why}`];
   if (!isRecord(study) || study['id'] !== key || typeof study['name'] !== 'string' || typeof study['analysisId'] !== 'string')
@@ -70,6 +101,7 @@ function studyErrors(where: string, key: string, study: unknown): string[] {
   if (typeof volumeFraction !== 'number' || !(volumeFraction > 0 && volumeFraction < 1)) return bad('volumeFraction must be in (0, 1)');
   if (!Array.isArray(study['keepIn']) || !Array.isArray(study['keepOut'])) return bad('keepIn / keepOut must be lists');
   if (!isRecord(settings) || !SETTING_KEYS.every((name) => isNamed(settings[name]))) return bad('settings are malformed');
+  if (!displacementErrors(study['objective'], study['designDomain'])) return bad('objective.displacementConstraints are malformed');
   const filter = settings['filter'];
   if (!isRecord(filter) || !isNamed(filter['radius']) || (filter['kind'] !== 'sensitivity' && filter['kind'] !== 'density'))
     return bad('settings.filter is malformed');

@@ -8,12 +8,12 @@ import { caseOf } from '../shared/access';
 import { refuseTopology } from './codes';
 import { COMPLIANCE_UNIT } from './defaults';
 import { findStudy, withStudy } from './model';
-import { badWeight, objectiveSchema, studyIdSchema, toObjective } from './schemas';
+import { badWeight, displacementProblem, objectiveSchema, studyIdSchema, toObjective } from './schemas';
 
 /**
  * @affects doc.analysis.cases[a].topology[studyId].objective (and settings.optimizer, set to mma for min_volume)
  * @invariant min_volume needs maxCompliance > 0 in the analysis compliance unit; a recorded result reads stale afterwards (the objective is input)
- * @failure unknown study -> TOP_STUDY_NOT_FOUND; maxCompliance <= 0, a load case weight <= 0, an unchanged objective -> TOP_SETUP_INVALID (unchanged doc)
+ * @failure unknown study -> TOP_STUDY_NOT_FOUND; maxCompliance <= 0, a load case weight <= 0, a displacement constraint with maxDisplacement <= 0 / no target point / an entity outside the design domain / a duplicate label, an unchanged objective -> TOP_SETUP_INVALID (unchanged doc)
  */
 export const setTopologyObjective = defineCommand({
   name: 'set_topology_objective',
@@ -21,7 +21,8 @@ export const setTopologyObjective = defineCommand({
     'Change what a topology study minimises: min_compliance (the stiffest layout within volumeFraction, the default) or min_volume (the least ' +
     'material whose weighted compliance stays at or below maxCompliance, given in the force x length unit of the analysis unit system, e.g. N*mm; ' +
     'read a solved min_compliance report to pick it). min_volume needs the MMA optimizer, so settings.optimizer switches to mma. loadCaseWeights ' +
-    'apply to both objectives (a case not listed weighs 1). A recorded result becomes stale: re-run topology_solve.',
+    'apply to both objectives (a case not listed weighs 1). min_volume also takes displacementConstraints: limits on the mean displacement of a ' +
+    'face / edge / point along one axis (document length units), e.g. the tip deflection; each is reported as a constraint. A recorded result becomes stale: re-run topology_solve.',
   params: z.object({
     studyId: studyIdSchema,
     objective: objectiveSchema.describe(
@@ -38,6 +39,8 @@ export const setTopologyObjective = defineCommand({
       return fail('TOP_SETUP_INVALID', `load case weight '${weight[0]}' = ${weight[1]} must be > 0`, ['objective.loadCaseWeights']);
     if (objective.kind === 'min_volume' && !(objective.maxCompliance > 0 && Number.isFinite(objective.maxCompliance)))
       return fail('TOP_SETUP_INVALID', `maxCompliance ${objective.maxCompliance} must be > 0`, ['objective.maxCompliance']);
+    const displacement = displacementProblem(objective, found.study.designDomain);
+    if (displacement !== undefined) return fail('TOP_SETUP_INVALID', displacement.message, [displacement.path]);
     const unitSystem = caseOf(doc, found.study.analysisId)?.unitSystem ?? 'N-mm-t-s';
     const next = toObjective(objective, COMPLIANCE_UNIT[unitSystem]);
     const switched = next.kind === 'min_volume' && found.study.settings.optimizer !== 'mma';
@@ -50,7 +53,7 @@ export const setTopologyObjective = defineCommand({
       return fail('TOP_SETUP_INVALID', 'nothing to change: the objective is already set so');
     const what =
       next.kind === 'min_volume'
-        ? `min_volume with weighted compliance <= ${next.maxCompliance} ${next.unit}${switched ? ' (optimizer switched to mma: min_volume needs it)' : ''}`
+        ? `min_volume with weighted compliance <= ${next.maxCompliance} ${next.unit}${next.displacementConstraints === undefined ? '' : ` and ${next.displacementConstraints.length} displacement constraint(s) (${next.displacementConstraints.map((c) => c.label).join(', ')})`}${switched ? ' (optimizer switched to mma: min_volume needs it)' : ''}`
         : 'min_compliance within the volume fraction';
     const weights = Object.entries(next.loadCaseWeights);
     return changed(

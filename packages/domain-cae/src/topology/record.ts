@@ -139,7 +139,7 @@ export const recordTopologyResult = defineCommand({
     const unit = expected.complianceUnit;
     return changed(
       next,
-      `record_topology_result: ${studyId} solved — ${expected.iterations} iterations (${expected.status}), compliance ${significantNumber(expected.compliance, 6)} ${unit}, volume fraction ${significantNumber(expected.volumeFraction, 4)}, grey ${significantNumber(expected.grey, 3)}, solid volume ${significantNumber(expected.thresholdedVolume, 6)} ${expected.volumeUnit} (${expected.solver.job} ${expected.solver.version}, ${expected.solver.device}${expected.solver.deterministic ? ', deterministic' : ''}); ${entity === null ? 'no voxel reaches the threshold: no iso-surface' : `iso-surface ${entityId} (${mesh.indices.length / 3} triangles, concept, read-only)`}${expected.unverified ? '; UNVERIFIED material inputs' : ''}.`,
+      `record_topology_result: ${studyId} solved — ${expected.iterations} iterations (${expected.status}), compliance ${significantNumber(expected.compliance, 6)} ${unit}, volume fraction ${significantNumber(expected.volumeFraction, 4)}, grey ${significantNumber(expected.grey, 3)}, solid volume ${significantNumber(expected.thresholdedVolume, 6)} ${expected.volumeUnit}${expected.massG === undefined ? '' : ` (${significantNumber(expected.massG, 6)} g)`} (${expected.solver.job} ${expected.solver.version}, ${expected.solver.device}${expected.solver.deterministic ? ', deterministic' : ''}); ${entity === null ? 'no voxel reaches the threshold: no iso-surface' : `iso-surface ${entityId} (${mesh.indices.length / 3} triangles, concept, read-only)`}${expected.unverified ? '; UNVERIFIED material inputs' : ''}.`,
       entity === null ? [studyId] : [studyId, entity.id],
     );
   },

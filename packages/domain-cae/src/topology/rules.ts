@@ -27,6 +27,11 @@ export function studyRules(doc: CadDocument, study: TopologyStudy): string[] {
     );
   }
   if (study.objective.kind === 'min_volume')
+    for (const c of study.objective.displacementConstraints ?? [])
+      rules.push(
+        `displacement constraint '${c.label}': |mean ${c.component}| of ${c.target.entityId} (${c.loadCase === undefined ? 'every load case' : `load case ${c.loadCase}`}) <= ${c.maxDisplacement} ${doc.units}`,
+      );
+  if (study.objective.kind === 'min_volume')
     rules.push(
       `objective min_volume: least material with weighted compliance <= ${study.objective.maxCompliance} ${study.objective.unit} (optimizer mma)`,
     );

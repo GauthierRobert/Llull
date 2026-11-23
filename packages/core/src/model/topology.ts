@@ -27,6 +27,18 @@ export interface TopologyTarget {
   readonly pointsNear?: readonly Vec3[];
 }
 
+/** `|mean displacement of the target's mesh nodes along `component`| <= maxDisplacement` in a load case (min_volume only). */
+export interface TopologyDisplacementConstraint {
+  readonly label: string;
+  /** Face / edge / point of a design-domain entity: the grid nodes it maps to are averaged. */
+  readonly target: TopologyTarget;
+  readonly component: 'ux' | 'uy' | 'uz';
+  /** Largest allowed |u|, document length units. */
+  readonly maxDisplacement: number;
+  /** Load case name; absent = the constraint holds in every load case of the analysis. */
+  readonly loadCase?: string;
+}
+
 export type TopologyObjective =
   | {
       readonly kind: 'min_compliance';
@@ -40,6 +52,8 @@ export type TopologyObjective =
       /** Force x length unit of `maxCompliance` (the analysis unit system's, e.g. 'N*mm'). */
       readonly unit: string;
       readonly loadCaseWeights: Readonly<Record<string, number>>;
+      /** Absent on studies written before displacement constraints. */
+      readonly displacementConstraints?: readonly TopologyDisplacementConstraint[];
     };
 
 export type TopologyRegion =
@@ -107,7 +121,9 @@ export interface TopologySolverInfo {
 
 /** A constraint of the final design as the solver reports it. */
 export interface TopologyConstraint {
-  readonly name: 'volume' | 'compliance';
+  readonly name: 'volume' | 'compliance' | 'displacement';
+  /** The label of a displacement constraint. */
+  readonly label?: string;
   readonly value: number;
   readonly limit: number;
   readonly satisfied: boolean;
@@ -131,6 +147,8 @@ export interface TopologyResultSummary {
   readonly grey: number;
   readonly thresholdedVolume: number;
   readonly volumeUnit: string;
+  /** Mass in grams of the thresholded solid (`thresholdedVolume` x the domain material density); absent without a density. */
+  readonly massG?: number;
   readonly history: readonly TopologyHistoryRow[];
   readonly solver: TopologySolverInfo;
   readonly optimizer: 'oc' | 'mma';
