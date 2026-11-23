@@ -90,6 +90,24 @@ impl Mma {
         Some(Mma { n, m, low: part(0), upp: part(1), xold1: part(2), xold2: part(3), iteration })
     }
 
+    /// Undoes the last step after the caller found its design `x_bad` unusable: returns the design that step started from, halves the
+    /// asymptote distances around it (the next step is then at most about half as bold) and forgets the step's direction. `None`
+    /// when there is nothing to go back to (no step yet, or the last step did not move).
+    pub fn rewind(&mut self, x_bad: &[f64]) -> Option<Vec<f64>> {
+        if self.iteration == 0 || self.xold1.len() != self.n || self.xold1.iter().zip(x_bad).all(|(a, b)| a == b) {
+            return None;
+        }
+        let x = self.xold1.clone();
+        for ((low, upp), &x) in self.low.iter_mut().zip(self.upp.iter_mut()).zip(&x) {
+            *low = x - 0.5 * (x - *low);
+            *upp = x + 0.5 * (*upp - x);
+        }
+        self.xold2 = x.clone();
+        // steps 1 and 2 start from fixed asymptotes: continue from the (shrunk) stored ones
+        self.iteration = self.iteration.max(2);
+        Some(x)
+    }
+
     /// One MMA step from `x` with the objective gradient `df0`, the constraint values `f` (m) and gradients `df` (m rows of n).
     /// Returns the new design. Panics on mismatched lengths.
     pub fn step(&mut self, x: &[f64], df0: &[f64], f: &[f64], df: &[Vec<f64>], bounds: Bounds) -> Vec<f64> {
@@ -452,5 +470,19 @@ mod tests {
         let mut mma = Mma::new(2, 0);
         let x = mma.step(&[0.5, 0.5], &[1.0, -1.0], &[], &[], Bounds { xmin: 0.0, xmax: 1.0, move_limit: 0.2 });
         assert!(x[0] < 0.5 && x[1] > 0.5);
+    }
+
+    #[test]
+    fn rewind_returns_the_previous_design_and_narrows_the_asymptotes() {
+        let mut mma = Mma::new(2, 1);
+        let bounds = Bounds { xmin: 0.0, xmax: 1.0, move_limit: 0.2 };
+        assert!(mma.rewind(&[0.5, 0.5]).is_none(), "no step yet");
+        let start = [0.5, 0.5];
+        let next = mma.step(&start, &[1.0, 1.0], &[0.1], &[vec![-1.0, -1.0]], bounds);
+        let width = mma.state().0[2] - mma.state().0[0];
+        assert_eq!(mma.rewind(&next).as_deref(), Some(&start[..]));
+        let (values, _) = mma.state();
+        assert!((values[2] - values[0] - 0.5 * width).abs() < 1e-12, "asymptotes halved around the start");
+        assert!(mma.rewind(&start).is_none(), "already at the previous design");
     }
 }

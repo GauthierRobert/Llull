@@ -3,8 +3,14 @@
 
 use crate::simp::{Device, Engine, Settings, TopError};
 use llull_voxfe::multigrid::{Multigrid, MultigridSettings};
-use llull_voxfe::pcg::{pcg, Jacobi};
+use llull_voxfe::pcg::{pcg, Jacobi, SolveError};
 use llull_voxfe::{Operator, SolverKind};
+
+/// Prefix of a solver warning that is a `TOP_SOLVER_FALLBACK` (every other solver warning is a `TOP_GPU_FALLBACK`).
+pub(crate) const SOLVER_FALLBACK_PREFIX: &str = "solver-fallback: ";
+
+/// Prefix of a `TOP_DESIGN_BACKTRACK` warning (a minVolume step taken back after it disconnected the design).
+pub(crate) const BACKTRACK_PREFIX: &str = "design-backtrack: ";
 
 /// Linear solves on the CPU twin or the GPU.
 pub(crate) enum Backend {
@@ -87,12 +93,25 @@ impl Solver<'_> {
     /// PCG on the CPU twin from `u` (masked by the solver).
     fn cpu(&mut self, op: &Operator, b: &[f64], mut u: Vec<f64>) -> Result<Vec<f64>, TopError> {
         let (tolerance, cap) = (self.settings.pcg_tolerance, self.settings.pcg_max_iterations);
+        let start = u.clone();
         let stats = match self.settings.solver {
             SolverKind::Jacobi => pcg(op, &Jacobi::new(op), b, &mut u, tolerance, cap),
             SolverKind::Multigrid => {
                 self.refresh_multigrid(op);
                 let multigrid = self.multigrid.as_ref().unwrap_or_else(|| unreachable!("built by refresh_multigrid"));
-                pcg(op, multigrid, b, &mut u, tolerance, cap)
+                match pcg(op, multigrid, b, &mut u, tolerance, cap) {
+                    // a near-void design can break the multigrid preconditioner (not the system): solve this system with Jacobi
+                    Err(error @ (SolveError::NonFinite { .. } | SolveError::Breakdown { .. } | SolveError::Diverged { .. })) => {
+                        if self.warnings.len() < 20 {
+                            self.warnings.push(format!(
+                                "{SOLVER_FALLBACK_PREFIX}multigrid PCG failed ({error}); this solve used the Jacobi preconditioner"
+                            ));
+                        }
+                        u = start;
+                        pcg(op, &Jacobi::new(op), b, &mut u, tolerance, cap)
+                    }
+                    other => other,
+                }
             }
         }
         .map_err(|error| TopError { code: "TOP_SOLVER_FAILED", message: error.to_string() })?;
@@ -140,5 +159,80 @@ impl Solver<'_> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use llull_voxfe::ke::element_matrix;
+    use llull_voxfe::Grid;
+
+    /// MBB 30 x 10 half beam on a thin broken-up design (stiffness contrast 1e9, as after a void collapse).
+    fn near_void(pattern: impl Fn(usize) -> f64) -> (Operator, Vec<f64>) {
+        let grid = Grid::new_2d(30, 10);
+        let mut fixed = vec![false; grid.dofs()];
+        for j in 0..=10 {
+            fixed[2 * (j * 31)] = true;
+        }
+        fixed[2 * 30 + 1] = true;
+        let scales: Vec<f64> = (0..grid.elements()).map(pattern).collect();
+        let op = Operator::new(grid, element_matrix(2, 0.3), scales, fixed);
+        let mut b = vec![0.0; grid.dofs()];
+        b[2 * (10 * 31) + 1] = -1.0;
+        (op, b)
+    }
+
+    fn solver(settings: &Settings) -> Solver<'_> {
+        Solver {
+            settings,
+            backend: Backend::Cpu,
+            multigrid: None,
+            stale: true,
+            warm: vec![Vec::new()],
+            pcg_iterations: 0,
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Pseudo-random thin design: `percent` % of the elements solid, the rest void (1e-9).
+    fn thin(seed: u64, percent: u64) -> impl Fn(usize) -> f64 {
+        move |e| {
+            let h = (e as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15 ^ seed.wrapping_mul(0x1234_5677)) >> 40;
+            if h % 100 < percent {
+                1.0
+            } else {
+                1e-9
+            }
+        }
+    }
+
+    fn solve_with(kind: SolverKind, design: impl Fn(usize) -> f64) -> (Vec<f64>, Vec<String>) {
+        let (op, b) = near_void(design);
+        let settings = Settings { solver: kind, ..Settings::default() };
+        let mut solver = solver(&settings);
+        solver.set_scale(&op);
+        let u = solver.solve(&op, 0, &b).expect("solved");
+        (u, solver.warnings)
+    }
+
+    /// A near-void design breaks the multigrid preconditioner (inf in the f32 V-cycle, or a residual growing 1e3-fold): that solve is
+    /// redone with Jacobi, names the cause in a `solver-fallback` warning and returns the Jacobi answer.
+    #[test]
+    fn a_broken_multigrid_falls_back_to_jacobi_with_a_named_warning() {
+        for (seed, percent, cause) in [(0, 4, "non-finite"), (3, 7, "diverged")] {
+            let (multigrid, warnings) = solve_with(SolverKind::Multigrid, thin(seed, percent));
+            let (jacobi, none) = solve_with(SolverKind::Jacobi, thin(seed, percent));
+            assert!(none.is_empty(), "{none:?}");
+            assert_eq!(warnings.len(), 1, "{warnings:?}");
+            assert!(warnings[0].starts_with(SOLVER_FALLBACK_PREFIX) && warnings[0].contains(cause), "{warnings:?}");
+            assert_eq!(multigrid, jacobi, "the fallback answer is the Jacobi solve");
+        }
+    }
+
+    #[test]
+    fn a_healthy_design_solves_by_multigrid_without_a_warning() {
+        let (u, warnings) = solve_with(SolverKind::Multigrid, |_| 1.0);
+        assert!(warnings.is_empty() && u.iter().all(|v| v.is_finite()), "{warnings:?}");
     }
 }

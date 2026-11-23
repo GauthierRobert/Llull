@@ -703,6 +703,28 @@ Measured after the fix, MBB 30 × 10 `min_volume` density filter: tip capped at 
 (261.2691 against 261.2689); with a self-weight case and compliance limit 1e5, caps 400 / 300 / 230 → volume 0.382 / 0.443 / 0.540, |ū| = cap, every row
 satisfied; a displacement row resumes from a checkpoint bit for bit.
 
+**Near-void collapse (multigrid NaN, found by review; as built).** `min_volume`, MBB 30 × 10, `maxCompliance` 1e5 (a row nobody binds at the start) ended in
+`TOP_SOLVER_FAILED` "PCG produced a non-finite value at iteration 1" at iteration 4. Cause: MMA stripped material at the move limit (volume 0.5 → 0.3 → 0.1
+→ 0.037, then 0.0017); that step broke the load path (compliance 1.2e5 → 9.3e9) and on the resulting ~1e9-contrast Galerkin hierarchy the coarse direct solve
+returned values up to 1.3e34 that the f32 V-cycle cast to inf. Two layers:
+1. *Solver fallback* (`llull-voxfe/src/pcg.rs`, `llull-topopt/src/solver.rs`): a multigrid PCG that ends `NonFinite`, `Breakdown` or `Diverged` (new: the residual
+   grew past 1e3 × its start; only preconditioners that opt in, i.e. multigrid) is solved again from the same start with the Jacobi preconditioner; the warning
+   `TOP_SOLVER_FALLBACK` names the cause. Plain `NotConverged` is not retried (a slow but falling run would pay another 10000 iterations); a Jacobi failure stays
+   `TOP_SOLVER_FAILED`. A saturating clamp of the f32 cast of the coarse correction was tried and dropped: it only turned the immediate NonFinite into 10000
+   diverging V-cycles (0.99 s against 0.31 s for the scenario) before the same fallback.
+2. *Backtrack* (`simp.rs` `collapse_backtrack` + `Mma::rewind`): in a `min_volume` MMA run an analysed design is a collapse when its compliance violates the limit and
+   jumped past 100 × the last accepted design's (10 × once it is also 100 × the limit), or is non-finite: a broken load path, not a gradual violation; scale free.
+   The last step is taken back: the design returns to the one that step started from, the asymptote distances around it halve (the next step is about half as
+   bold) and the iteration is re-analysed. `state.json` carries `backtracks` and `acceptedCompliance` (both optional, absent for other runs) beside the MMA state, so
+   a resumed run backtracks identically (tested with checkpoints before, on and after the backtrack iteration) and counts on. One warning per run,
+   `TOP_DESIGN_BACKTRACK`, "backtracked N time(s) in this run (M in all; first of this run at iteration i)".
+Result of the scenario: 70 iterations, converged, volume 0.0521, compliance 99999.8 (limit 1e5, satisfied), 0.47 s for two runs; before: `TOP_SOLVER_FAILED`; with the
+fallback alone the run finished at volume 0, compliance 1.2e11, `TOP_CONSTRAINT_UNSATISFIED`. 3D cantilever 12 × 4 × 3, E0 210000, `maxCompliance` 1000: 6
+backtracks, volume 0.0066, compliance 308, satisfied (the first design of this kind that an absolute `100 × limit` threshold missed: volume 0 at iteration 3);
+`maxCompliance` 10: 4 backtracks, ends `TOP_CONSTRAINT_UNSATISFIED` at 13.22 against 10 (pinned). MBB 60 × 20 MMA (203.1556703851201, 138 iterations) and
+`min_volume` 30 × 10 (373.2413141973718, 45 iterations, volume 0.3926080424755817) are bit-identical. Tests: `v1.rs` (`a_slack_compliance_row_…`,
+`a_3d_collapse_…` x2, `a_run_resumes_bit_for_bit_across_a_backtrack`), `solver::tests` (fallback only: NonFinite and Diverged cases equal the Jacobi solve), `mma::tests::rewind_…`.
+
 **Constraint tolerance and status.** One named `CONSTRAINT_TOLERANCE` = 1e-4 (relative) decides `satisfied` for every row (volume, compliance,
 displacement) in the solver and in the TS fallback (`defaults.ts`). A run that stops moving with a violated row keeps its status `converged` (the design stopped moving) and raises the warning
 `TOP_CONSTRAINT_UNSATISFIED` naming the row; `check_topology` fails it with `TOP_CONSTRAINT_VIOLATED` (a `min_volume` limit nobody can miss lets the design vanish).

@@ -497,3 +497,113 @@ fn a_run_that_ends_with_a_violated_row_warns_and_keeps_its_status() {
     assert!(events.contains("TOP_CONSTRAINT_UNSATISFIED"), "{events}");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+fn cantilever_min_volume(limit: f64, extra: Value) -> Value {
+    let mut job = cantilever(12, 4, 3, json!({ "optimizer": "mma", "filter": { "kind": "density" } }));
+    job["objective"] = json!({ "kind": "minVolume", "maxCompliance": limit });
+    if let Some(map) = extra.as_object() {
+        for (key, value) in map {
+            job[key] = value.clone();
+        }
+    }
+    job
+}
+
+fn backtracks_in(events: &str) -> usize {
+    events
+        .lines()
+        .filter(|line| line.contains("TOP_DESIGN_BACKTRACK"))
+        .filter_map(|line| line.split("backtracked ").nth(1)?.split(' ').next()?.parse().ok())
+        .next()
+        .unwrap_or(0)
+}
+
+/// TOP-V1b follow-up: a slack compliance row (limit 1e5, MBB 30 x 10) let MMA strip the design to a broken load path; the near-void
+/// multigrid hierarchy then produced a NaN in the f32 preconditioner (TOP_SOLVER_FAILED). The run must end finite and say what it did.
+#[test]
+fn a_slack_compliance_row_does_not_collapse_the_design_into_a_solver_failure() {
+    let dir = folder("slack");
+    let (result, field, events) = run(&dir, &min_volume_job(30, 10, 1.0e5, json!([]))).unwrap();
+    let (volume, compliance) = (result["volumeFraction"].as_f64().unwrap(), result["compliance"].as_f64().unwrap());
+    eprintln!("slack: volume {volume}, compliance {compliance}, {} iterations, {}", result["iterations"], result["status"]);
+    assert!(volume.is_finite() && compliance.is_finite() && field.iter().all(|v| v.is_finite()), "{result}");
+    // the first steps strip the design to a broken load path: that step is taken back, the broken multigrid solve falls back to Jacobi
+    assert!(events.contains("TOP_DESIGN_BACKTRACK") && backtracks_in(&events) >= 1, "{events}");
+    assert!(events.contains("TOP_SOLVER_FALLBACK"), "{events}");
+    assert!(!events.contains("TOP_SOLVER_FAILED"), "{events}");
+    assert_eq!(result["constraints"][0]["satisfied"], true, "{result}");
+    assert!(compliance <= 1.0e5 * 1.0001, "compliance {compliance}");
+    assert!(volume > 0.01 && volume < 0.2, "volume {volume}");
+    // deterministic, like every CPU run
+    let again = folder("slack-again");
+    let (second, _, _) = run(&again, &min_volume_job(30, 10, 1.0e5, json!([]))).unwrap();
+    assert_eq!(second["volumeFraction"], result["volumeFraction"]);
+    assert_eq!(second["iterations"], result["iterations"]);
+    for d in [dir, again] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// The collapse rule is scale free (a jump over the last accepted design, with the row violated): a 3D cantilever in a large unit
+/// system, limit 1000 (the old absolute threshold of 100 x limit missed it: volume 0 at iteration 3) ends feasible.
+#[test]
+fn a_3d_collapse_under_a_large_limit_is_backtracked() {
+    let dir = folder("cantilever-1000");
+    let (result, field, events) = run(&dir, &cantilever_min_volume(1000.0, json!({}))).unwrap();
+    let (volume, compliance) = (result["volumeFraction"].as_f64().unwrap(), result["compliance"].as_f64().unwrap());
+    eprintln!("cantilever 1000: volume {volume}, compliance {compliance}, {} it, {}\n{events}", result["iterations"], result["status"]);
+    assert!(field.iter().all(|v| v.is_finite()) && backtracks_in(&events) >= 1, "{events}");
+    assert!(volume > 0.0 && result["constraints"][0]["satisfied"] == true, "the design must stay feasible: {result}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A limit the design cannot meet after the backtracks: the run says so (TOP_CONSTRAINT_UNSATISFIED), never a NaN.
+#[test]
+fn a_3d_collapse_that_cannot_be_repaired_ends_unsatisfied_and_says_so() {
+    let dir = folder("cantilever-10");
+    let (result, field, events) = run(&dir, &cantilever_min_volume(10.0, json!({}))).unwrap();
+    eprintln!("cantilever 10: {} {} it\n{events}", result["constraints"], result["iterations"]);
+    assert!(field.iter().all(|v| v.is_finite()) && backtracks_in(&events) >= 1, "{events}");
+    assert!(events.contains("TOP_CONSTRAINT_UNSATISFIED") && !events.contains("TOP_SOLVER_FAILED"), "{events}");
+    assert_eq!(result["constraints"][0]["satisfied"], false);
+    let value = result["constraints"][0]["value"].as_f64().unwrap();
+    assert!((13.0..13.5).contains(&value), "pinned at 13.2226 against the limit 10, got {value}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A checkpoint right before and right after a backtrack iteration (the collapse of the slack scenario is analysed at iteration 4)
+/// resumes bit for bit, and the backtrack count in `state.json` carries over (no re-count).
+#[test]
+fn a_run_resumes_bit_for_bit_across_a_backtrack() {
+    let total = 9;
+    let job = min_volume_job(30, 10, 1.0e5, json!([]));
+    let full = folder("backtrack-full");
+    let mut whole = job.clone();
+    whole["settings"]["maxIterations"] = json!(total);
+    let (expected, _, whole_events) = run(&full, &whole).unwrap();
+    let state_of = |dir: &Path| -> Value { serde_json::from_slice(&std::fs::read(dir.join("state.json")).unwrap()).unwrap() };
+    assert!(state_of(&full)["backtracks"].as_u64().unwrap() >= 2, "{}", state_of(&full));
+    assert!(backtracks_in(&whole_events) >= 2);
+    for cut in [3, 4, 5] {
+        let part = folder(&format!("backtrack-part{cut}"));
+        let mut first = job.clone();
+        first["settings"]["maxIterations"] = json!(cut);
+        let (_, _, first_events) = run(&part, &first).unwrap();
+        let start = start_files(&part);
+        std::fs::copy(part.join("mma.f64"), part.join("mma.f64.start")).unwrap();
+        let mut state = state_of(&part);
+        state["mma"]["file"] = json!("mma.f64.start");
+        std::fs::write(part.join("start_state.json"), serde_json::to_vec(&state).unwrap()).unwrap();
+        let (result, _, second_events) = run(&part, &with_start(job.clone(), &start, cut, total - cut)).unwrap();
+        assert_eq!(result["iterations"], total - cut);
+        let names = ["design.f64", "field.bin", "displacements.f64", "mma.f64"];
+        assert_eq!(files(&full, &names), files(&part, &names), "cut at {cut}");
+        assert_eq!(state_of(&full), state_of(&part), "cut at {cut}");
+        assert_eq!(result["compliance"], expected["compliance"]);
+        // each run reports only its own backtracks; the totals add up to the whole run's
+        let (a, b) = (backtracks_in(&first_events), backtracks_in(&second_events));
+        assert_eq!(a + b, backtracks_in(&whole_events), "cut at {cut}: {first_events} / {second_events}");
+        let _ = std::fs::remove_dir_all(part);
+    }
+    let _ = std::fs::remove_dir_all(full);
+}
