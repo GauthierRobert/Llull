@@ -676,6 +676,18 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   never replaces a verified one). Any other case refuses `CFD_RESULT_MISSING`, nothing is kept.
   **Case lifecycle.** `update_cfd_case` reports `gridStudyStale` (data) and "its grid study is now stale" (summary) when the case hash differs from
   the study's `caseHash`; the study is kept, like a stale result. `delete_cfd_case` removes `doc.cfd.studies[caseId]` with the case and its result.
-- **Host wiring left (server / protocol lanes).** `cfd_solve gridStudy` must run the case at three resolutions (ratio 2: `cellsPerReferenceLength`
-  override n, 2n, 4n or n, n/2, n/4 within 8..2048 and the memory check), store the three bundles and dispatch `record_cfd_results` for the
-  finest plus `record_cfd_grid_study`; the `gridStudy` flag is not yet in `packages/protocol/src/nativeTools.ts`.
+- **`cfd_solve gridStudy`** (host wiring, `server/src/cfd/flowGridStudy.ts`; schema in `@protocol/nativeTools`, CLI `gridStudy=true`). The
+  levels are the case's own `cellsPerReferenceLength` n (the finest: the case as it stands, so its bundle is the one `record_cfd_results`
+  accepts as current), n/2 and n/4: refinement ratio 2, each an integer within 8..2048, so n is a multiple of 4 from 32 (a coarser level
+  than the case's own, because only the case-as-is bundle can be recorded; to study finer set n higher first with `update_cfd_case`). The
+  coarser levels are the case with only `cellsPerReferenceLength` overridden, which `record_cfd_grid_study` accepts. All three jobs are built
+  before anything runs, so a level out of bounds or not an integer is refused `CFD_PARAM_INVALID` (`data.gridStudy`), and a preparation row or
+  the `deviceMemoryBytes` check of any level refuses with its own code, with nothing run. The levels run coarsest first (progress lines are
+  prefixed `gridStudy k/3 (n cells/length)`); each bundle goes to the result store. The host then dispatches `record_cfd_results` for the finest
+  and `record_cfd_grid_study` with the three hashes through the host's `applyCommand` (the registry): the study the command computes from the
+  stored bundles (a dry `execute` on the current document) is passed back as `study`, so a replay on a machine without the store keeps it
+  flagged unverified. Nothing else touches the document. `cfd_stop` (also in the gap between two solves: a running study is registered in
+  the host) and the caller's signal cancel the whole study: the running solve's process tree is killed, the remaining levels do not start,
+  nothing is recorded (`CFD_CANCELLED`); a failed level answers its own code with the level named in the summary. Tests:
+  `server/tests/cfdGridStudy.test.ts` (fake runner whose drag follows the cell size) and the real CPU solver in
+  `server/tests/cfdGridStudyNative.test.ts` (skipped without `llull-compute`).

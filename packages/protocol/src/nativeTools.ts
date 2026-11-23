@@ -356,7 +356,7 @@ const cfdSolve = (): ToolDefinition => ({
     'the unioned flow surface (metres, case frame), runs to steady state (time averaging once the drag settles, stop at 0.1 % change over two ' +
     'flow-throughs or at maxSteps), stores the result bundle content-addressed and records its summary with record_cfd_results. device cpu ' +
     '(default: the f64 reference, deterministic) | gpu (wgpu, f32) | auto; without a usable adapter the CPU runs with the warning CFD_GPU_UNAVAILABLE. ' +
-    'A run that hits maxSteps is still recorded with converged false and the warning CFD_NOT_CONVERGED. --progress prints one line per drag ' +
+    'With gridStudy the case runs three times (n, n/2, n/4 cells per reference length) and the convergence study is recorded, but nothing at all unless the whole study is accepted (CFD_INPUT_STALE if the case or geometry changed meanwhile, CFD_CANCELLED on cfd_stop) (cfd_report shows it). A run that hits maxSteps is still recorded with converged false and the warning CFD_NOT_CONVERGED. --progress prints one line per drag ' +
     'sample. Errors: CFD_CASE_NOT_FOUND, the prepare fail codes (CFD_GEOMETRY_NOT_WATERTIGHT, CFD_BLOCKAGE_TOO_HIGH, ...), CFD_REGIME_MISMATCH ' +
     '(compressible cases: the Euler solver is not built), CFD_MEMORY_EXCEEDED (with deviceMemoryBytes), CFD_UNSTABLE_PARAMS, CFD_SOLVER_MISSING ' +
     '(no llull-compute), CFD_SOLVER_FAILED, CFD_TIMEOUT. Then: cfd_report caseId=ID, check_cfd.',
@@ -382,6 +382,14 @@ const cfdSolve = (): ToolDefinition => ({
         .optional()
         .describe('Inflow lattice Mach number setting the time step, in (0, 0.3] (default 0.1).'),
       les: z.boolean().optional().describe('Smagorinsky LES (default true, C_s 0.1); off for laminar validation cases.'),
+      gridStudy: z
+        .boolean()
+        .optional()
+        .describe(
+          'Grid-convergence study: solve the case at its own cellsPerReferenceLength n, n/2 and n/4 (refinement ratio 2; each an integer in 8..2048, ' +
+            'so n a multiple of 4 from 32), record the finest with record_cfd_results and the study (observed order, Richardson value, GCI) with ' +
+            'record_cfd_grid_study; refused with CFD_PARAM_INVALID otherwise. cfd_stop cancels the whole study.',
+        ),
     }),
   ),
   annotations: {},

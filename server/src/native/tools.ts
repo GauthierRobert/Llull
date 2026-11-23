@@ -31,6 +31,7 @@ import { defaultScanDeps, isScanTool, runScanTool } from '../scan/scanTools';
 import { isMeshHostTool, runMeshHostTool } from '../meshAssets/meshTools';
 import { MTEST_TOOL, runMtestTool } from '../mfront/mtestTool';
 import { CFD_TOOL_NAMES, runCfdTool } from '../cfd/cfdTools';
+import { cfdResultPort } from '../cfd/resultPort';
 
 const NAMES: ReadonlySet<string> = new Set([
   'fatigue_field',
@@ -48,7 +49,14 @@ const NAMES: ReadonlySet<string> = new Set([
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
 function defaultDeps(env: NodeJS.ProcessEnv, onProgress?: (line: string) => void): NativeDeps {
-  return { store: defaultFeArtifactStore(), runner: createComputeRunner(env), env, ...(onProgress !== undefined ? { onProgress } : {}) };
+  const store = defaultFeArtifactStore();
+  return {
+    store,
+    cfdResults: cfdResultPort(store),
+    runner: createComputeRunner(env),
+    env,
+    ...(onProgress !== undefined ? { onProgress } : {}),
+  };
 }
 
 const failure = (summary: string): CommandOutcome => ({ summary, affected: [], isError: true, changed: false });

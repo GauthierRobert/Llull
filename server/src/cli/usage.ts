@@ -86,7 +86,8 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
                               line per iteration; without llull-compute only 2D studies up to 2000 voxels (TypeScript), else
                               TOP_TOOL_MISSING; then: topology_report studyId=ID, check_topology studyId=ID
   cfd_solve caseId=ID         native llull-compute lattice-Boltzmann flow solve of a low-speed case (create_cfd_case, Mach < 0.3), recorded
-                              with record_cfd_results  [timeoutS=3600 device=cpu|gpu|auto maxSteps=200000 latticeMach=0.1 deviceMemoryBytes=N les=true];
+                              with record_cfd_results  [timeoutS=3600 device=cpu|gpu|auto maxSteps=200000 latticeMach=0.1 deviceMemoryBytes=N les=true gridStudy=true];
+                              gridStudy=true: solves n, n/2, n/4 cells per length and records the grid-convergence study;
                               --progress prints one line per drag sample; without llull-compute: CFD_SOLVER_MISSING; then: cfd_report caseId=ID
   cfd_stop caseId=ID          kill the running cfd_solve of the case in this host (use --app for the desktop backend); nothing is recorded
   cfd_probe caseId=ID points='[[x,y,z]]'      velocity / speed / p / cp / U/U∞ at world points (metres) on the recorded field
