@@ -2,6 +2,7 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { cfdCreateCase, cfdDeleteCase, cfdSetBoundary, cfdUpdateCase } from './caseCommands';
+import { recordCfdGridStudy } from './gridStudyCommand';
 import { checkCfd } from './checkCommand';
 import { cfdPrepare } from './prepareCommand';
 import { recordCfdResults } from './recordCommand';
@@ -16,4 +17,5 @@ export const cfdCommands = commandCatalog(
   checkCfd,
   recordCfdResults,
   cfdReport,
+  recordCfdGridStudy,
 );

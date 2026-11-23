@@ -109,9 +109,40 @@ export interface CfdResultSummary {
   readonly verified: boolean;
 }
 
+export type CfdStudyQuantity = 'cd' | 'cl' | 'cdAM2';
+
+/** A grid-convergence study (12 CFD M5 `gridStudy`): three solves of one case at finest-first spacings, the GCI of one force coefficient. */
+export interface CfdGridStudy {
+  readonly caseId: string;
+  readonly quantity: CfdStudyQuantity;
+  readonly safetyFactor: number;
+  /** Case hash and flow-surface hash the three runs were built for. */
+  readonly caseHash: string;
+  readonly geometryHash: string;
+  /** Finest first. */
+  readonly levels: readonly {
+    readonly resultsHash: string;
+    readonly cellM: number;
+    readonly cells: number;
+    readonly value: number;
+    readonly converged: boolean;
+  }[];
+  /** `monotone` carries the order, extrapolation and GCI; the other statuses only the classification (`@lib/convergence`). */
+  readonly status: 'monotone' | 'oscillatory' | 'divergent' | 'converged_exactly' | 'order_not_converged';
+  readonly r21: number;
+  readonly r32: number;
+  readonly orderP?: number;
+  readonly extrapolated?: number;
+  readonly gci21Fine?: number;
+  readonly gci32Fine?: number;
+  readonly asymptoticRatio?: number;
+}
+
 export interface CfdDocumentSlice {
   readonly cases: Readonly<Record<string, CfdCase>>;
   readonly results: Readonly<Record<string, CfdResultSummary>>;
+  /** Grid studies by case id (absent until `record_cfd_grid_study`). */
+  readonly studies?: Readonly<Record<string, CfdGridStudy>>;
 }
 
 declare module '@core/model/documentExtensions' {

@@ -85,6 +85,27 @@ function resultErrors(key: string, raw: unknown): string[] {
   return ok ? [] : [`${at} needs caseId equal to its key, resultsHash, caseHash, geometryHash and a solver`];
 }
 
+const STUDY_STATUSES: readonly unknown[] = ['monotone', 'oscillatory', 'divergent', 'converged_exactly', 'order_not_converged'];
+
+function studyErrors(key: string, raw: unknown): string[] {
+  const at = `cfd.studies.${key}`;
+  if (!isRecord(raw)) return [`${at} must be an object`];
+  const ok =
+    raw['caseId'] === key &&
+    ['cd', 'cl', 'cdAM2'].includes(String(raw['quantity'])) &&
+    isText(raw['caseHash']) &&
+    isFiniteNumber(raw['safetyFactor']) &&
+    STUDY_STATUSES.includes(raw['status']) &&
+    Array.isArray(raw['levels']) &&
+    raw['levels'].length === 3 &&
+    raw['levels'].every(
+      (level) => isRecord(level) && isText(level['resultsHash']) && isFiniteNumber(level['cellM']) && isFiniteNumber(level['value']),
+    );
+  return ok
+    ? []
+    : [`${at} needs caseId equal to its key, a quantity, caseHash, safetyFactor, a status and three levels { resultsHash, cellM, value }`];
+}
+
 export const cfdDocument: DocumentExtension = {
   validate(raw) {
     const slice = raw['cfd'];
@@ -93,6 +114,7 @@ export const cfdDocument: DocumentExtension = {
     return [
       ...Object.entries(slice['cases']).flatMap(([key, entry]) => caseErrors(key, entry)),
       ...Object.entries(slice['results']).flatMap(([key, entry]) => resultErrors(key, entry)),
+      ...(isRecord(slice['studies']) ? Object.entries(slice['studies']).flatMap(([key, entry]) => studyErrors(key, entry)) : []),
     ];
   },
   derivedEntityIds: () => new Set(),

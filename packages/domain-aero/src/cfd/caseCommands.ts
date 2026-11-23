@@ -176,7 +176,11 @@ export const cfdDeleteCase = defineCommand({
     const without = <T>(record: Readonly<Record<string, T>>): Record<string, T> =>
       Object.fromEntries(Object.entries(record).filter(([key]) => key !== caseId));
     return changed(
-      withCfd(doc, { cases: without(slice.cases), results: without(slice.results) }),
+      withCfd(doc, {
+        cases: without(slice.cases),
+        results: without(slice.results),
+        ...(slice.studies === undefined ? {} : { studies: without(slice.studies) }),
+      }),
       `delete_cfd_case: removed case '${caseId}'.`,
       [caseId],
     );

@@ -631,3 +631,21 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   kills the run, a shared run recorded once, wiring) and `cfdQueryNative.test.ts` (real binary: the probe equals the solve probe, slice,
   reproducible CPU streamlines, `cfd_stop` of a long solve). VC-CFD-40 (overlay legend) and 43 (GPU budget, 4096 seeds in at most 2 s)
   stay open.
+
+### M3b audit and `record_cfd_grid_study` (first M5 slice) — 2026-11-23
+
+- **Audit.** Everything the M3 query side asked for was already built in M3a: `cfd_probe`, `cfd_slice`, `cfd_streamlines` (native `flow-query`,
+  CPU + GPU) and `cfd_stop` (host lifecycle, `sharedRun.ts`) with their Rust and TypeScript tests. Still open and untouched here: nested
+  grid boxes (a multi-resolution LBM in `llull-flow-lbm`: a solver rewrite, not a slice), AA-pattern storage, the overlay / Flow panel
+  (UI lane), VC-CFD-40 / 43.
+- **`record_cfd_grid_study`** (plugin command, toolset `flow`; the pure half of the §4 `cfd_solve gridStudy` option). Params `caseId`,
+  `resultsHashes` (three bundle hashes, any order), `quantity` (`cd` default, `cl`, `cdAM2`), `safetyFactor` (default 1.25). Each bundle is
+  read from `ctx.cfdResults`, re-hashed, and must belong to the case: same case id and flow surface (current), and a case hash equal to the
+  case's own or to the case with only `cellsPerReferenceLength = round(L / cellM)`. The coefficient is recomputed from the bundle forces and the
+  case reference (`cfdSummary`). Sorted finest cell first, refinement ratios at least 1.1, then `@lib/convergence` `gciTriplet` (Celik 2008):
+  observed order, Richardson value, fine-grid GCI (21 and 32), asymptotic ratio; a non-monotone triplet is recorded with its status and no
+  GCI; unconverged solves are named in the summary. Stored in `doc.cfd.studies[caseId]` (validated on load, removed with the case). Unlike
+  `record_cfd_results` there is no unverified replay: without the bundles on this machine the command refuses `CFD_RESULT_MISSING`.
+- **Host wiring left (server / protocol lanes).** `cfd_solve gridStudy` must run the case at three resolutions (ratio 2: `cellsPerReferenceLength`
+  override n, 2n, 4n or n, n/2, n/4 within 8..2048 and the memory check), store the three bundles and dispatch `record_cfd_results` for the
+  finest plus `record_cfd_grid_study`; the `gridStudy` flag is not yet in `packages/protocol/src/nativeTools.ts`.
