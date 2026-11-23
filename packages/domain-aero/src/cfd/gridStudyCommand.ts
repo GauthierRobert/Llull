@@ -9,6 +9,7 @@ import { gciTriplet, type ConvergenceStatus } from '@lib/convergence';
 import { canonicalJson } from '@lib/canonicalJson';
 import { significantNumber } from '@lib/compactNumber';
 import { sha256Hex } from '@lib/sha256';
+import type { CadDocument } from '@core/model/types';
 import { caseHashOf, caseOf, cfdSlice, withCfd } from './caseDoc';
 import { refuseCfd } from './codes';
 import { resultStaleness } from './staleness';
@@ -83,13 +84,49 @@ function detailOf(study: CfdGridStudy): string {
 }
 
 /**
+ * The echoed study to keep unverified when no result store exists, or a refusal `{ code, message }`. Rules: it parses, is of this case and
+ * current, studies the same quantity with the same safety factor, its levels are exactly the three given hashes, and it never replaces a verified study.
+ */
+function replayRefusal(
+  doc: CadDocument,
+  cfdCase: CfdCase,
+  caseId: string,
+  resultsHashes: readonly string[],
+  quantity: CfdStudyQuantity,
+  safetyFactor: number,
+  given: unknown,
+): CfdGridStudy | { readonly code: string; readonly message: string } {
+  const where =
+    'no result store on this machine, and no complete study of this case and these bundles was given: run cfd_solve with gridStudy here';
+  const parsed = studySchema.safeParse(given);
+  if (!parsed.success || parsed.data.caseId !== caseId) return { code: 'CFD_RESULT_MISSING', message: where };
+  const study = parsed.data as CfdGridStudy;
+  const hashes = new Set(study.levels.map((entry) => entry.resultsHash));
+  if (hashes.size !== 3 || !resultsHashes.every((hash) => hashes.has(hash)))
+    return { code: 'CFD_RESULT_MISSING', message: 'the given study is not over the three given bundles' };
+  if (study.quantity !== quantity || study.safetyFactor !== safetyFactor)
+    return {
+      code: 'CFD_PARAM_INVALID',
+      message: `the given study is for ${study.quantity} with safety factor ${study.safetyFactor}, not ${quantity} / ${safetyFactor}`,
+    };
+  if (study.caseHash !== caseHashOf(cfdCase))
+    return { code: 'CFD_INPUT_STALE', message: 'the given study was computed for another state of the case: solve again' };
+  if (cfdSlice(doc).studies?.[caseId]?.verified === true)
+    return {
+      code: 'CFD_RESULT_MISSING',
+      message: `the case already has a verified study; an unverified one would replace it (solve where the bundles are)`,
+    };
+  return study;
+}
+
+/**
  * @affects doc.cfd.studies[caseId] (set, replacing an earlier study; affected: [caseId])
  * @invariant every bundle is in the result store, hashes to the given hash, belongs to the case (same case id, flow surface and case apart from
  *   the grid resolution, the surface current) and is sorted finest first by its cell size; the coefficient comes from the bundle (case reference),
  *   never from the caller; the GCI is `@lib/convergence` gciTriplet (Celik 2008); a non-monotone triplet is recorded with its status and no GCI;
- *   a given `study` must equal the recomputed one; WITHOUT the bundles (replay on another machine) a given complete `study` of this case whose
- *   levels are the given hashes is kept flagged `verified: false`
- * @failure unknown case -> CFD_CASE_NOT_FOUND; a bundle absent and no complete echoed study -> CFD_RESULT_MISSING; hash / case id / study mismatch ->
+ *   a given `study` must equal the recomputed one; with NO result store (replay on another machine) a given `study` of this case, current,
+ *   of the same quantity and safety factor, over exactly the given hashes, is kept flagged `verified: false` (never over a verified study)
+ * @failure unknown case -> CFD_CASE_NOT_FOUND; a bundle absent from the store, or no store and no acceptable echoed study -> CFD_RESULT_MISSING; hash / case id / study mismatch ->
  *   CFD_RESULT_HASH_MISMATCH; other case, other surface or stale -> CFD_INPUT_STALE; repeated hashes, refinement ratio below 1.1 or an unexpected
  *   convergence status -> CFD_PARAM_INVALID (all refusals, unchanged doc)
  * @invariant kernel-optional: surface staleness re-prepares the case through the kernel when present
@@ -129,31 +166,27 @@ export const recordCfdGridStudy = defineCommand({
     const cfdCase = caseOf(doc, caseId);
     if (cfdCase === undefined) return refuseCfd(doc, TOOL, 'CFD_CASE_NOT_FOUND', `no case '${caseId}'`, [caseId], ['caseId']);
     if (new Set(resultsHashes).size !== 3) return fail('CFD_PARAM_INVALID', 'the three result hashes must be different');
-    const store = (study: CfdGridStudy, summary: string): CommandResult => ({
+    const keep = (study: CfdGridStudy, summary: string): CommandResult => ({
       ...changed(withCfd(doc, { studies: { ...cfdSlice(doc).studies, [caseId]: study } }), summary, [caseId]),
       data: { study },
     });
+    const store = ctx?.cfdResults;
+    if (store === undefined || store === null) {
+      const refusal = replayRefusal(doc, cfdCase, caseId, resultsHashes, quantity, safetyFactor, given);
+      if ('code' in refusal) return fail(refusal.code, refusal.message);
+      return keep(
+        { ...refusal, verified: false },
+        `${TOOL}: ${caseId} grid study recorded UNVERIFIED (no result store on this machine): no number is trusted until cfd_solve runs here.`,
+      );
+    }
     const found: { hash: string; artifact: CfdResultArtifact }[] = [];
     for (const hash of resultsHashes) {
-      const artifact = ctx?.cfdResults?.get(hash) ?? null;
-      if (artifact === null) {
-        const parsed = studySchema.safeParse(given);
-        const complete =
-          parsed.success &&
-          parsed.data.caseId === caseId &&
-          parsed.data.levels.length === 3 &&
-          parsed.data.levels.every((level) => resultsHashes.includes(level.resultsHash));
-        if (!complete)
-          return fail(
-            'CFD_RESULT_MISSING',
-            `no result bundle ${hash.slice(0, 12)} in the store, and no complete study of this case and these bundles was given: ` +
-              'run cfd_solve with gridStudy on this machine',
-          );
-        return store(
-          { ...(parsed.data as CfdGridStudy), verified: false },
-          `${TOOL}: ${caseId} grid study recorded UNVERIFIED (bundles not available on this machine): no number is trusted until cfd_solve runs here.`,
+      const artifact = store.get(hash);
+      if (artifact === null)
+        return fail(
+          'CFD_RESULT_MISSING',
+          `no result bundle ${hash.slice(0, 12)} in the store: run cfd_solve with gridStudy on this machine`,
         );
-      }
       if (sha256Hex(canonicalJson(artifact)) !== hash)
         return fail('CFD_RESULT_HASH_MISMATCH', `the stored bundle does not hash to ${hash}`);
       if (artifact.caseId !== caseId)
@@ -207,7 +240,7 @@ export const recordCfdGridStudy = defineCommand({
     if (given !== undefined && canonicalJson(given) !== canonicalJson(study))
       return fail('CFD_RESULT_HASH_MISMATCH', 'the given study differs from the one recomputed from the bundles');
     const unconverged = levels.filter((level) => !level.converged).length;
-    return store(
+    return keep(
       study,
       `${TOOL}: ${caseId} ${quantity} on 3 grids (h ${levels.map((level) => significantNumber(level.cellM, 4)).join(' / ')} m, ratios ` +
         `${significantNumber(r21, 3)} / ${significantNumber(r32, 3)}): ${levels.map((level) => significantNumber(level.value, 5)).join(' / ')}; ${detailOf(study)}` +

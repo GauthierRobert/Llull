@@ -4,6 +4,14 @@ import { z } from '@core/commands/schema';
 
 const finite = z.number();
 
+const level = z.strictObject({
+  resultsHash: z.string().min(1),
+  cellM: finite.positive(),
+  cells: finite.nonnegative(),
+  value: finite,
+  converged: z.boolean(),
+});
+
 export const studySchema = z
   .strictObject({
     caseId: z.string().min(1),
@@ -11,17 +19,7 @@ export const studySchema = z
     safetyFactor: finite.min(1),
     caseHash: z.string().min(1),
     geometryHash: z.string().min(1),
-    levels: z
-      .array(
-        z.strictObject({
-          resultsHash: z.string().min(1),
-          cellM: finite.positive(),
-          cells: finite.nonnegative(),
-          value: finite,
-          converged: z.boolean(),
-        }),
-      )
-      .length(3),
+    levels: z.tuple([level, level, level]),
     status: z.enum(['monotone', 'oscillatory', 'divergent', 'converged_exactly', 'order_not_converged']),
     r21: finite,
     r32: finite,
@@ -34,7 +32,7 @@ export const studySchema = z
     asymptoticRatio: finite.optional(),
     verified: z.boolean(),
   })
-  .refine((study) => study.levels.every((level, index) => index === 0 || level.cellM > (study.levels[index - 1]?.cellM ?? Infinity)), {
+  .refine(({ levels: [fine, medium, coarse] }) => fine.cellM < medium.cellM && medium.cellM < coarse.cellM, {
     message: 'levels must be finest first (cell size strictly increasing)',
     path: ['levels'],
   });

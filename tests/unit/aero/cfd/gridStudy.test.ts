@@ -207,7 +207,7 @@ describe('record_cfd_grid_study', () => {
 
   it('keeps an echoed study unverified without the bundles, recomputes and compares it with them', () => {
     const echoed = (study().data as { study: CfdGridStudy }).study;
-    const none: ExecutionContext = { ...recorded.ctx, cfdResults: { get: () => null } };
+    const none: ExecutionContext = { ...recorded.ctx, cfdResults: null };
     const replay = execute(recorded.doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study: echoed }, none);
     expect(replay.rejected).not.toBe(true);
     expect(replay.document.cfd?.studies?.['c1']).toEqual({ ...echoed, verified: false });
@@ -223,6 +223,43 @@ describe('record_cfd_grid_study', () => {
     const withBundles = execute(recorded.doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study: echoed }, ctx);
     expect(withBundles.rejected).not.toBe(true);
     expect(codeOf({ study: { ...echoed, orderP: 9 } }, ctx)).toBe('CFD_RESULT_HASH_MISMATCH');
+  });
+
+  it('takes the unverified path only without a result store: a store with a bundle missing refuses', () => {
+    const echoed = (study().data as { study: CfdGridStudy }).study;
+    const partial = contextOf([fine, medium]);
+    const result = execute(recorded.doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study: echoed }, partial);
+    expect(result.error?.code).toBe('CFD_RESULT_MISSING');
+    expect(result.document).toBe(recorded.doc);
+  });
+
+  it('refuses an echoed study that does not match the request, the case state, or would replace a verified study', () => {
+    const verified = study().document;
+    const echoed = (study().data as { study: CfdGridStudy }).study;
+    const none: ExecutionContext = { ...recorded.ctx, cfdResults: null };
+    const codeOf = (doc: typeof verified, study: unknown, params: Record<string, unknown> = {}): string | undefined => {
+      const result = execute(doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study, ...params }, none);
+      expect(result.document).toBe(doc);
+      return result.error?.code;
+    };
+    const [a] = echoed.levels;
+    expect(codeOf(recorded.doc, { ...echoed, levels: [a, a, a] })).toBe('CFD_RESULT_MISSING');
+    expect(codeOf(recorded.doc, echoed, { quantity: 'cl' })).toBe('CFD_PARAM_INVALID');
+    expect(codeOf(recorded.doc, echoed, { safetyFactor: 2 })).toBe('CFD_PARAM_INVALID');
+    expect(codeOf(recorded.doc, { ...echoed, caseHash: 'e'.repeat(64) })).toBe('CFD_INPUT_STALE');
+    const result = execute(verified, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study: echoed }, none);
+    expect(result.error?.code).toBe('CFD_RESULT_MISSING');
+    expect(result.summary).toContain('verified study');
+    expect(result.document).toBe(verified);
+    const unverified = execute(
+      recorded.doc,
+      'record_cfd_grid_study',
+      { caseId: 'c1', resultsHashes: hashes, study: echoed },
+      none,
+    ).document;
+    expect(execute(unverified, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes, study: echoed }, none).rejected).not.toBe(
+      true,
+    );
   });
 
   it('is removed with its case; update_cfd_case reports it stale when the case hash changes', () => {

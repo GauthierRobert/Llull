@@ -668,9 +668,12 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   study), validated on load by a strict zod schema (`studySchema.ts`: every field finite, levels finest first, key equal to `caseId`, no study
   without its case).
   Each study carries `verified`. **Unverified replay** (as `record_cfd_results`): the optional `study` param is the study the transport returned.
-  With the bundles in the store it must equal the recomputed one (`CFD_RESULT_HASH_MISMATCH` otherwise). Without them (a replay on another
-  machine) a complete strict-schema study of this case whose three level hashes are the given hashes is kept with `verified: false` and the
-  summary says UNVERIFIED; no study, an incomplete one, another case id or other level hashes refuse `CFD_RESULT_MISSING`, nothing is kept.
+  With a result store, every bundle must be in it (any missing: `CFD_RESULT_MISSING`) and the given study must equal the recomputed one
+  (`CFD_RESULT_HASH_MISMATCH` otherwise). Only when the machine has NO result store (a replay elsewhere) is the echoed study kept, with
+  `verified: false` and the summary "UNVERIFIED (no result store on this machine)", and only if it parses under the strict schema, is of this
+  case, its three level hashes are exactly the three given ones, its `quantity` and `safetyFactor` equal the request's (defaults applied:
+  `CFD_PARAM_INVALID`), its `caseHash` is the case's current hash (`CFD_INPUT_STALE`), and the case has no verified study yet (an unverified study
+  never replaces a verified one). Any other case refuses `CFD_RESULT_MISSING`, nothing is kept.
   **Case lifecycle.** `update_cfd_case` reports `gridStudyStale` (data) and "its grid study is now stale" (summary) when the case hash differs from
   the study's `caseHash`; the study is kept, like a stale result. `delete_cfd_case` removes `doc.cfd.studies[caseId]` with the case and its result.
 - **Host wiring left (server / protocol lanes).** `cfd_solve gridStudy` must run the case at three resolutions (ratio 2: `cellsPerReferenceLength`
