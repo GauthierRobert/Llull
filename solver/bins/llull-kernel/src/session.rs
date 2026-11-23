@@ -159,7 +159,7 @@ impl Session {
 
     /// Answers one request line; the reply always carries the request id (null when unreadable).
     pub fn handle_line(&mut self, line: &str) -> Value {
-        let request: Value = match serde_json::from_str(line) {
+        let request: Value = match crate::request::parse_request(line) {
             Ok(value) => value,
             Err(error) => return reply_json(Value::Null, Reply::fail(BAD_REQUEST, format!("unreadable request: {error}"))),
         };

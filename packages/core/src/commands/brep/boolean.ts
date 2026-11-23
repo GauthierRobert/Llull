@@ -36,8 +36,8 @@ function enclosesNoVolume(positions: readonly number[], indices: readonly number
 }
 
 /**
- * Union of `recipes` as a balanced tree: depth log2(n), so hundreds of patterned tools neither nest the recipe hundreds deep (a sequential
- * chain overflows the kernel request parser around 120 levels) nor re-fuse a growing solid n times.
+ * Union of `recipes` as a balanced tree: depth log2(n), so hundreds of patterned tools neither nest the recipe hundreds deep (the native kernel
+ * refuses a request nested past 4096 levels) nor re-fuse a growing solid n times.
  */
 function balancedUnion(recipes: readonly ShapeRecipe[]): ShapeRecipe {
   if (recipes.length === 1) return recipes[0] as ShapeRecipe;
@@ -45,7 +45,7 @@ function balancedUnion(recipes: readonly ShapeRecipe[]): ShapeRecipe {
   return { op: 'boolean', boolean: 'union', a: balancedUnion(recipes.slice(0, middle)), b: balancedUnion(recipes.slice(middle)) };
 }
 
-/** Boolean nesting past which the native kernel request parser gives up (serde_json depth 128): the refusal names the cure. */
+/** Boolean nesting past which a refusal names the cure: a sequential chain re-fuses a growing solid at every cut (quadratic). */
 const DEEP_RECIPE = 100;
 
 /** Nesting depth of boolean nodes along the base operand chain (the depth sequential cuts grow). */

@@ -84,13 +84,26 @@ export interface StationRun {
 
 /** Smallest number of cells of a run (a cubic needs four). */
 const MIN_RUN_CELLS = 4;
+/** Breaks closer than this (path fraction) are one break. */
+const BREAK_MERGE = 1e-9;
+
+/**
+ * Path fractions where the swept surface is less smooth than a cubic in t can follow: curvature jumps of the path, and the interior stations of a
+ * variable section (the smoothstep blend is only C1 there, the linear one C0). Fitting across one forces the cell ladder up (a three-station duct
+ * needed 800 cells and 216 faces instead of 100 cells and 72 faces, and the boolean of two such ducts went from seconds to minutes).
+ */
+function runBreaks(sweep: SweepShape): number[] {
+  const stations = (sweep.stations ?? []).map((station) => station.at).filter((at) => at > BREAK_MERGE && at < 1 - BREAK_MERGE);
+  const inner = [...(sweep.helix === undefined ? curvatureBreaks(sweep.path) : []), ...stations].sort((a, b) => a - b);
+  return [0, ...inner.filter((at, k) => k === 0 || at - (inner[k - 1] as number) > BREAK_MERGE), 1];
+}
 
 /**
  * Runs of the fit: the path cut where its curvature jumps, `cells` shared out by length. Frames, laws and rails are evaluated once along the whole path,
  * so each station is the same on both sides of a break.
  */
 export function stationRuns(sweep: SweepShape, cells: number): StationRun[] | FitRefusal {
-  const breaks = [0, ...(sweep.helix === undefined ? curvatureBreaks(sweep.path) : []), 1];
+  const breaks = runBreaks(sweep);
   const sizes = breaks.slice(1).map((end, k) => Math.max(MIN_RUN_CELLS, Math.ceil(cells * (end - (breaks[k] as number)))));
   const ts: number[] = [];
   sizes.forEach((n, r) => {

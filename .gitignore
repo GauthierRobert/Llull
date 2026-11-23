@@ -30,3 +30,6 @@ reports/
 # CLI default document and stray vendor installers
 /model.llull.json
 *.msi
+
+# live-document crash recovery (server/src/liveDocument.ts RECOVERY_DIR), written at runtime
+server/.recovery/

@@ -9,7 +9,9 @@ publish.workspace = true
 [dependencies]
 llull-kernel-occt = { path = "../../crates/llull-kernel-occt" }
 base64 = "0.22"
-serde_json.workspace = true
+serde.workspace = true
+# unbounded_depth: request lines nest one level per sequential boolean; the cap is our own linear scan (src/request.rs)
+serde_json = { workspace = true, features = ["unbounded_depth"] }
 
 [lints]
 workspace = true
