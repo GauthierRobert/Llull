@@ -321,7 +321,6 @@ function sectionLabel(section: SweepSection, stations: SweepStation[] | undefine
 function runSweepProfile(
   doc: CadDocument,
   params: SweepRunParams & { readonly color?: string | undefined; readonly id?: string | undefined },
-  layout: 'joined' | 'edges',
 ): CommandResult {
   const fail = failer(doc, 'sweep_profile');
   const explicitId = params.id;
@@ -339,8 +338,9 @@ function runSweepProfile(
     layerId: existingLayerOrDefault(doc, params.layerId),
   });
   const sweepEntity = entity as SweepEntity;
-  // only a sweep that is fitted into exact faces has a face layout (a plain pipe stays the entity of before)
-  const placed: Entity = layout === 'joined' && needsFittedFaces(sweepEntity) ? { ...sweepEntity, faceLayout: 'joined' } : entity;
+  // the document decides (never the replay flag): a document without the marker keeps the per-edge layout its stored face names refer to; only a fitted sweep has one
+  const placed: Entity =
+    doc.sweepFaceLayout === 'joined' && needsFittedFaces(sweepEntity) ? { ...sweepEntity, faceLayout: 'joined' } : entity;
   const design = sweepDesign(doc, sweepEntity, loop);
   if ('document' in design) return design;
   const fitRefusal = fitToleranceRefusal(doc, sweepEntity, params.fitTolerance);
@@ -492,19 +492,7 @@ export const sweepProfile = defineCommand({
         'Largest distance (document units, > 0) between the exact fitted faces and the sweep evaluator. Default 1e-7 x the model size (at least 1e-9). Checked now: a tolerance the fit cannot reach is refused with SWG_FIT_TOLERANCE.',
       )
       .optional(),
-    faceLayout: z
-      .enum(['joined', 'edges'])
-      .describe(
-        'Recorded by this command, not for callers: how a variable-section / law sweep is cut into exact faces. "joined" (new sweeps) = the ring edges of a run are two faces; "edges" = one face per ring edge, the layout of documents made before it, so the persistent face and edge names stored in their history (f<k>, e(f<a>|f<b>)) still resolve when they are regenerated.',
-      )
-      .optional(),
     ...solidStyleFields(),
   }),
-  run: (doc, params, ctx): CommandResult => {
-    // a step replayed without the field is an old document: it keeps the per-edge layout its stored face names were made for
-    const layout = params.faceLayout ?? (ctx?.replaying === true ? 'edges' : 'joined');
-    const made = runSweepProfile(doc, params, layout);
-    const joined = made.affected.some((id) => (made.document.entities[id] as { faceLayout?: string } | undefined)?.faceLayout === 'joined');
-    return params.faceLayout === undefined && joined ? { ...made, recordExtras: { faceLayout: 'joined' } } : made;
-  },
+  run: (doc, params): CommandResult => runSweepProfile(doc, params),
 });

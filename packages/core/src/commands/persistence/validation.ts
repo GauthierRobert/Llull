@@ -206,10 +206,18 @@ function listedStaleIds(raw: Record<string, unknown>): ReadonlySet<string> {
  * Deep value validation of the document record. Returns an array of error strings. Integrity policy: dangling selection ids, entity key !=
  * entity.id, and duplicate order ids are REJECTED (not repaired). An empty array means the document is valid.
  */
+/** `uid` is a 32-hex string; `sweepFaceLayout` is 'joined' or absent (loading never adds it: an old document keeps the per-edge layout). */
+function identityProblems(v: Record<string, unknown>): string[] {
+  const problems: string[] = [];
+  if (v['uid'] !== undefined && !(typeof v['uid'] === 'string' && DOCUMENT_UID_PATTERN.test(v['uid'])))
+    problems.push('uid must be a 32-hex string');
+  if (v['sweepFaceLayout'] !== undefined && v['sweepFaceLayout'] !== 'joined') problems.push("sweepFaceLayout must be 'joined' or absent");
+  return problems;
+}
+
 export function validateDocumentValues(v: Record<string, unknown>): string[] {
   const errors: string[] = [];
-  if (v['uid'] !== undefined && !(typeof v['uid'] === 'string' && DOCUMENT_UID_PATTERN.test(v['uid'])))
-    errors.push('uid must be a 32-hex string');
+  for (const problem of identityProblems(v)) errors.push(problem);
   const entities = v['entities'] as Record<string, unknown>;
   const layers = v['layers'] as Record<string, unknown>;
   const arrays = isRecord(v['instanceArrays']) ? v['instanceArrays'] : {};

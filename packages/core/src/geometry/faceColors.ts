@@ -142,6 +142,17 @@ function matchSignature(sigs: ReadonlyArray<FaceSignature | null>, target: FaceS
   return found.length === 1 ? (found[0] as number) : -1;
 }
 
+/**
+ * The mean normal `m` as it reads in the body's own box coordinates (x / size per axis): direction of m (.) size, kept at the length of m (a whole wall
+ * has none). A per-axis resize (a pyramid taller by 10, a wedge flattened) leaves it unchanged, where the world normal of a slanted face turns.
+ */
+function normalInBox(m: Vec3, size: readonly number[]): Vec3 {
+  const scaled: Vec3 = [m[0] * (size[0] as number), m[1] * (size[1] as number), m[2] * (size[2] as number)];
+  const length = len3(scaled);
+  const keep = len3(m);
+  return length === 0 ? [0, 0, 0] : [(scaled[0] / length) * keep, (scaled[1] / length) * keep, (scaled[2] / length) * keep];
+}
+
 function patchSignatures(tris: IndexedTriangles, owner: readonly number[], count: number): Array<FaceSignature | null> {
   const lo = [Infinity, Infinity, Infinity];
   const hi = [-Infinity, -Infinity, -Infinity];
@@ -182,7 +193,7 @@ function patchSignatures(tris: IndexedTriangles, owner: readonly number[], count
     const [nx, ny, nz] = areaVector[p] as number[];
     const centre = (centreSum[p] as number[]).map((x, k) => (x / total - (lo[k] as number)) / (size[k] as number));
     return {
-      normal: [(nx as number) / total, (ny as number) / total, (nz as number) / total] as const,
+      normal: normalInBox([(nx as number) / total, (ny as number) / total, (nz as number) / total], size),
       centre: [centre[0] as number, centre[1] as number, centre[2] as number] as const,
       span: [0, 1, 2]
         .map((k) => ((boxHi[p] as number[])[k] as number) - ((boxLo[p] as number[])[k] as number))

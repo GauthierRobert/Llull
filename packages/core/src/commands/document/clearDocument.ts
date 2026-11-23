@@ -22,6 +22,7 @@ const KEPT_KEYS = [
   'kernelSettings',
   'siteContext',
   'nextStepNumber',
+  'sweepFaceLayout',
 ] as const satisfies readonly (keyof CadDocument)[];
 const LAYER_KEYS = ['layers', 'layerOrder'] as const satisfies readonly (keyof CadDocument)[];
 const NOT_COMPARED: ReadonlySet<string> = new Set<string>([...KEPT_KEYS, ...LAYER_KEYS]);

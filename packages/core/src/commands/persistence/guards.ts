@@ -184,7 +184,7 @@ function faceColorsProblem(kind: string, faceColors: unknown): string | null {
   const ok = Array.isArray(faceColors) && faceColors.length <= MAX_FACE_COLORS && faceColors.every(valid);
   return ok
     ? null
-    : `faceColors must be an array of at most ${MAX_FACE_COLORS} { near: [x, y, z], color: "#rrggbb", sig?: { normal, centre (0..1 of the body box), outward: 1 | -1 } (parametric solids only) }`;
+    : `faceColors must be an array of at most ${MAX_FACE_COLORS} { near: [x, y, z], color: "#rrggbb", sig?: { normal, centre and span (0..1 of the body box), outward: 1 | -1 } (parametric solids only) }`;
 }
 
 /** First problem of an entity's base fields, then its kind-specific fields, or null. */

@@ -121,6 +121,7 @@
     "jointOrder": [],
     "driveRelations": {},
     "driveRelationOrder": [],
+    "sweepFaceLayout": "joined",
     "nextStepNumber": 6
   }
 }

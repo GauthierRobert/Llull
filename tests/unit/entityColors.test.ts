@@ -432,6 +432,25 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     expect(paintedTriangles(stale as unknown as Entity)).toEqual([]);
   });
 
+  it('a pyramid taller by 10 and a wedge flattened keep the picked slanted face (normal read in the body box)', () => {
+    const pyramid = execute(createEmptyDocument(), 'add_pyramid', { baseWidth: 4, baseDepth: 4, height: 2 });
+    const pid = pyramid.affected[0] as string;
+    const p = (pyramid.document.entities[pid] as unknown as { position: Vec3 }).position;
+    // the +X slant: halfway up it lies at x = 1 above the base edge x = 2
+    const slant = execute(pyramid.document, 'set_face_color', { id: pid, faceNear: [[p[0] + 1, p[1], p[2] + 1]], color: RED }).document;
+    const before = paintedTriangles(slant.entities[pid] as Entity).length;
+    expect(before).toBeGreaterThan(0);
+    const taller = edit(slant, 'add_pyramid', { baseWidth: 4, baseDepth: 4, height: 20 });
+    expect(paintedTriangles(taller.document.entities[pid] as Entity)).toHaveLength(before);
+    const wedge = execute(createEmptyDocument(), 'add_wedge', { size: [4, 4, 4] });
+    const wid = wedge.affected[0] as string;
+    const w = (wedge.document.entities[wid] as unknown as { position: Vec3 }).position;
+    const sloped = execute(wedge.document, 'set_face_color', { id: wid, faceNear: [[w[0], w[1] + 0.5, w[2]]], color: RED }).document;
+    const flat = edit(sloped, 'add_wedge', { size: [4, 0.4, 4] });
+    expect(paintedTriangles(sloped.entities[wid] as Entity).length).toBeGreaterThan(0);
+    expect(paintedTriangles(flat.document.entities[wid] as Entity).length).toBe(paintedTriangles(sloped.entities[wid] as Entity).length);
+  });
+
   it('an axis sliver does not bridge the top of a revolved cylinder to its bottom', () => {
     const base = execute(createEmptyDocument(), 'revolve_profile', { profile: xy(0, 0, 2, 0, 2, 1, 0, 1), axis: 'z', segments: 32 });
     const id = base.affected[0] as string;

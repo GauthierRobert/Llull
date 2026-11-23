@@ -759,6 +759,7 @@ export function createEmptyDocument(): CadDocument {
     camera: { target: [0, 0, 0], azimuth: (3 * Math.PI) / 4, polar: Math.PI / 3, distance: 12 },
     groups: {},
     units: 'mm',
+    sweepFaceLayout: 'joined',
     displayPrecision: 3,
     parameters: {},
     animations: {},

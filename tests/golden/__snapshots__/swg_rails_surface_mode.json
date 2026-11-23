@@ -148,6 +148,7 @@
     },
     "groups": {},
     "units": "mm",
+    "sweepFaceLayout": "joined",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},
@@ -176,14 +177,14 @@
       {
         "id": "#15",
         "name": "sweep_profile",
-        "params": {"guideIds":["#1","#3"],"guideMode":"scale","radius":10,"anchors":[[10,0],[-10,0]],"faceLayout":"joined"},
+        "params": {"guideIds":["#1","#3"],"guideMode":"scale","radius":10,"anchors":[[10,0],[-10,0]]},
         "suppressed": false,
         "affected": ["#4"]
       },
       {
         "id": "#16",
         "name": "sweep_profile",
-        "params": {"guideIds":["#1","#3"],"guideMode":"scale","maintainHeight":true,"radius":10,"anchors":[[10,0],[-10,0]],"faceLayout":"joined"},
+        "params": {"guideIds":["#1","#3"],"guideMode":"scale","maintainHeight":true,"radius":10,"anchors":[[10,0],[-10,0]]},
         "suppressed": false,
         "affected": ["#5"]
       },
@@ -204,7 +205,7 @@
       {
         "id": "#19",
         "name": "sweep_profile",
-        "params": {"pathId":"#6","guideIds":["#7"],"guideMode":"scale","radius":10,"anchors":[[10,0]],"faceLayout":"joined"},
+        "params": {"pathId":"#6","guideIds":["#7"],"guideMode":"scale","radius":10,"anchors":[[10,0]]},
         "suppressed": false,
         "affected": ["#8"]
       },
