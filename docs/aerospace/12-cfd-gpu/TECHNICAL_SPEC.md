@@ -710,10 +710,11 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   query (a slice plane normal to a world axis through the case's moment point, or a plane rake of seeds one reference length upstream), runs the
   transport, fetches the stored file by hash, decodes it (`cfdFiles.ts`: pure LLSL / LLST decoders) and publishes it to `flowViewStore`; closing the
   panel clears it. Files are world metres; the overlay scales to document units. The colour scale is the shared `resultColor`.
-- **Open: the backend serves no result file.** The query transports store `slice.bin` / `streamlines.bin` content-addressed
-  (`server/src/cfd/fileStore.ts`) and return only the hash; no HTTP route reads them. The UI fetches `GET /cfd/file/<sha256>` (`src/ui/services/cfdFiles.ts`,
-  bearer token like the other routes, `application/octet-stream`, 404 when absent); until that route exists the panel says "could not serve the
-  result file (HTTP 404)" and nothing is drawn. Also open: surface colours (Cp / Mach on the body: `surface.bin` is in the bundle, no query serves it),
+- **Result files are served.** The query transports store `slice.bin` / `streamlines.bin` content-addressed
+  (`server/src/cfd/fileStore.ts`) and return only the hash; `GET /cfd/file/<sha256>` (`server/src/cfdFileRoutes.ts`, tests `server/tests/cfdFileRoute.test.ts`)
+  answers the verified bytes as `application/octet-stream`. It is guarded like `/live/snapshot` (`guardRead`: bearer token, loopback), 400 for a hash that is not
+  64 lowercase hex (no path can leave the store), 404 when absent or damaged. The UI calls it from `src/ui/services/cfdFiles.ts`.
+  Also open: surface colours (Cp / Mach on the body: `surface.bin` is in the bundle, no query serves it),
   `render_view overlay=cfd:...` (CLI lane), VC-CFD-40 (legend ranges are tested in `tests/component/FlowPanel.test.tsx`; the native-side check is open).
 - **Tests.** `tests/component/FlowPanel.test.tsx` (cases, param gathering and dispatch, solve / stop / failure, result, stale, unverified, study states, overlay
   queries, legend), `tests/unit/cfdOverlayFiles.test.ts` (decoders, quad, segments).
