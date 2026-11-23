@@ -37,4 +37,11 @@ describe('many-tool boolean vs the shape cache', () => {
     kernel.evaluate({ op: 'boolean', boolean: 'subtract', a: leaf(1), b: leaf(2), many: 1e9 });
     expect(kernel.cachedShapeCount()).toBeLessThanOrEqual(32);
   });
+
+  it('sizes the cache from the real tool count, not the claimed `many`', () => {
+    const kernel = kernelFromOps(ops(), 32);
+    kernel.evaluate({ op: 'boolean', boolean: 'subtract', a: leaf(1), b: balanced([leaf(2), leaf(3)]), many: 1000 });
+    for (let k = 0; k < 200; k++) kernel.evaluate(leaf(10 + k));
+    expect(kernel.cachedShapeCount()).toBeLessThanOrEqual(32);
+  });
 });

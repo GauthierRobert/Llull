@@ -9,8 +9,10 @@ import { composeEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { instanceToWorld } from './instanceTransform';
 import { scaleGeometry } from './scaleGeometry';
 import { soupIndices } from './meshVolume';
+import { faceColorMesh, faceColorSeeds, faceColorsOf } from './faceColors';
 import { appendAll } from '../lib/appendAll';
 
+const ORIGIN3: Vec3 = [0, 0, 0];
 export const UNIT_SCALE: Vec3 = [1, 1, 1];
 
 /**
@@ -36,9 +38,19 @@ function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id
   const mirrored = scale[0] * scale[1] * scale[2] < 0;
   const toWorld = instanceToWorld(scale, rotation, position);
   const positions: number[] = [];
-  for (const [a, b, c] of solidTriangles(child)) {
+  const triangles = solidTriangles(child);
+  for (const [a, b, c] of triangles) {
     for (const corner of mirrored ? [a, c, b] : [a, b, c]) appendAll(positions, toWorld(corner));
   }
+  const painted = faceColorsOf(child);
+  // the baked triangles keep the child's order: each coloured patch is re-picked at its first triangle's centroid in the world frame
+  const faceColors =
+    painted === undefined
+      ? []
+      : faceColorSeeds(faceColorMesh(child), painted).map(({ triangle, color }) => {
+          const [a, b, c] = (triangles[triangle] ?? [ORIGIN3, ORIGIN3, ORIGIN3]).map(toWorld) as [Vec3, Vec3, Vec3];
+          return { near: [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3] as Vec3, color };
+        });
   return {
     id,
     kind: 'mesh',
@@ -50,6 +62,7 @@ function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id
     ...(child.tags !== undefined ? { tags: child.tags } : {}),
     ...(child.materialId !== undefined ? { materialId: child.materialId } : {}),
     mesh: { positions, indices: soupIndices(positions) },
+    ...(faceColors.length === 0 ? {} : { faceColors }),
   };
 }
 
@@ -62,7 +75,18 @@ function scaledChild(entity: Entity, scale: Vec3): Entity {
   const [ax, ay, az] = [Math.abs(scale[0]), Math.abs(scale[1]), Math.abs(scale[2])];
   if (ax === 1 && ay === 1 && az === 1) return entity;
   if ((entity.kind === 'box' || entity.kind === 'wedge') && ax > 0 && ay > 0 && az > 0)
-    return { ...entity, size: [entity.size[0] * ax, entity.size[1] * ay, entity.size[2] * az] };
+    return {
+      ...entity,
+      size: [entity.size[0] * ax, entity.size[1] * ay, entity.size[2] * az],
+      ...(entity.faceColors === undefined
+        ? {}
+        : {
+            faceColors: entity.faceColors.map((face) => ({
+              ...face,
+              near: [face.near[0] * ax, face.near[1] * ay, face.near[2] * az] as Vec3,
+            })),
+          }),
+    };
   const factor = ax === ay && ay === az ? ax : Math.cbrt(ax * ay * az);
   return factor > 0 ? scaleGeometry(entity, factor).scaled : entity;
 }

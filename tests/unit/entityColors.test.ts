@@ -1,8 +1,21 @@
 /** LIM-1 #5: set_entity_color (with pattern copies) and per-face colours of mesh solids (set_face_color, viewport data, render_view, glTF). */
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument, type CadDocument, type MeshData, type MeshSolidEntity, type Vec3 } from '@core/model/types';
+import {
+  createEmptyDocument,
+  type CadDocument,
+  type Component,
+  type Entity,
+  type InstanceEntity,
+  type MeshData,
+  type MeshSolidEntity,
+  type Vec3,
+} from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { faceColorTriangles } from '@core/geometry/faceColors';
+import { faceColorMesh, faceColorTriangles } from '@core/geometry/faceColors';
+import { localTriangles } from '@core/geometry/solidTriangles';
+import { expandInstance } from '@core/geometry/instanceExpansion';
+import { tessellateEntity } from '@core/commands/render/polygons';
+import { cross3, sub3 } from '@lib/vec3';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 import { build } from '../helpers/addEntity';
 import { parsedGltf } from '../helpers/gltfExport';
@@ -187,7 +200,7 @@ describe('set_face_color on parametric primitives', () => {
   it('draws only the picked side in render_view and splits the glTF node by colour', () => {
     const { doc, id } = boxDoc();
     const [x, y, z] = (doc.entities[id] as unknown as { position: Vec3 }).position;
-    const coloured = execute(doc, 'set_face_color', { id, faceNear: [[x + 1, y + 1, z + 2]], color: '#ff0000' }).document;
+    const coloured = execute(doc, 'set_face_color', { id, faceNear: [[x, y, z + 2]], color: '#ff0000' }).document;
     const gltf = parsedGltf<{ nodes: Array<{ name?: string }> }>(coloured);
     expect(gltf.nodes.map((node) => node.name).some((name) => name?.endsWith('/face #ff0000'))).toBe(true);
     const svgOf = (d: CadDocument): string => (execute(d, 'render_view', { mode: 'vector', view: 'top' }).data as { svg: string }).svg;
@@ -198,7 +211,7 @@ describe('set_face_color on parametric primitives', () => {
   it('recolours and clears the same face without stacking entries', () => {
     const { doc, id } = boxDoc();
     const [x, y, z] = (doc.entities[id] as unknown as { position: Vec3 }).position;
-    const pick: Vec3 = [x + 1, y + 1, z + 2];
+    const pick: Vec3 = [x, y, z + 2];
     const red = execute(doc, 'set_face_color', { id, faceNear: [pick], color: '#ff0000' }).document;
     const blue = execute(red, 'set_face_color', { id, faceNear: [pick], color: '#0000ff' }).document;
     expect(faceColors(blue, id)?.map((f) => f.color)).toEqual(['#0000ff']);
@@ -224,5 +237,118 @@ describe('set_face_color on parametric primitives', () => {
     expectPure(doc, () => execute(doc, 'set_face_color', { id, faceNear: [entity.position], color: '#ff0000' }));
     expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ near: [0, 0], color: '#ff0000' }] })).toContain('faceColors');
     expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ near: [0, 0, 0], color: '#ff0000' }] })).toBeNull();
+  });
+});
+
+describe('primitive face colours survive regeneration, instancing and drawing', () => {
+  const redBox = (): { doc: CadDocument; id: string } => {
+    const { doc, ids } = build(['add_box', { size: [2, 3, 4] }]);
+    return { doc, id: ids[0] as string };
+  };
+  const colouredPatchNormals = (e: Entity): Vec3[] => {
+    const colors = faceColorTriangles(faceColorMesh(e), (e as MeshSolidEntity).faceColors ?? []);
+    return localTriangles(e).flatMap(([a, b, c], t) => {
+      if (colors[t] === undefined) return [];
+      const n = cross3(sub3(b, a), sub3(c, a));
+      const l = Math.hypot(...n);
+      return [[n[0] / l, n[1] / l, n[2] / l] as Vec3];
+    });
+  };
+  const resized = (doc: CadDocument, size: Vec3): CadDocument =>
+    execute(doc, 'edit_step_params', { stepId: doc.featureHistory[0]?.id, params: { size } }).document;
+  const coloured = (face: Vec3): { doc: CadDocument; id: string } => {
+    const { doc, id } = redBox();
+    const p = (doc.entities[id] as unknown as { position: Vec3 }).position;
+    return {
+      doc: execute(doc, 'set_face_color', { id, faceNear: [[p[0] + face[0], p[1] + face[1], p[2] + face[2]]], color: '#ff0000' }).document,
+      id,
+    };
+  };
+
+  it('records the patch ordinals and keeps the +Z side coloured when the box grows taller', () => {
+    const { doc, id } = coloured([0, 0, 2]);
+    expect(doc.featureHistory[1]?.params).toMatchObject({ faces: [expect.any(Number)] });
+    const taller = resized(doc, [2, 3, 6]);
+    expect(taller.entities[id]).toMatchObject({ size: [2, 3, 6] });
+    const normals = colouredPatchNormals(taller.entities[id] as Entity);
+    expect(normals.length).toBeGreaterThan(0);
+    for (const n of normals) expect(n[2]).toBeCloseTo(1);
+  });
+
+  it('keeps the +X side coloured when the box gets thin, and when a resize moves no face', () => {
+    const { doc, id } = coloured([1, 0, 0]);
+    for (const size of [
+      [2, 3, 1],
+      [2, 3, 4],
+    ] as Vec3[]) {
+      const next = resized(doc, size);
+      const normals = colouredPatchNormals(next.entities[id] as Entity);
+      expect(normals.length).toBeGreaterThan(0);
+      for (const n of normals) expect(n[0]).toBeCloseTo(1);
+    }
+  });
+
+  it('a replayed faces list wins over faceNear; unknown ordinals are dropped and a mesh solid refuses faces', () => {
+    const { doc, id } = redBox();
+    const r = execute(doc, 'set_face_color', { id, faceNear: [[500, 0, 0]], faces: [1, 99], color: '#00ff00' });
+    expect(r.affected).toEqual([id]);
+    expect(r.summary).toContain('Dropped faces with no such patch: 99');
+    expectNoOp(execute(doc, 'set_face_color', { id }), doc, 'give faceNear');
+    expectNoOp(execute(doc, 'set_face_color', { id, faces: [99], color: '#00ff00' }), doc, 'face 99');
+    const mesh = withMesh();
+    expectNoOp(execute(mesh.doc, 'set_face_color', { id: mesh.id, faces: [0], color: '#00ff00' }), mesh.doc, 'mesh solid');
+  });
+
+  it('an instance with a non-uniform scale keeps the picked side in both export modes and render_view', () => {
+    const { doc, id } = coloured([1, 0, 0]);
+    let withComponent = execute(doc, 'create_component', { name: 'C', entityIds: [id] }).document;
+    const componentId = Object.keys(withComponent.components)[0] as string;
+    withComponent = execute(withComponent, 'insert_instance', { componentId, position: [20, 0, 0], scale: [1, 1, 0.25] }).document;
+    const instance = Object.values(withComponent.entities)
+      .filter((e) => e.kind === 'instance')
+      .at(-1) as InstanceEntity;
+    const [child] = expandInstance(instance, withComponent.components[componentId] as Component);
+    for (const n of colouredPatchNormals(child as Entity)) expect(n[0]).toBeCloseTo(1);
+    const baked = execute(withComponent, 'insert_instance', { componentId, position: [40, 0, 0], scale: [1, 1, -1] }).document;
+    const bakedInstance = Object.values(baked.entities)
+      .filter((e) => e.kind === 'instance')
+      .at(-1) as InstanceEntity;
+    const [bakedChild] = expandInstance(bakedInstance, baked.components[componentId] as Component);
+    expect(bakedChild?.kind).toBe('mesh');
+    expect((bakedChild as MeshSolidEntity).faceColors?.length).toBe(1);
+    for (const mode of ['gpu', 'expand']) {
+      const gltf = parsedGltf<{ nodes: Array<{ name?: string }> }>(withComponent, { instancing: mode });
+      expect(gltf.nodes.some((node) => node.name?.includes('/face #ff0000'))).toBe(true);
+    }
+  });
+
+  it('draws a coloured box as six quads, not twelve triangles', () => {
+    const { doc } = coloured([0, 0, 2]);
+    const plain = tessellateEntity(Object.values(redBox().doc.entities)[0] as Entity);
+    const painted = tessellateEntity(Object.values(doc.entities)[0] as Entity);
+    expect(painted).toHaveLength(plain.length);
+    expect(painted.filter((polygon) => polygon.color === '#ff0000')).toHaveLength(1);
+  });
+
+  it('a coloured box and an identical plain box never share a gpu glTF mesh', () => {
+    const { doc, id } = coloured([0, 0, 2]);
+    const twin = execute(doc, 'add_box', { size: [2, 3, 4] }).document;
+    const gltf = parsedGltf<{ nodes: Array<{ name?: string; mesh?: number }>; meshes: unknown[] }>(twin, { instancing: 'gpu' });
+    const meshOf = gltf.nodes.filter((node) => node.mesh !== undefined);
+    expect(meshOf.some((node) => node.name?.startsWith(`${id}/face`))).toBe(true);
+    const plainNodes = meshOf.filter((node) => !node.name?.includes('/face'));
+    const colouredNodes = meshOf.filter((node) => node.name?.includes('/face'));
+    for (const node of plainNodes) expect(colouredNodes.map((c) => c.mesh)).not.toContain(node.mesh);
+  });
+
+  it('stored face colours are bounded and refused on kinds without faces', () => {
+    const { doc, id } = redBox();
+    const entry = { near: [0, 0, 0], color: '#ff0000' };
+    expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ ...entry, face: 3 }] })).toBeNull();
+    expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ ...entry, face: -1 }] })).toContain('faceColors');
+    expect(validateEntityValue({ ...doc.entities[id], faceColors: Array.from({ length: 4097 }, () => entry) })).toContain('faceColors');
+    const rectangle = execute(createEmptyDocument(), 'draw_rectangle', { width: 1, height: 1 });
+    const flat = rectangle.document.entities[rectangle.affected[0] as string];
+    expect(validateEntityValue({ ...flat, faceColors: [entry] })).toContain('not a rectangle');
   });
 });

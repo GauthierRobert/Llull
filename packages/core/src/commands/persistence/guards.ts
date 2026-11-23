@@ -14,6 +14,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
 import { isHexColor } from '../../lib/isHexColor';
+import { FACE_COLORED_KINDS } from '../../geometry/faceColors';
 import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
 import { curvesProblem, isCurveSegment } from './curvesGuard';
@@ -159,10 +160,18 @@ export function validateLayer(v: unknown): v is Layer {
   );
 }
 
-function faceColorsProblem(faceColors: unknown): string | null {
+const MAX_FACE_COLORS = 4096;
+
+function faceColorsProblem(kind: string, faceColors: unknown): string | null {
   if (faceColors === undefined) return null;
-  const ok = Array.isArray(faceColors) && faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color']));
-  return ok ? null : 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
+  if (!FACE_COLORED_KINDS.has(kind)) return `faceColors apply to mesh solids and parametric solids, not a ${kind}`;
+  const valid = (f: unknown): boolean =>
+    isRecord(f) &&
+    isVec3(f['near']) &&
+    isHexColor(f['color']) &&
+    (f['face'] === undefined || (Number.isInteger(f['face']) && (f['face'] as number) >= 0));
+  const ok = Array.isArray(faceColors) && faceColors.length <= MAX_FACE_COLORS && faceColors.every(valid);
+  return ok ? null : `faceColors must be an array of at most ${MAX_FACE_COLORS} { near: [x, y, z], color: "#rrggbb", face?: ordinal }`;
 }
 
 /** First problem of an entity's base fields, then its kind-specific fields, or null. */
@@ -178,7 +187,7 @@ export function validateEntityValue(v: unknown): string | null {
   if (!isHexColor(color)) return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
   const decals = decalsProblem(v['decals']);
   if (decals !== null) return `entity ${id}: ${decals}`;
-  const faceColors = faceColorsProblem(v['faceColors']);
+  const faceColors = faceColorsProblem(kind, v['faceColors']);
   if (faceColors !== null) return `entity ${id} (${kind}): ${faceColors}`;
   for (const field of POSITIVE_FIELDS[kind] ?? []) {
     const value = v[field];

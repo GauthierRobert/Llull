@@ -61,11 +61,13 @@ export interface VertexTint {
   vertexColors?: ReadonlyArray<number>;
 }
 
-/** Colour of one face: the smooth patch of the triangles around `near` (entity-local, before `position` / `rotation`), so it follows the face through regeneration. */
+/** Colour of one face: the smooth patch around `near` (entity-local, before `position` / `rotation`) on a mesh solid; on a parametric solid the patch `face`. */
 export interface FaceColor {
   readonly near: Vec3;
   /** Hex `#rrggbb`. */
   readonly color: string;
+  /** Parametric solids only: ordinal of the patch in triangle order (`faceColors.ts` partition); wins over `near`, so a resize keeps the side. */
+  readonly face?: number;
 }
 
 /** Per-face display colours (`set_face_color`), drawn over `color`; resolved on the current triangles (a mesh solid's `mesh`, a primitive's tessellation) by `faceColorTriangles`. */

@@ -293,6 +293,17 @@ function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S
   };
 }
 
+/** Leaves of the union tree `b` (at most `limit`: the claimed `many` never sizes the cache beyond what the tree really holds). */
+function toolLeaves(b: ShapeRecipe, limit: number): number {
+  let leaves = 0;
+  const stack: ShapeRecipe[] = [b];
+  for (let node = stack.pop(); node !== undefined && leaves < limit; node = stack.pop()) {
+    if (node.op === 'boolean' && node.boolean === 'union') stack.push(node.a, node.b);
+    else leaves++;
+  }
+  return leaves;
+}
+
 const BOUNDS_CAPACITY = 4096;
 
 /**
@@ -342,7 +353,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, baseCapacity = 128): Caching
       return hit;
     }
     if (recipe.op === 'boolean' && recipe.many !== undefined && recipe.many <= MAX_BOOLEAN_TOOLS)
-      capacity = Math.max(capacity, 2 * recipe.many + 16);
+      capacity = Math.max(capacity, 2 * toolLeaves(recipe.b, recipe.many) + 16);
     let shape: S | null;
     try {
       builds++;

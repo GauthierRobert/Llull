@@ -61,15 +61,23 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   result 76 k -> 10.8 k triangles, volume unchanged to 1.7e-8. The LLR-845 plan itself was not re-measured (not in the repo).
 - DONE: evaluator LRU > 256 tools. A fixed bound evicted the leaves of a long `many` list while its result was built, so a fallback or a
   re-evaluation rebuilt them. Both evaluators now size their cache to the request: a `boolean` with `many` (<= 1000, `MAX_BOOLEAN_TOOLS`)
-  raises the capacity to `2 * many + 16` (leaves plus the balanced tree of the fallback), never shrinking (`Evaluator::reserve` in
+  raises the capacity to `2 * leaves + 16` (leaves counted in the tree, never the claimed `many`) (leaves plus the balanced tree of the fallback), never shrinking (`Evaluator::reserve` in
   `recipe/many.rs`; `kernelFromOps`). Chosen over pinning: the bound stays a plain LRU, memory is bounded by the schema cap, and a hostile
   `many` never raises it. Test: `tests/unit/kernelManyToolsCache.test.ts` (300 tools, leaves built once), `many_tests.rs` (native; not yet run
   in this container, OCCT still building).
-- DONE: per-face colour on parametric primitives. `set_face_color` now takes box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion and
-  revolution as well as mesh solids: the faces are the smooth patches of the primitive's own tessellation (`geometry/faceColors.ts`
-  `faceColorMesh`), stored as `faceColors` picks in the entity frame, so a resize keeps the picked sides and `scale_entity` scales the picks.
-  `render_view` and glTF / GLB export draw them. The desktop viewport (`src/ui/viewport`) still draws a primitive in one colour: it must call
-  `faceColorMesh` / `faceColorTriangles` like `meshSolidGeometry.ts` does for mesh solids (UI lane).
+- DONE: per-face colour on parametric primitives. `set_face_color` takes box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion and
+  revolution as well as mesh solids. A face is a smooth patch of the primitive's own tessellation (`geometry/faceColors.ts` `faceColorMesh`).
+  Selector (regeneration): a stored `near` point cannot follow a resize (a box taller by 2 moves its top away from the pick, and the replayed
+  command no-ops), so on a primitive the command records the ORDINAL of each picked patch (patches numbered in triangle order; a primitive keeps
+  its triangle order when its size changes) as `recordExtras.faces`. A replayed step carries `faces`, which wins over `faceNear`, and the
+  stored `FaceColor.face` ordinal is what render / glTF resolve. Chosen over a named side ("+z"): it covers every kind with one mechanism
+  and needs no per-kind table; the cost is that a change of topology (an extrusion profile with another point count, a revolution with another
+  segment count) renumbers patches, and a replayed ordinal with no patch is dropped with a warning in the summary. Mesh solids keep the
+  `near` pick (their mesh is fixed). `render_view` draws the kind's own quads / rings coloured by their nearest triangle (no diagonal seams);
+  glTF / GLB export and instance expansion (parametric non-uniform scale: picks scaled; baked: patches re-picked on the baked mesh) carry them.
+  Stored colours are validated (at most 4096, only on kinds with faces). A revolution with few segments (facets beyond 30 degrees) has one
+  patch per facet strip. The desktop viewport (`src/ui/viewport`) still draws a primitive in one colour: it must use `faceColorMesh` /
+  `faceColorTriangles` like `meshSolidGeometry.ts` and keep coloured primitives out of the shared prototype (UI lane).
 
 ## Left
 
