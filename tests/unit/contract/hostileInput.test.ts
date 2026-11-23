@@ -74,6 +74,10 @@ function sourceFiles(directory: string, found: string[] = []): string[] {
   return found;
 }
 
+/** The renderer's decoders of binary files the backend serves (`parseSliceFile`, `parseStreamlinesFile`): untrusted bytes too. Keys start with `../src/ui/`. */
+const UI = path.resolve(PACKAGES, '../src/ui');
+const UI_FILE_READER = /^export (?:async )?function (parse\w*File)\(/gm;
+
 function exportedReaders(): string[] {
   const keys: string[] = [];
   for (const dir of readdirSync(PACKAGES, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
@@ -83,6 +87,10 @@ function exportedReaders(): string[] {
       for (const match of [...text.matchAll(READER_FUNCTION), ...text.matchAll(HEADER_FUNCTION)])
         keys.push(`${file}:${match[1] as string}`);
     }
+  }
+  for (const file of sourceFiles(UI)) {
+    const text = readFileSync(path.join(PACKAGES, file), 'utf8');
+    for (const match of text.matchAll(UI_FILE_READER)) keys.push(`${file}:${match[1] as string}`);
   }
   return keys;
 }

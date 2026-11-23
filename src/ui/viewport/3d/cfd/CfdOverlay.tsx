@@ -1,3 +1,4 @@
+// Not `captureExclude`: the computed flow is part of the design view, so capture_viewport / render_view frames include it (the editing helpers are the ones left out).
 // The Flow panel's slice and streamlines on the model (inside the floating-origin group): a colour-mapped plane patch and speed-coloured
 // polylines, drawn from the decoded files in the flow view store. Presentation only: nothing here computes flow or touches the document.
 
@@ -10,6 +11,8 @@ import { useDisposable } from '../../useDisposable';
 import { sliceCorners, sliceTexels, streamlineSegments, type ValueRange } from './cfdPaint';
 
 const UNIT_RANGE: ValueRange = { min: 0, max: 1 };
+/** The layers are a readout, never a pick target: clicks reach the model behind them. */
+const noRaycast = (): void => undefined;
 
 function SliceQuad({ layer, scale }: { layer: SliceLayer; scale: number }): React.ReactElement {
   const { file } = layer;
@@ -43,7 +46,7 @@ function SliceQuad({ layer, scale }: { layer: SliceLayer; scale: number }): Reac
       }),
     [texture],
   );
-  return <mesh name="cfd-slice" geometry={geometry} material={material} renderOrder={5} frustumCulled={false} />;
+  return <mesh name="cfd-slice" geometry={geometry} material={material} renderOrder={5} frustumCulled={false} raycast={noRaycast} />;
 }
 
 function Streamlines({ layer, scale }: { layer: StreamlinesLayer; scale: number }): React.ReactElement {
@@ -57,7 +60,16 @@ function Streamlines({ layer, scale }: { layer: StreamlinesLayer; scale: number 
     return made;
   }, [file, range, scale]);
   const material = useDisposable(() => new THREE.LineBasicMaterial({ vertexColors: true, toneMapped: false }), []);
-  return <lineSegments name="cfd-streamlines" geometry={geometry} material={material} renderOrder={6} frustumCulled={false} />;
+  return (
+    <lineSegments
+      name="cfd-streamlines"
+      geometry={geometry}
+      material={material}
+      renderOrder={6}
+      frustumCulled={false}
+      raycast={noRaycast}
+    />
+  );
 }
 
 export function CfdOverlay(): React.ReactElement | null {

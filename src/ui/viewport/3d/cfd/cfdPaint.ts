@@ -58,7 +58,9 @@ export interface LineSegments {
 
 /** Each polyline as consecutive point pairs, coloured by the speed at the point. */
 export function streamlineSegments(file: StreamlinesFile, range: ValueRange, sceneUnitsPerMetre: number): LineSegments {
-  const segments = Math.max(0, file.pointCount - file.lineCount);
+  let segments = 0;
+  for (let line = 0; line < file.lineCount; line += 1)
+    segments += Math.max(0, (file.offsets[line + 1] ?? 0) - (file.offsets[line] ?? 0) - 1);
   const positions = new Float32Array(segments * 6);
   const colors = new Float32Array(segments * 6);
   let out = 0;

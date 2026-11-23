@@ -1,17 +1,11 @@
 // Runs `cfd_solve` (optionally with the grid study) and `cfd_stop` for one case and reports their state. The solve is a long native job:
-// the answer arrives when it ends, so the panel shows the elapsed time meanwhile; the result is recorded by the transport.
+// the answer arrives when it ends, so the panel shows the elapsed time meanwhile; the result is recorded by the transport. The state lives
+// in the flow view store, per case, so it survives picking another case.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '@ui/store';
+import { useFlowViewStore, type FlowSolveEntry, type FlowSolveState } from '@ui/store/flowViewStore';
 import { callFlowTool, OFFLINE } from './flowTransport';
-
-type FlowSolveState =
-  | { readonly status: 'idle' }
-  | { readonly status: 'running'; readonly elapsedS: number; readonly gridStudy: boolean }
-  | { readonly status: 'done'; readonly summary: string }
-  | { readonly status: 'cancelled'; readonly summary: string }
-  | { readonly status: 'failed'; readonly summary: string; readonly code: string | null; readonly remediation: string }
-  | { readonly status: 'missing'; readonly reason: string };
 
 export interface FlowSolveOptions {
   readonly gridStudy: boolean;
@@ -28,32 +22,26 @@ interface FlowSolve {
   stop(): void;
 }
 
-const IDLE: FlowSolveState = { status: 'idle' };
+const IDLE: FlowSolveEntry = { state: { status: 'idle' }, stopNote: '' };
 
-/** A change of `caseId` resets the state: a run belongs to one case. */
 export function useFlowSolve(caseId: string): FlowSolve {
   const online = useStore((s) => s.liveStatus === 'connected');
-  const [held, setHeld] = useState<{ caseId: string; value: FlowSolveState; stopNote: string }>({ caseId, value: IDLE, stopNote: '' });
-  const startedAt = useRef(0);
-  const own = held.caseId === caseId;
-  const current = own ? held.value : IDLE;
-  const running = current.status === 'running';
+  const { state, stopNote } = useFlowViewStore((s) => s.solves[caseId] ?? IDLE);
+  const running = state.status === 'running';
 
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => {
-      setHeld((previous) =>
-        previous.value.status === 'running'
-          ? { ...previous, value: { ...previous.value, elapsedS: Math.round((Date.now() - startedAt.current) / 1000) } }
-          : previous,
-      );
+      const current = useFlowViewStore.getState().solves[caseId]?.state;
+      if (current?.status === 'running')
+        useFlowViewStore.getState().setSolve(caseId, { state: { ...current, elapsedS: current.elapsedS + 1 } });
     }, 1000);
     return () => clearInterval(timer);
-  }, [running]);
+  }, [running, caseId]);
 
   const start = (options: FlowSolveOptions): void => {
-    startedAt.current = Date.now();
-    setHeld({ caseId, value: { status: 'running', elapsedS: 0, gridStudy: options.gridStudy }, stopNote: '' });
+    const { setSolve } = useFlowViewStore.getState();
+    setSolve(caseId, { state: { status: 'running', elapsedS: 0, gridStudy: options.gridStudy }, stopNote: '' });
     const params = {
       caseId,
       ...(options.gridStudy ? { gridStudy: true } : {}),
@@ -65,16 +53,16 @@ export function useFlowSolve(caseId: string): FlowSolve {
       else if (outcome.code === 'BACKEND_MISSING') value = { status: 'missing', reason: outcome.summary };
       else if (outcome.code === 'CFD_CANCELLED') value = { status: 'cancelled', summary: outcome.summary };
       else value = { status: 'failed', summary: outcome.summary, code: outcome.code, remediation: outcome.remediation };
-      setHeld((previous) => ({ caseId, value, stopNote: previous.caseId === caseId ? previous.stopNote : '' }));
+      setSolve(caseId, { state: value });
     });
   };
 
   const stop = (): void => {
-    void callFlowTool('cfd_stop', { caseId }).then((outcome) => {
-      setHeld((previous) => (previous.caseId === caseId ? { ...previous, stopNote: outcome.summary } : previous));
-    });
+    void callFlowTool('cfd_stop', { caseId }).then((outcome) =>
+      useFlowViewStore.getState().setSolve(caseId, { stopNote: outcome.summary }),
+    );
   };
 
-  const disabledReason = !online ? OFFLINE : current.status === 'missing' ? current.reason : running ? 'Solving…' : null;
-  return { state: current, disabledReason, stopNote: own ? held.stopNote : '', start, stop };
+  const disabledReason = !online ? OFFLINE : state.status === 'missing' ? state.reason : running ? 'Solving…' : null;
+  return { state, disabledReason, stopNote, start, stop };
 }

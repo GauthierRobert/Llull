@@ -1,22 +1,25 @@
-/** GET /cfd/file/:sha256: the stored bytes, guarded like /live/snapshot; malformed hashes and traversal are refused. */
+/** GET /cfd/file/:sha256: the stored slice / streamline bytes, guarded like /live/snapshot; malformed hashes, traversal, oversized and non-result files are refused. */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import request from 'supertest';
 
-const cacheDir = vi_hoistedDir();
-function vi_hoistedDir(): string {
+const cacheDir = vi.hoisted(() => {
   const dir = `${process.env['TMPDIR'] ?? '/tmp'}/llull-cfd-file-route-${process.pid}`;
   process.env['LLULL_FEA_CACHE'] = dir;
   return dir;
-}
+});
 
-import { rmSync } from 'node:fs';
-import request from 'supertest';
 import { app } from '../src/index';
 import { cfdFileStore } from '../src/cfd/fileStore';
+import { MAX_CFD_FILE_BYTES } from '../src/cfdFileRoutes';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
 
 const TOKEN = 'secret-token';
 const auth: [string, string] = ['Authorization', `Bearer ${TOKEN}`];
+const store = (): ReturnType<typeof cfdFileStore> => cfdFileStore(defaultFeArtifactStore().directory);
+const slice = (...tail: number[]): Buffer => Buffer.from([...Buffer.from('LLSL'), ...tail]);
 
 beforeEach(() => {
   process.env['LLULL_AUTH_TOKEN'] = TOKEN;
@@ -26,13 +29,10 @@ afterEach(() => {
 });
 afterAll(() => rmSync(cacheDir, { recursive: true, force: true }));
 
-const binary = (res: request.Response, done: (body: Buffer) => void): void => done(res.body as Buffer);
-
 describe('GET /cfd/file/:sha256', () => {
   it('serves the stored bytes as application/octet-stream', async () => {
-    const bytes = Buffer.from([0, 1, 2, 250, 251, 252, 253, 254, 255]);
-    const hash = cfdFileStore(defaultFeArtifactStore().directory).put(bytes);
-    let served: Buffer | null = null;
+    const bytes = slice(0, 1, 2, 250, 251, 252, 253, 254, 255);
+    const hash = store().put(bytes);
     const res = await request(app)
       .get(`/cfd/file/${hash}`)
       .set(...auth)
@@ -42,15 +42,13 @@ describe('GET /cfd/file/:sha256', () => {
         response.on('data', (chunk: Buffer) => chunks.push(chunk));
         response.on('end', () => callback(null, Buffer.concat(chunks)));
       });
-    binary(res, (body) => (served = body));
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('application/octet-stream');
-    expect(served).not.toBeNull();
-    expect(Buffer.compare(served as unknown as Buffer, bytes)).toBe(0);
+    expect(Buffer.compare(res.body as Buffer, bytes)).toBe(0);
   });
 
   it('answers 401 without the token', async () => {
-    const hash = cfdFileStore(defaultFeArtifactStore().directory).put(Buffer.from('guarded'));
+    const hash = store().put(slice(7));
     expect((await request(app).get(`/cfd/file/${hash}`)).status).toBe(401);
     expect((await request(app).get(`/cfd/file/${hash}`).set('Authorization', 'Bearer nope')).status).toBe(401);
   });
@@ -92,5 +90,36 @@ describe('GET /cfd/file/:sha256', () => {
           .set(...auth)
       ).status,
     ).toBe(400);
+  });
+
+  it('refuses a file that is not a slice or streamline file (a solve field, any other stored bytes)', async () => {
+    const hash = store().put(Buffer.from('LLFD field file'));
+    const res = await request(app)
+      .get(`/cfd/file/${hash}`)
+      .set(...auth);
+    expect(res.status).toBe(415);
+    expect(res.headers['content-type']).not.toContain('application/octet-stream');
+  });
+
+  it('refuses a file over the size cap before reading it', async () => {
+    const hash = 'c'.repeat(64);
+    mkdirSync(store().directory, { recursive: true });
+    const file = path.join(store().directory, `${hash}.bin`);
+    writeFileSync(file, 'LLSL');
+    truncateSync(file, MAX_CFD_FILE_BYTES + 1);
+    const res = await request(app)
+      .get(`/cfd/file/${hash}`)
+      .set(...auth);
+    expect(res.status).toBe(413);
+  });
+
+  it('answers 404 for a damaged file (content that no longer hashes to its name)', async () => {
+    const hash = 'd'.repeat(64);
+    mkdirSync(store().directory, { recursive: true });
+    writeFileSync(path.join(store().directory, `${hash}.bin`), slice(1, 2, 3));
+    const res = await request(app)
+      .get(`/cfd/file/${hash}`)
+      .set(...auth);
+    expect(res.status).toBe(404);
   });
 });

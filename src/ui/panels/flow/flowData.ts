@@ -23,6 +23,8 @@ export interface FlowReport {
   readonly staleReasons: readonly string[];
   readonly trusted: boolean;
   readonly warnings: readonly FlowWarning[];
+  /** Whether the grid study still matches the case and flow surface (decided by `cfd_report`); null when the case has no study. */
+  readonly study: { readonly stale: boolean; readonly staleReasons: readonly string[] } | null;
   readonly steps: number | null;
   readonly averagedSteps: number | null;
   /** Drag coefficient per monitor sample, step order. */
@@ -33,6 +35,8 @@ export interface FlowReport {
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 const finite = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+
+const reasonsOf = (value: unknown): string[] => (Array.isArray(value) ? value.map(text) : []);
 
 function warningsOf(value: unknown): FlowWarning[] {
   return Array.isArray(value)
@@ -47,9 +51,13 @@ export function parseFlowReport(data: unknown): FlowReport | null {
   const history = Array.isArray(convergence['history']) ? convergence['history'].filter(isRecord) : [];
   return {
     stale: data['stale'],
-    staleReasons: Array.isArray(data['staleReasons']) ? data['staleReasons'].map(text) : [],
+    staleReasons: reasonsOf(data['staleReasons']),
     trusted: data['trusted'],
     warnings: warningsOf(data['warnings']),
+    study:
+      isRecord(data['study']) && typeof data['study']['stale'] === 'boolean'
+        ? { stale: data['study']['stale'], staleReasons: reasonsOf(data['study']['staleReasons']) }
+        : null,
     steps: finite(convergence['steps']),
     averagedSteps: finite(convergence['averagedSteps']),
     history: history.flatMap((row) => {
@@ -114,11 +122,8 @@ function verdictOf(study: FlowStudy, label: string): StudyView['verdict'] {
   return { tone: 'warn', text: `No GCI (${study.status})` };
 }
 
-/**
- * The study as the panel shows it. `stale`: the case or the flow surface changed since the study (the result of the same solve is stale, or
- * its case hash differs from the study's); the study is kept, like a stale result, and says so.
- */
-export function studyView(study: FlowStudy, stale: boolean): StudyView {
+/** The study as the panel shows it. `staleReasons` (from `cfd_report`): why it no longer matches the case or flow surface; it is kept, like a stale result, and says so. */
+export function studyView(study: FlowStudy, staleReasons: readonly string[] | null): StudyView {
   const label = QUANTITY_LABELS[study.quantity];
   const details = [
     ...(study.orderP === undefined ? [] : [{ key: 'order', label: 'Observed order p', value: num(study.orderP) }]),
@@ -128,7 +133,8 @@ export function studyView(study: FlowStudy, stale: boolean): StudyView {
   return {
     quantityLabel: label,
     badge: study.verified ? { tone: 'ok', text: 'Verified' } : { tone: 'warn', text: 'Unverified' },
-    staleNote: stale ? 'Stale: the case or geometry changed since this study. Solve it again.' : '',
+    staleNote:
+      staleReasons === null ? '' : `Stale: ${staleReasons.join('; ') || 'the case or geometry changed since this study'}. Solve it again.`,
     levels: study.levels.map((level) => ({
       key: level.resultsHash,
       cellText: `${num(level.cellM)} m`,
@@ -142,7 +148,9 @@ export function studyView(study: FlowStudy, stale: boolean): StudyView {
   };
 }
 
-/** Does the study still describe the case? Unknown (no result to compare with) counts as current. */
-export function studyIsStale(study: FlowStudy, result: FlowResult | undefined, report: FlowReport | null): boolean {
-  return report?.stale === true || (result !== undefined && result.caseHash !== study.caseHash);
+/** A case id (`flow-1`, `flow-2`, …) no case of the document uses. */
+export function freeCaseId(cases: Readonly<Record<string, FlowCase>>): string {
+  let n = Object.keys(cases).length + 1;
+  while (Object.hasOwn(cases, `flow-${n}`)) n += 1;
+  return `flow-${n}`;
 }

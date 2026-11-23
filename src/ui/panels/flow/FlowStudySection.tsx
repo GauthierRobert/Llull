@@ -4,8 +4,14 @@ import React from 'react';
 import { PanelSection, StatusChip } from '@ui/panels/PanelParts';
 import { studyView, type FlowStudy } from './flowData';
 
-export function FlowStudySection({ study, stale }: { study: FlowStudy; stale: boolean }): React.ReactElement {
-  const view = studyView(study, stale);
+export function FlowStudySection({
+  study,
+  staleReasons,
+}: {
+  study: FlowStudy;
+  staleReasons: readonly string[] | null;
+}): React.ReactElement {
+  const view = studyView(study, staleReasons);
   return (
     <PanelSection title={`Grid study (${view.quantityLabel})`} testId="flow-study">
       <p className="flow__state">

@@ -32,6 +32,8 @@ export function FlowCaseForm({ suggestedId, onCreated }: FlowCaseFormProps): Rea
   const [area, setArea] = useState('');
   const [length, setLength] = useState('');
   const [cells, setCells] = useState('');
+  /** Why the last create was refused (the command's summary). */
+  const [refusal, setRefusal] = useState('');
   const caseId = id.trim() === '' ? suggestedId : id.trim();
   const numbers = {
     speedMS: positive(speed),
@@ -56,14 +58,18 @@ export function FlowCaseForm({ suggestedId, onCreated }: FlowCaseFormProps): Rea
 
   const create = (): void => {
     if (problem !== '' || numbers.speedMS === null || numbers.areaM2 === null || numbers.lengthM === null) return;
-    dispatch('create_cfd_case', {
-      id: caseId,
-      entityIds: selection,
-      freestream: { speedMS: numbers.speedMS, altitudeM: numbers.altitudeM ?? 0, alphaDeg: numbers.alphaDeg ?? 0 },
-      reference: { areaM2: numbers.areaM2, lengthM: numbers.lengthM },
-      ...(numbers.cells === undefined || numbers.cells === null ? {} : { cellsPerReferenceLength: Math.round(numbers.cells) }),
-    });
-    onCreated(caseId);
+    setRefusal('');
+    dispatch(
+      'create_cfd_case',
+      {
+        id: caseId,
+        entityIds: selection,
+        freestream: { speedMS: numbers.speedMS, altitudeM: numbers.altitudeM ?? 0, alphaDeg: numbers.alphaDeg ?? 0 },
+        reference: { areaM2: numbers.areaM2, lengthM: numbers.lengthM },
+        ...(numbers.cells === undefined || numbers.cells === null ? {} : { cellsPerReferenceLength: Math.round(numbers.cells) }),
+      },
+      { onResult: (result) => (result.changed ? onCreated(caseId) : setRefusal(result.summary)) },
+    );
   };
 
   return (
@@ -93,6 +99,11 @@ export function FlowCaseForm({ suggestedId, onCreated }: FlowCaseFormProps): Rea
       <button type="button" className="btn btn--primary btn--sm" disabled={problem !== ''} onClick={create} data-testid="flow-create">
         Create case
       </button>
+      {refusal !== '' && (
+        <p className="analysis__hint" role="status" data-testid="flow-create-refused">
+          {refusal}
+        </p>
+      )}
       {problem !== '' && (
         <p className="analysis__hint" data-testid="flow-create-problem">
           {problem}

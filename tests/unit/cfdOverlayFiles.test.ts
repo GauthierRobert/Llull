@@ -38,4 +38,33 @@ describe('flow result files', () => {
     expect(scaleFraction(5, { min: 5, max: 5 })).toBe(0.5);
     expect(scaleFraction(2, { min: 0, max: 4 })).toBe(0.5);
   });
+
+  it('refuses non-finite header numbers, a non-positive spacing, offsets not starting at 0 and absurd counts', () => {
+    const slice = sliceBytes(2, [1, 2, 3, 4], 'speed');
+    const word = (bytes: Uint8Array, at: number, value: number, kind: 'f' | 'u'): Uint8Array => {
+      const copy = bytes.slice();
+      const view = new DataView(copy.buffer);
+      if (kind === 'f') view.setFloat32(at, value, true);
+      else view.setUint32(at, value, true);
+      return copy;
+    };
+    expect(parseSliceFile(word(slice, 24, NaN, 'f'))).toContain('non-finite');
+    expect(parseSliceFile(word(slice, 52, 0, 'f'))).toContain('non-positive spacing');
+    const lines = streamlinesBytes();
+    expect(parseStreamlinesFile(word(lines, 16, 1, 'u'))).toContain('offsets');
+    expect(parseStreamlinesFile(word(lines, 12, 0xfffffff0, 'u'))).toContain('too many');
+    expect(parseStreamlinesFile(word(lines, 8, 0xffffffff, 'u'))).toContain('too many');
+  });
+
+  it('counts the segments of each polyline (empty and one-point lines have none)', () => {
+    const file = {
+      lineCount: 3,
+      pointCount: 3,
+      offsets: new Uint32Array([0, 0, 1, 3]),
+      positions: new Float32Array(9),
+      speeds: new Float32Array(3),
+      range: null,
+    };
+    expect(streamlineSegments(file, { min: 0, max: 1 }, 1).positions).toHaveLength(6);
+  });
 });

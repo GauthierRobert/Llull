@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { act, render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { useFlowViewStore } from '@ui/store/flowViewStore';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
@@ -7,6 +7,7 @@ import { FlowPanel } from '@ui/panels/flow/FlowPanel';
 import { CfdLegend } from '@ui/viewport/3d/cfd/CfdLegend';
 import { recordedGridStudy } from '../unit/aero/cfd/studyFixtures';
 import { sliceBytes, streamlinesBytes } from '../helpers/cfdFiles';
+import { localDispatch } from '../helpers/storeTestHelpers';
 
 const mocks = vi.hoisted(() => ({ report: null as Record<string, unknown> | null, post: vi.fn(), fetch: vi.fn() }));
 
@@ -47,6 +48,8 @@ const REPORT = {
 
 let dispatch = vi.fn();
 let recorded: CadDocument;
+const resultHashOf = (doc: CadDocument): string => doc.cfd?.results['c1']?.resultsHash ?? '';
+let RESULT_HASH = '';
 
 function load(patch: (doc: CadDocument) => CadDocument = (doc) => doc): void {
   useStore.getState().setDocument(patch(recorded));
@@ -69,6 +72,7 @@ beforeEach(() => {
   useFlowViewStore.setState(useFlowViewStore.getInitialState(), true);
   dispatch = vi.fn();
   recorded = recordedGridStudy().doc;
+  RESULT_HASH = resultHashOf(recorded);
   useStore.getState().setDocument(createEmptyDocument());
   useStore.setState({ dispatch, liveStatus: 'disconnected' });
 });
@@ -97,19 +101,91 @@ describe('FlowPanel cases', () => {
     fireEvent.change(screen.getByTestId('flow-cells'), { target: { value: '48' } });
     fireEvent.change(screen.getByTestId('flow-case-id'), { target: { value: 'wing' } });
     fireEvent.click(create);
-    expect(dispatch).toHaveBeenCalledWith('create_cfd_case', {
-      id: 'wing',
-      entityIds: [body],
-      freestream: { speedMS: 40, altitudeM: 0, alphaDeg: 3 },
-      reference: { areaM2: 0.8, lengthM: 1.2 },
-      cellsPerReferenceLength: 48,
-    });
+    expect(dispatch).toHaveBeenCalledWith(
+      'create_cfd_case',
+      {
+        id: 'wing',
+        entityIds: [body],
+        freestream: { speedMS: 40, altitudeM: 0, alphaDeg: 3 },
+        reference: { areaM2: 0.8, lengthM: 1.2 },
+        cellsPerReferenceLength: 48,
+      },
+      { onResult: expect.any(Function) },
+    );
   });
 
   it('asks for a selection before a case can be created', () => {
     render(<FlowPanel />);
     fireEvent.click(screen.getByText('New case'));
     expect(screen.getByTestId('flow-create-problem').textContent).toContain('Select the solids');
+  });
+});
+
+describe('FlowPanel new-case outcomes', () => {
+  const answer =
+    (changed: boolean, summary: string) =>
+    (_name: string, _params: unknown, options?: { onResult?: (r: { changed: boolean; summary: string }) => void }) =>
+      options?.onResult?.({ changed, summary });
+  const fill = (): void => {
+    fireEvent.click(screen.getByText('New case'));
+    fireEvent.change(screen.getByTestId('flow-area'), { target: { value: '0.8' } });
+    fireEvent.change(screen.getByTestId('flow-length'), { target: { value: '1' } });
+  };
+  const withSelection = (): void => {
+    const body = Object.keys(recorded.entities)[0] as string;
+    useStore.getState().setDocument({ ...recorded, selection: [body] });
+  };
+
+  it('picks the new case only once the command succeeded', () => {
+    withSelection();
+    dispatch = vi.fn(answer(true, 'created'));
+    useStore.setState({ dispatch });
+    render(<FlowPanel />);
+    fill();
+    fireEvent.change(screen.getByTestId('flow-case-id'), { target: { value: 'wing' } });
+    fireEvent.click(screen.getByTestId('flow-create'));
+    expect(screen.queryByTestId('flow-create-refused')).toBeNull();
+    // Online the case reaches the document a moment later: the pick waits for it, then lands on it.
+    expect(useFlowViewStore.getState().caseId).toBe('c1');
+    act(() => {
+      const source = recorded.cfd?.cases['c1'];
+      if (recorded.cfd === undefined || source === undefined) throw new Error('fixture');
+      useStore
+        .getState()
+        .setDocument({ ...recorded, cfd: { ...recorded.cfd, cases: { ...recorded.cfd.cases, wing: { ...source, id: 'wing' } } } });
+    });
+    expect(useFlowViewStore.getState().caseId).toBe('wing');
+  });
+
+  it('keeps the pick and shows the refusal when create_cfd_case is refused', () => {
+    withSelection();
+    dispatch = vi.fn(answer(false, "create_cfd_case rejected: case 'c1' already exists"));
+    useStore.setState({ dispatch });
+    render(<FlowPanel />);
+    fill();
+    fireEvent.change(screen.getByTestId('flow-case-id'), { target: { value: 'c1' } });
+    fireEvent.click(screen.getByTestId('flow-create'));
+    expect(screen.getByTestId('flow-create-refused').textContent).toContain('already exists');
+    expect(useFlowViewStore.getState().caseId).toBe('c1');
+  });
+
+  it('suggests an id no case uses', () => {
+    load((doc) => {
+      const cfd = doc.cfd;
+      const source = cfd?.cases['c1'];
+      if (cfd === undefined || source === undefined) throw new Error('fixture');
+      return { ...doc, cfd: { cases: { 'flow-2': { ...source, id: 'flow-2' } }, results: {} } };
+    });
+    render(<FlowPanel />);
+    fireEvent.click(screen.getByText('New case'));
+    expect((screen.getByTestId('flow-case-id') as HTMLInputElement).placeholder).toBe('flow-3');
+  });
+
+  it('falls back to a shown case when the picked one is deleted', () => {
+    load();
+    useFlowViewStore.setState({ caseId: 'gone' });
+    render(<FlowPanel />);
+    expect(useFlowViewStore.getState().caseId).toBe('c1');
   });
 });
 
@@ -227,17 +303,20 @@ describe('FlowPanel grid study', () => {
     expect(screen.getByTestId('flow-study').textContent).toContain('no number is trusted');
   });
 
-  it('notes a stale study when the result is stale', async () => {
+  it('notes a stale study with the reasons cfd_report gives, even when the result itself is current', async () => {
     load();
-    mocks.report = { ...REPORT, stale: true, staleReasons: ['the case changed since the solve'] };
+    mocks.report = { ...REPORT, study: { stale: true, staleReasons: ['the flow surface changed since the solve'] } };
     render(<FlowPanel />);
-    await waitFor(() => expect(screen.getByTestId('flow-study-stale').textContent).toContain('Stale'));
+    await waitFor(() => expect(screen.getByTestId('flow-study-stale').textContent).toContain('the flow surface changed'));
+    expect(screen.getByTestId('flow-state').textContent).toBe('Current');
   });
 
-  it('notes a study whose case hash differs from the recorded result', () => {
-    load(withStudy({ caseHash: 'f'.repeat(64) }));
+  it('shows no stale note when cfd_report says the study is current', async () => {
+    load();
+    mocks.report = { ...REPORT, study: { stale: false, staleReasons: [] } };
     render(<FlowPanel />);
-    expect(screen.getByTestId('flow-study-stale')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('flow-state').textContent).toBe('Current'));
+    expect(screen.queryByTestId('flow-study-stale')).toBeNull();
   });
 
   it('reports a non-monotone study with no GCI', () => {
@@ -273,6 +352,69 @@ describe('FlowPanel grid study', () => {
   });
 });
 
+describe('FlowPanel state per case and stale layers', () => {
+  it('keeps a running solve while another case is picked', () => {
+    load((doc) => {
+      const source = doc.cfd?.cases['c1'];
+      if (doc.cfd === undefined || source === undefined) throw new Error('fixture');
+      return { ...doc, cfd: { ...doc.cfd, cases: { ...doc.cfd.cases, c2: { ...source, id: 'c2' } } } };
+    });
+    useStore.setState({ liveStatus: 'connected' });
+    mocks.post.mockReturnValue(new Promise(() => undefined));
+    render(<FlowPanel />);
+    fireEvent.click(screen.getByTestId('flow-solve'));
+    expect(screen.getByTestId('flow-progress')).toBeTruthy();
+    fireEvent.click(within(screen.getByTestId('flow-case-c2')).getByRole('button', { name: 'Flow case c2' }));
+    expect(screen.queryByTestId('flow-progress')).toBeNull();
+    fireEvent.click(within(screen.getByTestId('flow-case-c1')).getByRole('button', { name: 'Flow case c1' }));
+    expect(screen.getByTestId('flow-progress')).toBeTruthy();
+  });
+
+  const slice = {
+    caseId: 'c1',
+    file: {
+      samples: 2,
+      origin: [0, 0, 0] as [number, number, number],
+      axisU: [1, 0, 0] as [number, number, number],
+      axisV: [0, 1, 0] as [number, number, number],
+      spacingM: 1,
+      field: 'speed',
+      values: new Float32Array(4),
+      range: { min: 0, max: 1 },
+    },
+  };
+
+  it('drops a drawn layer sampled from another result and keeps one of the current result', () => {
+    load();
+    useFlowViewStore.setState({ caseId: 'c1', slice: { status: 'ready', value: { ...slice, resultsHash: RESULT_HASH } } });
+    const view = render(<FlowPanel />);
+    expect(useFlowViewStore.getState().slice.status).toBe('ready');
+    view.unmount();
+    useFlowViewStore.setState({ caseId: 'c1', slice: { status: 'ready', value: { ...slice, resultsHash: 'older' } } });
+    render(<FlowPanel />);
+    expect(useFlowViewStore.getState().slice.status).toBe('idle');
+  });
+
+  it('drops a drawn layer once the result is stale', async () => {
+    load();
+    mocks.report = { ...REPORT, stale: true, staleReasons: ['the case changed since the solve'] };
+    useFlowViewStore.setState({ caseId: 'c1', slice: { status: 'ready', value: { ...slice, resultsHash: RESULT_HASH } } });
+    render(<FlowPanel />);
+    await waitFor(() => expect(useFlowViewStore.getState().slice.status).toBe('idle'));
+  });
+
+  it('asks cfd_report again when only the geometry moved, and shows the result stale', async () => {
+    load();
+    render(<FlowPanel />);
+    await waitFor(() => expect(screen.getByTestId('flow-state').textContent).not.toBe('Stale'));
+    const ball = Object.keys(recorded.entities)[0] as string;
+    act(() => {
+      localDispatch('move_entities', { ids: [ball], delta: [0.5, 0, 0] });
+    });
+    await waitFor(() => expect(screen.getByTestId('flow-state').textContent).toBe('Stale'));
+  });
+});
+
 describe('FlowPanel overlay layers', () => {
   const SHA = 'b'.repeat(64);
   const serve = (bytes: Uint8Array): void => {
@@ -287,7 +429,7 @@ describe('FlowPanel overlay layers', () => {
       summary: 'cfd_slice c1: speed',
       affected: [],
       isError: false,
-      data: { file: { sha256: SHA, bytes: 1 } },
+      data: { file: { sha256: SHA, bytes: 1 }, resultsHash: RESULT_HASH },
     });
     serve(sliceBytes(3, [1, 2, 3, 4, NaN, 6, 7, 8, 9], 'speed'));
     render(<FlowPanel />);
@@ -309,7 +451,7 @@ describe('FlowPanel overlay layers', () => {
       summary: 'cfd_streamlines c1: 2 lines',
       affected: [],
       isError: false,
-      data: { file: { sha256: SHA, bytes: 1 } },
+      data: { file: { sha256: SHA, bytes: 1 }, resultsHash: RESULT_HASH },
     });
     serve(streamlinesBytes());
     render(<FlowPanel />);
@@ -330,7 +472,7 @@ describe('FlowPanel overlay layers', () => {
       summary: 'cfd_slice c1: speed',
       affected: [],
       isError: false,
-      data: { file: { sha256: SHA, bytes: 1 } },
+      data: { file: { sha256: SHA, bytes: 1 }, resultsHash: RESULT_HASH },
     });
     mocks.fetch.mockResolvedValue({ ok: false, status: 404 });
     render(<FlowPanel />);
@@ -359,6 +501,7 @@ describe('CfdLegend', () => {
         status: 'ready',
         value: {
           caseId: 'c1',
+          resultsHash: 'h',
           file: {
             samples: 2,
             origin: [0, 0, 0],
@@ -375,6 +518,7 @@ describe('CfdLegend', () => {
         status: 'ready',
         value: {
           caseId: 'c1',
+          resultsHash: 'h',
           summary: 's',
           file: {
             lineCount: 1,
@@ -405,6 +549,7 @@ describe('CfdLegend', () => {
         status: 'ready',
         value: {
           caseId: 'c1',
+          resultsHash: 'h',
           file: {
             samples: 2,
             origin: [0, 0, 0],

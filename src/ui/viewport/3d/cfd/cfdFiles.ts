@@ -29,8 +29,10 @@ export interface StreamlinesFile {
 
 const SLICE_HEADER_BYTES = 72;
 const STREAMLINES_HEADER_BYTES = 16;
-/** Named guard: the solver caps a patch at 512 samples a side. */
+/** Named guards: the solver caps a patch at 512 samples a side and a rake at 4096 seeds; the backend serves files of at most 64 MiB (16 bytes a point). */
 const MAX_SAMPLES = 512;
+const MAX_LINES = 4096;
+const MAX_POINTS = 4_000_000;
 
 const magic = (bytes: Uint8Array, text: string): boolean => [...text].every((char, k) => bytes[k] === char.charCodeAt(0));
 
@@ -66,6 +68,8 @@ export function parseSliceFile(bytes: Uint8Array): SliceFile | string {
     return `Unsupported slice (version, ${nu} x ${nv} samples).`;
   if (bytes.length !== SLICE_HEADER_BYTES + 4 * nu * nv) return 'The slice file has the wrong length.';
   const header = words(bytes, 16, 10, Float32Array);
+  if (!header.every(Number.isFinite) || (header[9] ?? 0) <= 0)
+    return 'The slice header holds a non-finite number or a non-positive spacing.';
   const values = words(bytes, SLICE_HEADER_BYTES, nu * nv, Float32Array);
   const name = new TextDecoder().decode(bytes.subarray(56, SLICE_HEADER_BYTES)).replace(/\0+$/, '');
   return {
@@ -86,9 +90,15 @@ export function parseStreamlinesFile(bytes: Uint8Array): StreamlinesFile | strin
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const [lineCount, pointCount] = [view.getUint32(8, true), view.getUint32(12, true)];
   if (view.getUint32(4, true) !== 1) return 'Unsupported streamline file version.';
+  if (lineCount > MAX_LINES || pointCount > MAX_POINTS)
+    return `The streamline file declares ${lineCount} lines and ${pointCount} points: too many.`;
   if (bytes.length !== STREAMLINES_HEADER_BYTES + 4 * (lineCount + 1) + 16 * pointCount) return 'The streamline file has the wrong length.';
   const offsets = words(bytes, STREAMLINES_HEADER_BYTES, lineCount + 1, Uint32Array);
-  if (offsets[lineCount] !== pointCount || offsets.some((at, k) => at > pointCount || (k > 0 && at < (offsets[k - 1] ?? 0))))
+  if (
+    offsets[0] !== 0 ||
+    offsets[lineCount] !== pointCount ||
+    offsets.some((at, k) => at > pointCount || (k > 0 && at < (offsets[k - 1] ?? 0)))
+  )
     return 'The streamline offsets are inconsistent.';
   const positionsAt = STREAMLINES_HEADER_BYTES + 4 * (lineCount + 1);
   const speeds = words(bytes, positionsAt + 12 * pointCount, pointCount, Float32Array);

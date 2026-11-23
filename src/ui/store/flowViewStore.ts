@@ -12,17 +12,39 @@ export type LayerFeed<T> =
 
 export interface SliceLayer {
   readonly caseId: string;
+  /** Hash of the recorded result the file was sampled from: a layer is dropped when the case records another. */
+  readonly resultsHash: string;
   readonly file: SliceFile;
 }
 
 export interface StreamlinesLayer {
   readonly caseId: string;
+  readonly resultsHash: string;
   readonly file: StreamlinesFile;
   /** The transport's one-line summary (seed count, lengths, stops). */
   readonly summary: string;
 }
 
+export type FlowSolveState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'running'; readonly elapsedS: number; readonly gridStudy: boolean }
+  | { readonly status: 'done'; readonly summary: string }
+  | { readonly status: 'cancelled'; readonly summary: string }
+  | { readonly status: 'failed'; readonly summary: string; readonly code: string | null; readonly remediation: string }
+  | { readonly status: 'missing'; readonly reason: string };
+
+/** Run state of one case's solve and the answer of its last `cfd_stop`; kept here so it survives selecting another case or closing the panel. */
+export interface FlowSolveEntry {
+  readonly state: FlowSolveState;
+  readonly stopNote: string;
+}
+
+const NO_SOLVE: FlowSolveEntry = { state: { status: 'idle' }, stopNote: '' };
+
 interface FlowViewState {
+  /** Solve state by case id. */
+  solves: Readonly<Record<string, FlowSolveEntry>>;
+  setSolve(caseId: string, entry: Partial<FlowSolveEntry>): void;
   /** Case drawn on the model; null while the Flow panel is closed. */
   caseId: string | null;
   showSlice: boolean;
@@ -39,6 +61,9 @@ interface FlowViewState {
 const IDLE = { status: 'idle' } as const;
 
 export const useFlowViewStore = create<FlowViewState>()((set, get) => ({
+  solves: {},
+  setSolve: (caseId, entry) =>
+    set((state) => ({ solves: { ...state.solves, [caseId]: { ...(state.solves[caseId] ?? NO_SOLVE), ...entry } } })),
   caseId: null,
   showSlice: true,
   showStreamlines: true,

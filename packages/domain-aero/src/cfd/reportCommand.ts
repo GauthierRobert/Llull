@@ -24,7 +24,7 @@ interface Warning {
 const warning = (code: string, message: string): Warning => ({ code, message, remediation: CFD_REMEDIATION[code] ?? '' });
 
 /**
- * @affects none; data = { caseId, resultsHash, stale, staleReasons, verified, trusted, converged, solver, forces?, peaks?, convergence?,
+ * @affects none; data = { caseId, resultsHash, stale, staleReasons, study?: { stale, staleReasons } (the grid study against the case and flow surface now), verified, trusted, converged, solver, forces?, peaks?, convergence?,
  *   probes?, provenance?, warnings[], reviewRequired }
  * @invariant numbers shown are the recorded summary only when it equals the one recomputed from the stored bundle (`trusted`); a stale result
  *   is reported with the warning CFD_RESULT_STALE, never hidden
@@ -37,7 +37,7 @@ export const cfdReport = defineCommand({
     'Read-only report of the recorded flow result of a case: forces and coefficients (Cd, Cl, Cs, Cm, CdA), per-body forces, pressure and ' +
     'speed peaks with positions, convergence (steps, averaging, drag history), probe values and provenance (solver, device, precision, wall ' +
     'time, what is not modelled, named defaults). `stale: true` with the warning CFD_RESULT_STALE when the case or the geometry changed since the ' +
-    'solve; `trusted: false` when the recorded summary cannot be re-verified against the stored bundle on this machine. `include` picks the ' +
+    'solve; `trusted: false` when the recorded summary cannot be re-verified against the stored bundle on this machine. `study: { stale, staleReasons }` says whether the grid study of the case (record_cfd_grid_study) still matches the case and flow surface. `include` picks the ' +
     'sections (default all). Refused with CFD_NO_RESULT before any cfd_solve.',
   annotations: { kernelOptional: true, readOnly: true, idempotent: true },
   params: z.object({
@@ -65,6 +65,8 @@ export const cfdReport = defineCommand({
       warnings.push(warning('CFD_RESULT_HASH_MISMATCH', 'the recorded summary differs from the one recomputed from the bundle'));
     else trusted = true;
     const { forces } = recorded;
+    const study = cfdSlice(doc).studies?.[params.caseId];
+    const studyStaleness = study === undefined ? null : resultStaleness(doc, cfdCase, study, ctx?.kernel ?? null);
     const data = {
       caseId: params.caseId,
       resultsHash: recorded.resultsHash,
@@ -89,6 +91,7 @@ export const cfdReport = defineCommand({
         : {}),
       ...(include.has('probes') ? { probes: artifact?.probes ?? [] } : {}),
       ...(include.has('provenance') ? { provenance: recorded.provenance, grid: recorded.grid } : {}),
+      ...(studyStaleness === null ? {} : { study: { stale: studyStaleness.stale, staleReasons: studyStaleness.reasons } }),
       warnings,
       reviewRequired: false,
     };

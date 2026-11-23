@@ -703,17 +703,21 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   per-sample progress lines are not streamed to the UI). The result section shows Cd / Cl / Cs / CdA from the recorded summary and, from the read-only
   `cfd_report`, the stale reasons, the unverified note, the warnings and the drag history chart; the study section shows the three levels (finest
   first), the observed order, extrapolated value, asymptotic ratio and fine-grid GCI, the verified / unverified badge, the non-monotone refusal
-  (no GCI), the absolute GCI when the fine value is 0, unconverged levels, and a stale note. A study counts as stale when the result is stale
-  or the study's `caseHash` differs from the recorded result's (the document keeps no separate "study stale" flag; `update_cfd_case` only reports it once).
+  (no GCI), the absolute GCI when the fine value is 0, unconverged levels, and a stale note. Whether a study is stale is decided
+  by `cfd_report` (`data.study = { stale, staleReasons }`, from `resultStaleness` of the study's case hash and flow-surface hash against the case and
+  geometry now, so a moved body shows too); the panel only displays it. The report is asked again on every document change except the selection.
 - **Overlay** (`src/ui/viewport/3d/cfd/`): `CfdOverlay` (inside the floating-origin group) draws a `cfd_slice` patch as a nearest-filtered colour texture
   on one quad and `cfd_streamlines` as speed-coloured line segments; `CfdLegend` prints the field, unit, min / max and ramp. The panel gathers the
   query (a slice plane normal to a world axis through the case's moment point, or a plane rake of seeds one reference length upstream), runs the
-  transport, fetches the stored file by hash, decodes it (`cfdFiles.ts`: pure LLSL / LLST decoders) and publishes it to `flowViewStore`; closing the
-  panel clears it. Files are world metres; the overlay scales to document units. The colour scale is the shared `resultColor`.
+  transport, fetches the stored file by hash, decodes it (`cfdFiles.ts`: pure LLSL / LLST decoders) and publishes it to `flowViewStore` with the hash of the result it read; closing the
+  panel, a newer recorded result or a stale report drops it. The decoders refuse non-finite headers, offsets not starting at 0 and absurd counts, and are in
+  the hostile-input table (`tests/helpers/hostile/uiReaders.ts`; the completeness check also scans `src/ui` for `parse*File`). The layers are not pickable
+  (`raycast` off) and not `captureExclude`: capture / `render_view` frames include the computed flow. A solve's run state is kept per case in the store. Files are world metres; the overlay scales to document units. The colour scale is the shared `resultColor`.
 - **Result files are served.** The query transports store `slice.bin` / `streamlines.bin` content-addressed
   (`server/src/cfd/fileStore.ts`) and return only the hash; `GET /cfd/file/<sha256>` (`server/src/cfdFileRoutes.ts`, tests `server/tests/cfdFileRoute.test.ts`)
   answers the verified bytes as `application/octet-stream`. It is guarded like `/live/snapshot` (`guardRead`: bearer token, loopback), 400 for a hash that is not
-  64 lowercase hex (no path can leave the store), 404 when absent or damaged. The UI calls it from `src/ui/services/cfdFiles.ts`.
+  64 lowercase hex (no path can leave the store), 404 when absent or damaged, 413 over 64 MiB (checked by `stat` before any read), 415 unless the file starts with the
+  `LLSL` / `LLST` magic (a solve's `field.bin` never leaves through here). The UI calls it from `src/ui/services/cfdFiles.ts`.
   Also open: surface colours (Cp / Mach on the body: `surface.bin` is in the bundle, no query serves it),
   `render_view overlay=cfd:...` (CLI lane), VC-CFD-40 (legend ranges are tested in `tests/component/FlowPanel.test.tsx`; the native-side check is open).
 - **Tests.** `tests/component/FlowPanel.test.tsx` (cases, param gathering and dispatch, solve / stop / failure, result, stale, unverified, study states, overlay

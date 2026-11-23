@@ -1,6 +1,7 @@
 // Fills the viewport overlay: runs `cfd_slice` / `cfd_streamlines`, fetches the stored file the transport names by hash, decodes it and
 // publishes it to the flow view store. Read-only: nothing here changes the document.
 
+import { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import { useFlowViewStore, type LayerFeed } from '@ui/store/flowViewStore';
 import { fetchCfdFile } from '@ui/services/cfdFiles';
@@ -15,7 +16,6 @@ interface FlowLayers {
   readonly online: boolean;
   showSlice(choice: { axis: SliceAxis; field: SliceField; positionM: number | null }): void;
   traceStreamlines(count: number): void;
-  clear(): void;
 }
 
 const refused = (reason: string): LayerFeed<never> => ({ status: 'refused', reason });
@@ -25,19 +25,40 @@ function fileHash(outcome: FlowOutcome): string | null {
   return isRecord(file) && typeof file['sha256'] === 'string' ? file['sha256'] : null;
 }
 
+/** The hash of the recorded result the query read (`data.resultsHash`). */
+function resultsHashOf(outcome: FlowOutcome): string | null {
+  return isRecord(outcome.data) && typeof outcome.data['resultsHash'] === 'string' ? outcome.data['resultsHash'] : null;
+}
+
+/** Drops the drawn layers once they no longer describe the case: another result was recorded (or it was deleted), or the result is stale. */
+export function useDropStaleLayers(resultsHash: string | null, stale: boolean): void {
+  const slice = useFlowViewStore((s) => s.slice);
+  const streamlines = useFlowViewStore((s) => s.streamlines);
+  const outdated = (feed: LayerFeed<{ readonly resultsHash: string }>): boolean =>
+    feed.status === 'ready' && (stale || feed.value.resultsHash !== resultsHash);
+  const dropSlice = outdated(slice);
+  const dropStreamlines = outdated(streamlines);
+  useEffect(() => {
+    if (dropSlice) useFlowViewStore.getState().setSlice({ status: 'idle' });
+    if (dropStreamlines) useFlowViewStore.getState().setStreamlines({ status: 'idle' });
+  }, [dropSlice, dropStreamlines]);
+}
+
 /** Runs `tool`, then decodes the file it stored; the answer is a decoded value or the reason there is none. */
 async function queryLayer<T>(
   tool: 'cfd_slice' | 'cfd_streamlines',
   params: Record<string, unknown>,
   decode: (bytes: Uint8Array) => T | string,
-): Promise<{ value: T; summary: string } | { reason: string }> {
+): Promise<{ value: T; summary: string; resultsHash: string } | { reason: string }> {
   const outcome = await callFlowTool(tool, params);
   if (!outcome.ok) return { reason: `${outcome.summary} ${outcome.remediation}`.trim() };
   const hash = fileHash(outcome);
   if (hash === null) return { reason: `${tool} returned no result file.` };
+  const resultsHash = resultsHashOf(outcome);
+  if (resultsHash === null) return { reason: `${tool} did not say which result it read.` };
   try {
     const decoded = decode(await fetchCfdFile(hash));
-    return typeof decoded === 'string' ? { reason: decoded } : { value: decoded, summary: outcome.summary };
+    return typeof decoded === 'string' ? { reason: decoded } : { value: decoded, summary: outcome.summary, resultsHash };
   } catch (err) {
     return { reason: errorMessage(err) };
   }
@@ -56,7 +77,12 @@ export function useFlowLayers(cfdCase: FlowCase): FlowLayers {
       if (!online) return setSlice(refused(OFFLINE));
       setSlice({ status: 'loading' });
       void queryLayer('cfd_slice', sliceParams(cfdCase, choice), parseSliceFile).then((answer) => {
-        if (current()) setSlice('value' in answer ? { status: 'ready', value: { caseId, file: answer.value } } : refused(answer.reason));
+        if (current())
+          setSlice(
+            'value' in answer
+              ? { status: 'ready', value: { caseId, resultsHash: answer.resultsHash, file: answer.value } }
+              : refused(answer.reason),
+          );
       });
     },
     traceStreamlines: (count) => {
@@ -66,14 +92,10 @@ export function useFlowLayers(cfdCase: FlowCase): FlowLayers {
         if (current())
           setStreamlines(
             'value' in answer
-              ? { status: 'ready', value: { caseId, file: answer.value, summary: answer.summary } }
+              ? { status: 'ready', value: { caseId, resultsHash: answer.resultsHash, file: answer.value, summary: answer.summary } }
               : refused(answer.reason),
           );
       });
-    },
-    clear: () => {
-      setSlice({ status: 'idle' });
-      setStreamlines({ status: 'idle' });
     },
   };
 }
