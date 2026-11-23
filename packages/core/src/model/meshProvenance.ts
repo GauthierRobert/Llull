@@ -1,4 +1,5 @@
 /** Provenance and grouping of mesh triangles (07 MSH): where an imported mesh came from, and named triangle ranges. */
+import type { Vec3 } from './vectors';
 
 /** Provenance of imported or generated mesh triangles (07 MSH TECHNICAL §3). */
 export interface MeshSource {
@@ -58,4 +59,16 @@ export interface MeshAssetRef {
 /** Per-vertex display colours of a mesh solid (terrain tint): sRGB bytes, r, g, b for each vertex of `mesh.positions`, drawn over `color`; ignored unless 3 per vertex. */
 export interface VertexTint {
   vertexColors?: ReadonlyArray<number>;
+}
+
+/** Colour of one face: the smooth patch of the triangles around `near` (entity-local, before `position` / `rotation`), so it follows the face through regeneration. */
+export interface FaceColor {
+  readonly near: Vec3;
+  /** Hex `#rrggbb`. */
+  readonly color: string;
+}
+
+/** Per-face display colours (`set_face_color`), drawn over `color`; resolved on the current triangles (a mesh solid's `mesh`, a primitive's tessellation) by `faceColorTriangles`. */
+export interface FaceColored {
+  faceColors?: ReadonlyArray<FaceColor>;
 }

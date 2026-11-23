@@ -140,14 +140,16 @@ describe('set_face_color', () => {
 
   it('rejects an unknown id, a non-mesh solid, a malformed colour and picks off the solid; is pure', () => {
     const { doc, id } = withMesh();
-    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+    const box = execute(doc, 'draw_rectangle', { width: 1, height: 1 });
     const boxId = box.affected[0] as string;
+    expect(box.document.entities[boxId]?.kind).toBe('rectangle');
     expectNoOp(execute(doc, 'set_face_color', { id: 'ghost', faceNear: [[0, 0, 0]], color: '#ff0000' }), doc, 'does not exist');
     expectNoOp(
       execute(box.document, 'set_face_color', { id: boxId, faceNear: [[0, 0, 0]], color: '#ff0000' }),
       box.document,
       'set_entity_color',
     );
+    expect(box.affected).toHaveLength(1);
     expectNoOp(execute(doc, 'set_face_color', { id, faceNear: [[10.5, 0.5, 1]], color: 'red' }), doc, '#rrggbb');
     expectNoOp(execute(doc, 'set_face_color', { id, faceNear: [[0, 0, 0]], color: '#ff0000' }), doc, 'no point lies on');
     expectPure(doc, () => execute(doc, 'set_face_color', { id, faceNear: [[10.5, 0.5, 1]], color: '#ff0000' }));
@@ -159,5 +161,68 @@ describe('set_face_color', () => {
     expect(validateEntityValue(coloured.entities[id])).toBeNull();
     expect(validateEntityValue({ ...coloured.entities[id], faceColors: [{ near: [0, 0], color: '#ff0000' }] })).toContain('faceColors');
     expect(validateEntityValue({ ...coloured.entities[id], faceColors: [{ near: [0, 0, 0], color: 'red' }] })).toContain('faceColors');
+  });
+});
+
+describe('set_face_color on parametric primitives', () => {
+  const boxDoc = (): { doc: CadDocument; id: string } => {
+    const { doc, ids } = build(['add_box', { size: [2, 3, 4] }]);
+    return { doc, id: ids[0] as string };
+  };
+  const faceColors = (doc: CadDocument, id: string): MeshSolidEntity['faceColors'] =>
+    (doc.entities[id] as unknown as MeshSolidEntity).faceColors;
+
+  it('colours one side of a box and keeps the parameters', () => {
+    const { doc, id } = boxDoc();
+    const box = doc.entities[id] as unknown as { position: Vec3; size: Vec3 };
+    const top: Vec3 = [box.position[0] + 1, box.position[1] + 1, box.position[2] + 2];
+    const r = execute(doc, 'set_face_color', { id, faceNear: [top], color: '#ff0000' });
+    expect(r.affected).toEqual([id]);
+    expect(r.document.order).toEqual(doc.order);
+    expect(r.document.entities[id]).toMatchObject({ kind: 'box', size: box.size, position: box.position });
+    expect(faceColors(r.document, id)).toHaveLength(1);
+    expect(r.summary).toContain('1 face(s)');
+  });
+
+  it('draws only the picked side in render_view and splits the glTF node by colour', () => {
+    const { doc, id } = boxDoc();
+    const [x, y, z] = (doc.entities[id] as unknown as { position: Vec3 }).position;
+    const coloured = execute(doc, 'set_face_color', { id, faceNear: [[x + 1, y + 1, z + 2]], color: '#ff0000' }).document;
+    const gltf = parsedGltf<{ nodes: Array<{ name?: string }> }>(coloured);
+    expect(gltf.nodes.map((node) => node.name).some((name) => name?.endsWith('/face #ff0000'))).toBe(true);
+    const svgOf = (d: CadDocument): string => (execute(d, 'render_view', { mode: 'vector', view: 'top' }).data as { svg: string }).svg;
+    expect(svgOf(coloured)).toMatch(/fill="rgb\([1-9]\d*,0,0\)"/);
+    expect(svgOf(doc)).not.toMatch(/fill="rgb\([1-9]\d*,0,0\)"/);
+  });
+
+  it('recolours and clears the same face without stacking entries', () => {
+    const { doc, id } = boxDoc();
+    const [x, y, z] = (doc.entities[id] as unknown as { position: Vec3 }).position;
+    const pick: Vec3 = [x + 1, y + 1, z + 2];
+    const red = execute(doc, 'set_face_color', { id, faceNear: [pick], color: '#ff0000' }).document;
+    const blue = execute(red, 'set_face_color', { id, faceNear: [pick], color: '#0000ff' }).document;
+    expect(faceColors(blue, id)?.map((f) => f.color)).toEqual(['#0000ff']);
+    const cleared = execute(blue, 'set_face_color', { id, faceNear: [pick] }).document;
+    expect(faceColors(cleared, id)).toBeUndefined();
+  });
+
+  it('works on a cylinder and scale_entity carries the picks', () => {
+    const { doc, ids } = build(['add_cylinder', { radius: 1, height: 2 }]);
+    const id = ids[0] as string;
+    const [x, y, z] = (doc.entities[id] as unknown as { position: Vec3 }).position;
+    const r = execute(doc, 'set_face_color', { id, faceNear: [[x, y, z + 1]], color: '#00ff00' });
+    expect(r.affected).toEqual([id]);
+    const scaled = execute(r.document, 'scale_entity', { id, factor: 2 });
+    expect(faceColors(scaled.document, id)?.[0]?.near).toEqual(faceColors(r.document, id)?.[0]?.near.map((c) => c * 2));
+  });
+
+  it('rejects a pick off the solid and a malformed colour; is pure; stored colours are validated', () => {
+    const { doc, id } = boxDoc();
+    expectNoOp(execute(doc, 'set_face_color', { id, faceNear: [[500, 500, 500]], color: '#ff0000' }), doc, 'no point lies on');
+    expectNoOp(execute(doc, 'set_face_color', { id, faceNear: [[0, 0, 0]], color: 'red' }), doc, '#rrggbb');
+    const entity = doc.entities[id] as unknown as { position: Vec3 };
+    expectPure(doc, () => execute(doc, 'set_face_color', { id, faceNear: [entity.position], color: '#ff0000' }));
+    expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ near: [0, 0], color: '#ff0000' }] })).toContain('faceColors');
+    expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ near: [0, 0, 0], color: '#ff0000' }] })).toBeNull();
   });
 });

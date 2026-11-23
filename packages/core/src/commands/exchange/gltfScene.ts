@@ -20,7 +20,7 @@ import { facetNormal } from '../../geometry/tessellation';
 import { UNIT_SCALE, expandInstance } from '../../geometry/instanceExpansion';
 import { localTriangles, solidTriangles } from '../../geometry/solidTriangles';
 import { toRadians } from '../../lib/angle';
-import { faceColorTriangles } from '../../geometry/faceColors';
+import { faceColorMesh, faceColorsOf, faceColorTriangles } from '../../geometry/faceColors';
 import { InstanceTransforms } from './gltfInstancing';
 import { indexedMesh, placementMatrix, positionKey, sharedGeometryGroups } from './gltfMeshData';
 import { exactShapeKeyOf } from './gltfPrototypes';
@@ -70,11 +70,12 @@ function appearanceOf(doc: CadDocument, entity: Entity, inherited?: string): Par
   return { name: entity.color, color: entity.color, metalness: DEFAULT_METALNESS, roughness: DEFAULT_ROUGHNESS };
 }
 
-/** Triangle indices of a mesh solid grouped by face colour (undefined = the part's own appearance); null without face colours. */
+/** Triangle indices of a solid grouped by face colour (undefined = the part's own appearance); null without face colours. */
 function faceColorGroups(solid: Entity): Map<string | undefined, number[]> | null {
-  if (solid.kind !== 'mesh' || solid.faceColors === undefined || solid.faceColors.length === 0) return null;
+  const faceColors = faceColorsOf(solid);
+  if (faceColors === undefined) return null;
   const groups = new Map<string | undefined, number[]>();
-  faceColorTriangles(solid.mesh, solid.faceColors).forEach((color, t) => {
+  faceColorTriangles(faceColorMesh(solid), faceColors).forEach((color, t) => {
     const group = groups.get(color);
     if (group === undefined) groups.set(color, [t]);
     else group.push(t);
@@ -164,8 +165,7 @@ function addToBuckets(
  */
 function placedParts(name: string, solid: Entity, doc: CadDocument, prototypes: Map<string, readonly ScenePart[]>): ScenePart[] {
   const appearance = appearanceOf(doc, solid);
-  if (solid.kind === 'mesh' && solid.faceColors !== undefined && solid.faceColors.length > 0)
-    return partsOfSolid(name, solid.id, solid, appearance);
+  if (faceColorsOf(solid) !== undefined) return partsOfSolid(name, solid.id, solid, appearance);
   const key = `${exactShapeKeyOf(solid)}|${JSON.stringify(appearance)}`;
   const prototype = prototypes.get(key);
   if (prototype === undefined) {

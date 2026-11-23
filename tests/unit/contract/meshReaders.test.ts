@@ -70,6 +70,9 @@ const AUDIT: Readonly<Record<string, Answer>> = {
   'core/src/commands/mesh/meshCommon.ts': { assets: 'loadSolidMesh reads the asset before this branch' },
   'core/src/commands/render/polygons.ts': { display: 'render_view / render_motion / render_walkthrough draw the display mesh' },
   'core/src/commands/surface/surfaceShared.ts': { commands: ['analyze_draft', 'check_continuity', 'measure_deviation'] },
+  'core/src/geometry/faceColors.ts': {
+    helper: 'tessellates a parametric primitive (never asset-backed) for face picks; a mesh solid uses its own mesh',
+  },
   'core/src/geometry/instanceExpansion.ts': { helper: 'bakes a component child; callers are the commands of the other entries' },
   'core/src/geometry/renderPlan.ts': {
     display: 'render_stats counts the display triangles and hashes the display mesh the viewport draws, by design',

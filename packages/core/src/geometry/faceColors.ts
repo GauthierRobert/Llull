@@ -5,7 +5,8 @@
  * B-rep face, so there a patch never leaves its B-rep face; welded meshes (Manifold, imports) stop at creases.
  */
 
-import type { FaceColor, MeshData, Vec3 } from '../model/types';
+import type { Entity, FaceColor, MeshData, Vec3 } from '../model/types';
+import { localTriangles } from './solidTriangles';
 import { closestPointOnTriangle, type Triangle } from './triangleQueries';
 import { cross3, distanceSq3, dot3, len3, normalize3OrZero, sub3 } from '../lib/vec3';
 import { toRadians } from '../lib/angle';
@@ -153,3 +154,31 @@ export function mergeFaceColors(
   const kept = existing.filter((entry) => !covered.has(faces.closest(entry.near).triangle));
   return { faceColors: color === undefined ? kept : [...kept, ...applied.map((near) => ({ near, color }))], applied, missed };
 }
+
+/** Entity kinds that carry `faceColors`: mesh solids and the parametric solids whose triangles are fixed by their parameters. */
+const FACE_COLORED_KINDS: ReadonlySet<Entity['kind']> = new Set([
+  'mesh',
+  'box',
+  'cylinder',
+  'sphere',
+  'cone',
+  'torus',
+  'wedge',
+  'pyramid',
+  'extrusion',
+  'revolution',
+]);
+
+export const acceptsFaceColors = (e: Entity): boolean => FACE_COLORED_KINDS.has(e.kind);
+
+/** The triangles `faceColors` of `e` refer to, in the entity frame and in the order of `solidTriangles`: a mesh solid's mesh, else the solid's tessellation. @pure */
+export function faceColorMesh(e: Entity): MeshData {
+  if (e.kind === 'mesh') return e.mesh;
+  const positions: number[] = [];
+  for (const triangle of localTriangles(e)) for (const [x, y, z] of triangle) positions.push(x, y, z);
+  return { positions, indices: [] };
+}
+
+/** `e`'s face colours when it has any. */
+export const faceColorsOf = (e: Entity): readonly FaceColor[] | undefined =>
+  acceptsFaceColors(e) && 'faceColors' in e && e.faceColors !== undefined && e.faceColors.length > 0 ? e.faceColors : undefined;

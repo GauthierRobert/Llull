@@ -65,9 +65,13 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   `recipe/many.rs`; `kernelFromOps`). Chosen over pinning: the bound stays a plain LRU, memory is bounded by the schema cap, and a hostile
   `many` never raises it. Test: `tests/unit/kernelManyToolsCache.test.ts` (300 tools, leaves built once), `many_tests.rs` (native; not yet run
   in this container, OCCT still building).
+- DONE: per-face colour on parametric primitives. `set_face_color` now takes box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion and
+  revolution as well as mesh solids: the faces are the smooth patches of the primitive's own tessellation (`geometry/faceColors.ts`
+  `faceColorMesh`), stored as `faceColors` picks in the entity frame, so a resize keeps the picked sides and `scale_entity` scales the picks.
+  `render_view` and glTF / GLB export draw them. The desktop viewport (`src/ui/viewport`) still draws a primitive in one colour: it must call
+  `faceColorMesh` / `faceColorTriangles` like `meshSolidGeometry.ts` does for mesh solids (UI lane).
 
 ## Left
 
 - The remaining 15 s: the General Fuse still pairs 96 x 96 long strip faces; one face per run (the 24 ring edges as one closed
   surface) would cut the pairs ~500x on smooth sections.
-- Per-face colour on parametric primitives (board).

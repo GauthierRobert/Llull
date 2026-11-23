@@ -74,7 +74,7 @@
 | `set_entity_color` | Set the display colour of one or more entities (2D or 3D). |  |
 | `set_entity_layer` | Move an entity to a different layer by updating its layerId. |  |
 | `set_entity_name` | Set an entity's display name and/or tags. |  |
-| `set_face_color` | Colour single faces of a mesh solid (kind "mesh": results of booleans, fillets, shells and other kernel operations, imported bodies). |  |
+| `set_face_color` | Colour single faces of a mesh solid (kind "mesh": results of booleans, fillets, shells and other kernel operations, imported bodies) or of a parametric primiti… |  |
 | `set_mesh_storage` | Choose how saved files store kernel results (boolean / fillet / chamfer meshes that carry an exact recipe). |  |
 | `set_modeling_tolerance` | Set the document modelling tolerances used by exact (B-rep) work. |  |
 | `set_parameter` | Create or update a named numeric parameter in the document. |  |

@@ -32,7 +32,7 @@ import { positiveSweep } from '../../lib/angle';
 import { arcPolyline } from '../../lib/arc';
 import { catmullRomBeziers, segmentPoint } from '../../geometry/curveSegments';
 import { planeToWorld } from '../../geometry/workPlane';
-import { faceColorTriangles } from '../../geometry/faceColors';
+import { faceColorMesh, faceColorsOf, faceColorTriangles } from '../../geometry/faceColors';
 
 // 3D solids
 
@@ -118,6 +118,12 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       e.color,
     ),
   ];
+  const primitiveColors = e.kind === 'mesh' ? undefined : faceColorsOf(e);
+  if (primitiveColors !== undefined) {
+    const mesh = faceColorMesh(e);
+    const colors = faceColorTriangles(mesh, primitiveColors);
+    return rotated(meshTriangles(mesh, e.position)).map((polygon, t) => ({ ...polygon, color: colors[t] ?? polygon.color }));
+  }
   switch (e.kind) {
     case 'box':
       return rotated(boxFaces(e.position, e.size));

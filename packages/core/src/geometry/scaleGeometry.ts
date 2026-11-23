@@ -35,8 +35,13 @@ function scaledSection(section: SweepSection, f: number): SweepSection {
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
 export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   const result = scaleKindGeometry(e, f);
-  if (e.decals === undefined) return result;
-  return { scaled: { ...result.scaled, decals: scaledDecals(e.decals, f) } as Entity, dims: result.dims };
+  const faceColors = e.kind !== 'mesh' && 'faceColors' in e ? e.faceColors : undefined;
+  const scaled =
+    faceColors === undefined
+      ? result.scaled
+      : ({ ...result.scaled, faceColors: faceColors.map((face) => ({ ...face, near: scale3(face.near, f) })) } as Entity);
+  if (e.decals === undefined) return { scaled, dims: result.dims };
+  return { scaled: { ...scaled, decals: scaledDecals(e.decals, f) } as Entity, dims: result.dims };
 }
 
 function scaledMesh(e: MeshSolidEntity, f: number): { scaled: Entity; dims: string } {

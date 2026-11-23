@@ -159,6 +159,12 @@ export function validateLayer(v: unknown): v is Layer {
   );
 }
 
+function faceColorsProblem(faceColors: unknown): string | null {
+  if (faceColors === undefined) return null;
+  const ok = Array.isArray(faceColors) && faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color']));
+  return ok ? null : 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
+}
+
 /** First problem of an entity's base fields, then its kind-specific fields, or null. */
 export function validateEntityValue(v: unknown): string | null {
   if (!isRecord(v)) return 'entity is not an object';
@@ -172,6 +178,8 @@ export function validateEntityValue(v: unknown): string | null {
   if (!isHexColor(color)) return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
   const decals = decalsProblem(v['decals']);
   if (decals !== null) return `entity ${id}: ${decals}`;
+  const faceColors = faceColorsProblem(v['faceColors']);
+  if (faceColors !== null) return `entity ${id} (${kind}): ${faceColors}`;
   for (const field of POSITIVE_FIELDS[kind] ?? []) {
     const value = v[field];
     if (!isPositiveNumber(value)) return `entity ${id} (${kind}): ${field} must be finite and > 0, got ${String(value)}`;
@@ -358,12 +366,6 @@ function meshProblem(v: Record<string, unknown>): string | null {
     return `mesh.indices must be a flat array of triangle indices (at most ${MAX_IMPORT_TRIANGLES} triangles)`;
   if (!indices.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount))
     return `mesh.indices must be integers in [0, ${vertexCount})`;
-  const faceColors = v['faceColors'];
-  if (
-    faceColors !== undefined &&
-    (!Array.isArray(faceColors) || !faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color'])))
-  )
-    return 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
   const vertexColors = v['vertexColors'];
   if (
     vertexColors !== undefined &&
