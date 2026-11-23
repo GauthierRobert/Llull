@@ -13,6 +13,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-11-23 — `[WIP]` lane 1 LIM-1 follow-ups (`lane/lim1-fu`, ../llull-lane1), lane 2 CFD-M3+ first slice (`lane/cfd-m3`, ../llull-lane2), lane 3 TOP-V1b non-GPU items (`lane/top-v1b`, ../llull-lane3); OCCT 7.9.2 building in this container for the native item. Next up: RS follow-ups, CNT-M4b.
 - 2026-11-23 — DES-6c both follow-ups done: 8 / 8 fans on the cut block (§13.47); own strip integrator for mass properties on high-degree B-spline faces (§13.48; 10cdb8d6 + 3f672259 + 48e2e45f, two cad-reviewer rounds + fixes; every guard tested with forced refusals, falls back to BRepGProp bit for bit): fans-on / fans-off 1.41x (was 2.21x; target 1.6x). Kernel 414 passed, server native 834 passed, golden + contract 4957 passed. Not done (optional perf): cut strips at CN intervals.
 - 2026-11-22 — DES-6c vertex fans are the DEFAULT (§13.46; 1e3ee4ec + c016657b + f146f904, each after cad-reviewer + fixes): robust fallbacks (OCCT/std exceptions, gate refusal, post-sew rebuild without fans), exact trimmed-face bounds (proof or deferral), per-shape caches; fillet_edge fans-on 1.8x fans-off (2.1x with check_blends: Gauss integrals over 144 faces, own integrator is the next lever). Kernel 403 passed, server native 800 passed.
 - 2026-11-22 — DES-6c vertex fans merged opt-in (spokes "G2-fan", `set_corner_fan`, default off; §13.45): G2 at every spoke mark on the cube, box and three more bodies, never worse; not default because `analyze` of the fan shell is ~80 s. cad-reviewer: descriptions now say off by default; pre-flip checklist in §13.45.3.
@@ -144,13 +145,13 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 ## Priority
 
-- `[TODO]` **LIM-1 follow-ups** (LIM-1 merged, PRs #101/#102; 2026-11-23: request depth cap 4096 + variable-sweep fit broken at stations,
+- `[WIP]` **LIM-1 follow-ups** (LIM-1 merged, PRs #101/#102; 2026-11-23: request depth cap 4096 + variable-sweep fit broken at stations,
   duct boolean 2 min -> 15 s): per-face colour on parametric primitives; one fitted face per run (the 15 s left); LRU > 256 tools (`docs/decisions/LIM1-scale.md`). _deps: —_
 - `[TODO]` **RS follow-ups** (RS wave PR #98 and RS-6 llull-geomq done) RS-6 options (wgpu BVH traversal for geomq, plant 09 instance BVH / VC-VIS-60 (a), physics 13 broad phase VC-COR-17); plant 10 M3 viewport, plant 02 V1 (route\*pipe, fittings, check*piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). \_deps: —*
-- `[TODO]` **TOP-V1b** Topology V1 left after TOP-V1 (MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads +
+- `[WIP]` **TOP-V1b** Topology V1 left after TOP-V1 (MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads +
   compliance ratio, `deadlineS` checkpoint: built 2026-10-22, §15): VC-TOP-34 on a desktop GPU (GPU cap), PHY-18 shape optimisation (needs
   PHY-18 M2), unstructured SIMP on the tet mesh, displacement constraints for `min_volume`, `massG`: `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §15.7. _deps: —_
-- `[TODO]` **CFD-M3+** (CFD-M2 merged, `feat/cfd-m2` fully in main): nested grid boxes, `cfd_streamlines` / `cfd_slice` /
+- `[WIP]` **CFD-M3+** (CFD-M2 merged, `feat/cfd-m2` fully in main): nested grid boxes, `cfd_streamlines` / `cfd_slice` /
   `cfd_probe` / `cfd_stop`, `gridStudy`, overlay + Flow panel, AA-pattern storage, VC-CFD-21 at 32 cells per diameter on a GPU (ignored test),
   VC-CFD-13 / 23–25 / 54. _deps: —_
 
