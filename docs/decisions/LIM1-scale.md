@@ -63,19 +63,22 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   re-evaluation rebuilt them. Both evaluators now size their cache to the request: a `boolean` with `many` (<= 1000, `MAX_BOOLEAN_TOOLS`)
   raises the capacity to `2 * leaves + 16` (leaves counted in the tree, never the claimed `many`) (leaves plus the balanced tree of the fallback), never shrinking (`Evaluator::reserve` in
   `recipe/many.rs`; `kernelFromOps`). Chosen over pinning: the bound stays a plain LRU, memory is bounded by the schema cap, and a hostile
-  `many` never raises it. Test: `tests/unit/kernelManyToolsCache.test.ts` (300 tools, leaves built once), `many_tests.rs` (native; not yet run
-  in this container, OCCT still building).
+  `many` never raises it. Test: `tests/unit/kernelManyToolsCache.test.ts` (300 tools, leaves built once), `many_tests.rs` (native, `cargo test -p llull-kernel-occt` green).
 - DONE: per-face colour on parametric primitives. `set_face_color` takes box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion and
   revolution as well as mesh solids. A face is a smooth patch of the primitive's own tessellation (`geometry/faceColors.ts` `faceColorMesh`).
-  Selector (regeneration): a stored `near` point cannot follow a resize (a box taller by 2 moves its top away from the pick, and the replayed
-  command no-ops), so on a primitive the command records the ORDINAL of each picked patch (patches numbered in triangle order; a primitive keeps
-  its triangle order when its size changes) as `recordExtras.faces`. A replayed step carries `faces` and `patchCount`; `faces` wins over `faceNear` while the primitive still has that many patches, otherwise (an extrusion profile gaining or losing a vertex, revolution segments changing) the ordinals are stale and `faceNear` re-picks the face, or the colour is dropped when there is none. A partial drop reaches the `edit_step_params` summary (the step result carries `data.ok: false`). The stored `FaceColor.of` does the same at render time, and the
-  stored `FaceColor.face` ordinal is what render / glTF resolve. Chosen over a named side ("+z"): it covers every kind with one mechanism
-  and needs no per-kind table; the cost is that a change of topology (an extrusion profile with another point count, a revolution with another
-  segment count) renumbers patches, and a replayed ordinal with no patch is dropped with a warning in the summary. Baked instance meshes are unwelded triangle soups, so a bake re-picks every coloured triangle. Mesh solids keep the
-  `near` pick (their mesh is fixed). `render_view` draws the kind's own quads / rings coloured by their nearest triangle (no diagonal seams);
-  glTF / GLB export and instance expansion (parametric non-uniform scale: picks scaled; baked: patches re-picked on the baked mesh) carry them.
-  Stored colours are validated (at most 4096, only on kinds with faces). A revolution with few segments (facets beyond 30 degrees) has one
+  Selector (regeneration): a stored `near` point cannot follow a resize (the replayed command no-ops), and a patch ordinal or count renames faces
+  when a profile is reordered or a vertex is added. A picked patch is therefore stored as a resize-invariant SIGNATURE (`FaceColor.sig`, recorded
+  by the command as `faceSignatures`): the area-weighted mean normal, the patch centre as fractions of the body's bounding box, and the sign of
+  normal . (centre - box middle) (outer or inner wall; a full cylinder wall has a zero mean normal and only this sign and the centre tell outer
+  from inner). Resolution picks the patch with the same sign whose normal differs by under 0.5 and centre by under 0.35 (box fractions), best
+  score first: a resize keeps both within a few hundredths, while two faces of one body differ by 0.5 or more in at least one (perpendicular
+  box sides: 1.41 in normal; opposite sides: 1.0 in centre; a unit-normal facet strip vs a whole wall: 1 in normal). Nothing is written back on
+  replay. No match (a revolution going from 32 to 6 segments) re-picks by `faceNear` (summary note, result still ok, so later regenerations do
+  not fail), and without `faceNear` the step changes nothing, which the replay reports as a step that no longer changes the document. Mesh
+  solids keep the `near` pick (their mesh is fixed). Collapsed-edge slivers (a profile touching the axis) may join a patch but never carry it
+  on, so the top of a revolved cylinder does not reach its bottom. `render_view` draws the kind's own quads / rings coloured by their nearest triangle (no diagonal seams);
+  glTF / GLB export and instance expansion (parametric non-uniform scale: picks scaled; baked: every coloured triangle re-picked on the baked mesh) carry them.
+  Stored colours are validated on load (at most 4096, only on kinds with faces, `sig` only on parametric solids with a unit-bounded normal, a centre inside the box and a sign of 1 or -1). A revolution with few segments (facets beyond 30 degrees) has one
   patch per facet strip. The desktop viewport (`src/ui/viewport`) still draws a primitive in one colour: it must use `faceColorMesh` /
   `faceColorTriangles` like `meshSolidGeometry.ts` and keep coloured primitives out of the shared prototype (UI lane).
 

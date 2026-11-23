@@ -11,11 +11,11 @@ import {
   type Vec3,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { faceColorMesh, faceColorTriangles, ordinalPoints } from '@core/geometry/faceColors';
+import { faceColorMesh, faceColorTriangles } from '@core/geometry/faceColors';
 import { localTriangles } from '@core/geometry/solidTriangles';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import { tessellateEntity } from '@core/commands/render/polygons';
-import { cross3, sub3 } from '@lib/vec3';
+import { cross3, len3, sub3 } from '@lib/vec3';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { xy } from '../helpers/xy';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
@@ -253,7 +253,7 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
       if (colors[t] === undefined) return [];
       const n = cross3(sub3(b, a), sub3(c, a));
       const l = Math.hypot(...n);
-      return [[n[0] / l, n[1] / l, n[2] / l] as Vec3];
+      return l === 0 ? [] : [[n[0] / l, n[1] / l, n[2] / l] as Vec3];
     });
   };
   const resized = (doc: CadDocument, size: Vec3): CadDocument =>
@@ -267,9 +267,9 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     };
   };
 
-  it('records the patch ordinals and keeps the +Z side coloured when the box grows taller', () => {
+  it('records the face signature and keeps the +Z side coloured when the box grows taller', () => {
     const { doc, id } = coloured([0, 0, 2]);
-    expect(doc.featureHistory[1]?.params).toMatchObject({ faces: [expect.any(Number)] });
+    expect(doc.featureHistory[1]?.params).toMatchObject({ faceSignatures: [{ outward: 1 }] });
     const taller = resized(doc, [2, 3, 6]);
     expect(taller.entities[id]).toMatchObject({ size: [2, 3, 6] });
     const normals = colouredPatchNormals(taller.entities[id] as Entity);
@@ -300,12 +300,12 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
   it.each([
     ['a vertex inserted into the profile', xy(0, 0, 1, -0.5, 2, 0, 2, 2, 0, 2)],
     ['a vertex removed from the profile', xy(0, 0, 2, 0, 2, 2)],
-  ])('an extrusion whose patch count changes re-picks +X by faceNear (%s)', (_name, profile) => {
+  ])('an extrusion whose patch count changes keeps +X (%s)', (_name, profile) => {
     const base = execute(createEmptyDocument(), 'extrude_profile', { profile: SQUARE, depth: 4 });
     const id = base.affected[0] as string;
     const pick: Vec3 = [2, 1, 2];
     const painted = execute(base.document, 'set_face_color', { id, faceNear: [pick], color: RED });
-    expect(painted.document.featureHistory.at(-1)?.params).toMatchObject({ patchCount: expect.any(Number) });
+    expect(painted.document.featureHistory.at(-1)?.params).toMatchObject({ faceSignatures: expect.any(Array) });
     const edited = edit(painted.document, 'extrude_profile', { profile, depth: 4 });
     const entity = edited.document.entities[id] as Entity;
     const normals = colouredPatchNormals(entity);
@@ -317,7 +317,6 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
       color: RED,
     });
     expect(paintedTriangles(entity)).toEqual(paintedTriangles(fresh.document.entities[id] as Entity));
-    expect(edited.summary).toContain('re-picked by faceNear');
   });
 
   it('a revolution that goes from 32 to 6 segments re-picks the strip by faceNear', () => {
@@ -335,29 +334,79 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     expect(paintedTriangles(edited.document.entities[id] as Entity).length).toBeGreaterThan(0);
   });
 
-  it('stale ordinals without a faceNear are dropped by name; a partial drop is reported by the replay', () => {
+  it('signatures no face matches and no faceNear: nothing coloured, named; a mesh solid refuses faceSignatures', () => {
     const { doc, id } = redBox();
-    expectNoOp(execute(doc, 'set_face_color', { id, faces: [1], patchCount: 99, color: RED }), doc, 'stale patch ordinals');
-    const live = execute(doc, 'set_face_color', { id, faceNear: [[0, 0, 2]], faces: [1, 99], color: RED });
-    expect(live.data).toMatchObject({ ok: false, droppedFaces: [99] });
-    const painted = execute(doc, 'set_face_color', { id, faceNear: [[0, 0, 2]], color: RED });
-    const step = painted.document.featureHistory.at(-1)?.id as string;
-    const broken = execute(painted.document, 'edit_step_params', {
-      stepId: step,
-      params: { ...(painted.document.featureHistory.at(-1)?.params as object), faces: [1, 99], patchCount: 6 },
-    });
-    expect(broken.summary).toContain('FAILED during regeneration');
+    const stale = { normal: [0.3, 0.3, 0.3] as Vec3, centre: [0.5, 0.5, 0.5] as Vec3, outward: -1 as const };
+    expectNoOp(execute(doc, 'set_face_color', { id, faceSignatures: [stale], color: RED }), doc, 'stale face signatures');
+    expectNoOp(execute(doc, 'set_face_color', { id }), doc, 'give faceNear');
+    const mesh = withMesh();
+    expectNoOp(execute(mesh.doc, 'set_face_color', { id: mesh.id, faceSignatures: [stale], color: RED }), mesh.doc, 'mesh solid');
+    const fallback = execute(doc, 'set_face_color', { id, faceNear: [[0, 0, 2]], faceSignatures: [stale], color: RED });
+    expect(fallback.affected).toEqual([id]);
+    expect(fallback.summary).toContain('re-picked by faceNear');
+    expect(fallback.data).toBeUndefined();
   });
 
-  it('a replayed faces list wins over faceNear; unknown ordinals are dropped and a mesh solid refuses faces', () => {
-    const { doc, id } = redBox();
-    const r = execute(doc, 'set_face_color', { id, faceNear: [[500, 0, 0]], faces: [1, 99], color: '#00ff00' });
-    expect(r.affected).toEqual([id]);
-    expect(r.summary).toContain('Dropped faces with no such patch: 99');
-    expectNoOp(execute(doc, 'set_face_color', { id }), doc, 'give faceNear');
-    expectNoOp(execute(doc, 'set_face_color', { id, faces: [99], color: '#00ff00' }), doc, 'face 99');
-    const mesh = withMesh();
-    expectNoOp(execute(mesh.doc, 'set_face_color', { id: mesh.id, faces: [0], color: '#00ff00' }), mesh.doc, 'mesh solid');
+  it('a face colour re-picked after a profile edit does not fail later regenerations', () => {
+    const base = execute(createEmptyDocument(), 'extrude_profile', { profile: SQUARE, depth: 2 });
+    const id = base.affected[0] as string;
+    const painted = execute(base.document, 'set_face_color', { id, faceNear: [[2, 1, 1]], color: RED }).document;
+    const gained = edit(painted, 'extrude_profile', { profile: xy(0, 0, 2, 0, 2, 2, 0, 2, -1, 1), depth: 2 });
+    const deeper = edit(gained.document, 'extrude_profile', { profile: xy(0, 0, 2, 0, 2, 2, 0, 2, -1, 1), depth: 3 });
+    for (const r of [gained, deeper]) {
+      expect(r.summary).not.toContain('FAILED');
+      expect((r as { error?: unknown }).error).toBeUndefined();
+    }
+    expect(paintedTriangles(deeper.document.entities[id] as Entity).length).toBeGreaterThan(0);
+  });
+
+  it('the profile start vertex moving keeps +X on +X; a reordered revolution profile keeps its outer wall', () => {
+    const base = execute(createEmptyDocument(), 'extrude_profile', { profile: xy(-1, -1, 1, -1, 1, 1, -1, 1), depth: 2 });
+    const id = base.affected[0] as string;
+    const painted = execute(base.document, 'set_face_color', { id, faceNear: [[1, 0, 1]], color: RED }).document;
+    const rotated = edit(painted, 'extrude_profile', { profile: xy(1, -1, 1, 1, -1, 1, -1, -1), depth: 2 });
+    const normals = colouredPatchNormals(rotated.document.entities[id] as Entity);
+    expect(normals.length).toBeGreaterThan(0);
+    for (const n of normals) expect(n[0]).toBeCloseTo(1);
+    const ring = execute(createEmptyDocument(), 'revolve_profile', { profile: xy(1, 0, 2, 0, 2, 1, 1, 1), axis: 'z', segments: 32 });
+    const ringId = ring.affected[0] as string;
+    const outer = execute(ring.document, 'set_face_color', { id: ringId, faceNear: [[2, 0, 0.5]], color: RED }).document;
+    const reordered = edit(outer, 'revolve_profile', { profile: xy(2, 0, 2, 1, 1, 1, 1, 0), axis: 'z', segments: 32 });
+    const painted2 = paintedTriangles(reordered.document.entities[ringId] as Entity);
+    const mesh = faceColorMesh(reordered.document.entities[ringId] as Entity);
+    expect(painted2.length).toBeGreaterThan(0);
+    for (const t of painted2) {
+      const radii = [0, 1, 2].map((k) =>
+        Math.hypot(mesh.positions[(t * 3 + k) * 3] as number, mesh.positions[(t * 3 + k) * 3 + 1] as number),
+      );
+      expect(Math.min(...radii)).toBeGreaterThan(1.9);
+    }
+  });
+
+  it('an axis sliver does not bridge the top of a revolved cylinder to its bottom', () => {
+    const base = execute(createEmptyDocument(), 'revolve_profile', { profile: xy(0, 0, 2, 0, 2, 1, 0, 1), axis: 'z', segments: 32 });
+    const id = base.affected[0] as string;
+    const painted = execute(base.document, 'set_face_color', { id, faceNear: [[0.5, 0, 1]], color: RED }).document;
+    const entity = painted.entities[id] as Entity;
+    const mesh = faceColorMesh(entity);
+    const list = paintedTriangles(entity);
+    expect(list.length).toBeGreaterThan(0);
+    for (const t of list) {
+      const zs = [0, 1, 2].map((k) => mesh.positions[(t * 3 + k) * 3 + 2] as number);
+      expect(Math.max(...zs)).toBeGreaterThan(0.5);
+    }
+    const areaful = list.filter((t) => {
+      const v = [0, 1, 2].map(
+        (k): Vec3 => [
+          mesh.positions[(t * 3 + k) * 3] as number,
+          mesh.positions[(t * 3 + k) * 3 + 1] as number,
+          mesh.positions[(t * 3 + k) * 3 + 2] as number,
+        ],
+      );
+      return len3(cross3(sub3(v[1] as Vec3, v[0] as Vec3), sub3(v[2] as Vec3, v[0] as Vec3))) > 1e-9;
+    });
+    expect(areaful).toHaveLength(32);
+    for (const t of areaful) for (let k = 0; k < 3; k++) expect(mesh.positions[(t * 3 + k) * 3 + 2]).toBeCloseTo(1);
   });
 
   const RED = '#ff0000';
@@ -433,8 +482,27 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
   it('stored face colours are bounded and refused on kinds without faces', () => {
     const { doc, id } = redBox();
     const entry = { near: [0, 0, 0], color: '#ff0000' };
-    expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ ...entry, face: 3 }] })).toBeNull();
-    expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ ...entry, face: -1 }] })).toContain('faceColors');
+    expect(
+      validateEntityValue({
+        ...doc.entities[id],
+        faceColors: [{ ...entry, sig: { normal: [0, 0, 1], centre: [0.5, 0.5, 1], outward: 1 } }],
+      }),
+    ).toBeNull();
+    expect(
+      validateEntityValue({
+        ...doc.entities[id],
+        faceColors: [{ ...entry, sig: { normal: [0, 0, 2], centre: [0.5, 0.5, 1], outward: 1 } }],
+      }),
+    ).toContain('faceColors');
+    const sig = { normal: [0, 0, 1], centre: [0.5, 0.5, 1], outward: 1 };
+    for (const bad of [
+      { ...sig, outward: 0 },
+      { ...sig, centre: [0.5, 0.5, 4] },
+      { ...sig, normal: [NaN, 0, 1] },
+      { ...sig, normal: [1, 1, 1] },
+    ])
+      expect(validateEntityValue({ ...doc.entities[id], faceColors: [{ ...entry, sig: bad }] })).toContain('faceColors');
+    expect(validateEntityValue({ ...withMesh().doc.entities['mesh-1'], faceColors: [{ ...entry, sig }] })).toContain('faceColors');
     expect(validateEntityValue({ ...doc.entities[id], faceColors: Array.from({ length: 4097 }, () => entry) })).toContain('faceColors');
     const rectangle = execute(createEmptyDocument(), 'draw_rectangle', { width: 1, height: 1 });
     const flat = rectangle.document.entities[rectangle.affected[0] as string];
@@ -444,7 +512,12 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
   it.each([0.01, 1, 100])('a sphere of radius %d is one smooth patch (no absolute weld or sliver tolerance)', (radius) => {
     const sphere = execute(createEmptyDocument(), 'add_sphere', { radius });
     const entity = sphere.document.entities[sphere.affected[0] as string] as Entity;
-    expect(ordinalPoints(faceColorMesh(entity))).toHaveLength(1);
+    const painted = execute(sphere.document, 'set_face_color', { id: entity.id, faceNear: [[radius, 0, 0]], color: RED }).document;
+    const colors = faceColorTriangles(
+      faceColorMesh(painted.entities[entity.id] as Entity),
+      (painted.entities[entity.id] as MeshSolidEntity).faceColors ?? [],
+    );
+    expect(colors.every((c) => c === RED)).toBe(true);
   });
 
   it('load_document refuses 4097 face colours and face colours on a rectangle', () => {
@@ -458,7 +531,8 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     const tooMany = { ...doc.entities[id], faceColors: Array.from({ length: 4097 }, () => entry) };
     const rectangle = execute(createEmptyDocument(), 'draw_rectangle', { width: 1, height: 1 });
     const flat = { ...rectangle.document.entities[rectangle.affected[0] as string], id: 'flat-1', faceColors: [entry] };
-    for (const bad of [stored(tooMany, id), stored(flat, 'flat-1')]) {
+    const badSig = { ...doc.entities[id], faceColors: [{ ...entry, sig: { normal: [0, 0, 3], centre: [0.5, 0.5, 0.5], outward: 1 } }] };
+    for (const bad of [stored(tooMany, id), stored(flat, 'flat-1'), stored(badSig, id)]) {
       const r = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(bad) });
       expect(r.document.entities).toEqual({});
       expect(r.summary).toContain('faceColors');

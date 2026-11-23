@@ -2,7 +2,7 @@
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
 import type { FaceColored, FaceGroup, MeshAssetRef, MeshSource, VertexTint } from './meshProvenance';
-export type { FaceColor } from './meshProvenance';
+export type { FaceColor, FaceSignature } from './meshProvenance';
 import type { EdgeBlendNode, FaceBlendParams, FullRoundParams, JointRadius } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';

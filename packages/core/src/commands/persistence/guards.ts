@@ -162,16 +162,26 @@ export function validateLayer(v: unknown): v is Layer {
 
 const MAX_FACE_COLORS = 4096;
 
+/** A face signature: a normal of length at most 1, a centre inside the body box (fractions 0..1) and an outward sign of 1 or -1. */
+function validSignature(sig: unknown): boolean {
+  if (!isRecord(sig) || !isVec3(sig['normal']) || !isVec3(sig['centre'])) return false;
+  const [nx, ny, nz] = sig['normal'];
+  return (
+    Math.hypot(nx, ny, nz) <= 1.0001 &&
+    sig['centre'].every((c) => c >= -0.001 && c <= 1.001) &&
+    (sig['outward'] === 1 || sig['outward'] === -1)
+  );
+}
+
 function faceColorsProblem(kind: string, faceColors: unknown): string | null {
   if (faceColors === undefined) return null;
   if (!FACE_COLORED_KINDS.has(kind)) return `faceColors apply to mesh solids and parametric solids, not a ${kind}`;
   const valid = (f: unknown): boolean =>
-    isRecord(f) &&
-    isVec3(f['near']) &&
-    isHexColor(f['color']) &&
-    (f['face'] === undefined || (Number.isInteger(f['face']) && (f['face'] as number) >= 0));
+    isRecord(f) && isVec3(f['near']) && isHexColor(f['color']) && (f['sig'] === undefined || (kind !== 'mesh' && validSignature(f['sig'])));
   const ok = Array.isArray(faceColors) && faceColors.length <= MAX_FACE_COLORS && faceColors.every(valid);
-  return ok ? null : `faceColors must be an array of at most ${MAX_FACE_COLORS} { near: [x, y, z], color: "#rrggbb", face?: ordinal }`;
+  return ok
+    ? null
+    : `faceColors must be an array of at most ${MAX_FACE_COLORS} { near: [x, y, z], color: "#rrggbb", sig?: { normal, centre (0..1 of the body box), outward: 1 | -1 } (parametric solids only) }`;
 }
 
 /** First problem of an entity's base fields, then its kind-specific fields, or null. */
