@@ -102,6 +102,7 @@ use crate::projection::Projection;
 use crate::simp::{
     optimise, Device, Engine, HistoryRow, LoadCase, Objective, Optimizer, OptimizerState, Problem, Settings, Start, Status, TopError, Voxel,
 };
+use crate::solver::{BACKTRACK_PREFIX, SOLVER_FALLBACK_PREFIX};
 use llull_protocol::{emit, sha256_hex, Event, Output};
 use llull_voxfe::{Grid, SolverKind};
 use serde::{Deserialize, Serialize};
@@ -752,8 +753,19 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
         }
         worker.join().unwrap_or_else(|_| Err(TopError { code: "TOP_SOLVER_FAILED", message: "the solver thread panicked".to_string() }))
     })?;
-    let mut warnings: Vec<WarningEntry> =
-        outcome.warnings.iter().map(|message| WarningEntry { code: "TOP_GPU_FALLBACK", message: message.clone() }).collect();
+    let mut warnings: Vec<WarningEntry> = outcome
+        .warnings
+        .iter()
+        .map(|message| {
+            if let Some(rest) = message.strip_prefix(SOLVER_FALLBACK_PREFIX) {
+                WarningEntry { code: "TOP_SOLVER_FALLBACK", message: rest.to_string() }
+            } else if let Some(rest) = message.strip_prefix(BACKTRACK_PREFIX) {
+                WarningEntry { code: "TOP_DESIGN_BACKTRACK", message: rest.to_string() }
+            } else {
+                WarningEntry { code: "TOP_GPU_FALLBACK", message: message.clone() }
+            }
+        })
+        .collect();
     let (device, deterministic, precision, adapter) = match &outcome.engine {
         Engine::Cpu => ("cpu", true, "f64", None),
         Engine::Gpu { adapter } => ("gpu", false, "f32-gpu+f64-refinement", Some(adapter.clone())),

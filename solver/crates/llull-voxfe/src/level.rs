@@ -212,7 +212,33 @@ impl Coarse {
         }
         z.fill(T::ZERO);
         for (&d, &v) in self.dofs.iter().zip(&y) {
-            z[d] = T::of(v);
+            z[d] = T::of(guard(v));
         }
+    }
+}
+
+/// Largest coarse correction handed to the (possibly f32) V-cycle: a near-void Galerkin level (stiffness contrast ~1e9) can return
+/// values past the f32 range, which would cast to inf. Saturating (and zeroing a NaN) keeps the preconditioner finite; every value
+/// below the bound passes unchanged.
+const COARSE_CORRECTION_LIMIT: f64 = 1.0e30;
+
+fn guard(value: f64) -> f64 {
+    if value.is_nan() {
+        0.0
+    } else {
+        value.clamp(-COARSE_CORRECTION_LIMIT, COARSE_CORRECTION_LIMIT)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::guard;
+
+    #[test]
+    fn the_coarse_correction_is_finite_in_f32_and_unchanged_below_the_bound() {
+        assert_eq!(guard(1.0e34) as f32, 1.0e30);
+        assert_eq!(guard(-f64::INFINITY) as f32, -1.0e30);
+        assert_eq!(guard(f64::NAN), 0.0);
+        assert_eq!(guard(-3.25e-7), -3.25e-7);
     }
 }

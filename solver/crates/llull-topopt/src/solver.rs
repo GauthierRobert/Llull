@@ -3,8 +3,14 @@
 
 use crate::simp::{Device, Engine, Settings, TopError};
 use llull_voxfe::multigrid::{Multigrid, MultigridSettings};
-use llull_voxfe::pcg::{pcg, Jacobi};
+use llull_voxfe::pcg::{pcg, Jacobi, SolveError};
 use llull_voxfe::{Operator, SolverKind};
+
+/// Prefix of a solver warning that is a `TOP_SOLVER_FALLBACK` (every other solver warning is a `TOP_GPU_FALLBACK`).
+pub(crate) const SOLVER_FALLBACK_PREFIX: &str = "solver-fallback: ";
+
+/// Prefix of a `TOP_DESIGN_BACKTRACK` warning (a minVolume step taken back after it disconnected the design).
+pub(crate) const BACKTRACK_PREFIX: &str = "design-backtrack: ";
 
 /// Linear solves on the CPU twin or the GPU.
 pub(crate) enum Backend {
@@ -87,12 +93,25 @@ impl Solver<'_> {
     /// PCG on the CPU twin from `u` (masked by the solver).
     fn cpu(&mut self, op: &Operator, b: &[f64], mut u: Vec<f64>) -> Result<Vec<f64>, TopError> {
         let (tolerance, cap) = (self.settings.pcg_tolerance, self.settings.pcg_max_iterations);
+        let start = u.clone();
         let stats = match self.settings.solver {
             SolverKind::Jacobi => pcg(op, &Jacobi::new(op), b, &mut u, tolerance, cap),
             SolverKind::Multigrid => {
                 self.refresh_multigrid(op);
                 let multigrid = self.multigrid.as_ref().unwrap_or_else(|| unreachable!("built by refresh_multigrid"));
-                pcg(op, multigrid, b, &mut u, tolerance, cap)
+                match pcg(op, multigrid, b, &mut u, tolerance, cap) {
+                    // a near-void design can break the multigrid preconditioner (not the system): solve this system with Jacobi
+                    Err(error @ (SolveError::NonFinite { .. } | SolveError::Breakdown { .. } | SolveError::NotConverged { .. })) => {
+                        if self.warnings.len() < 20 {
+                            self.warnings.push(format!(
+                                "{SOLVER_FALLBACK_PREFIX}multigrid PCG failed ({error}); this solve used the Jacobi preconditioner"
+                            ));
+                        }
+                        u = start;
+                        pcg(op, &Jacobi::new(op), b, &mut u, tolerance, cap)
+                    }
+                    other => other,
+                }
             }
         }
         .map_err(|error| TopError { code: "TOP_SOLVER_FAILED", message: error.to_string() })?;

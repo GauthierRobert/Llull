@@ -18,7 +18,7 @@ use crate::loads::{gravity_work, with_gravity};
 use crate::mma::{Bounds, Mma};
 use crate::oc::{self, Design, Limits};
 use crate::projection::Projection;
-use crate::solver::{choose_backend, Solver};
+use crate::solver::{choose_backend, Solver, BACKTRACK_PREFIX};
 use llull_gpu::reduce::{max_abs, sum};
 use llull_voxfe::ke::element_matrix;
 use llull_voxfe::MIN_LEN;
@@ -226,6 +226,9 @@ pub struct TopError {
 
 /// Relative slack a constraint row may exceed its limit by and still count as satisfied (every row, the host's `check_topology` too).
 pub const CONSTRAINT_TOLERANCE: f64 = 1e-4;
+
+/// A minVolume design whose compliance exceeds this multiple of max(limit, the first iteration's compliance) is a collapse (a broken load path).
+const COLLAPSE_FACTOR: f64 = 100.0;
 
 /// Smallest grid (DOFs) that `device: auto` sends to a hardware GPU.
 pub const AUTO_GPU_MIN_DOFS: usize = 500_000;
@@ -451,6 +454,7 @@ pub fn optimise(
         }),
     };
     let mut objective_scale = initial.objective_scale;
+    let mut backtracks = 0usize;
     let started = Instant::now();
     let mut history = Vec::new();
     let mut iterations = 0;
@@ -465,6 +469,31 @@ pub fn optimise(
         solver.set_scale(&op);
         let analysis = analyse(&op, &mut solver, problem, &x_phys, &active)?;
         let compliance = analysis.compliance;
+        // a minVolume step that disconnects the design (compliance far past the limit and past the start's) is taken back
+        if let (Some(mma), Objective::MinVolume { max_compliance }) = (&mut mma, problem.objective) {
+            let scale = *objective_scale.get_or_insert(compliance);
+            if compliance.is_nan() || compliance > COLLAPSE_FACTOR * max_compliance.max(scale) {
+                let current: Vec<f64> = free.iter().map(|&v| vars[v]).collect();
+                if let Some(previous) = mma.rewind(&current) {
+                    for (k, &v) in free.iter().enumerate() {
+                        vars[v] = previous[k];
+                    }
+                    if backtracks == 0 {
+                        solver.warnings.push(format!(
+                            "{BACKTRACK_PREFIX}iteration {iterations}: the step disconnected the design (compliance {compliance:.4e} against the limit {max_compliance:.4e}); it was taken back and the moves are shortened"
+                        ));
+                    }
+                    backtracks += 1;
+                    let change = max_abs(&vars.iter().zip(&x).map(|(a, b)| a - b).collect::<Vec<f64>>());
+                    x = expand(&vars);
+                    x_phys = physical(&vars, beta);
+                    let row = HistoryRow { it: iterations, compliance, volume: sum(&x_phys) / active_count as f64, change };
+                    progress(&row);
+                    history.push(row);
+                    continue;
+                }
+            }
+        }
         let factor = -settings.penal * (problem.e0 - emin) * geometric;
         let has_gravity = !analysis.gravity.is_empty();
         let mut dc: Vec<f64> = (0..n)

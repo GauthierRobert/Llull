@@ -497,3 +497,27 @@ fn a_run_that_ends_with_a_violated_row_warns_and_keeps_its_status() {
     assert!(events.contains("TOP_CONSTRAINT_UNSATISFIED"), "{events}");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// TOP-V1b follow-up: a slack compliance row (limit 1e5, MBB 30 x 10) let MMA strip the design to the lower bound; the near-void
+/// multigrid hierarchy then produced a NaN in the f32 preconditioner (TOP_SOLVER_FAILED). The run must end finite and say what it did.
+#[test]
+fn a_slack_compliance_row_does_not_collapse_the_design_into_a_solver_failure() {
+    let dir = folder("slack");
+    let (result, field, events) = run(&dir, &min_volume_job(30, 10, 1.0e5, json!([]))).unwrap();
+    let (volume, compliance) = (result["volumeFraction"].as_f64().unwrap(), result["compliance"].as_f64().unwrap());
+    eprintln!("slack: volume {volume}, compliance {compliance}, {} iterations, {}", result["iterations"], result["status"]);
+    assert!(volume.is_finite() && compliance.is_finite() && field.iter().all(|v| v.is_finite()), "{result}");
+    // the first steps strip the design to a broken load path: that step is taken back (named warning) and the run ends feasible
+    assert!(events.contains("TOP_DESIGN_BACKTRACK"), "{events}");
+    assert!(!events.contains("TOP_SOLVER_FAILED"), "{events}");
+    assert_eq!(result["constraints"][0]["satisfied"], true, "{result}");
+    assert!(compliance <= 1.0e5 * 1.0001, "compliance {compliance}");
+    assert!(volume > 0.01 && volume < 0.2, "volume {volume}");
+    // deterministic, like every CPU run
+    let again = folder("slack-again");
+    let (second, _, _) = run(&again, &min_volume_job(30, 10, 1.0e5, json!([]))).unwrap();
+    assert_eq!(second["volumeFraction"], result["volumeFraction"]);
+    assert_eq!(second["iterations"], result["iterations"]);
+    let _ = std::fs::remove_dir_all(again);
+    let _ = std::fs::remove_dir_all(dir);
+}
