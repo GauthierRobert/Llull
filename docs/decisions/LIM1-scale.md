@@ -48,10 +48,21 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
 5. **Dense boolean results could overflow the stack**: the empty-result check spread every coordinate into `Math.max(...)` (throws past
    ~150 k vertices); it is a linear scan now.
 
-## Left (native kernel owner)
+## Follow-ups (2026-11-23)
 
-- serde_json `unbounded_depth` (+ a large-stack session thread) in `solver/bins/llull-kernel` so a long sequential chain still parses.
-- A relative / size-aware display deflection (e.g. max(0.1, 1e-4 × bbox diagonal)) to cut boolean meshes, documents and GLBs of large
-  parts 3–10×; and an OCCT multi-tool cut (`BRepAlgoAPI_Cut` with N tools) for the list form instead of the balanced union tree.
+- DONE: serde_json depth. The sidecar measures nesting with a linear scan (cap 4096 levels, refused by name with the list-form cure),
+  parses with the recursion limit off and runs the session on a 512 MiB-stack thread (`solver/bins/llull-kernel/src/request.rs`).
+- DONE earlier: size-aware display deflection (`solver/crates/llull-kernel-occt/src/mesh.rs`) and the OCCT multi-tool boolean for
+  the list form (`cpp/boolean_many.cxx`, ASC M1a).
+- DONE: the slow variable-section sweep boolean was not OCCT intersection time alone. The fitted faces were cut into runs only at
+  path curvature jumps, so the C1 (smoothstep) / C0 (linear) blend at an interior station drove the fit to ~800 cells: 216 faces of
+  ~95 spans per sweep. Runs now also break at interior stations (`packages/core/src/geometry/sweepEval/fitted.ts`). Stand-in duct
+  (two 3-station smooth sweeps, outer minus inner; Linux, 4 cores): 96 faces of 12-37 spans per sweep, boolean 2 min 06 s -> 15.4 s,
+  result 76 k -> 10.8 k triangles, volume unchanged to 1.7e-8. The LLR-845 plan itself was not re-measured (not in the repo).
+
+## Left
+
+- The remaining 15 s: the General Fuse still pairs 96 x 96 long strip faces; one face per run (the 24 ring edges as one closed
+  surface) would cut the pairs ~500x on smooth sections.
 - The evaluator LRU holds 256 shapes; a list of > 256 tools re-builds leaves when the result is re-evaluated after eviction.
-- The variable-section sweep boolean (13–15 s) is OCCT BSpline–BSpline intersection time.
+- Per-face colour on parametric primitives (board).
