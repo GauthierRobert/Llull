@@ -1,0 +1,160 @@
+{
+  "total_kg": 4.235,
+  "cg_x_mm": 412.0,
+  "inertia_kgm2": {
+    "Ixx_roll": 0.00234,
+    "Iyy_Izz_pitch_yaw": 0.1125
+  },
+  "groups_g": {
+    "structure": 542,
+    "propulsion": 1666,
+    "energy": 1647,
+    "avionics": 380
+  },
+  "items": [
+    {
+      "item": "Fuselage shell CFRP 0.8 mm (0.1752 m2 measured)",
+      "group": "structure",
+      "mass_g": 217,
+      "x_mm": 451
+    },
+    {
+      "item": "Nose spinner GFRP 0.6 mm (0.0193 m2 measured)",
+      "group": "structure",
+      "mass_g": 22,
+      "x_mm": 766
+    },
+    {
+      "item": "Fins x4 CFRP over Rohacell (4 x 10.4 cm3 measured)",
+      "group": "structure",
+      "mass_g": 40,
+      "x_mm": 40
+    },
+    {
+      "item": "Landing toes x4 CFRP + TPU pads",
+      "group": "structure",
+      "mass_g": 10,
+      "x_mm": 9
+    },
+    {
+      "item": "Frames x5 + battery rails",
+      "group": "structure",
+      "mass_g": 70,
+      "x_mm": 420
+    },
+    {
+      "item": "Bearing cartridges x2 (nose, tail)",
+      "group": "structure",
+      "mass_g": 50,
+      "x_mm": 410
+    },
+    {
+      "item": "Motor bulkheads x4 + mounts",
+      "group": "structure",
+      "mass_g": 48,
+      "x_mm": 420
+    },
+    {
+      "item": "Battery hatch, latches, fasteners",
+      "group": "structure",
+      "mass_g": 40,
+      "x_mm": 420
+    },
+    {
+      "item": "Structure contingency (10 %)",
+      "group": "structure",
+      "mass_g": 45,
+      "x_mm": 420
+    },
+    {
+      "item": "Motor MN2 (inrunner 36 x 68, 360 g)",
+      "group": "propulsion",
+      "mass_g": 360,
+      "x_mm": 648
+    },
+    {
+      "item": "Motor MN1",
+      "group": "propulsion",
+      "mass_g": 360,
+      "x_mm": 574
+    },
+    {
+      "item": "Motor MT1",
+      "group": "propulsion",
+      "mass_g": 360,
+      "x_mm": 194
+    },
+    {
+      "item": "Motor MT2",
+      "group": "propulsion",
+      "mass_g": 360,
+      "x_mm": 268
+    },
+    {
+      "item": "Rotor N1 (2 CFRP blades + split hub)",
+      "group": "propulsion",
+      "mass_g": 34,
+      "x_mm": 730
+    },
+    {
+      "item": "Rotor N2",
+      "group": "propulsion",
+      "mass_g": 34,
+      "x_mm": 690
+    },
+    {
+      "item": "Rotor T1",
+      "group": "propulsion",
+      "mass_g": 34,
+      "x_mm": 140
+    },
+    {
+      "item": "Rotor T2",
+      "group": "propulsion",
+      "mass_g": 34,
+      "x_mm": 100
+    },
+    {
+      "item": "Coaxial shafts: 2 x Ti-6Al-4V inner tube 10/7, 2 x CFRP outer tube 16/13",
+      "group": "propulsion",
+      "mass_g": 90,
+      "x_mm": 420
+    },
+    {
+      "item": "Battery 20S3P 1050 mAh LiPo (60 cells + bus bars)",
+      "group": "energy",
+      "mass_g": 1647,
+      "x_mm": 420
+    },
+    {
+      "item": "ESC x4 (150 V FETs, 253 A phase burst)",
+      "group": "avionics",
+      "mass_g": 140,
+      "x_mm": 434
+    },
+    {
+      "item": "FC + RX + telemetry stack",
+      "group": "avionics",
+      "mass_g": 60,
+      "x_mm": 270
+    },
+    {
+      "item": "GNSS + antennas in GFRP boom cap",
+      "group": "avionics",
+      "mass_g": 10,
+      "x_mm": 10
+    },
+    {
+      "item": "Elevon servos x4",
+      "group": "avionics",
+      "mass_g": 48,
+      "x_mm": 45
+    },
+    {
+      "item": "Wiring, bus bars, connectors, BMS taps",
+      "group": "avionics",
+      "mass_g": 122,
+      "x_mm": 420
+    }
+  ]
+}

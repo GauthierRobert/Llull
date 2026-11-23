@@ -1,0 +1,74 @@
+# BASELINE (not the proposal): X-quad tail-sitter dart, the conventional record layout refined with lifting pylons. README section 2. Flight direction +X, Z up in level flight, mm.
+# Design study + parameter choice: designs/velox/README.md section 2 and study/velox_model.py. Every size below is a parameter.
+design velox_baseline_xquad units=mm
+
+# ---- fuselage (Myring body of revolution, battery bay amidships)
+param L = 520             # fuselage length
+param Df = 74             # fuselage max diameter (houses the 16S2P pack, study/sweep.py fuselage_diameter_mm)
+param noseLen = 150
+param midLen = 150
+param tailAngle = 0.40    # Myring tail half-angle at the tip, rad
+
+# ---- propulsion (4 tractor rotors in an X, hub radius clears neighbouring disks)
+param D = 7*25.4          # prop diameter
+param PD = 2.8            # geometric pitch / diameter
+param c75 = 0.15          # chord / tip radius at 0.75 R
+param hubR = 0.24         # spinner radius / tip radius
+param tcRoot = 0.12
+param tcTip = 0.055
+param sweepTip = 30       # scimitar tip sweep, deg
+param Rh = (D + 12) / sqrt(2)  # hub radius from the fuselage axis
+param xDisk = 318         # prop disk station (fuselage tail = 0)
+param podD = 38           # pod diameter (36 mm inrunner can + 1 mm shell)
+param podLen = 150
+param spinLen = 34
+
+# ---- lifting pylons (NACA 0012, incidence carries the weight at speed) and tail fins / landing legs (NACA 0008)
+param pylC = 46
+param pylX = 236          # pylon leading-edge station
+param pylInc = 2.0        # pylon incidence, deg (lift up on all four)
+param finC = 60
+param finSpan = 48
+param finX = 60           # fin root leading-edge station
+param finSweep = 30       # aft shift of the fin tip so the four tips are the landing feet
+
+fn myring(u) = (let c = L - noseLen - midLen in (if u < noseLen then Df / 2 * sqrt(max(1 - pow((u - noseLen) / noseLen, 2), 0)) else (if u < noseLen + midLen then Df / 2 else (let x = u - noseLen - midLen in max(Df / 2 - (3 * Df / 2 / (c * c) - tan(tailAngle) / c) * x * x + (2 * Df / 2 / (c * c * c) - tan(tailAngle) / (c * c)) * x * x * x, 0)))))
+fn podR(u) = (if u < 40 then podD / 2 * sqrt(max(1 - pow((u - 40) / 40, 2), 0)) else (if u < 95 then podD / 2 else podD / 2 - (podD / 2 - 7) * pow((u - 95) / (podLen - 95), 1.6)))
+# NACA 4-digit thickness / camber (closed trailing edge), cosine stations, one closed loop TE -> upper -> LE -> lower
+fn yt(u, t) = 5 * t * (0.2969 * sqrt(u) - 0.1260 * u - 0.3516 * u * u + 0.2843 * u * u * u - 0.1036 * u * u * u * u)
+fn yc(u, m) = (if u < 0.4 then m / 0.16 * (0.8 * u - u * u) else m / 0.36 * (0.2 + 0.8 * u - u * u))
+fn cx(k, n) = (let u = (if k <= n then (1 - k / n) else (k - n) / n) in (1 - cos(pi * u)) / 2)
+fn sgn(k, n) = (if k <= n then 1 else -1)
+# blade section at x = r/R: chord taper, constant geometric pitch, cubic scimitar sweep, thinning tip; spin = +1 / -1 (mirror)
+fn chordAt(x) = c75 * D / 2 * (1.25 - 0.55 * x) * sqrt(max(1 - pow(x, 10), 0.05)) / ((1.25 - 0.55 * 0.75) * sqrt(1 - pow(0.75, 10)))
+fn betaAt(x) = atan(PD / (pi * x))
+fn sweepOff(x) = (if x < 0.55 then 0 else D / 2 * tan(sweepTip * pi / 180) * pow((x - 0.55) / 0.45, 3) * 0.15)
+fn tcAt(x) = tcRoot + (tcTip - tcRoot) * (x - hubR) / (1 - hubR)
+fn bladePt(k, n, x, spin) = (let c = chordAt(x) in (let b = betaAt(x) in (let u = cx(k, n) in (let y = yc(u, 0.02) + sgn(k, n) * yt(u, tcAt(x)) in (let s = (u - 0.25) * c + sweepOff(x) in [s * (-sin(b)) + y * c * cos(b), spin * (s * (-cos(b)) - y * c * sin(b))])))))
+# symmetric section with LE toward +X and incidence inc (deg, nose toward +local y)
+fn foilPt(k, n, c, t, inc) = (let u = cx(k, n) in (let px = (0.25 - u) * c in (let py = sgn(k, n) * yt(u, t) * c in (let a = inc * pi / 180 in [px * cos(a) - py * sin(a), px * sin(a) + py * cos(a)]))))
+fn phiOf(i) = pi / 4 + i * pi / 2
+fn spinOf(i) = (if mod(i, 2) == 0 then 1 else -1)
+fn psiOf(i, j) = j * pi + pi / 2 + i * pi / 4  # blade azimuth (clocked per rotor for the render only)
+
+# ------------------------------------------------------------------ fuselage
+revolve_profile fuselage profile=(concat([[0, 0]], [for k in 0..80: [myring(L - L * k / 80), L * k / 80]], [[0, L]])) axis="x" segments=72 color="#d9dde3"
+set_entity_name _ id=fuselage name="FUS-100 fuselage shell"
+
+# ------------------------------------------------------------------ pods, spinners, props, pylons (i = 0..3, X layout)
+for i in 0..3 {
+  revolve_profile pod{i} profile=(concat([[0, xDisk - podLen]], [for k in 0..40: [podR((podLen - spinLen) * k / 40 + spinLen), xDisk - spinLen - (podLen - spinLen) * k / 40]], [[0, xDisk - spinLen]])) axis="x" position=[0, Rh * cos(phiOf(i)), Rh * sin(phiOf(i))] segments=48 color="#2b2f36"
+  revolve_profile spinner{i} profile=(concat([[0, xDisk - spinLen]], [for k in 0..20: [podD / 2 * sqrt(max(1 - pow(k / 20, 2), 0)), xDisk - spinLen + spinLen * k / 20]], [[0, xDisk]])) axis="x" position=[0, Rh * cos(phiOf(i)), Rh * sin(phiOf(i))] segments=48 color="#b8bec7"
+  for j in 0..1 {
+    loft_sections blade{i}_{j} sections=[for x in [0.22, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.88, 0.94, 0.98]: {center: [xDisk - spinLen * 0.55, Rh * cos(phiOf(i)) + x * D / 2 * cos(psiOf(i, j)), Rh * sin(phiOf(i)) + x * D / 2 * sin(psiOf(i, j))], rotation: [pi / 2 + psiOf(i, j), 0, 0], section: [for k in 0..<24: bladePt(k, 12, x, spinOf(i))]}] color="#3c4250"
+  }
+  loft_sections pylon{i} sections=[for rr in [Df / 2 - 6, Rh - podD / 2 + 4]: {center: [pylX - pylC * 0.25, rr * cos(phiOf(i)), rr * sin(phiOf(i))], rotation: [pi / 2 + phiOf(i), 0, 0], section: [for k in 0..<24: foilPt(k, 12, pylC, 0.12, pylInc * sign(cos(phiOf(i))))]}] ruled=true color="#2b2f36"
+}
+
+# ------------------------------------------------------------------ tail fins = landing legs (+ layout, out of the pylon wakes)
+for f in 0..3 {
+  loft_sections fin{f} sections=[for rr in [1, 14 + finSpan]: {center: [finX - finC * 0.25 - (if rr < 10 then 0 else finSweep), rr * cos(f * pi / 2), rr * sin(f * pi / 2)], rotation: [pi / 2 + f * pi / 2, 0, 0], section: [for k in 0..<24: foilPt(k, 12, finC * (if rr < 10 then 1 else 0.7), 0.08, 0)]}] ruled=true color="#2b2f36"
+}
+
+check bbox of=fuselage expect ~= [L, Df, Df] ± 1%
+check volume of=fuselage expect >= 1200000

@@ -1,0 +1,6 @@
+llull run_flight (MuJoCo) open-loop dash, 0.5 s from 271.1 m/s, mass 4.235 kg, rotors at the BEMT design rpm, installed Ct/Cp(J) tables
+  N1: thrust 12.64 N (BEMT 11.35), shaft 5820 W (BEMT 5455), J 4.398
+  N2: thrust 11.96 N (BEMT 11.32), shaft 5043 W (BEMT 4948), J 4.883
+  T1: thrust 14.63 N (BEMT 14.8), shaft 5241 W (BEMT 5318), J 4.532
+  T2: thrust 15.15 N (BEMT 13.67), shaft 5127 W (BEMT 4853), J 4.961
+  thrust sum 54.37 N vs drag 51.12 N; mean speed over 0.5 s 271.34 m/s (start 271.1); mean shaft power 21273 W; warnings []

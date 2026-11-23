@@ -1,0 +1,107 @@
+# VELOX-X: electric contra-rotating "spindle" drone. Four rotors, all on the fuselage axis:
+#   nose pair N1/N2 (tractor, contra-rotating) + tail pair T1/T2 (pusher, contra-rotating, boundary-layer ingestion),
+#   cruciform elevon fins on a tail boom in the slipstream (control in hover and at speed, incidence carries the weight),
+#   landing toes on the fin tips (tail-sitter VTOL). Flight direction +X, Z up in level flight, mm. README.md.
+design velox_x units=mm
+
+# ---- fuselage (body of revolution: boom | tail-pair hub | boat-tail | battery bay | nose-pair hub | nose spinner)
+param L = 800             # overall length, boom end to nose spinner tip
+param Df = 85             # max diameter (20S3P 1050 mAh pack, study/sweep.py fuselage_diameter_mm)
+param boomR = 16          # tail boom radius (elevon servos + toe loads)
+param tailHubR = 24       # tail-pair hub radius (two 36 mm inrunners + 3 mm shell)
+param boomEnd = 75        # boom -> tail hub station
+param boatStart = 150     # tail hub -> boat-tail
+param boatEnd = 300       # boat-tail -> full diameter
+param noseLen = 55        # nose spinner length
+
+# ---- rotors (one blade design, 2 blades per rotor; the aft rotor of each pair is pitched up by dPD)
+param D = 9.0*25.4
+param PD = 4.4
+param dPD = 0.35
+param c75 = 0.13
+param tcRoot = 0.12
+param tcTip = 0.055
+param sweepTip = 30       # scimitar tip sweep, deg
+param xN1 = L - 70        # nose pair: upstream rotor N1, downstream rotor N2 (40 mm apart: root axial chord ~25 mm)
+param xN2 = L - 110
+param xT1 = 140           # tail pair: upstream rotor T1, downstream rotor T2
+param xT2 = 100
+
+# ---- fins + toes (X layout, NACA 0008, elevon 30 % chord not modelled as a separate body)
+param finRootC = 55
+param finTipC = 40
+param finLE = 66          # root leading-edge station
+param finInc = 0          # incidence, deg: the body flies at ~2.5 deg AoA, fins carry the weight, Munk moment balances (README 5.3)
+param toeOut = 14         # toe reaches this far beyond the disk radius
+param toeX = -15          # toe station (lowest point when standing on the tail)
+
+fn bodyR(x) = (if x < 8 then boomR * sqrt(max(1 - pow((8 - x) / 8, 2), 0)) else (if x < boomEnd then boomR else (if x < boomEnd + 12 then boomR + (tailHubR - boomR) * (3 * pow((x - boomEnd) / 12, 2) - 2 * pow((x - boomEnd) / 12, 3)) else (if x < boatStart then tailHubR else (if x < boatEnd then tailHubR + (Df / 2 - tailHubR) * (3 * pow((x - boatStart) / (boatEnd - boatStart), 2) - 2 * pow((x - boatStart) / (boatEnd - boatStart), 3)) else (if x < L - noseLen then Df / 2 else Df / 2 * sqrt(max(1 - pow((x - L + noseLen) / noseLen, 2), 0))))))))
+fn yt(u, t) = 5 * t * (0.2969 * sqrt(u) - 0.1260 * u - 0.3516 * u * u + 0.2843 * u * u * u - 0.1036 * u * u * u * u)
+fn yc(u, m) = (if u < 0.4 then m / 0.16 * (0.8 * u - u * u) else m / 0.36 * (0.2 + 0.8 * u - u * u))
+fn cx(k, n) = (let u = (if k <= n then (1 - k / n) else (k - n) / n) in (1 - cos(pi * u)) / 2)
+fn sgn(k, n) = (if k <= n then 1 else -1)
+fn chordAt(x) = c75 * D / 2 * (1.25 - 0.55 * x) * sqrt(max(1 - pow(x, 10), 0.05)) / ((1.25 - 0.55 * 0.75) * sqrt(1 - pow(0.75, 10)))
+fn sweepOff(x) = (if x < 0.55 then 0 else D / 2 * tan(sweepTip * pi / 180) * pow((x - 0.55) / 0.45, 3) * 0.15)
+fn tcAt(x, h) = tcRoot + (tcTip - tcRoot) * (x - h) / (1 - h)
+# blade section at x = r/R for pitch ratio pd, hub ratio h, spin +1 / -1 (mirror image = opposite rotation)
+fn bladePt(k, n, x, pd, h, spin) = (let c = chordAt(x) in (let b = atan(pd / (pi * x)) in (let u = cx(k, n) in (let y = yc(u, 0.02) + sgn(k, n) * yt(u, tcAt(x, h)) in (let s = (u - 0.25) * c + sweepOff(x) in [s * (-sin(b)) + y * c * cos(b), spin * (s * (-cos(b)) - y * c * sin(b))])))))
+fn foilPt(k, n, c, t, inc) = (let u = cx(k, n) in (let px = (0.25 - u) * c in (let py = sgn(k, n) * yt(u, t) * c in (let a = inc * pi / 180 in [px * cos(a) - py * sin(a), px * sin(a) + py * cos(a)]))))
+fn stations(h) = [for q in [0, 0.1, 0.22, 0.35, 0.48, 0.6, 0.72, 0.84, 0.93, 0.98]: h + (0.98 - h) * q + (if q == 0 then 0.0 else 0)]
+fn rotorX(n) = (if n == 0 then xN1 else (if n == 1 then xN2 else (if n == 2 then xT1 else xT2)))
+fn rotorPD(n) = PD + (if mod(n, 2) == 1 then dPD else 0)
+fn rotorHub(n) = (if n < 2 then (Df / 2 - 2) / (D / 2) else (tailHubR - 2) / (D / 2))
+fn rotorSpin(n) = (if mod(n, 2) == 0 then 1 else -1)
+fn phiFin(f) = pi / 4 + f * pi / 2
+
+# ------------------------------------------------------------------ fuselage shell (one body of revolution)
+revolve_profile fuselage profile=(concat([[0, 0]], [for k in 0..152: [bodyR((L - noseLen) * k / 152), (L - noseLen) * k / 152]], [[0, L - noseLen]])) axis="x" segments=72 color="#d9dde3"
+revolve_profile spinner profile=(concat([[0, L - noseLen]], [for k in 0..24: [bodyR(L - noseLen + noseLen * k / 24), L - noseLen + noseLen * k / 24]], [[0, L]])) axis="x" segments=72 color="#b8bec7"
+
+# ------------------------------------------------------------------ rotors N1, N2, T1, T2 (2 blades each)
+for n in 0..3 {
+  for j in 0..1 {
+    loft_sections blade{n}_{j} sections=[for x in stations(rotorHub(n)): {center: [rotorX(n), x * D / 2 * cos(j * pi + pi / 2 + n * pi / 4), x * D / 2 * sin(j * pi + pi / 2 + n * pi / 4)], rotation: [pi / 2 + j * pi + pi / 2 + n * pi / 4, 0, 0], section: [for k in 0..<24: bladePt(k, 12, x, rotorPD(n), rotorHub(n), rotorSpin(n))]}] color="#3c4250"
+  }
+}
+
+# ------------------------------------------------------------------ elevon fins (X) + landing toes
+for f in 0..3 {
+  loft_sections fin{f} sections=[for rr in [boomR - 4, 0.85 * D / 2]: {center: [(if rr < boomR then finLE - finRootC * 0.25 else finLE - 14 - finTipC * 0.25), rr * cos(phiFin(f)), rr * sin(phiFin(f))], rotation: [pi / 2 + phiFin(f), 0, 0], section: [for k in 0..<24: foilPt(k, 12, (if rr < boomR then finRootC else finTipC), 0.08, finInc * sign(cos(phiFin(f))))]}] ruled=true color="#2b2f36"
+  loft_sections toe{f} sections=[for q in [0, 1]: {center: [(1 - q) * (finLE - 14 - finTipC * 0.6) + q * toeX, ((1 - q) * 0.85 * D / 2 + q * (D / 2 + toeOut)) * cos(phiFin(f)), ((1 - q) * 0.85 * D / 2 + q * (D / 2 + toeOut)) * sin(phiFin(f))], rotation: [pi / 2 + phiFin(f), 0, 0], section: [for k in 0..<16: foilPt(k, 8, (if q == 0 then 16 else 8), 0.3, 0)]}] ruled=true color="#c0392b"
+}
+
+# ------------------------------------------------------------------ internal layout (layer "Internal": envelopes for packaging + mass)
+param motorR = 18         # 36 mm inrunner can
+param motorLen = 68
+param xMN2 = L - 186      # nose motors: MN2 drives N2 (hollow shaft), MN1 behind it drives N1 (inner shaft)
+param xMN1 = L - 260
+param xMT1 = 160          # tail motors: MT1 drives T1 (hollow shaft), MT2 ahead of it drives T2 (inner shaft)
+param xMT2 = 234
+param batX0 = 300         # battery bay: 20S3P = 4 modules of 5S3P (stepped pouch stacks), each envelope 57 mm long
+param batLen = 240
+add_layer internal name="Internal" color="#e67e22"
+for m in 0..3 {
+  add_cylinder motor{m} radius=motorR height=motorLen axis=[1, 0, 0] position=[(if m == 0 then xMN2 else (if m == 1 then xMN1 else (if m == 2 then xMT1 else xMT2))) + motorLen / 2, 0, 0] color="#b87333"
+  set_entity_layer _ entityId=motor{m} layerId=internal
+}
+add_cylinder shaftN axis=[1, 0, 0] radius=5 height=(L - 70 - xMN1 + 8) position=[(xMN1 + L - 62) / 2, 0, 0] color="#9aa3ad"
+add_cylinder shaftT axis=[1, 0, 0] radius=5 height=(xMT2 + motorLen - xT2 + 8) position=[(xT2 - 8 + xMT2 + motorLen) / 2, 0, 0] color="#9aa3ad"
+set_entity_layer _ entityId=shaftN layerId=internal
+set_entity_layer _ entityId=shaftT layerId=internal
+for b in 0..3 {
+  add_cylinder bat{b} axis=[1, 0, 0] radius=(Df / 2 - 4.5) height=(batLen / 4 - 3) position=[batX0 + batLen / 8 + b * batLen / 4, 0, 0] color="#2e86de"
+  set_entity_layer _ entityId=bat{b} layerId=internal
+}
+add_box fc size=[50, 28, 10] position=[270, 0, 26] color="#27ae60"  # FC + RX + telemetry stack above MT2
+set_entity_layer _ entityId=fc layerId=internal
+for e in 0..3 {
+  # ESC boards flank the motors in the cooling annulus: nose pair beside MN1/MN2, tail pair beside MT2
+  add_box esc{e} size=[(if e < 2 then 70 else 60), 6, 24] position=[(if e < 2 then 600 else 268), (if mod(e, 2) == 0 then 1 else -1) * (if e < 2 then 28 else 22), 0] color="#8e44ad"
+  set_entity_layer _ entityId=esc{e} layerId=internal
+}
+
+check bbox of=fuselage expect ~= [L - noseLen, Df, Df] ± 1%
+check bbox of=spinner expect ~= [noseLen, Df, Df] ± 1%
+check volume of=fuselage expect >= 2000000
+check max of=bat3 expect ~= [batX0 + batLen - 1.5, Df / 2 - 4.5, Df / 2 - 4.5] ± 0.5mm
+check bbox of=shaftN expect ~= [L - 70 - xMN1 + 8, 10, 10] ± 0.5mm

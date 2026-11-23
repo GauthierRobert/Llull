@@ -1,0 +1,50 @@
+{
+  "20S2P-1300 at 220 A": {
+    "speed_kmh_at_m": {
+      "500": 475.3,
+      "1000": 661.2,
+      "1500": 758.8,
+      "2000": 825.6,
+      "3000": 902.7
+    },
+    "trap_average_kmh": 857.1,
+    "full_power_time_s": 20.7,
+    "energy_wh": 159.6,
+    "pack_energy_wh": 192.4,
+    "energy_used_pct": 82.9,
+    "pack_dt_k": 39.9,
+    "mass_kg": 3.84
+  },
+  "20S3P-1050 at 220 A": {
+    "speed_kmh_at_m": {
+      "500": 450.1,
+      "1000": 634.5,
+      "1500": 737.8,
+      "2000": 806.3,
+      "3000": 889.1
+    },
+    "trap_average_kmh": 837.2,
+    "full_power_time_s": 21.3,
+    "energy_wh": 164.6,
+    "pack_energy_wh": 233.1,
+    "energy_used_pct": 70.6,
+    "pack_dt_k": 28.1,
+    "mass_kg": 4.142
+  },
+  "FINAL 20S3P-1050 at 253 A burst": {
+    "speed_kmh_at_m": {
+      "500": 466.0,
+      "1000": 648.6,
+      "1500": 773.9,
+      "2000": 848.8,
+      "3000": 933.0
+    },
+    "trap_average_kmh": 888.9,
+    "full_power_time_s": 20.5,
+    "energy_wh": 193.1,
+    "pack_energy_wh": 233.1,
+    "energy_used_pct": 82.8,
+    "pack_dt_k": 41.9,
+    "mass_kg": 4.142
+  }
+}

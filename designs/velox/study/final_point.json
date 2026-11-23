@@ -1,0 +1,94 @@
+{
+  "design": {
+    "d_in": 9.0,
+    "pd": 4.4,
+    "kv": 750.0,
+    "motor_kg": 0.36,
+    "pack": [
+      20,
+      3,
+      "1050"
+    ],
+    "dpd": 0.35,
+    "esc_phase_limit_a": 253.0
+  },
+  "mass_kg": 4.142,
+  "fuselage_diameter_mm": 84.9,
+  "top_speed_kmh": 976.1,
+  "top_speed_mps": 271.1,
+  "mach": 0.797,
+  "drag_n": 51.12,
+  "cda_cm2": {
+    "fuselage": 5.14,
+    "fins x4": 2.05,
+    "interference": 0.43,
+    "cooling": 2.6,
+    "toe rods": 0.4,
+    "misc": 0.64,
+    "total": 11.26
+  },
+  "fin_lift_n": 40.6,
+  "fin_induced_drag_n": 0.43,
+  "thrust_tilt_deg": 0.0,
+  "rotors": {
+    "N1": {
+      "rpm": 16205,
+      "thrust_n": 11.35,
+      "shaft_w": 5455,
+      "motor_a": 253.0
+    },
+    "N2": {
+      "rpm": 14596,
+      "thrust_n": 11.32,
+      "shaft_w": 4948,
+      "motor_a": 253.0
+    },
+    "T1": {
+      "rpm": 15726,
+      "thrust_n": 14.8,
+      "shaft_w": 5318,
+      "motor_a": 253.0
+    },
+    "T2": {
+      "rpm": 14366,
+      "thrust_n": 13.67,
+      "shaft_w": 4853,
+      "motor_a": 253.0
+    }
+  },
+  "propulsive_efficiency": 0.674,
+  "tip_helical_mach": 0.98,
+  "bus_voltage_v": 73.4,
+  "pack_current_a": 324.4,
+  "electrical_power_kw": 23.81,
+  "limited_by": "motor current",
+  "static": {
+    "thrust_to_weight": 2.11,
+    "thrust_n": [
+      22.4,
+      21.5,
+      21.4,
+      20.4
+    ],
+    "rpm": [
+      22363,
+      18376,
+      22138,
+      19456
+    ],
+    "pack_current_a": 422.9,
+    "power_kw": 31.26
+  },
+  "pack_energy_wh": 233.1,
+  "motor": {
+    "motor_loss_w": 699.174,
+    "motor_eff": 0.876,
+    "dt_motor_k": 33.686,
+    "dt_pack_k": 30.073
+  },
+  "baseline_xquad_same_class": {
+    "top_speed_kmh": 857.1,
+    "mass_kg": 3.781,
+    "power_kw": 22.66
+  }
+}
