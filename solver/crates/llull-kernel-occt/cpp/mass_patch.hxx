@@ -24,6 +24,12 @@ void surface_properties(const TopoDS_Shape &shape, GProp_GProps &out);
 // Test hook: switches the strip integrator on (default) or off (every face by BRepGProp).
 void set_patch_integrator(bool on);
 void set_patch_order(int order);
+// The agreement the order search asks for (0: the default 1e-12); a negative tolerance makes every face fall back to BRepGProp at once.
+void set_patch_agreement(double tolerance);
+// Test hook: why the last face was left to BRepGProp (0 none yet, 1 unreadable boundary, 2 integration failed, 3 orders did not agree, 4 parameter domain mismatch).
+int last_patch_refusal();
+// Test hook: the relative mismatch of the two parameter-domain areas of the last face.
+double last_domain_gap();
 
 // Test hook: how many faces of `shape` the strip integrator takes.
 int eligible_patch_faces(const TopoDS_Shape &shape);

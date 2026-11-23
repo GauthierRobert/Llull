@@ -465,34 +465,38 @@ bool adaptive_rule(const Shape &shape) { return shape.refined_mass && has_freefo
 
 bool refined_mass_flag(const Shape &shape) { return shape.refined_mass; }
 
-rust::Vec<double> patch_properties_probe(const Shape &shape, int32_t volume) {
-  // [faces taken, strips: mass, centre x y z, inertia xx yy zz xy xz yz about the origin, BRepGProp fixed rule: the same ten]
+rust::Vec<double> patch_properties_probe(const Shape &shape, int32_t mode) {
+  // mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape moved (a rotation and a translation of about 1100 into its faces' locations).
+  // [faces taken, strips: mass, centre x y z, central inertia xx yy zz xy xz yz, BRepGProp fixed rule: the same ten, seconds of each]
   const auto push = [](rust::Vec<double> &out, const GProp_GProps &props) {
     out.push_back(props.Mass());
     const gp_Pnt centre = props.CentreOfMass();
     out.push_back(centre.X()), out.push_back(centre.Y()), out.push_back(centre.Z());
-    // MatrixOfInertia is about the centre; the Huygens term gives the one about the origin
-    gp_Mat about_centre = props.MatrixOfInertia();
-    const double mass = props.Mass(), c[3] = {centre.X(), centre.Y(), centre.Z()};
-    const double r2 = c[0] * c[0] + c[1] * c[1] + c[2] * c[2];
+    const gp_Mat about_centre = props.MatrixOfInertia();
     const int pairs[6][2] = {{0, 0}, {1, 1}, {2, 2}, {0, 1}, {0, 2}, {1, 2}};
-    for (const auto &pair : pairs) {
-      const double shift = mass * ((pair[0] == pair[1] ? r2 : 0.0) - c[pair[0]] * c[pair[1]]);
-      out.push_back(about_centre.Value(pair[0] + 1, pair[1] + 1) + shift);
-    }
+    for (const auto &pair : pairs) out.push_back(about_centre.Value(pair[0] + 1, pair[1] + 1));
   };
+  const bool volume = mode == 1 || mode == 2 || mode == 3 || mode == 5 || mode == 6;
+  TopoDS_Shape target = shape.shape;
+  if (mode == 2) target = target.Reversed();
+  if (mode >= 3) {
+    gp_Trsf turn, shift;
+    turn.SetRotation(gp_Ax1(gp_Pnt(1, 2, 3), gp_Dir(1, 2, 2)), mode == 5 || mode == 7 ? 0.0 : 0.7);
+    shift.SetTranslation(gp_Vec(mode == 6 ? 0 : 1000, mode == 6 ? 0 : -500, mode == 6 ? 0 : 250));
+    target = target.Moved(TopLoc_Location(shift * turn));
+  }
   rust::Vec<double> out;
-  out.push_back(query::eligible_patch_faces(shape.shape));
+  out.push_back(query::eligible_patch_faces(target));
   GProp_GProps strips, fixed;
   const auto started = std::chrono::steady_clock::now();
-  const bool taken = volume ? query::fast_volume_properties(shape.shape, strips) : query::fast_surface_properties(shape.shape, strips);
+  const bool taken = volume ? query::fast_volume_properties(target, strips) : query::fast_surface_properties(target, strips);
   if (!taken) {
     out.clear();
     return out;
   }
   const auto middle = std::chrono::steady_clock::now();
-  if (volume) BRepGProp::VolumeProperties(shape.shape, fixed, Standard_False, Standard_False, Standard_False);
-  else BRepGProp::SurfaceProperties(shape.shape, fixed, Standard_False, Standard_False);
+  if (volume) BRepGProp::VolumeProperties(target, fixed, Standard_False, Standard_False, Standard_False);
+  else BRepGProp::SurfaceProperties(target, fixed, Standard_False, Standard_False);
   const auto finished = std::chrono::steady_clock::now();
   push(out, strips);
   push(out, fixed);
@@ -503,6 +507,9 @@ rust::Vec<double> patch_properties_probe(const Shape &shape, int32_t volume) {
 
 void set_patch_integrator(bool on) { query::set_patch_integrator(on); }
 void set_patch_order(int32_t order) { query::set_patch_order(order); }
+void set_patch_agreement(double tolerance) { query::set_patch_agreement(tolerance); }
+int32_t last_patch_refusal() { return query::last_patch_refusal(); }
+double last_domain_gap() { return query::last_domain_gap(); }
 
 int32_t span_cut_count(const Shape &shape) {
   int cut = 0;

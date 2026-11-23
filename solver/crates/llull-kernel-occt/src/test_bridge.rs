@@ -54,14 +54,20 @@ mod ffi {
         fn set_law_node_cap(nodes: i32);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
-        /// The strip integrator against BRepGProp's fixed rule on the whole shape (area 0, volume 1): `[faces taken, 10 numbers, 10 numbers]` (mass, centre, inertia about the origin xx yy zz xy xz yz), empty when no face is taken.
-        fn patch_properties_probe(shape: &Shape, volume: i32) -> Vec<f64>;
+        /// The strip integrator against BRepGProp's fixed rule on the whole shape (mode 0 area, 1 volume, 2 volume of the reversed shape, 3 volume and 4 area of the shape moved far from the origin): `[faces taken, 10 numbers, 10 numbers]` (mass, centre, inertia about the origin xx yy zz xy xz yz), empty when no face is taken.
+        fn patch_properties_probe(shape: &Shape, mode: i32) -> Vec<f64>;
         /// The strip integrator on (default) or off (every face by BRepGProp).
-        /// The same on a synthetic B-spline face (`cpp/mass_patch_probe.cxx`: kinds 0 to 6, plus 8 for the reversed face).
+        /// The same on a synthetic B-spline face (`cpp/mass_patch_probe.cxx`: kinds 0 to 8, plus 16 for the reversed face).
         fn patch_synthetic_probe(kind: i32, volume: i32) -> Vec<f64>;
         fn set_patch_integrator(on: bool);
         /// The Gauss order of the strip integrator in both directions (0: from the degree).
         fn set_patch_order(order: i32);
+        /// The agreement the order search asks for (0: the default); a negative tolerance sends every face to BRepGProp at once.
+        fn set_patch_agreement(tolerance: f64);
+        /// Why the last face was left to BRepGProp (1 boundary, 2 integration, 3 orders did not agree, 4 parameter domain).
+        fn last_patch_refusal() -> i32;
+        /// The relative mismatch of the two parameter-domain areas of the last face.
+        fn last_domain_gap() -> f64;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
         fn oriented_angle_probe(shape: &Shape, face: i32, reverse: bool) -> f64;
         /// The same for a creased star: every B-spline face is a sub-patch, `sharp_edge` the unrounded edge it continues.
@@ -90,7 +96,11 @@ pub fn boundary_angle(shape: &Shape, face: i32, drop_one: bool) -> f64 {
 
 /// `None` when the strip integrator takes no face of the shape; else (faces taken, strip numbers, BRepGProp numbers, seconds of each).
 pub fn patch_properties(shape: &Shape, volume: bool) -> Option<PatchProperties> {
-    unpack(&ffi::patch_properties_probe(crate::inner(shape).expect("a shape"), i32::from(volume)))
+    patch_properties_mode(shape, i32::from(volume))
+}
+
+pub fn patch_properties_mode(shape: &Shape, mode: i32) -> Option<PatchProperties> {
+    unpack(&ffi::patch_properties_probe(crate::inner(shape).expect("a shape"), mode))
 }
 
 pub type PatchProperties = (usize, [f64; 10], [f64; 10], [f64; 2]);
@@ -112,6 +122,18 @@ pub fn patch_synthetic(kind: i32, volume: bool) -> Option<PatchProperties> {
 
 pub fn set_patch_integrator(on: bool) {
     ffi::set_patch_integrator(on);
+}
+
+pub fn last_domain_gap() -> f64 {
+    ffi::last_domain_gap()
+}
+
+pub fn last_patch_refusal() -> i32 {
+    ffi::last_patch_refusal()
+}
+
+pub fn set_patch_agreement(tolerance: f64) {
+    ffi::set_patch_agreement(tolerance);
 }
 
 pub fn set_patch_order(order: i32) {

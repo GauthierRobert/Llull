@@ -2,9 +2,13 @@
 
 #include "llull-kernel-occt/cpp/mass_spans.hxx"
 #include "llull-kernel-occt/cpp/mass_patch_basis.hxx"
+#include "llull-kernel-occt/cpp/mass_patch_pieces.hxx"
 
 #include <BRepAdaptor_Curve2d.hxx>
 #include <BRepGProp.hxx>
+#include <BRepGProp_Domain.hxx>
+#include <BRepGProp_Face.hxx>
+#include <BRepGProp_Vinert.hxx>
 #include <BRep_Builder.hxx>
 #include <GProp_GProps.hxx>
 #include <TopExp_Explorer.hxx>
@@ -12,11 +16,18 @@
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Face.hxx>
 #include <gp_Mat.hxx>
+#include <TopLoc_Location.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Trsf.hxx>
+#include <gp_Vec.hxx>
+#include <gp_XYZ.hxx>
+
+#include <Standard_Failure.hxx>
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <exception>
 #include <memory>
 #include <vector>
 
@@ -27,6 +38,9 @@ namespace {
 
 std::atomic<bool> g_patch_integrator{true};
 std::atomic<int> g_order_override{0};
+std::atomic<double> g_agree_override{0.0};
+std::atomic<double> g_domain_gap{0.0};
+std::atomic<int> g_refusal{0};  // why the last face was left to BRepGProp: 1 boundary, 2 integrate, 3 no convergence, 4 parameter domain
 
 // An eligible face has at least this many knot cells: below it BRepGProp is as fast and the small faces stay on the rule every golden value was made with.
 constexpr size_t kMinCells = 64;
@@ -35,135 +49,16 @@ constexpr int kMaxDegree = 12;
 constexpr int kMinDegree = 6;
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kMaxOrder = 61;
-constexpr int kOrders[] = {4, 6, 10, 16, 24, 32, 48};
-constexpr double kAgree = 1e-12;
-
-// A boundary piece of the face in (u, v), monotone in both: a straight segment (closed form) or a part of a curve (inverted by a safeguarded Newton). `t0` is the end with the lower u.
-struct Piece {
-  bool line = false;
-  double u0 = 0, v0 = 0, u1 = 0, v1 = 0;
-  std::shared_ptr<BRepAdaptor_Curve2d> curve;
-  double t0 = 0, t1 = 0;
-  // the tangent is vertical (du = 0) at the lower-u / upper-u end: the width of a strip that ends there goes as a square root of u, which Gauss points do not resolve (see strip)
-  bool steep0 = false, steep1 = false;
-};
-
-// The parameter t of `curve` in [ta, tb] at which its coordinate `axis` (0 u, 1 v) equals `target`, a coordinate monotone on the interval.
-bool solve(const BRepAdaptor_Curve2d &curve, int axis, double ta, double tb, double target, double &t) {
-  const double scale = std::max(1.0, std::fabs(target));
-  gp_Pnt2d point;
-  gp_Vec2d slope;
-  curve.D1(ta, point, slope);
-  const double ga = point.Coord(axis + 1) - target;
-  curve.D1(tb, point, slope);
-  const double gb = point.Coord(axis + 1) - target;
-  if (std::fabs(ga) <= 1e-15 * scale) return t = ta, true;
-  if (std::fabs(gb) <= 1e-15 * scale) return t = tb, true;
-  if (ga * gb > 0) return false;
-  double lo = ta, hi = tb;
-  t = ta + (tb - ta) * ga / (ga - gb);
-  for (int i = 0; i < 80; ++i) {
-    curve.D1(t, point, slope);
-    const double g = point.Coord(axis + 1) - target;
-    if (std::fabs(g) <= 1e-15 * scale) return true;
-    if ((g < 0) == (ga < 0)) lo = t;
-    else hi = t;
-    const double d = slope.Coord(axis + 1);
-    double next = d != 0 ? t - g / d : 0.5 * (lo + hi);
-    if (!(next > lo && next < hi)) next = 0.5 * (lo + hi);
-    if (std::fabs(next - t) <= 1e-16 * (1 + std::fabs(t))) {
-      t = next;
-      break;
-    }
-    t = next;
-  }
-  curve.D1(t, point, slope);
-  return std::fabs(point.Coord(axis + 1) - target) <= 1e-12 * scale;
-}
-
-double v_at(const Piece &piece, double u, bool &ok) {
-  if (piece.line) return piece.v0 + (u - piece.u0) * (piece.v1 - piece.v0) / (piece.u1 - piece.u0);
-  double t = 0;
-  if (!solve(*piece.curve, 0, piece.t0, piece.t1, u, t)) return ok = false, 0.0;
-  return piece.curve->Value(t).Y();
-}
-
-double u_at(const Piece &piece, double v, bool &ok) {
-  if (piece.line) return piece.u0 + (v - piece.v0) * (piece.u1 - piece.u0) / (piece.v1 - piece.v0);
-  double t = 0;
-  if (!solve(*piece.curve, 1, piece.t0, piece.t1, v, t)) return ok = false, 0.0;
-  return piece.curve->Value(t).X();
-}
-
-Piece make_piece(const std::shared_ptr<BRepAdaptor_Curve2d> &curve, bool line, double ta, double tb) {
-  Piece piece;
-  piece.line = line;
-  piece.curve = curve;
-  const gp_Pnt2d a = curve->Value(ta), b = curve->Value(tb);
-  const bool forward = a.X() <= b.X();
-  piece.t0 = forward ? ta : tb;
-  piece.t1 = forward ? tb : ta;
-  const gp_Pnt2d low = forward ? a : b, high = forward ? b : a;
-  piece.u0 = low.X(), piece.v0 = low.Y(), piece.u1 = high.X(), piece.v1 = high.Y();
-  if (!line) {
-    gp_Pnt2d point;
-    gp_Vec2d slope;
-    curve->D1(piece.t0, point, slope);
-    piece.steep0 = std::fabs(slope.X()) <= 1e-6 * std::fabs(slope.Y());
-    curve->D1(piece.t1, point, slope);
-    piece.steep1 = std::fabs(slope.X()) <= 1e-6 * std::fabs(slope.Y());
-  }
-  return piece;
-}
-
-// The parameter in (ta, tb) where the derivative of coordinate `axis` changes sign, by bisection on the sign.
-double derivative_root(const BRepAdaptor_Curve2d &curve, int axis, double ta, double tb) {
-  gp_Pnt2d point;
-  gp_Vec2d slope;
-  curve.D1(ta, point, slope);
-  const bool positive = slope.Coord(axis + 1) > 0;
-  for (int i = 0; i < 60; ++i) {
-    const double mid = 0.5 * (ta + tb);
-    curve.D1(mid, point, slope);
-    if ((slope.Coord(axis + 1) > 0) == positive) ta = mid;
-    else tb = mid;
-  }
-  return 0.5 * (ta + tb);
-}
-
-// The edge cut at the extrema of u and of v (sampled at 48 points, the sign changes bisected): each piece is monotone in both.
-void add_pieces(const std::shared_ptr<BRepAdaptor_Curve2d> &curve, std::vector<Piece> &out) {
-  const double first = curve->FirstParameter(), last = curve->LastParameter();
-  if (curve->GetType() == GeomAbs_Line) {
-    out.push_back(make_piece(curve, true, first, last));
-    return;
-  }
-  constexpr int kSamples = 48;
-  std::vector<double> cuts{first};
-  gp_Pnt2d point;
-  gp_Vec2d slope, before;
-  curve->D1(first, point, before);
-  double previous = first;
-  for (int i = 1; i <= kSamples; ++i) {
-    const double t = first + (last - first) * i / kSamples;
-    curve->D1(t, point, slope);
-    for (int axis = 0; axis < 2; ++axis) {
-      const double a = before.Coord(axis + 1), b = slope.Coord(axis + 1);
-      if ((a > 0 && b < 0) || (a < 0 && b > 0)) cuts.push_back(derivative_root(*curve, axis, previous, t));
-    }
-    before = slope;
-    previous = t;
-  }
-  cuts.push_back(last);
-  std::sort(cuts.begin(), cuts.end());
-  for (size_t i = 0; i + 1 < cuts.size(); ++i)
-    if (cuts[i + 1] > cuts[i]) out.push_back(make_piece(curve, false, cuts[i], cuts[i + 1]));
-}
+constexpr int kOrders[] = {4, 5, 6, 8, 12, 16, 24, 32, 48};
+constexpr double kAgree = 1e-11;
+// the parameter-domain area of the strips (order 32) against Green's theorem along the boundary: a dropped or mispaired piece is far above this
+constexpr double kDomain = 1e-11;
 
 struct Sums {
   double m0 = 0, m1[3] = {0, 0, 0}, m2[6] = {0, 0, 0, 0, 0, 0};  // m2: xx yy zz xy xz yz
 };
 
+// `s` is the point relative to the reference point of the shape: the cones of a closed shell are valid from any apex, and the moments about a point near the shape do not cancel.
 inline void accumulate(Sums &sums, bool volume, double weight, const double *s, const double *su, const double *sv) {
   const double nx = su[1] * sv[2] - su[2] * sv[1], ny = su[2] * sv[0] - su[0] * sv[2], nz = su[0] * sv[1] - su[1] * sv[0];
   const double f = weight * (volume ? s[0] * nx + s[1] * ny + s[2] * nz : std::sqrt(nx * nx + ny * ny + nz * nz));
@@ -181,6 +76,9 @@ struct Integrator {
   double u_eps = 0;  // the tolerance of a coincidence in u
   Row row;
   std::vector<std::vector<VNode>> cached;  // per v cell: the basis at the nodes of the whole cell
+  double ref[3] = {0, 0, 0};
+  bool width_only = false;  // only the area of the parameter domain (no surface point)
+  double uv_area = 0;
 
   const std::vector<VNode> &cell_nodes(int cell) {
     std::vector<VNode> &nodes = cached[cell];
@@ -203,6 +101,7 @@ struct Integrator {
       if (!whole) basis_and_derivative(surf.v, span, mid + half * rule_v.x[k], fresh.n, fresh.d);
       const VNode &basis = whole ? (*nodes)[k] : fresh;
       evaluate(surf, row, span, basis, s, su, sv);
+      for (int c = 0; c < 3; ++c) s[c] -= ref[c];
       accumulate(sums, volume, weight_u * half * rule_v.w[k], s, su, sv);
     }
   }
@@ -233,11 +132,16 @@ struct Integrator {
       if (left && right) x = a + span * 0.5 * (1 - std::cos(kPi * s)), weight_u = ds * span * 0.5 * kPi * std::sin(kPi * s);
       else if (left) x = a + span * s * s, weight_u = ds * 2 * span * s;
       else if (right) x = b - span * s * s, weight_u = ds * 2 * span * s;
-      combine_row(surf, u_span, x, row);
+      if (!width_only) combine_row(surf, u_span, x, row);
       for (size_t k = 0; k < pairs.size(); ++k) {
         const int cl = pairs[k].low_cell, ch = pairs[k].high_cell;
-        const double low = std::max(v_at(*bounds[2 * k], x, ok), surf.v.knots[cl]), high = std::min(v_at(*bounds[2 * k + 1], x, ok), surf.v.knots[ch + 1]);
+        const double raw_low = v_at(*bounds[2 * k], x, ok), raw_high = v_at(*bounds[2 * k + 1], x, ok);
         if (!ok) return false;
+        if (width_only) {
+          uv_area += weight_u * (raw_high - raw_low);
+          continue;
+        }
+        const double low = std::max(raw_low, surf.v.knots[cl]), high = std::min(raw_high, surf.v.knots[ch + 1]);
         for (int c = cl; c <= ch; ++c) {
           const double from = c == cl ? low : surf.v.knots[c], to = c == ch ? high : surf.v.knots[c + 1];
           if (to > from) along_v(c, from, to, c > cl && c < ch, weight_u);
@@ -293,15 +197,15 @@ bool integrate(Integrator &integrator, const std::vector<Piece> &pieces) {
   return true;
 }
 
-// The pieces of the boundary of the face, the face taken forward so that its edges bound the parameter domain.
+// The pieces of the boundary of the face, the face taken forward so that its edges bound the parameter domain. False when an edge cannot be read (no pcurve range, a piece that is not monotone).
 bool boundary_of(const TopoDS_Face &face, std::vector<Piece> &pieces) {
   const TopoDS_Face forward = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
   for (TopExp_Explorer edges(forward, TopAbs_EDGE); edges.More(); edges.Next()) {
     const TopoDS_Edge edge = TopoDS::Edge(edges.Current());
     if (edge.Orientation() == TopAbs_INTERNAL || edge.Orientation() == TopAbs_EXTERNAL) continue;
     const auto curve = std::make_shared<BRepAdaptor_Curve2d>(edge, forward);
-    if (curve->FirstParameter() >= curve->LastParameter()) continue;
-    add_pieces(curve, pieces);
+    if (!(curve->FirstParameter() < curve->LastParameter())) return false;
+    if (!add_pieces(curve, edge.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0, pieces)) return false;
   }
   return !pieces.empty();
 }
@@ -318,46 +222,73 @@ bool eligible(const TopoDS_Face &face, Surf &surf) {
   return load_surface(spline, surf);
 }
 
-// Adds the weighted moments of one face to `total`; false when the face cannot be integrated by strips.
-bool face_sums(const TopoDS_Face &face, bool volume, Sums &total) {
-  Surf surf;
-  if (!eligible(face, surf)) return false;
+// The largest disagreement of two sets of moments, each term scaled by what it measures (mass, mass x reach, mass x reach^2) and a floor of rounding.
+double disagreement(const Sums &x, const Sums &y, double reach, bool volume) {
+  const double unit = std::fabs(x.m0) + 1e-15 * (volume ? reach * reach * reach : reach * reach);
+  double worst = std::fabs(x.m0 - y.m0) / unit;
+  for (int k = 0; k < 3; ++k) worst = std::max(worst, std::fabs(x.m1[k] - y.m1[k]) / (unit * reach));
+  for (int k = 0; k < 6; ++k) worst = std::max(worst, std::fabs(x.m2[k] - y.m2[k]) / (unit * reach * reach));
+  return worst;
+}
+
+// The parameter-domain area two ways (strips at order 32, Green along the boundary): a piece the strips dropped or paired wrongly shows as a mismatch.
+bool domain_is_consistent(const Surf &surf, const std::vector<Piece> &pieces) {
+  bool curved = false;
+  for (const Piece &piece : pieces) curved = curved || !piece.line;
+  // straight pieces make the width linear in u: a few nodes are exact
+  Integrator probe{surf, false, gauss_rule(curved ? 16 : 4), gauss_rule(1), Sums(), 0.0, Row(), {}};
+  probe.width_only = true;
+  if (!integrate(probe, pieces)) return false;
+  double u_low = 1e300, u_high = -1e300, v_low = 1e300, v_high = -1e300;
+  for (const Piece &piece : pieces) {
+    u_low = std::min(u_low, piece.u0), u_high = std::max(u_high, piece.u1);
+    v_low = std::min({v_low, piece.v0, piece.v1}), v_high = std::max({v_high, piece.v0, piece.v1});
+  }
+  const double green = std::fabs(domain_area(pieces));
+  const double scale = std::max(green, 1e-3 * (u_high - u_low) * (v_high - v_low));
+  g_domain_gap = std::fabs(green - probe.uv_area) / scale;
+  return g_domain_gap.load() <= kDomain;
+}
+
+// Adds the weighted moments of one face, about `ref`, to `total`; false when the face cannot be integrated by strips (the caller leaves it to BRepGProp).
+bool face_sums(const TopoDS_Face &face, bool volume, const Surf &surf, const double *ref, Sums &total) {
   std::vector<Piece> pieces;
-  if (!boundary_of(face, pieces)) return false;
-  // Orders 4, 6, 10, 16, ... are run in turn until two successive ones agree to kAgree on every moment (the error of the higher one is then far below the difference: Gauss errors fall faster than
-  // geometrically). A smooth face such as a vertex fan agrees at 4 and 6 (1e-13 measured, 13.48); a rough or trimmed one climbs; a face that does not agree by the last order is left to BRepGProp.
+  if (!boundary_of(face, pieces)) return g_refusal = 1, false;
+  // Orders 4, 6, 8, 12, ... are run in turn until three successive ones agree pairwise to kAgree on every moment (Gauss errors fall faster than geometrically, so the error of the highest is then far below the
+  // differences; two orders alone can agree by chance). A smooth face such as a vertex fan agrees from 4 (1e-13 measured, 13.48); a rough or trimmed one climbs; a face that has not agreed by the last order is left to BRepGProp.
+  double reach = 0;
+  for (size_t i = 0; i + 2 < surf.poles.size(); i += 3)
+    for (int k = 0; k < 3; ++k) reach = std::max(reach, std::fabs(surf.poles[i + k] - ref[k]));
   const auto run = [&](int order, Sums &out) {
     if (order > kMaxOrder) return false;
     Integrator integrator{surf, volume, gauss_rule(order), gauss_rule(order), Sums(), 0.0, Row(), {}};
+    for (int k = 0; k < 3; ++k) integrator.ref[k] = ref[k];
     integrator.cached.resize(surf.v.knots.size() - 1);
     if (!integrate(integrator, pieces)) return false;
     out = integrator.sums;
     return true;
-  };
-  double reach = 0;
-  for (double pole : surf.poles) reach = std::max(reach, std::fabs(pole));
-  const auto agree = [&](const Sums &x, const Sums &y) {
-    const double tolerance = kAgree * std::fabs(x.m0) + 1e-15 * (volume ? reach * reach * reach : reach * reach);
-    bool same = std::fabs(x.m0 - y.m0) <= tolerance;
-    for (int k = 0; k < 3; ++k) same = same && std::fabs(x.m1[k] - y.m1[k]) <= tolerance * reach;
-    for (int k = 0; k < 6; ++k) same = same && std::fabs(x.m2[k] - y.m2[k]) <= tolerance * reach * reach;
-    return same;
   };
   Sums sums;
   const int forced = g_order_override.load();
   if (forced > 0) {
     if (!run(forced, sums)) return false;
   } else {
+    if (g_agree_override.load() < 0) return g_refusal = 3, false;  // the test hook: no face converges
+    const double agree = g_agree_override.load() > 0 ? g_agree_override.load() : kAgree;
     Sums lower;
-    if (!run(kOrders[0], lower)) return false;
+    if (!run(kOrders[0], lower)) return g_refusal = 2, false;
+    double previous_gap = 1e300;
     bool converged = false;
     for (size_t k = 1; k < sizeof(kOrders) / sizeof(kOrders[0]) && !converged; ++k) {
-      if (!run(kOrders[k], sums)) return false;
-      converged = agree(sums, lower);
+      if (!run(kOrders[k], sums)) return g_refusal = 2, false;
+      const double gap = disagreement(sums, lower, reach, volume);
+      converged = gap <= agree && previous_gap <= agree;
+      previous_gap = gap;
       lower = sums;
     }
-    if (!converged) return false;
+    if (!converged) return g_refusal = 3, false;
   }
+  if (!domain_is_consistent(surf, pieces)) return g_refusal = 4, false;
   const double sign = volume && face.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0;
   const double scale[3] = {volume ? 1.0 / 3 : 1.0, volume ? 1.0 / 4 : 1.0, volume ? 1.0 / 5 : 1.0};
   total.m0 += sign * scale[0] * sums.m0;
@@ -366,19 +297,46 @@ bool face_sums(const TopoDS_Face &face, bool volume, Sums &total) {
   return true;
 }
 
-// The properties of a set of moments, with the origin as reference point.
+// The same, any failure of OCCT or of the standard library answering "not taken".
+bool face_sums_guarded(const TopoDS_Face &face, bool volume, const double *ref, Sums &total) {
+  try {
+    Surf surf;
+    return eligible(face, surf) && face_sums(face, volume, surf, ref, total);
+  } catch (const Standard_Failure &) {
+    return false;
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
+// The properties of a mass, a centre relative to the reference point `ref` and an inertia matrix about it, with `ref` as the reference point of the result.
 class MomentProps : public GProp_GProps {
  public:
-  explicit MomentProps(const Sums &sums) {
-    dim = sums.m0;
-    g = std::fabs(sums.m0) > 0 ? gp_Pnt(sums.m1[0] / sums.m0, sums.m1[1] / sums.m0, sums.m1[2] / sums.m0) : gp_Pnt(0, 0, 0);
-    const double *q = sums.m2;
-    inertia = gp_Mat(q[1] + q[2], -q[3], -q[4], -q[3], q[0] + q[2], -q[5], -q[4], -q[5], q[0] + q[1]);
+  MomentProps(double mass, const gp_XYZ &centre_from_ref, const gp_Mat &about_ref, const gp_Pnt &ref) : GProp_GProps(ref) {
+    dim = mass;
+    g = gp_Pnt(centre_from_ref);  // GProp_GProps keeps the centre relative to its reference point (CentreOfMass adds `loc`)
+    inertia = about_ref;
   }
 };
 
+// The matrix of inertia about the reference point from the second moments xx yy zz xy xz yz.
+gp_Mat inertia_of(const double *q) { return gp_Mat(q[1] + q[2], -q[3], -q[4], -q[3], q[0] + q[2], -q[5], -q[4], -q[5], q[0] + q[1]); }
+
 bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) {
   if (volume && !all_shells_closed(shape)) return false;
+  // the reference point: the centre of the poles of the first eligible face (near the shape, whatever the shape's place)
+  double ref[3] = {0, 0, 0};
+  bool any = false;
+  for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More() && !any; faces.Next()) {
+    Surf surf;
+    if (!eligible(TopoDS::Face(faces.Current()), surf)) continue;
+    double low[3] = {1e300, 1e300, 1e300}, high[3] = {-1e300, -1e300, -1e300};
+    for (size_t i = 0; i + 2 < surf.poles.size(); i += 3)
+      for (int k = 0; k < 3; ++k) low[k] = std::min(low[k], surf.poles[i + k]), high[k] = std::max(high[k], surf.poles[i + k]);
+    for (int k = 0; k < 3; ++k) ref[k] = 0.5 * (low[k] + high[k]);
+    any = true;
+  }
+  if (!any) return false;
   BRep_Builder builder;
   TopoDS_Compound rest;
   builder.MakeCompound(rest);
@@ -386,7 +344,7 @@ bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) 
   int taken = 0, left = 0;
   for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
     const TopoDS_Face face = TopoDS::Face(faces.Current());
-    if (face_sums(face, volume, total)) {
+    if (face_sums_guarded(face, volume, ref, total)) {
       ++taken;
     } else {
       builder.Add(rest, face);
@@ -394,14 +352,25 @@ bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) 
     }
   }
   if (taken == 0) return false;
-  out = GProp_GProps();
-  out.Add(MomentProps(total));
+  const gp_Pnt centre(ref[0], ref[1], ref[2]);
+  GProp_GProps result = MomentProps(total.m0, std::fabs(total.m0) > 0 ? gp_XYZ(total.m1[0], total.m1[1], total.m1[2]) / total.m0 : gp_XYZ(0, 0, 0), inertia_of(total.m2), centre);
   if (left > 0) {
-    GProp_GProps others;
-    if (volume) BRepGProp::VolumeProperties(rest, others, Standard_False, Standard_False, Standard_False);
-    else BRepGProp::SurfaceProperties(rest, others, Standard_False, Standard_False);
-    out.Add(others);
+    if (volume) {
+      // BRepGProp::VolumeProperties of an open set of faces does not take the origin as apex (measured): face by face with the cones from `ref`, the apex of the faces taken
+      for (TopExp_Explorer faces(rest, TopAbs_FACE); faces.More(); faces.Next()) {
+        const TopoDS_Face face = TopoDS::Face(faces.Current());
+        BRepGProp_Face surface;
+        BRepGProp_Domain domain(face);
+        surface.Load(face);
+        result.Add(BRepGProp_Vinert(surface, domain, centre));
+      }
+    } else {
+      GProp_GProps others;
+      BRepGProp::SurfaceProperties(rest, others, Standard_False, Standard_False);
+      result.Add(others);
+    }
   }
+  out = result;
   return true;
 }
 
@@ -410,6 +379,12 @@ bool fast_properties(const TopoDS_Shape &shape, GProp_GProps &out, bool volume) 
 void set_patch_integrator(bool on) { g_patch_integrator.store(on); }
 
 void set_patch_order(int order) { g_order_override.store(order); }
+
+void set_patch_agreement(double tolerance) { g_agree_override.store(tolerance); }
+
+int last_patch_refusal() { return g_refusal.load(); }
+
+double last_domain_gap() { return g_domain_gap.load(); }
 
 bool fast_surface_properties(const TopoDS_Shape &shape, GProp_GProps &out) { return fast_properties(shape, out, false); }
 
