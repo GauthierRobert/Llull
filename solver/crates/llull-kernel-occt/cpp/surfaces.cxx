@@ -453,7 +453,10 @@ std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<
     GProp_GProps properties;
     BRepGProp::VolumeProperties(result, properties);
     if (!(properties.Mass() > 0)) return nullptr;
-    return wrap(result);
+    std::unique_ptr<Shape> built = wrap(result);
+    // a fitted sweep or loft has multi-span freeform faces: the fixed Gauss rule reads them ~5e-5 off, the adaptive rule (facade.cxx volume_props) to its own estimate
+    if (built != nullptr) built->refined_mass = true;
+    return built;
   } catch (const Standard_Failure &) {
     return nullptr;
   }

@@ -81,8 +81,19 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   Stored colours are validated on load (at most 4096, only on kinds with faces, `sig` only on parametric solids with a unit-bounded normal, a centre inside the box and a sign of 1 or -1). A revolution with few segments (facets beyond 30 degrees) has one
   patch per facet strip. The desktop viewport (`src/ui/viewport`) still draws a primitive in one colour: it must use `faceColorMesh` /
   `faceColorTriangles` like `meshSolidGeometry.ts` and keep coloured primitives out of the shared prototype (UI lane).
+- DONE: fewer, longer fitted faces (`geometry/sweepEval/mergeFaces.ts`). The 24 cubic ring edges of a run chunk, each already fitted across the
+  stations, are joined along u into `FACE_GROUPS = 2` B-spline faces (double knot at a C1 junction, triple at a corner; equal to the edge faces,
+  pinned by `tests/unit/sweep/mergeFaces.test.ts`). One face per run is NOT used: a face closed on itself is not sewn to its own seam by the
+  kernel's sewing (`kernelSheets.ts` already cuts closed faces for that reason), so a ring is cut in two halves that sew to each other. Rational or
+  lower-degree sections (constant circles, profiles with arcs) keep one face per edge.
+  Accuracy: BRepGProp's fixed Gauss rule reads a multi-span bicubic face ~5e-5 off (the merged duct read 452975.6 and the outer sweep 2235883.6
+  where the per-edge layout read 452952.76 / 2235780.32), although an independent 5 x 5 Gauss quadrature of the fitted lateral faces gives the same
+  1940669.07485 for both layouts to 4e-12 (the geometry is identical). The sheet solid therefore asks for the adaptive mass rule
+  (`surfaces.cxx` `sheet_solid`: `refined_mass`, kept through booleans like a deformed body): duct 452952.76408 and outer 2235780.31773, within
+  2e-9 of the per-edge layout.
+  Measured (Linux, 4 cores shared with other work, `llull-kernel` release build, outer minus inner of the two 3-station smooth sweeps of
+  `tests/unit/sweep/stationBreaks.test.ts`, kernel.evaluate of the boolean): 12.9 / 12.8 / 12.1 s before (96 faces per sweep, 10 748 triangles),
+  3.3 / 3.4 / 2.9 s after (8 faces per sweep, 6 824 triangles).
+  Not measured: the LLR-845 plan.
 
 ## Left
-
-- The remaining 15 s: the General Fuse still pairs 96 x 96 long strip faces; one face per run (the 24 ring edges as one closed
-  surface) would cut the pairs ~500x on smooth sections.

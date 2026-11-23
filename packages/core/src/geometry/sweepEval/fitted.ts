@@ -21,6 +21,8 @@ import type { RailIssue } from './rails';
 import { transformPoint, type SectionTransform } from './sectionTransform';
 import { constantEdges, ringEdges, type SectionEdge } from './sectionEdges';
 import { stationRingAt } from './sections';
+import { appendAll } from '../../lib/appendAll';
+import { mergeEdgeFaces } from './mergeFaces';
 import { maxOf, minOf } from '../../lib/arrayExtrema';
 import { hypotOf } from '../../lib/hypotOf';
 
@@ -200,6 +202,7 @@ function fitOnce(
 ): { faceSets: NurbsSurfaceData[][]; deviation: number; cells: number } | FitRefusal {
   const runs = stationRuns(sweep, cells);
   if (!Array.isArray(runs)) return runs;
+  const scale = modelSize(sweep);
   const faceSets: NurbsSurfaceData[][] = constants.map(() => []);
   let deviation = 0;
   let total = 0;
@@ -207,13 +210,16 @@ function fitOnce(
     for (const [set, constant] of constants.entries()) {
       const edgesByStation = Array.from({ length: run.cells + 1 }, (_, k) => edgesAt(sweep, constant, (run.stations[2 * k] as Station).t));
       const edgeCount = (edgesByStation[0] as SectionEdge[]).length;
-      for (let e = 0; e < edgeCount; e++)
-        for (const { first, width } of chunksOf(run.cells)) {
+      for (const { first, width } of chunksOf(run.cells)) {
+        const edgeFaces: NurbsSurfaceData[] = [];
+        for (let e = 0; e < edgeCount; e++) {
           const made = chunkFace(sweep, constant, run.stations, edgesByStation, e, first, width);
           if (made === null) return { code: 'SWG_FIT_UNSUPPORTED', message: 'the station interpolation system is singular' };
-          (faceSets[set] as NurbsSurfaceData[]).push(made.face);
+          edgeFaces.push(made.face);
           deviation = Math.max(deviation, made.deviation);
         }
+        appendAll(faceSets[set] as NurbsSurfaceData[], mergeEdgeFaces(edgeFaces, scale));
+      }
     }
     total += run.cells;
   }

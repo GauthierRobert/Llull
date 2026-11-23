@@ -120,6 +120,7 @@ fn a_sheet_solid_takes_the_expected_number_of_caps() {
     assert!(sheet_solid_capped(&sides, 1e-6, 0).map(|shape| shape.is_none()).unwrap_or(true), "an open prism is not a closed loft");
     let solid = sheet_solid_capped(&sides, 1e-6, 2).unwrap().unwrap();
     assert!((volume(&solid) - 9.0).abs() < 1e-9);
+    assert!(crate::test_bridge::refined_mass(&solid), "a fitted sheet solid asks for the adaptive mass rule (multi-span faces)");
 }
 
 /// SWG M8: MakePipeShell fast path: a constant round section along a straight spine is a cylinder; a probe off the result refuses it.

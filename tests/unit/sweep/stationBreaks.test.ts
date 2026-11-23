@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { type SweepEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { FACE_GROUPS } from '@core/geometry/sweepEval/mergeFaces';
 import { fitSweepFaces, fitToleranceOf, type FittedSweep } from '@core/geometry/sweepEval/fitted';
 
 const PATH = [
@@ -20,7 +21,6 @@ function fitted(stations: ReadonlyArray<Record<string, number>>, extra: Record<s
   return fit;
 }
 
-const RING_EDGES = 24;
 const TAPER = [
   { at: 0, radius: 60 },
   { at: 1, radius: 30 },
@@ -35,14 +35,14 @@ describe('fitted variable sweeps break at their interior stations', () => {
   it('an interior station costs one run, not a finer fit of the whole path', () => {
     const taper = fitted(TAPER);
     const waist = fitted(WAIST);
-    // 3 path segments (curvature breaks) = 3 runs; the station at 0.5 adds one run: 4 runs x 24 edges, within the fit tolerance
-    expect(taper.faces).toHaveLength(3 * RING_EDGES);
-    expect(waist.faces).toHaveLength(4 * RING_EDGES);
+    // 3 path segments (curvature breaks) = 3 runs; the station at 0.5 adds one run; the 24 ring edges of a run are FACE_GROUPS faces
+    expect(taper.faces).toHaveLength(3 * FACE_GROUPS);
+    expect(waist.faces).toHaveLength(4 * FACE_GROUPS);
     expect(waist.cells).toBeLessThanOrEqual(2 * taper.cells);
   });
 
   it('a linear blend (a C0 kink at the station) fits as cheaply', () => {
     const linear = fitted(WAIST, { stationBlend: 'linear' });
-    expect(linear.faces).toHaveLength(4 * RING_EDGES);
+    expect(linear.faces).toHaveLength(4 * FACE_GROUPS);
   });
 });
