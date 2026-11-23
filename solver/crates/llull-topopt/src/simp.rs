@@ -639,7 +639,7 @@ pub fn optimise(
     };
     if run_backtracks > 0 {
         solver.warnings.push(format!(
-            "{BACKTRACK_PREFIX}backtracked {run_backtracks} time(s) in this run ({backtracks} in all; first of this run at iteration {first_backtrack}): a step disconnected the design (compliance 100x past the last accepted design's and over the limit); it was taken back and the moves shortened",
+            "{BACKTRACK_PREFIX}backtracked {run_backtracks} time(s) in this run ({backtracks} in all; first of this run at iteration {first_backtrack}): a step disconnected the design (compliance over the limit and a jump of 100x on the last accepted design's, or 10x when already 100x over the limit); it was taken back and the moves shortened",
         ));
     }
     // the warm start of the next iteration: what a resumed run needs to continue bit for bit
