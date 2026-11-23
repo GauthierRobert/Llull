@@ -21,7 +21,8 @@ import { recordedModel } from '../unit/plant/stress/m3Fixtures';
 import { scene as nozzleScene } from '../unit/plant/stress/nozzleFixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
 import { fixturePcf } from '../unit/plant/fabrication/fabricationFixtures';
-import { addBody, caseParams, metreDocument, ok } from '../unit/aero/cfd/fixtures';
+import { caseParams } from '../unit/aero/cfd/fixtures';
+import { recordedGridStudy } from '../unit/aero/cfd/studyFixtures';
 import { docWith, sampleCatalogFile } from '../unit/aero/fasteners/fixtures';
 import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
@@ -346,10 +347,8 @@ function scanWithLedger(): CadDocument {
   return { ...doc, scan: { ...(doc.scan as NonNullable<CadDocument['scan']>), acceptanceLedger } };
 }
 
-function cfdDocument(): CadDocument {
-  const body = addBody(metreDocument(), 'add_box', { size: [1, 1, 1], position: [0, 0, 0], anchor: 'min' });
-  return ok(body.doc, 'create_cfd_case', caseParams([body.id])).document;
-}
+let gridStudySeed: ReturnType<typeof recordedGridStudy> | undefined;
+const gridStudyFixture = (): ReturnType<typeof recordedGridStudy> => (gridStudySeed ??= recordedGridStudy());
 
 /** The 05 bar with a verified convergence study (PHY-00 VNV-M3): the cae slice with its studies, behind an in-memory artifact port. */
 let lsqSeed: ReturnType<typeof studyBar> | undefined;
@@ -564,7 +563,8 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   cfd: {
     roots: ['cfd'],
-    build: cfdDocument,
+    build: () => gridStudyFixture().doc,
+    ctx: () => gridStudyFixture().ctx,
     query: { name: 'check_cfd', params: constant({}) },
     mutate: { name: 'create_cfd_case', params: (doc) => caseParams(Object.keys(doc.entities).slice(0, 1), { id: 'fuzz' }) },
   },

@@ -101,59 +101,78 @@ export type CfdQuality = 'draft' | 'standard' | 'fine';
 export type CfdDomainRule = 'external_aero' | 'buildings' | 'custom';
 
 export interface CfdFreestream {
-  readonly mach?: number;                    // compressible cases
-  readonly speedMS?: number;                 // low-speed cases (one of mach / speedMS)
-  readonly altitudeM?: number;               // -> 10 AER standard_atmosphere (or explicit air state)
+  readonly mach?: number; // compressible cases
+  readonly speedMS?: number; // low-speed cases (one of mach / speedMS)
+  readonly altitudeM?: number; // -> 10 AER standard_atmosphere (or explicit air state)
   readonly air?: { readonly densityKgM3: number; readonly temperatureK: number; readonly viscosityPaS: number };
-  readonly alphaDeg: number;                 // angle of attack, rotation about the case lateral axis
-  readonly betaDeg: number;                  // sideslip
+  readonly alphaDeg: number; // angle of attack, rotation about the case lateral axis
+  readonly betaDeg: number; // sideslip
 }
 
 export interface CfdBoundaryTag {
   readonly kind: CfdBoundaryKind;
   readonly entityId: string;
-  readonly faceRefs?: readonly string[];     // stable face refs (01 KRN FaceQueryPort) when available; whole entity otherwise
+  readonly faceRefs?: readonly string[]; // stable face refs (01 KRN FaceQueryPort) when available; whole entity otherwise
 }
 
 export interface CfdCase {
   readonly id: string;
-  readonly entityIds: readonly string[];     // bodies in the flow (unioned)
+  readonly entityIds: readonly string[]; // bodies in the flow (unioned)
   readonly excludedEntityIds: readonly string[];
   readonly regime: CfdRegime;
   readonly freestream: CfdFreestream;
-  readonly flowAxis: Vec3;                   // body axis aligned with the free stream at alpha = beta = 0 (default +X)
-  readonly upAxis: Vec3;                     // default +Z
+  readonly flowAxis: Vec3; // body axis aligned with the free stream at alpha = beta = 0 (default +X)
+  readonly upAxis: Vec3; // default +Z
   readonly reference: { readonly areaM2: number; readonly lengthM: number; readonly momentPointM: Vec3 };
-  readonly domain: { readonly rule: CfdDomainRule; readonly box?: { readonly min: Vec3; readonly max: Vec3 }; readonly symmetryPlane?: 'xz' | null };
+  readonly domain: {
+    readonly rule: CfdDomainRule;
+    readonly box?: { readonly min: Vec3; readonly max: Vec3 };
+    readonly symmetryPlane?: 'xz' | null;
+  };
   readonly ground: { readonly enabled: boolean; readonly moving: boolean };
   readonly boundaries: readonly CfdBoundaryTag[];
   readonly quality: CfdQuality;
   readonly cellsPerReferenceLength?: number; // overrides quality
-  readonly solver?: CfdSolver;               // forced; refused outside its range
+  readonly solver?: CfdSolver; // forced; refused outside its range
   readonly outputs: { readonly surfaceFields: readonly string[]; readonly slices: readonly CfdSlice[]; readonly probes: readonly Vec3[] };
 }
 
 export interface CfdResultSummary {
   readonly caseId: string;
-  readonly resultsHash: string;              // sha256 of the result bundle in the store
-  readonly caseHash: string;                 // canonical JSON hash of the case
-  readonly geometryHash: string;             // hash of the exported flow surface
+  readonly resultsHash: string; // sha256 of the result bundle in the store
+  readonly caseHash: string; // canonical JSON hash of the case
+  readonly geometryHash: string; // hash of the exported flow surface
   readonly solver: CfdSolver;
   readonly converged: boolean;
-  readonly forces: { readonly totalN: Vec3; readonly momentNm: Vec3; readonly cd: number; readonly cl: number; readonly cs: number; readonly cm: Vec3; readonly cdAM2: number };
+  readonly forces: {
+    readonly totalN: Vec3;
+    readonly momentNm: Vec3;
+    readonly cd: number;
+    readonly cl: number;
+    readonly cs: number;
+    readonly cm: Vec3;
+    readonly cdAM2: number;
+  };
   readonly perBody: readonly { readonly entityId: string; readonly forceN: Vec3 }[];
-  readonly peaks: readonly { readonly field: string; readonly min: number; readonly max: number; readonly minAt: Vec3; readonly maxAt: Vec3; readonly unit: string }[];
+  readonly peaks: readonly {
+    readonly field: string;
+    readonly min: number;
+    readonly max: number;
+    readonly minAt: Vec3;
+    readonly maxAt: Vec3;
+    readonly unit: string;
+  }[];
   readonly grid: { readonly cells: number; readonly finestCellM: number; readonly levels: number };
   readonly provenance: CfdProvenance;
-  readonly verified: boolean;                // false when replayed without the artifact (05 TR-FEA-05 rule)
+  readonly verified: boolean; // false when replayed without the artifact (05 TR-FEA-05 rule)
 }
 
 export interface CfdProvenance {
-  readonly solverVersion: string;            // llull-compute semver + git hash
+  readonly solverVersion: string; // llull-compute semver + git hash
   readonly device: { readonly backend: 'vulkan' | 'metal' | 'dx12' | 'cpu'; readonly name: string; readonly driver: string };
   readonly wallTimeS: number;
   readonly steps: number;
-  readonly notModelled: readonly string[];   // e.g. ['viscosity'] for Euler, ['wall-resolved boundary layer'] for LBM
+  readonly notModelled: readonly string[]; // e.g. ['viscosity'] for Euler, ['wall-resolved boundary layer'] for LBM
   readonly defaults: readonly { readonly path: string; readonly value: unknown; readonly source: string }[]; // AF-31
 }
 
@@ -168,26 +187,26 @@ A result is **stale** when the current `caseHash` or `geometryHash` differs from
 
 ## 4. Commands (plugin `cfd`, palette group "Flow")
 
-| Name | Kind | Params (sketch) | data | Failure codes |
-| ---- | ---- | --------------- | ---- | ------------- |
-| `create_cfd_case` | mutating | `id`, `entityIds[]`, `regime`, `freestream`, `reference`, `domain`, `ground`, `quality`, `solver?`, `outputs?` | case, defaults named | `CFD_PARAM_INVALID`, `CFD_ENTITY_NOT_FOUND`, `CFD_CASE_EXISTS`, `CFD_REGIME_MISMATCH` |
-| `update_cfd_case` | mutating | `caseId` + any case field | case, results now stale | as above + `CFD_CASE_NOT_FOUND` |
-| `delete_cfd_case` | mutating | `caseId` | — | `CFD_CASE_NOT_FOUND` |
-| `set_cfd_boundary` | mutating | `caseId`, `kind`, `entityId`, `faceRefs?` | boundary list | `CFD_ENTITY_NOT_FOUND`, `CFD_BOUNDARY_CONFLICT` |
-| `prepare_cfd_case` | query, `requiresKernel` | `caseId`, `quality?` | §5.1 report: checks[], surface stats, small features[], domain, blockage, cells, memory, time estimate, solver | `CFD_GEOMETRY_NOT_WATERTIGHT`, `CFD_GEOMETRY_SELF_INTERSECTING`, `CFD_BLOCKAGE_TOO_HIGH`, `CFD_NO_GEOMETRY` (as check rows, not a refusal) |
-| `record_cfd_results` | mutating, validated | `caseId`, `summary` | — | `CFD_RESULT_MISSING`, `CFD_RESULT_HASH_MISMATCH`, `CFD_INPUT_STALE` (no-op with reason) |
-| `cfd_report` | query | `caseId`, `include?: ('forces'\|'peaks'\|'convergence'\|'probes'\|'provenance')[]` | summary, stale, warnings, `reviewRequired` | `CFD_CASE_NOT_FOUND`, `CFD_NO_RESULT`, `CFD_RESULT_STALE` (warning) |
-| `check_cfd` | query | `caseIds?` | pass / warn / fail per case (AF-20) | — |
+| Name                 | Kind                    | Params (sketch)                                                                                                | data                                                                                                           | Failure codes                                                                                                                              |
+| -------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `create_cfd_case`    | mutating                | `id`, `entityIds[]`, `regime`, `freestream`, `reference`, `domain`, `ground`, `quality`, `solver?`, `outputs?` | case, defaults named                                                                                           | `CFD_PARAM_INVALID`, `CFD_ENTITY_NOT_FOUND`, `CFD_CASE_EXISTS`, `CFD_REGIME_MISMATCH`                                                      |
+| `update_cfd_case`    | mutating                | `caseId` + any case field                                                                                      | case, results now stale                                                                                        | as above + `CFD_CASE_NOT_FOUND`                                                                                                            |
+| `delete_cfd_case`    | mutating                | `caseId`                                                                                                       | —                                                                                                              | `CFD_CASE_NOT_FOUND`                                                                                                                       |
+| `set_cfd_boundary`   | mutating                | `caseId`, `kind`, `entityId`, `faceRefs?`                                                                      | boundary list                                                                                                  | `CFD_ENTITY_NOT_FOUND`, `CFD_BOUNDARY_CONFLICT`                                                                                            |
+| `prepare_cfd_case`   | query, `requiresKernel` | `caseId`, `quality?`                                                                                           | §5.1 report: checks[], surface stats, small features[], domain, blockage, cells, memory, time estimate, solver | `CFD_GEOMETRY_NOT_WATERTIGHT`, `CFD_GEOMETRY_SELF_INTERSECTING`, `CFD_BLOCKAGE_TOO_HIGH`, `CFD_NO_GEOMETRY` (as check rows, not a refusal) |
+| `record_cfd_results` | mutating, validated     | `caseId`, `summary`                                                                                            | —                                                                                                              | `CFD_RESULT_MISSING`, `CFD_RESULT_HASH_MISMATCH`, `CFD_INPUT_STALE` (no-op with reason)                                                    |
+| `cfd_report`         | query                   | `caseId`, `include?: ('forces'\|'peaks'\|'convergence'\|'probes'\|'provenance')[]`                             | summary, stale, warnings, `reviewRequired`                                                                     | `CFD_CASE_NOT_FOUND`, `CFD_NO_RESULT`, `CFD_RESULT_STALE` (warning)                                                                        |
+| `check_cfd`          | query                   | `caseIds?`                                                                                                     | pass / warn / fail per case (AF-20)                                                                            | —                                                                                                                                          |
 
 Host transports (CLI, desktop; not registry commands):
 
-| Name | Params | What it does |
-| ---- | ------ | ------------ |
-| `cfd_solve` | `caseId`, `timeoutS?=3600`, `device?: 'auto'\|'gpu'\|'cpu'`, `gridStudy?: boolean` | runs `prepare_cfd_case`; refuses on any fail row; exports the surface; runs `llull-compute flow`; streams progress; stores the bundle; dispatches `record_cfd_results`. `gridStudy` runs three resolutions (ratio 2) and records the GCI |
-| `cfd_streamlines` | `caseId`, `rake` (`line` \| `plane` \| `sphere`), `count`, `field?`, `maxLengthM?` | traces on the stored field (no re-solve), adds a streamline set to the bundle under a new hash, re-records |
-| `cfd_slice` | `caseId`, `plane: { origin, normal }`, `field` | samples a plane, stores it, re-records |
-| `cfd_probe` | `caseId`, `points[]`, `heightAboveGroundM?` | values at points; speed-up ratio U/U_ref when the case has a ground |
-| `cfd_stop` | `caseId` | stops a running solve (the partial result is recorded `converged: false`) |
+| Name              | Params                                                                             | What it does                                                                                                                                                                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cfd_solve`       | `caseId`, `timeoutS?=3600`, `device?: 'auto'\|'gpu'\|'cpu'`, `gridStudy?: boolean` | runs `prepare_cfd_case`; refuses on any fail row; exports the surface; runs `llull-compute flow`; streams progress; stores the bundle; dispatches `record_cfd_results`. `gridStudy` runs three resolutions (ratio 2) and records the GCI |
+| `cfd_streamlines` | `caseId`, `rake` (`line` \| `plane` \| `sphere`), `count`, `field?`, `maxLengthM?` | traces on the stored field (no re-solve), adds a streamline set to the bundle under a new hash, re-records                                                                                                                               |
+| `cfd_slice`       | `caseId`, `plane: { origin, normal }`, `field`                                     | samples a plane, stores it, re-records                                                                                                                                                                                                   |
+| `cfd_probe`       | `caseId`, `points[]`, `heightAboveGroundM?`                                        | values at points; speed-up ratio U/U_ref when the case has a ground                                                                                                                                                                      |
+| `cfd_stop`        | `caseId`                                                                           | stops a running solve (the partial result is recorded `converged: false`)                                                                                                                                                                |
 
 Every command carries `@affects / @invariant / @failure` tags (C2). `cfd_report` sets `reviewRequired: true` with the reason whenever
 the case is tagged `designLoad: true` (AF-33).
@@ -217,8 +236,8 @@ sewn B-rep with no slivers. The steps:
    - thin walls: inward ray from each triangle centroid; local thickness < 2h;
    - gaps: outward ray hitting another part of the surface within 2h;
    - small closed loops of feature edges (holes, bosses) with diameter < 2h.
-   Each row gives entity id, size, position and the remedy: exclude the entity, raise the resolution, or (V1) defeature through 07 FTR
-   `recognize_features`. Features below h vanish or close on the grid; the report makes that visible instead of silent.
+     Each row gives entity id, size, position and the remedy: exclude the entity, raise the resolution, or (V1) defeature through 07 FTR
+     `recognize_features`. Features below h vanish or close on the grid; the report makes that visible instead of silent.
 8. **Openings.** Faces tagged `inlet` / `outlet` become boundary patches; an untagged open nozzle or intake fails the watertight check
    and the remediation names `set_cfd_boundary`.
 9. **Symmetry.** If `domain.symmetryPlane` is set, the body is checked mirror-symmetric within 1e-4 L (Hausdorff on vertices); the
@@ -257,7 +276,7 @@ The report is deterministic for a given document and kernel (AF-13); its canonic
 - **Boundaries:** half-way bounce-back on wall cells (MVP), interpolated bounce-back with cut distances (Bouzidi [R10], V1);
   velocity inlet by equilibrium distributions; pressure outlet with zero-gradient extrapolation; free-slip side walls and symmetry
   by specular reflection; ground as no-slip, or moving at the free-stream speed when `ground.moving` (cars). The atmospheric
-  boundary-layer inlet uses the log law u(z) = (u*/κ) ln((z + z0)/z0) [R3] (V1).
+  boundary-layer inlet uses the log law u(z) = (u\*/κ) ln((z + z0)/z0) [R3] (V1).
 - **Forces:** momentum exchange on wall links, summed per body with a deterministic fixed-order tree reduction.
 - **Steady state:** time averaging starts when the running mean of the drag over one flow-through time changes by < 0.5 %
   (named default); the run stops when it changes by < 0.1 % over two flow-throughs, or at the step limit (`converged: false`).
@@ -323,62 +342,62 @@ The report is deterministic for a given document and kernel (AF-13); its canonic
   slices, legend with unit and range). `render_view overlay=cfd:<caseId>:<field>` renders the same overlay to PNG (AF-22).
 - **No MCP surface** (owner directive 1).
 
-| Code | Meaning |
-| ---- | ------- |
-| CFD_PARAM_INVALID | a value outside its documented range |
-| CFD_CASE_EXISTS / CFD_CASE_NOT_FOUND | duplicate or unknown case id |
-| CFD_ENTITY_NOT_FOUND / CFD_NO_GEOMETRY | unknown ids / only 2D entities |
-| CFD_KERNEL_REQUIRED | overlapping bodies need a kernel union |
-| CFD_GEOMETRY_NOT_WATERTIGHT | open or non-manifold edges (counts + positions) |
-| CFD_GEOMETRY_SELF_INTERSECTING | intersecting triangle pairs |
-| CFD_SMALL_FEATURE | feature below 2 cells (warning) |
-| CFD_BLOCKAGE_TOO_HIGH | blockage above the rule limit |
-| CFD_BOUNDARY_CONFLICT | an entity tagged twice with different kinds |
-| CFD_REGIME_MISMATCH | Mach outside the solver range |
-| CFD_UNSTABLE_PARAMS | LBM relaxation time too close to 0.5 |
-| CFD_MEMORY_EXCEEDED | the estimate exceeds device memory (largest fitting resolution given) |
-| CFD_SOLVER_MISSING | `llull-compute` not found (install hint; generic code `NATIVE_TOOL_MISSING`) |
-| CFD_GPU_UNAVAILABLE | no usable adapter; CPU fallback used (warning) |
-| CFD_NOT_CONVERGED | stopped by time / step limit before the criterion |
-| CFD_SOLVER_FAILED | NaN / negative density / sidecar crash (log tail attached) |
-| CFD_TIMEOUT | `--timeout` reached (partial result recorded) |
-| CFD_NO_RESULT / CFD_RESULT_STALE | no result / case or geometry changed since the result |
-| CFD_RESULT_MISSING / CFD_RESULT_HASH_MISMATCH / CFD_INPUT_STALE | record-command trust checks (§4.1 of 05, same rules) |
+| Code                                                            | Meaning                                                                      |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| CFD_PARAM_INVALID                                               | a value outside its documented range                                         |
+| CFD_CASE_EXISTS / CFD_CASE_NOT_FOUND                            | duplicate or unknown case id                                                 |
+| CFD_ENTITY_NOT_FOUND / CFD_NO_GEOMETRY                          | unknown ids / only 2D entities                                               |
+| CFD_KERNEL_REQUIRED                                             | overlapping bodies need a kernel union                                       |
+| CFD_GEOMETRY_NOT_WATERTIGHT                                     | open or non-manifold edges (counts + positions)                              |
+| CFD_GEOMETRY_SELF_INTERSECTING                                  | intersecting triangle pairs                                                  |
+| CFD_SMALL_FEATURE                                               | feature below 2 cells (warning)                                              |
+| CFD_BLOCKAGE_TOO_HIGH                                           | blockage above the rule limit                                                |
+| CFD_BOUNDARY_CONFLICT                                           | an entity tagged twice with different kinds                                  |
+| CFD_REGIME_MISMATCH                                             | Mach outside the solver range                                                |
+| CFD_UNSTABLE_PARAMS                                             | LBM relaxation time too close to 0.5                                         |
+| CFD_MEMORY_EXCEEDED                                             | the estimate exceeds device memory (largest fitting resolution given)        |
+| CFD_SOLVER_MISSING                                              | `llull-compute` not found (install hint; generic code `NATIVE_TOOL_MISSING`) |
+| CFD_GPU_UNAVAILABLE                                             | no usable adapter; CPU fallback used (warning)                               |
+| CFD_NOT_CONVERGED                                               | stopped by time / step limit before the criterion                            |
+| CFD_SOLVER_FAILED                                               | NaN / negative density / sidecar crash (log tail attached)                   |
+| CFD_TIMEOUT                                                     | `--timeout` reached (partial result recorded)                                |
+| CFD_NO_RESULT / CFD_RESULT_STALE                                | no result / case or geometry changed since the result                        |
+| CFD_RESULT_MISSING / CFD_RESULT_HASH_MISMATCH / CFD_INPUT_STALE | record-command trust checks (§4.1 of 05, same rules)                         |
 
 ## 8. Performance and robustness budgets
 
 Memory per cell (derived, float32):
 
-| Solver | Stored per cell | Bytes / cell |
-| ------ | --------------- | ------------ |
-| LBM D3Q19, AA pattern (one copy) | 19 distributions + flags + averaged u, p | 19×4 + 4 + 16 ≈ 96 |
-| LBM D3Q19, two copies (A/B) | 2 × 19 distributions + flags + averages | 2×19×4 + 20 ≈ 172 |
-| LBM D3Q27 cumulant, AA | 27 distributions + flags + averages | 27×4 + 20 ≈ 128 |
+| Solver                           | Stored per cell                                        | Bytes / cell                   |
+| -------------------------------- | ------------------------------------------------------ | ------------------------------ |
+| LBM D3Q19, AA pattern (one copy) | 19 distributions + flags + averaged u, p               | 19×4 + 4 + 16 ≈ 96             |
+| LBM D3Q19, two copies (A/B)      | 2 × 19 distributions + flags + averages                | 2×19×4 + 20 ≈ 172              |
+| LBM D3Q27 cumulant, AA           | 27 distributions + flags + averages                    | 27×4 + 20 ≈ 128                |
 | Euler (SSP-RK3, local time step) | 5 conserved × 2 stages + 5×3 gradients + dt + geometry | (10 + 15 + 1) × 4 + ≈ 40 ≈ 144 |
 
 So an 8 GB device holds about 80 M LBM cells (D3Q19, AA) or about 50 M Euler cells, after a 20 % reserve. The exact figures for
 each case come from `memoryEstimate.ts` and are checked against measured allocation (VC-CFD-50).
 
-| Target (to be measured, VC-CFD-54) | Value |
-| ---------------------------------- | ----- |
-| LBM throughput, mid-range 8 GB GPU | ≥ 1000 M cell-updates / s (D3Q19 float32) |
-| Draft case, 16 M cells, steady | ≤ 10 min |
-| `prepare_cfd_case` on a 1 M-triangle model | ≤ 5 s |
-| Streamlines, 4096 seeds | ≤ 2 s |
-| Overlay frame rate, 1 M surface vertices + 4096 lines | ≥ 30 fps |
+| Target (to be measured, VC-CFD-54)                    | Value                                     |
+| ----------------------------------------------------- | ----------------------------------------- |
+| LBM throughput, mid-range 8 GB GPU                    | ≥ 1000 M cell-updates / s (D3Q19 float32) |
+| Draft case, 16 M cells, steady                        | ≤ 10 min                                  |
+| `prepare_cfd_case` on a 1 M-triangle model            | ≤ 5 s                                     |
+| Streamlines, 4096 seeds                               | ≤ 2 s                                     |
+| Overlay frame rate, 1 M surface vertices + 4096 lines | ≥ 30 fps                                  |
 
 Robustness: NaN / negative density / negative pressure stop the run with `CFD_SOLVER_FAILED` and the location; the sidecar never
 writes into the document; a crashed sidecar leaves the document unchanged.
 
 ## 9. Test strategy
 
-| VC | Test |
-| -- | ---- |
+| VC            | Test                                                                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | VC-CFD-10..16 | `tests/unit/aero/cfd/prepare.test.ts`, `caseCommands.test.ts` (watertight, orientation, small features, domain sizing, blockage, memory estimate, replay hash) |
-| VC-CFD-20..26 | `solver/crates/llull-flow-lbm/tests/*.rs` (Poiseuille order, Taylor-Green, sphere drag, GPU vs CPU) + CLI scenarios |
-| VC-CFD-30..35 | `solver/crates/llull-flow-euler/tests/*.rs` (Sod, wedge, stagnation, entropy order) + CLI scenarios |
-| VC-CFD-40..43 | `solver/crates/llull-flow-core/tests/streamlines.rs` (analytic sphere field), `tests/component/CfdOverlay.test.tsx` (legend, ranges) |
-| VC-CFD-50..55 | `server/tests/cfd/*.test.ts` (refusals, fallback, stale, record trust model) + `npm run quality:cfd` (scenario plans, performance log) |
+| VC-CFD-20..26 | `solver/crates/llull-flow-lbm/tests/*.rs` (Poiseuille order, Taylor-Green, sphere drag, GPU vs CPU) + CLI scenarios                                            |
+| VC-CFD-30..35 | `solver/crates/llull-flow-euler/tests/*.rs` (Sod, wedge, stagnation, entropy order) + CLI scenarios                                                            |
+| VC-CFD-40..43 | `solver/crates/llull-flow-core/tests/streamlines.rs` (analytic sphere field), `tests/component/CfdOverlay.test.tsx` (legend, ranges)                           |
+| VC-CFD-50..55 | `server/tests/cfd/*.test.ts` (refusals, fallback, stale, record trust model) + `npm run quality:cfd` (scenario plans, performance log)                         |
 
 Scenario plans in `validation/plans/` are CLI scripts (AF-23) run by the benchmark runner (`llull run_benchmarks`, PHY-00) against
 `validation/expected_results.json`. The GPU suites run where a GPU is present and are skipped with a logged reason otherwise; the
@@ -386,21 +405,21 @@ CPU backend runs everywhere, so every VC has a CI path. Coverage 90/85/90/90 app
 
 ## 10. Delivery plan
 
-| Milestone | Content | Depends on | Effort |
-| --------- | ------- | ---------- | ------ |
-| M1 | Data model, case commands, `prepare_cfd_case` (§5.1 complete), `check_cfd`, VC-CFD-10..16 | 01 KRN union (done) | 3 eng-weeks |
-| M2 | = RS-0: `solver/` workspace, shared `llull-gpu` / `llull-protocol`, voxeliser, LBM D3Q19 BGK + LES, forces, CPU backend, bundling, `cfd_solve` transport, `record_cfd_results`, `cfd_report`, VC-CFD-20..22, 26, 50..52, 55 | M1 | 6 eng-weeks |
-| M3 | Viewport overlay + legend, `render_view` overlay, streamlines, slices, probes, Flow panel, VC-CFD-40..43 | M2 | 3 eng-weeks |
-| M4 | Euler cut-cell octree solver, adaptation, VC-CFD-30..35, shuttle-like CLI scenario | M2 | 7 eng-weeks |
-| M5 | Grid study (`gridStudy`, GCI), pinned literature benchmarks (Schäfer-Turek 3D, AIJ, ONERA M6), performance gate | M3, M4 | 3 eng-weeks |
-| V1 | cumulant D3Q27, interpolated walls, ABL inlet + comfort maps, defeaturing via 07 FTR, time-accurate + animation, viscous drag estimate | M5 | ≈ 8 eng-weeks |
-| V2 | PyFR body-fitted mode (bundled CPython, Netgen mesh), nozzle / plume (11 FLD) | V1 | ≈ 8 eng-weeks |
+| Milestone | Content                                                                                                                                                                                                                     | Depends on          | Effort        |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------- |
+| M1        | Data model, case commands, `prepare_cfd_case` (§5.1 complete), `check_cfd`, VC-CFD-10..16                                                                                                                                   | 01 KRN union (done) | 3 eng-weeks   |
+| M2        | = RS-0: `solver/` workspace, shared `llull-gpu` / `llull-protocol`, voxeliser, LBM D3Q19 BGK + LES, forces, CPU backend, bundling, `cfd_solve` transport, `record_cfd_results`, `cfd_report`, VC-CFD-20..22, 26, 50..52, 55 | M1                  | 6 eng-weeks   |
+| M3        | Viewport overlay + legend, `render_view` overlay, streamlines, slices, probes, Flow panel, VC-CFD-40..43                                                                                                                    | M2                  | 3 eng-weeks   |
+| M4        | Euler cut-cell octree solver, adaptation, VC-CFD-30..35, shuttle-like CLI scenario                                                                                                                                          | M2                  | 7 eng-weeks   |
+| M5        | Grid study (`gridStudy`, GCI), pinned literature benchmarks (Schäfer-Turek 3D, AIJ, ONERA M6), performance gate                                                                                                             | M3, M4              | 3 eng-weeks   |
+| V1        | cumulant D3Q27, interpolated walls, ABL inlet + comfort maps, defeaturing via 07 FTR, time-accurate + animation, viscous drag estimate                                                                                      | M5                  | ≈ 8 eng-weeks |
+| V2        | PyFR body-fitted mode (bundled CPython, Netgen mesh), nozzle / plume (11 FLD)                                                                                                                                               | V1                  | ≈ 8 eng-weeks |
 
 MVP (M1–M5): about 22 eng-weeks. M3 also gives FEA its first 3D result overlay (same overlay component, 05 field data).
 
 ## 11. Open questions / decisions needed
 
-1. **Rust toolchain in the repo** — *resolved 2026-10-18*: the owner made the stack non-fixed ("always use the best-suited
+1. **Rust toolchain in the repo** — _resolved 2026-10-18_: the owner made the stack non-fixed ("always use the best-suited
    stack", `conventions.md` C7). CFD lives in the shared `solver/` Cargo workspace (RS1); CI and the desktop build gain `cargo`.
 2. **FEA port location.** `FeaToolsPort` lives in `packages/mcp`; when MCP is removed it must move to `server/` (transport types) and
    core (`FeArtifactPort` already is). This pack uses the target location from the start.
@@ -631,3 +650,32 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   kills the run, a shared run recorded once, wiring) and `cfdQueryNative.test.ts` (real binary: the probe equals the solve probe, slice,
   reproducible CPU streamlines, `cfd_stop` of a long solve). VC-CFD-40 (overlay legend) and 43 (GPU budget, 4096 seeds in at most 2 s)
   stay open.
+
+### M3b audit and `record_cfd_grid_study` (first M5 slice) — 2026-11-23
+
+- **Audit.** Everything the M3 query side asked for was already built in M3a: `cfd_probe`, `cfd_slice`, `cfd_streamlines` (native `flow-query`,
+  CPU + GPU) and `cfd_stop` (host lifecycle, `sharedRun.ts`) with their Rust and TypeScript tests. Still open and untouched here: nested
+  grid boxes (a multi-resolution LBM in `llull-flow-lbm`: a solver rewrite, not a slice), AA-pattern storage, the overlay / Flow panel
+  (UI lane), VC-CFD-40 / 43.
+- **`record_cfd_grid_study`** (plugin command, toolset `flow`; the pure half of the §4 `cfd_solve gridStudy` option). Params `caseId`,
+  `resultsHashes` (three bundle hashes, any order), `quantity` (`cd` default, `cl`, `cdAM2`), `safetyFactor` (default 1.25). Each bundle is
+  read from `ctx.cfdResults`, re-hashed, and must belong to the case: same case id and flow surface (current), and a case hash equal to the
+  case's own or to the case with only `cellsPerReferenceLength = round(L / cellM)`. The coefficient is recomputed from the bundle forces and the
+  case reference (`cfdSummary`). Sorted finest cell first, refinement ratios at least 1.1, then `@lib/convergence` `gciTriplet` (Celik 2008):
+  observed order, Richardson value, fine-grid GCI (21 and 32), asymptotic ratio; a non-monotone triplet is recorded with its status and no
+  GCI; unconverged solves are named in the summary. A fine value of exactly 0 has no relative GCI: the study stores `relativeUndefined: true`
+  and the absolute `gciAbs` (unit of the coefficient) and the summary prints that. Stored in `doc.cfd.studies[caseId]` (replacing an earlier
+  study), validated on load by a strict zod schema (`studySchema.ts`: every field finite, levels finest first, key equal to `caseId`, no study
+  without its case).
+  Each study carries `verified`. **Unverified replay** (as `record_cfd_results`): the optional `study` param is the study the transport returned.
+  With a result store, every bundle must be in it (any missing: `CFD_RESULT_MISSING`) and the given study must equal the recomputed one
+  (`CFD_RESULT_HASH_MISMATCH` otherwise). Only when the machine has NO result store (a replay elsewhere) is the echoed study kept, with
+  `verified: false` and the summary "UNVERIFIED (no result store on this machine)", and only if it parses under the strict schema, is of this
+  case, its three level hashes are exactly the three given ones, its `quantity` and `safetyFactor` equal the request's (defaults applied:
+  `CFD_PARAM_INVALID`), its `caseHash` is the case's current hash (`CFD_INPUT_STALE`), and the case has no verified study yet (an unverified study
+  never replaces a verified one). Any other case refuses `CFD_RESULT_MISSING`, nothing is kept.
+  **Case lifecycle.** `update_cfd_case` reports `gridStudyStale` (data) and "its grid study is now stale" (summary) when the case hash differs from
+  the study's `caseHash`; the study is kept, like a stale result. `delete_cfd_case` removes `doc.cfd.studies[caseId]` with the case and its result.
+- **Host wiring left (server / protocol lanes).** `cfd_solve gridStudy` must run the case at three resolutions (ratio 2: `cellsPerReferenceLength`
+  override n, 2n, 4n or n, n/2, n/4 within 8..2048 and the memory check), store the three bundles and dispatch `record_cfd_results` for the
+  finest plus `record_cfd_grid_study`; the `gridStudy` flag is not yet in `packages/protocol/src/nativeTools.ts`.
