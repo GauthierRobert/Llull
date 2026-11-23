@@ -38,20 +38,48 @@ function triangleNormals(tris: IndexedTriangles): Vec3[] {
   const normals: Vec3[] = [];
   for (let t = 0; t < tris.count; t++) {
     const [a, b, c] = triangleAt(tris, t);
-    normals.push(normalize3OrZero(cross3(sub3(b, a), sub3(c, a))));
+    const normal = cross3(sub3(b, a), sub3(c, a));
+    const longest = Math.max(len3(sub3(b, a)), len3(sub3(c, a)), len3(sub3(c, b)));
+    // a sliver (pole fans, collapsed quads) has no direction: relative to its own size, not to a fixed epsilon
+    normals.push(len3(normal) <= 1e-9 * longest * longest ? [0, 0, 0] : normalize3OrZero(normal));
   }
   return normals;
 }
 
-/** Triangles sharing each edge, keyed by vertex identity (index when indexed, else rounded position). */
+/**
+ * Welded vertex ids of an unindexed mesh: corners closer than a tolerance relative to the mesh size share an id (a spatial hash that also
+ * looks in the neighbouring cells, so two corners straddling a cell border still weld).
+ */
+function weldedIds(tris: IndexedTriangles): (i: number) => string {
+  let [min, max] = [Infinity, -Infinity];
+  const count = tris.count * 3;
+  for (let i = 0; i < count; i++) for (const x of tris.vertex(i)) [min, max] = [Math.min(min, x), Math.max(max, x)];
+  const tolerance = Math.max((max - min) * 1e-6, 1e-12);
+  const cells = new Map<string, number[]>();
+  const ids: number[] = [];
+  const cellOf = (v: Vec3): [number, number, number] => [
+    Math.floor(v[0] / tolerance),
+    Math.floor(v[1] / tolerance),
+    Math.floor(v[2] / tolerance),
+  ];
+  for (let i = 0; i < count; i++) {
+    const v = tris.vertex(i);
+    const [cx, cy, cz] = cellOf(v);
+    let found = -1;
+    for (let dx = -1; dx <= 1 && found < 0; dx++)
+      for (let dy = -1; dy <= 1 && found < 0; dy++)
+        for (let dz = -1; dz <= 1 && found < 0; dz++)
+          for (const other of cells.get(`${cx + dx},${cy + dy},${cz + dz}`) ?? [])
+            if (distanceSq3(tris.vertex(other), v) <= tolerance * tolerance) found = ids[other] as number;
+    ids.push(found < 0 ? i : found);
+    if (found < 0) cells.set(`${cx},${cy},${cz}`, [...(cells.get(`${cx},${cy},${cz}`) ?? []), i]);
+  }
+  return (i) => String(ids[i] ?? i);
+}
+
+/** Triangles sharing each edge, keyed by vertex identity (index when indexed, else welded position). */
 function edgeNeighbours(tris: IndexedTriangles, indexed: boolean): number[][] {
-  const key = (i: number): string =>
-    indexed
-      ? String(i)
-      : tris
-          .vertex(i)
-          .map((x) => Math.round(x * 1e6))
-          .join(',');
+  const key = indexed ? String : weldedIds(tris);
   const byEdge = new Map<string, number[]>();
   for (let t = 0; t < tris.count; t++)
     for (let k = 0; k < 3; k++) {
@@ -127,10 +155,16 @@ function meshFaces(mesh: MeshData): MeshFaces {
   return { closest, patch, partition, centroid };
 }
 
-/** Triangles an entry colours: its patch by ordinal (`face`, parametric solids) else the smooth patch around `near`. */
-function entryTriangles(faces: MeshFaces, owner: () => readonly number[], entry: FaceColor): Iterable<number> {
-  if (entry.face === undefined) return faces.patch(faces.closest(entry.near).triangle);
-  return owner().flatMap((patchOf, t) => (patchOf === entry.face ? [t] : []));
+/** Triangles an entry colours: its patch by ordinal (`face`, parametric solids, while the patch count is the one it was picked at) else the smooth patch around `near`. */
+function entryTriangles(
+  faces: MeshFaces,
+  parts: () => { readonly owner: readonly number[]; readonly seeds: readonly number[] },
+  entry: FaceColor,
+): Iterable<number> {
+  const { owner, seeds } = entry.face === undefined ? { owner: [], seeds: [] } : parts();
+  if (entry.face === undefined || (entry.of !== undefined && entry.of !== seeds.length))
+    return faces.patch(faces.closest(entry.near).triangle);
+  return owner.flatMap((patchOf, t) => (patchOf === entry.face ? [t] : []));
 }
 
 /**
@@ -142,9 +176,9 @@ export function faceColorTriangles(mesh: MeshData, faceColors: readonly FaceColo
   const colors: (string | undefined)[] = Array.from({ length: indexedTriangles(mesh).count }, () => undefined);
   if (faceColors.length === 0) return colors;
   const faces = meshFaces(mesh);
-  let owners: readonly number[] | undefined;
-  const owner = (): readonly number[] => (owners ??= faces.partition().owner);
-  for (const entry of faceColors) for (const t of entryTriangles(faces, owner, entry)) colors[t] = entry.color;
+  let parts: ReturnType<MeshFaces['partition']> | undefined;
+  const partition = (): ReturnType<MeshFaces['partition']> => (parts ??= faces.partition());
+  for (const entry of faceColors) for (const t of entryTriangles(faces, partition, entry)) colors[t] = entry.color;
   return colors;
 }
 
@@ -171,7 +205,7 @@ export function mergeFaceColors(
   byOrdinal = false,
 ): FaceColorMerge {
   const faces = meshFaces(mesh);
-  const { owner } = faces.partition();
+  const { owner, seeds } = faces.partition();
   const applied: Vec3[] = [];
   const ordinals: number[] = [];
   const missed: Vec3[] = [];
@@ -186,9 +220,13 @@ export function mergeFaceColors(
     }
   }
   const seedOf = (entry: FaceColor): number =>
-    entry.face === undefined ? faces.closest(entry.near).triangle : owner.findIndex((patchOf) => patchOf === entry.face);
+    entry.face === undefined || (entry.of !== undefined && entry.of !== seeds.length)
+      ? faces.closest(entry.near).triangle
+      : owner.findIndex((patchOf) => patchOf === entry.face);
   const kept = existing.filter((entry) => !covered.has(seedOf(entry)));
-  const added = applied.map((near, i): FaceColor => ({ near, color: color ?? '', ...(byOrdinal ? { face: ordinals[i] as number } : {}) }));
+  const added = applied.map(
+    (near, i): FaceColor => ({ near, color: color ?? '', ...(byOrdinal ? { face: ordinals[i] as number, of: seeds.length } : {}) }),
+  );
   return { faceColors: color === undefined ? kept : [...kept, ...added], applied, ordinals, missed };
 }
 
@@ -198,15 +236,9 @@ export function ordinalPoints(mesh: MeshData): Vec3[] {
   return faces.partition().seeds.map(faces.centroid);
 }
 
-/** The first triangle of every coloured patch of `mesh` with its colour (a bake maps these triangles through its transform). @pure */
-export function faceColorSeeds(mesh: MeshData, faceColors: readonly FaceColor[]): Array<{ triangle: number; color: string }> {
-  const colors = faceColorTriangles(mesh, faceColors);
-  const seeds: Array<{ triangle: number; color: string }> = [];
-  for (const triangle of meshFaces(mesh).partition().seeds) {
-    const color = colors[triangle];
-    if (color !== undefined) seeds.push({ triangle, color });
-  }
-  return seeds;
+/** Every coloured triangle of `mesh` with its colour, in triangle order (a bake into a triangle soup re-picks each one). @pure */
+export function coloredTriangles(mesh: MeshData, faceColors: readonly FaceColor[]): Array<{ triangle: number; color: string }> {
+  return faceColorTriangles(mesh, faceColors).flatMap((color, triangle) => (color === undefined ? [] : [{ triangle, color }]));
 }
 
 /** Entity kinds that carry `faceColors`: mesh solids and the parametric solids whose triangles are fixed by their parameters. */

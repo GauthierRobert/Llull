@@ -68,6 +68,8 @@ export interface FaceColor {
   readonly color: string;
   /** Parametric solids only: ordinal of the patch in triangle order (`faceColors.ts` partition); wins over `near`, so a resize keeps the side. */
   readonly face?: number;
+  /** Patch count when `face` was picked: with another count now, `face` is stale and `near` re-picks the face. */
+  readonly of?: number;
 }
 
 /** Per-face display colours (`set_face_color`), drawn over `color`; resolved on the current triangles (a mesh solid's `mesh`, a primitive's tessellation) by `faceColorTriangles`. */

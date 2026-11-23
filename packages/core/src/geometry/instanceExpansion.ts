@@ -9,7 +9,8 @@ import { composeEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { instanceToWorld } from './instanceTransform';
 import { scaleGeometry } from './scaleGeometry';
 import { soupIndices } from './meshVolume';
-import { faceColorMesh, faceColorSeeds, faceColorsOf } from './faceColors';
+import { faceColorMesh, coloredTriangles, faceColorsOf } from './faceColors';
+import { cross3, len3, sub3 } from '../lib/vec3';
 import { appendAll } from '../lib/appendAll';
 
 const ORIGIN3: Vec3 = [0, 0, 0];
@@ -43,13 +44,15 @@ function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id
     for (const corner of mirrored ? [a, c, b] : [a, b, c]) appendAll(positions, toWorld(corner));
   }
   const painted = faceColorsOf(child);
-  // the baked triangles keep the child's order: each coloured patch is re-picked at its first triangle's centroid in the world frame
+  // the baked triangles keep the child's order and are not welded (one patch each): every coloured triangle is re-picked at its centroid
   const faceColors =
     painted === undefined
       ? []
-      : faceColorSeeds(faceColorMesh(child), painted).map(({ triangle, color }) => {
+      : coloredTriangles(faceColorMesh(child), painted).flatMap(({ triangle, color }) => {
           const [a, b, c] = (triangles[triangle] ?? [ORIGIN3, ORIGIN3, ORIGIN3]).map(toWorld) as [Vec3, Vec3, Vec3];
-          return { near: [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3] as Vec3, color };
+          const area2 = len3(cross3(sub3(b, a), sub3(c, a)));
+          const near: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+          return area2 > 1e-12 ? [{ near, color }] : [];
         });
   return {
     id,

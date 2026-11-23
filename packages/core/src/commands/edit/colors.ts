@@ -78,6 +78,14 @@ export const setFaceColor = defineCommand({
       .min(1)
       .optional()
       .describe('One point per face to colour (give this or faces).'),
+    patchCount: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        'Recorded with faces: how many patches the primitive had when they were picked; when it differs now, faces are stale and faceNear (if given) is used instead.',
+      ),
     faces: z
       .array(z.number().int().min(0))
       .min(1)
@@ -87,7 +95,7 @@ export const setFaceColor = defineCommand({
       ),
     color: z.string().optional().describe('Hex colour "#rrggbb". Omit to clear the colour of the picked faces.'),
   }),
-  run: (doc, { id, faceNear, faces, color }): CommandResult => {
+  run: (doc, { id, faceNear, faces: recordedFaces, patchCount, color }): CommandResult => {
     const entity = doc.entities[id];
     if (entity === undefined) return noop(doc, `set_face_color: entity '${id}' does not exist.`);
     if (!acceptsFaceColors(entity))
@@ -98,14 +106,20 @@ export const setFaceColor = defineCommand({
     if (color !== undefined && !isHexColor(color)) return noop(doc, `set_face_color: color must be a #rrggbb hex string (got "${color}").`);
     const mesh = faceColorMesh(entity);
     const parametric = entity.kind !== 'mesh';
-    if (faces !== undefined && !parametric)
+    if (recordedFaces !== undefined && !parametric)
       return noop(
         doc,
         `set_face_color: faces (patch ordinals) apply to parametric primitives; '${id}' is a mesh solid, pick with faceNear.`,
       );
-    if (faces === undefined && faceNear === undefined)
+    if (recordedFaces === undefined && faceNear === undefined)
       return noop(doc, 'set_face_color: give faceNear (points on the faces) or faces (patch ordinals).');
-    const centres = faces === undefined ? [] : ordinalPoints(mesh);
+    const centres = parametric ? ordinalPoints(mesh) : [];
+    const stale = recordedFaces !== undefined && patchCount !== undefined && patchCount !== centres.length;
+    const faces = stale ? undefined : recordedFaces;
+    const staleNote = !stale
+      ? ''
+      : ` The primitive now has ${centres.length} patches, not the ${patchCount} the ordinals were recorded for, so ordinals ${(recordedFaces ?? []).join(', ')} may name other faces: ${faceNear === undefined ? 'dropped (no faceNear to re-pick)' : 're-picked by faceNear'}.`;
+    if (stale && faceNear === undefined) return noop(doc, `set_face_color: stale patch ordinals.${staleNote}`);
     const outOfRange = (faces ?? []).filter((ordinal) => ordinal >= centres.length);
     const local: Vec3[] =
       faces === undefined
@@ -124,7 +138,7 @@ export const setFaceColor = defineCommand({
     else delete next.faceColors;
     const action = color === undefined ? 'cleared the colour of' : `set ${color} on`;
     const skipped = missed.length === 0 ? '' : ` Skipped points off the solid: ${missed.map(formatPoint).join(', ')}.`;
-    const dropped = outOfRange.length === 0 ? '' : ` Dropped faces with no such patch: ${outOfRange.join(', ')}.`;
+    const dropped = (outOfRange.length === 0 ? '' : ` Dropped faces with no such patch: ${outOfRange.join(', ')}.`) + staleNote;
     const kept = parametric ? ` Patch ordinals ${merge.ordinals.join(', ')} are recorded and replayed; faceNear is then ignored.` : '';
     return {
       ...changed(
@@ -132,7 +146,8 @@ export const setFaceColor = defineCommand({
         `set_face_color: ${action} ${merge.applied.length} face(s) of ${id} (${merge.faceColors.length} coloured face(s) in total).${skipped}${dropped}${kept}`,
         [id],
       ),
-      ...(parametric ? { recordExtras: { faces: merge.ordinals } } : {}),
+      ...(parametric ? { recordExtras: { faces: merge.ordinals, patchCount: centres.length } } : {}),
+      ...(outOfRange.length > 0 || stale ? { data: { ok: false, droppedFaces: outOfRange, stalePatchCount: stale } } : {}),
     };
   },
 });

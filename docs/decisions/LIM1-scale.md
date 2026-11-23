@@ -69,10 +69,10 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   revolution as well as mesh solids. A face is a smooth patch of the primitive's own tessellation (`geometry/faceColors.ts` `faceColorMesh`).
   Selector (regeneration): a stored `near` point cannot follow a resize (a box taller by 2 moves its top away from the pick, and the replayed
   command no-ops), so on a primitive the command records the ORDINAL of each picked patch (patches numbered in triangle order; a primitive keeps
-  its triangle order when its size changes) as `recordExtras.faces`. A replayed step carries `faces`, which wins over `faceNear`, and the
+  its triangle order when its size changes) as `recordExtras.faces`. A replayed step carries `faces` and `patchCount`; `faces` wins over `faceNear` while the primitive still has that many patches, otherwise (an extrusion profile gaining or losing a vertex, revolution segments changing) the ordinals are stale and `faceNear` re-picks the face, or the colour is dropped when there is none. A partial drop reaches the `edit_step_params` summary (the step result carries `data.ok: false`). The stored `FaceColor.of` does the same at render time, and the
   stored `FaceColor.face` ordinal is what render / glTF resolve. Chosen over a named side ("+z"): it covers every kind with one mechanism
   and needs no per-kind table; the cost is that a change of topology (an extrusion profile with another point count, a revolution with another
-  segment count) renumbers patches, and a replayed ordinal with no patch is dropped with a warning in the summary. Mesh solids keep the
+  segment count) renumbers patches, and a replayed ordinal with no patch is dropped with a warning in the summary. Baked instance meshes are unwelded triangle soups, so a bake re-picks every coloured triangle. Mesh solids keep the
   `near` pick (their mesh is fixed). `render_view` draws the kind's own quads / rings coloured by their nearest triangle (no diagonal seams);
   glTF / GLB export and instance expansion (parametric non-uniform scale: picks scaled; baked: patches re-picked on the baked mesh) carry them.
   Stored colours are validated (at most 4096, only on kinds with faces). A revolution with few segments (facets beyond 30 degrees) has one

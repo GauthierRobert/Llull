@@ -11,11 +11,13 @@ import {
   type Vec3,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { faceColorMesh, faceColorTriangles } from '@core/geometry/faceColors';
+import { faceColorMesh, faceColorTriangles, ordinalPoints } from '@core/geometry/faceColors';
 import { localTriangles } from '@core/geometry/solidTriangles';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import { tessellateEntity } from '@core/commands/render/polygons';
 import { cross3, sub3 } from '@lib/vec3';
+import { serializeDocument } from '@core/commands/persistence/serialization';
+import { xy } from '../helpers/xy';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 import { build } from '../helpers/addEntity';
 import { parsedGltf } from '../helpers/gltfExport';
@@ -288,6 +290,65 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     }
   });
 
+  const paintedTriangles = (e: Entity): number[] =>
+    faceColorTriangles(faceColorMesh(e), (e as MeshSolidEntity).faceColors ?? []).flatMap((c, t) => (c === undefined ? [] : [t]));
+  const stepOf = (doc: CadDocument, name: string): string => doc.featureHistory.find((step) => step.name === name)?.id as string;
+  const edit = (doc: CadDocument, name: string, params: Record<string, unknown>): { document: CadDocument; summary: string } =>
+    execute(doc, 'edit_step_params', { stepId: stepOf(doc, name), params });
+  const SQUARE = xy(0, 0, 2, 0, 2, 2, 0, 2);
+
+  it.each([
+    ['a vertex inserted into the profile', xy(0, 0, 1, -0.5, 2, 0, 2, 2, 0, 2)],
+    ['a vertex removed from the profile', xy(0, 0, 2, 0, 2, 2)],
+  ])('an extrusion whose patch count changes re-picks +X by faceNear (%s)', (_name, profile) => {
+    const base = execute(createEmptyDocument(), 'extrude_profile', { profile: SQUARE, depth: 4 });
+    const id = base.affected[0] as string;
+    const pick: Vec3 = [2, 1, 2];
+    const painted = execute(base.document, 'set_face_color', { id, faceNear: [pick], color: RED });
+    expect(painted.document.featureHistory.at(-1)?.params).toMatchObject({ patchCount: expect.any(Number) });
+    const edited = edit(painted.document, 'extrude_profile', { profile, depth: 4 });
+    const entity = edited.document.entities[id] as Entity;
+    const normals = colouredPatchNormals(entity);
+    expect(normals.length).toBeGreaterThan(0);
+    for (const n of normals) expect(n[0]).toBeCloseTo(1);
+    const fresh = execute(execute(createEmptyDocument(), 'extrude_profile', { profile, depth: 4 }).document, 'set_face_color', {
+      id,
+      faceNear: [pick],
+      color: RED,
+    });
+    expect(paintedTriangles(entity)).toEqual(paintedTriangles(fresh.document.entities[id] as Entity));
+    expect(edited.summary).toContain('re-picked by faceNear');
+  });
+
+  it('a revolution that goes from 32 to 6 segments re-picks the strip by faceNear', () => {
+    const profile = xy(1, 0, 3, 0, 3, 2, 1, 2);
+    const base = execute(createEmptyDocument(), 'revolve_profile', { profile, axis: 'z', segments: 32 });
+    const id = base.affected[0] as string;
+    const painted = execute(base.document, 'set_face_color', { id, faceNear: [[3, 0, 1]], color: RED }).document;
+    const edited = edit(painted, 'revolve_profile', { profile, axis: 'z', segments: 6 });
+    const fresh = execute(
+      execute(createEmptyDocument(), 'revolve_profile', { profile, axis: 'z', segments: 6 }).document,
+      'set_face_color',
+      { id, faceNear: [[3, 0, 1]], color: RED },
+    ).document;
+    expect(paintedTriangles(edited.document.entities[id] as Entity)).toEqual(paintedTriangles(fresh.entities[id] as Entity));
+    expect(paintedTriangles(edited.document.entities[id] as Entity).length).toBeGreaterThan(0);
+  });
+
+  it('stale ordinals without a faceNear are dropped by name; a partial drop is reported by the replay', () => {
+    const { doc, id } = redBox();
+    expectNoOp(execute(doc, 'set_face_color', { id, faces: [1], patchCount: 99, color: RED }), doc, 'stale patch ordinals');
+    const live = execute(doc, 'set_face_color', { id, faceNear: [[0, 0, 2]], faces: [1, 99], color: RED });
+    expect(live.data).toMatchObject({ ok: false, droppedFaces: [99] });
+    const painted = execute(doc, 'set_face_color', { id, faceNear: [[0, 0, 2]], color: RED });
+    const step = painted.document.featureHistory.at(-1)?.id as string;
+    const broken = execute(painted.document, 'edit_step_params', {
+      stepId: step,
+      params: { ...(painted.document.featureHistory.at(-1)?.params as object), faces: [1, 99], patchCount: 6 },
+    });
+    expect(broken.summary).toContain('FAILED during regeneration');
+  });
+
   it('a replayed faces list wins over faceNear; unknown ordinals are dropped and a mesh solid refuses faces', () => {
     const { doc, id } = redBox();
     const r = execute(doc, 'set_face_color', { id, faceNear: [[500, 0, 0]], faces: [1, 99], color: '#00ff00' });
@@ -299,28 +360,56 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     expectNoOp(execute(mesh.doc, 'set_face_color', { id: mesh.id, faces: [0], color: '#00ff00' }), mesh.doc, 'mesh solid');
   });
 
-  it('an instance with a non-uniform scale keeps the picked side in both export modes and render_view', () => {
-    const { doc, id } = coloured([1, 0, 0]);
-    let withComponent = execute(doc, 'create_component', { name: 'C', entityIds: [id] }).document;
-    const componentId = Object.keys(withComponent.components)[0] as string;
-    withComponent = execute(withComponent, 'insert_instance', { componentId, position: [20, 0, 0], scale: [1, 1, 0.25] }).document;
-    const instance = Object.values(withComponent.entities)
+  const RED = '#ff0000';
+  const paintedCount = (e: Entity): number =>
+    faceColorTriangles(faceColorMesh(e), (e as MeshSolidEntity).faceColors ?? []).filter((c) => c !== undefined).length;
+  /** The coloured solid placed once, with `scale`: the expanded child, the doc and the red polygons its render draws. */
+  const instanced = (
+    add: [string, Record<string, unknown>],
+    pick: Vec3,
+    scale: Vec3,
+  ): { source: Entity; child: Entity; doc: CadDocument; red: Array<{ normal: Vec3 }> } => {
+    const base = execute(createEmptyDocument(), add[0], add[1]);
+    const id = base.affected[0] as string;
+    const painted = execute(base.document, 'set_face_color', { id, faceNear: [pick], color: RED }).document;
+    let doc = execute(painted, 'create_component', { name: 'C', entityIds: [id] }).document;
+    const componentId = Object.keys(doc.components)[0] as string;
+    doc = execute(doc, 'insert_instance', { componentId, position: [20, 0, 0], scale }).document;
+    const instance = Object.values(doc.entities)
       .filter((e) => e.kind === 'instance')
       .at(-1) as InstanceEntity;
-    const [child] = expandInstance(instance, withComponent.components[componentId] as Component);
-    for (const n of colouredPatchNormals(child as Entity)) expect(n[0]).toBeCloseTo(1);
-    const baked = execute(withComponent, 'insert_instance', { componentId, position: [40, 0, 0], scale: [1, 1, -1] }).document;
-    const bakedInstance = Object.values(baked.entities)
-      .filter((e) => e.kind === 'instance')
-      .at(-1) as InstanceEntity;
-    const [bakedChild] = expandInstance(bakedInstance, baked.components[componentId] as Component);
-    expect(bakedChild?.kind).toBe('mesh');
-    expect((bakedChild as MeshSolidEntity).faceColors?.length).toBe(1);
+    const [child] = expandInstance(instance, doc.components[componentId] as Component) as [Entity];
+    const red = tessellateEntity(child).filter((polygon) => polygon.color === RED);
+    return { source: painted.entities[id] as Entity, child, doc, red };
+  };
+
+  it('a parametric non-uniform instance scale keeps the +X side: render polygons, glTF in both modes, render_view', () => {
+    const { child, doc, red } = instanced(['add_box', { size: [2, 3, 4] }], [1, 0, 0], [1, 1, 0.25]);
+    expect(child.kind).toBe('box');
+    expect(red).toHaveLength(1);
+    expect(red[0]?.normal[0]).toBeCloseTo(1);
     for (const mode of ['gpu', 'expand']) {
-      const gltf = parsedGltf<{ nodes: Array<{ name?: string }> }>(withComponent, { instancing: mode });
+      const gltf = parsedGltf<{ nodes: Array<{ name?: string }> }>(doc, { instancing: mode });
       expect(gltf.nodes.some((node) => node.name?.includes('/face #ff0000'))).toBe(true);
     }
+    const svg = (execute(doc, 'render_view', { mode: 'vector', view: 'right' }).data as { svg: string }).svg;
+    expect(svg).toMatch(/fill="rgb\([1-9]\d*,0,0\)"/);
   });
+
+  it.each([
+    ['a mirrored box', ['add_box', { size: [2, 3, 4] }], [1, 0, 0], [1, 1, -1], 2],
+    ['a squashed cylinder', ['add_cylinder', { radius: 1, height: 2 }], [1, 0, 0], [1, 0.15, 1], 48],
+    ['a flattened sphere (pole slivers skipped)', ['add_sphere', { radius: 1 }], [1, 0, 0], [1, 1, 0.1], 352],
+  ] as Array<[string, [string, Record<string, unknown>], Vec3, Vec3, number]>)(
+    'a baked %s paints as many triangles as the source side (%i)',
+    (_name, add, pick, scale, count) => {
+      const { source, child, red } = instanced(add, pick, scale);
+      expect(child.kind).toBe('mesh');
+      expect(paintedCount(source)).toBeGreaterThanOrEqual(count);
+      expect(paintedCount(child)).toBe(count);
+      expect(red).toHaveLength(count);
+    },
+  );
 
   it('draws a coloured box as six quads, not twelve triangles', () => {
     const { doc } = coloured([0, 0, 2]);
@@ -350,5 +439,29 @@ describe('primitive face colours survive regeneration, instancing and drawing', 
     const rectangle = execute(createEmptyDocument(), 'draw_rectangle', { width: 1, height: 1 });
     const flat = rectangle.document.entities[rectangle.affected[0] as string];
     expect(validateEntityValue({ ...flat, faceColors: [entry] })).toContain('not a rectangle');
+  });
+
+  it.each([0.01, 1, 100])('a sphere of radius %d is one smooth patch (no absolute weld or sliver tolerance)', (radius) => {
+    const sphere = execute(createEmptyDocument(), 'add_sphere', { radius });
+    const entity = sphere.document.entities[sphere.affected[0] as string] as Entity;
+    expect(ordinalPoints(faceColorMesh(entity))).toHaveLength(1);
+  });
+
+  it('load_document refuses 4097 face colours and face colours on a rectangle', () => {
+    const { doc, id } = redBox();
+    const entry = { near: [0, 0, 0], color: RED };
+    const stored = (entity: unknown, key: string): CadDocument => ({
+      ...doc,
+      entities: { ...doc.entities, [key]: entity as Entity },
+      order: [...doc.order, key],
+    });
+    const tooMany = { ...doc.entities[id], faceColors: Array.from({ length: 4097 }, () => entry) };
+    const rectangle = execute(createEmptyDocument(), 'draw_rectangle', { width: 1, height: 1 });
+    const flat = { ...rectangle.document.entities[rectangle.affected[0] as string], id: 'flat-1', faceColors: [entry] };
+    for (const bad of [stored(tooMany, id), stored(flat, 'flat-1')]) {
+      const r = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(bad) });
+      expect(r.document.entities).toEqual({});
+      expect(r.summary).toContain('faceColors');
+    }
   });
 });
