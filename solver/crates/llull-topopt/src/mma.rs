@@ -47,7 +47,14 @@ pub struct Mma {
     xold2: Vec<f64>,
     /// Outer steps taken so far.
     iteration: usize,
+    /// Rewinds so far: the smallest asymptote distance is halved once for each (it keeps the bisection onto a limit going).
+    narrowed: usize,
+    /// Steps taken since the last rewind, saturating at `SETTLE_STEPS`.
+    settled: usize,
 }
+
+/// Steps after a [`Mma::rewind`] during which [`Mma::settling`] holds: the small moves of the narrowed asymptotes are no convergence.
+const SETTLE_STEPS: usize = 10;
 
 /// The separable approximation of one step: `Σ_j p_j / (upp_j − x_j) + q_j / (x_j − low_j)` per function.
 struct Approximation {
@@ -65,29 +72,41 @@ struct Approximation {
 
 impl Mma {
     pub fn new(n: usize, m: usize) -> Mma {
-        Mma { n, m, low: vec![0.0; n], upp: vec![0.0; n], xold1: vec![0.0; n], xold2: vec![0.0; n], iteration: 0 }
+        Mma { n, m, low: vec![0.0; n], upp: vec![0.0; n], xold1: vec![0.0; n], xold2: vec![0.0; n], iteration: 0, narrowed: 0, settled: 0 }
     }
 
     pub fn iteration(&self) -> usize {
         self.iteration
     }
 
-    /// The state a later [`Mma::restore`] continues from: `low, upp, xold1, xold2` (4 n values) and the step count.
+    /// True for `SETTLE_STEPS` steps after a rewind: the moves are small because the asymptotes were narrowed, not because the design converged.
+    pub fn settling(&self) -> bool {
+        self.narrowed > 0 && self.settled < SETTLE_STEPS
+    }
+
+    /// The state a later [`Mma::restore`] continues from: `low, upp, xold1, xold2` (4 n values) and the step count; two more
+    /// values (rewinds, steps since) once a rewind happened, so other runs keep the plain layout.
     pub fn state(&self) -> (Vec<f64>, usize) {
-        let mut values = Vec::with_capacity(4 * self.n);
+        let mut values = Vec::with_capacity(4 * self.n + 2);
         for part in [&self.low, &self.upp, &self.xold1, &self.xold2] {
             values.extend_from_slice(part);
+        }
+        if self.narrowed > 0 {
+            values.extend([self.narrowed as f64, self.settled as f64]);
         }
         (values, self.iteration)
     }
 
-    /// Restores a [`Mma::state`]; `None` when the lengths do not match this optimiser.
-    pub fn restore(n: usize, m: usize, values: &[f64], iteration: usize) -> Option<Mma> {
-        if values.len() != 4 * n {
+    /// Restores a [`Mma::state`]; `None` when the lengths do not match this optimiser. A plain 4 n layout written after `backtracks`
+    /// rewinds (before the state carried them) restores as that many rewinds, already settled.
+    pub fn restore(n: usize, m: usize, values: &[f64], iteration: usize, backtracks: usize) -> Option<Mma> {
+        if values.len() != 4 * n && values.len() != 4 * n + 2 {
             return None;
         }
         let part = |k: usize| values[k * n..(k + 1) * n].to_vec();
-        Some(Mma { n, m, low: part(0), upp: part(1), xold1: part(2), xold2: part(3), iteration })
+        let (narrowed, settled) =
+            if values.len() == 4 * n { (backtracks, SETTLE_STEPS) } else { (values[4 * n] as usize, values[4 * n + 1] as usize) };
+        Some(Mma { n, m, low: part(0), upp: part(1), xold1: part(2), xold2: part(3), iteration, narrowed, settled })
     }
 
     /// Undoes the last step after the caller found its design `x_bad` unusable: returns the design that step started from, halves the
@@ -103,6 +122,7 @@ impl Mma {
             *upp = x + 0.5 * (*upp - x);
         }
         self.xold2 = x.clone();
+        (self.narrowed, self.settled) = (self.narrowed + 1, 0);
         // steps 1 and 2 start from fixed asymptotes: continue from the (shrunk) stored ones
         self.iteration = self.iteration.max(2);
         Some(x)
@@ -114,6 +134,7 @@ impl Mma {
         assert!(x.len() == self.n && df0.len() == self.n && f.len() == self.m && df.len() == self.m, "MMA: sizes do not match");
         assert!(df.iter().all(|row| row.len() == self.n), "MMA: constraint gradient rows must have n entries");
         self.iteration += 1;
+        self.settled = (self.settled + 1).min(SETTLE_STEPS);
         let approximation = self.approximate(x, df0, f, df, bounds);
         let lambda = solve_dual(&approximation, self.m);
         let x_new = primal(&approximation, &lambda);
@@ -126,6 +147,8 @@ impl Mma {
 
     fn approximate(&self, x: &[f64], df0: &[f64], f: &[f64], df: &[Vec<f64>], bounds: Bounds) -> Approximation {
         let range = (bounds.xmax - bounds.xmin).max(1e-5);
+        // the smallest asymptote distance; a rewind lowers it (halved per halving outstanding) so repeated backtracks can keep narrowing
+        let floor = 0.01 * range * 0.5f64.powi(self.narrowed.min(30) as i32);
         let (low, upp): (Vec<f64>, Vec<f64>) = if self.iteration <= 2 {
             (x.iter().map(|v| v - ASY_INIT * range).collect(), x.iter().map(|v| v + ASY_INIT * range).collect())
         } else {
@@ -141,7 +164,7 @@ impl Mma {
                     };
                     let low = x[j] - factor * (self.xold1[j] - self.low[j]);
                     let upp = x[j] + factor * (self.upp[j] - self.xold1[j]);
-                    (low.clamp(x[j] - 10.0 * range, x[j] - 0.01 * range), upp.clamp(x[j] + 0.01 * range, x[j] + 10.0 * range))
+                    (low.clamp(x[j] - 10.0 * range, x[j] - floor), upp.clamp(x[j] + floor, x[j] + 10.0 * range))
                 })
                 .unzip()
         };
@@ -430,12 +453,12 @@ mod tests {
         }
         let (state, iteration) = mma.state();
         assert_eq!(state.len(), 8);
-        let mut restored = Mma::restore(2, 1, &state, iteration).unwrap();
+        let mut restored = Mma::restore(2, 1, &state, iteration, 0).unwrap();
         let (df0, f, df) = problem(&x);
         let from_restored = restored.step(&x, &df0, &f, &df, bounds);
         let from_original = mma.step(&x, &df0, &f, &df, bounds);
         assert_eq!(from_restored, from_original);
-        assert!(Mma::restore(2, 1, &state[..7], iteration).is_none());
+        assert!(Mma::restore(2, 1, &state[..7], iteration, 0).is_none());
     }
 
     /// Two coupled dense rows, the second never binding (a copy of the first shifted far into feasibility), give the one-row result
@@ -484,5 +507,40 @@ mod tests {
         let (values, _) = mma.state();
         assert!((values[2] - values[0] - 0.5 * width).abs() < 1e-12, "asymptotes halved around the start");
         assert!(mma.rewind(&start).is_none(), "already at the previous design");
+    }
+
+    #[test]
+    fn a_rewind_extends_the_state_and_holds_convergence_for_a_few_steps() {
+        let mut mma = Mma::new(2, 1);
+        let bounds = Bounds { xmin: 0.0, xmax: 1.0, move_limit: 0.2 };
+        let start = [0.5, 0.5];
+        let next = mma.step(&start, &[1.0, -1.0], &[0.1], &[vec![1.0, 1.0]], bounds);
+        assert!(!mma.settling() && mma.state().0.len() == 8, "plain layout before any rewind");
+        mma.rewind(&next).unwrap();
+        assert!(mma.settling());
+        let (values, iteration) = mma.state();
+        assert_eq!(values.len(), 10);
+        let mut restored = Mma::restore(2, 1, &values, iteration, 0).unwrap();
+        assert!(restored.settling());
+        for _ in 0..SETTLE_STEPS {
+            assert!(restored.settling());
+            restored.step(&start, &[1.0, -1.0], &[0.1], &[vec![1.0, 1.0]], bounds);
+        }
+        assert!(!restored.settling(), "released after SETTLE_STEPS steps");
+        assert_eq!(restored.state().0.len(), 10, "the rewind count stays (it lowers the asymptote floor)");
+    }
+
+    #[test]
+    fn a_plain_layout_after_backtracks_restores_as_rewound_and_settled() {
+        let mut mma = Mma::new(2, 1);
+        let bounds = Bounds { xmin: 0.0, xmax: 1.0, move_limit: 0.2 };
+        mma.step(&[0.5, 0.5], &[1.0, -1.0], &[0.1], &[vec![1.0, 1.0]], bounds);
+        let (values, iteration) = mma.state();
+        let restored = Mma::restore(2, 1, &values, iteration, 3).unwrap();
+        assert!(!restored.settling());
+        let (extended, _) = restored.state();
+        assert_eq!(extended.len(), 10);
+        assert_eq!(&extended[8..], &[3.0, SETTLE_STEPS as f64]);
+        assert_eq!(Mma::restore(2, 1, &values, iteration, 0).unwrap().state().0.len(), 8);
     }
 }

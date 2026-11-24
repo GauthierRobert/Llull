@@ -11,7 +11,9 @@ fn folder(name: &str) -> PathBuf {
     dir
 }
 
-fn run(dir: &Path, job: &Value) -> Result<(Value, Vec<f32>, String), (String, String)> {
+type RunOutcome = Result<(Value, Vec<f32>, String), (String, String)>;
+
+fn run(dir: &Path, job: &Value) -> RunOutcome {
     std::fs::write(dir.join("job.json"), serde_json::to_vec(job).unwrap()).unwrap();
     let mut events = Vec::new();
     let result = llull_topopt::job::run(dir, &mut events).map_err(|e| (e.code.to_string(), e.message));
@@ -554,20 +556,25 @@ fn a_3d_collapse_under_a_large_limit_is_backtracked() {
     eprintln!("cantilever 1000: volume {volume}, compliance {compliance}, {} it, {}\n{events}", result["iterations"], result["status"]);
     assert!(field.iter().all(|v| v.is_finite()) && backtracks_in(&events) >= 1, "{events}");
     assert!(volume > 0.0 && result["constraints"][0]["satisfied"] == true, "the design must stay feasible: {result}");
+    // after the backtracks the row is the active one (a min-volume optimum), not a feasible design far below the limit
+    // (before: converged at volume 0.0066, compliance 308, after 6 backtracks and a shrunk step under changeTol)
+    assert!(compliance >= 0.99 * 1000.0, "the compliance row must be active, got {compliance}");
+    assert!(volume < 0.005, "volume {volume}");
     let _ = std::fs::remove_dir_all(dir);
 }
 
-/// A limit the design cannot meet after the backtracks: the run says so (TOP_CONSTRAINT_UNSATISFIED), never a NaN.
+/// A tight limit (10, the design collapses repeatedly on the way): the backtracks keep halving the moves until the run lands on the
+/// limit instead of ending far from it (before: unsatisfied at 13.2226, TOP_CONSTRAINT_UNSATISFIED).
 #[test]
-fn a_3d_collapse_that_cannot_be_repaired_ends_unsatisfied_and_says_so() {
+fn a_3d_collapse_under_a_tight_limit_is_repaired_onto_the_limit() {
     let dir = folder("cantilever-10");
     let (result, field, events) = run(&dir, &cantilever_min_volume(10.0, json!({}))).unwrap();
     eprintln!("cantilever 10: {} {} it\n{events}", result["constraints"], result["iterations"]);
     assert!(field.iter().all(|v| v.is_finite()) && backtracks_in(&events) >= 1, "{events}");
-    assert!(events.contains("TOP_CONSTRAINT_UNSATISFIED") && !events.contains("TOP_SOLVER_FAILED"), "{events}");
-    assert_eq!(result["constraints"][0]["satisfied"], false);
+    assert!(!events.contains("TOP_SOLVER_FAILED") && !events.contains("TOP_CONSTRAINT_UNSATISFIED"), "{events}");
+    assert_eq!(result["constraints"][0]["satisfied"], true);
     let value = result["constraints"][0]["value"].as_f64().unwrap();
-    assert!((13.0..13.5).contains(&value), "pinned at 13.2226 against the limit 10, got {value}");
+    assert!((9.9..=10.0001).contains(&value), "pinned at 9.98 against the limit 10, got {value}");
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -606,4 +613,75 @@ fn a_run_resumes_bit_for_bit_across_a_backtrack() {
         let _ = std::fs::remove_dir_all(part);
     }
     let _ = std::fs::remove_dir_all(full);
+}
+
+/// 3D cantilever, limit 1000: the backtracks (iterations 3 to 18) and the settle window after them are cut through at several places;
+/// the resumed run equals the whole one byte for byte, MMA state (rewind count, settle counter) included.
+#[test]
+fn a_3d_run_resumes_bit_for_bit_across_backtracks_and_the_settle_window() {
+    let total = 30;
+    let job = cantilever_min_volume(1000.0, json!({}));
+    let full = folder("cant-full");
+    let mut whole = job.clone();
+    whole["settings"]["maxIterations"] = json!(total);
+    let (expected, _, _) = run(&full, &whole).unwrap();
+    let state_of = |dir: &Path| -> Value { serde_json::from_slice(&std::fs::read(dir.join("state.json")).unwrap()).unwrap() };
+    for cut in [4, 17, 22] {
+        let part = folder(&format!("cant-part{cut}"));
+        let mut first = job.clone();
+        first["settings"]["maxIterations"] = json!(cut);
+        run(&part, &first).unwrap();
+        let start = start_files(&part);
+        std::fs::copy(part.join("mma.f64"), part.join("mma.f64.start")).unwrap();
+        let mut state = state_of(&part);
+        state["mma"]["file"] = json!("mma.f64.start");
+        std::fs::write(part.join("start_state.json"), serde_json::to_vec(&state).unwrap()).unwrap();
+        let (result, _, _) = run(&part, &with_start(job.clone(), &start, cut, total - cut)).unwrap();
+        let names = ["design.f64", "field.bin", "displacements.f64", "mma.f64"];
+        assert_eq!(files(&full, &names), files(&part, &names), "cut at {cut}");
+        assert_eq!(state_of(&full), state_of(&part), "cut at {cut}");
+        assert_eq!(result["compliance"], expected["compliance"], "cut at {cut}");
+        let _ = std::fs::remove_dir_all(part);
+    }
+    let _ = std::fs::remove_dir_all(full);
+}
+
+fn resume_with_mma_values(name: &str, cut: usize, edit: impl Fn(&mut Vec<f64>)) -> (PathBuf, RunOutcome) {
+    let job = cantilever_min_volume(1000.0, json!({}));
+    let part = folder(name);
+    let mut first = job.clone();
+    first["settings"]["maxIterations"] = json!(cut);
+    run(&part, &first).unwrap();
+    let start = start_files(&part);
+    let mut values: Vec<f64> =
+        std::fs::read(part.join("mma.f64")).unwrap().chunks_exact(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect();
+    edit(&mut values);
+    let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
+    std::fs::write(part.join("mma.f64.start"), bytes).unwrap();
+    let mut state: Value = serde_json::from_slice(&std::fs::read(part.join("state.json")).unwrap()).unwrap();
+    state["mma"]["file"] = json!("mma.f64.start");
+    state["mma"]["length"] = json!(values.len());
+    std::fs::write(part.join("start_state.json"), serde_json::to_vec(&state).unwrap()).unwrap();
+    let outcome = run(&part, &with_start(job, &start, cut, 5));
+    (part, outcome)
+}
+
+/// A checkpoint of the plain 4 n layout written after backtracks (before the state carried the rewind count) still resumes, now as
+/// rewound and settled: the next checkpoint is in the extended layout.
+#[test]
+fn a_plain_layout_mma_state_after_a_backtrack_resumes_as_rewound() {
+    let (part, outcome) = resume_with_mma_values("old-layout", 22, |values| values.truncate(4 * 144));
+    outcome.unwrap();
+    let length = std::fs::read(part.join("mma.f64")).unwrap().len() / 8;
+    assert_eq!(length, 4 * 144 + 2, "rewinds and settle counter appended once the state has backtracks");
+    let _ = std::fs::remove_dir_all(part);
+}
+
+#[test]
+fn a_wrong_length_mma_state_is_refused_not_restarted() {
+    let (part, outcome) = resume_with_mma_values("bad-length", 5, |values| values.truncate(4 * 144 - 1));
+    let (code, message) = outcome.unwrap_err();
+    assert_eq!(code, "NATIVE_JOB_INPUT");
+    assert!(message.contains("mma.f64 length"), "{message}");
+    let _ = std::fs::remove_dir_all(part);
 }
