@@ -2,7 +2,7 @@
 // slice / streamline files the 3D overlay and the legend draw. The panel fills the feeds from the transports; closing it clears them.
 
 import { create } from 'zustand';
-import type { SliceFile, StreamlinesFile } from '@ui/viewport/3d/cfd/cfdFiles';
+import type { SliceFile, StreamlinesFile } from '@aero/index';
 
 export type LayerFeed<T> =
   | { readonly status: 'idle' }

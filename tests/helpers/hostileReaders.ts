@@ -12,7 +12,7 @@ import { GLTF_READERS } from './hostile/gltfReaders';
 import { EXCHANGE_READERS } from './hostile/exchangeReaders';
 import { MESH_READERS } from './hostile/meshReaders';
 import { PLANT_DATA_READERS } from './hostile/plantDataReaders';
-import { UI_READERS } from './hostile/uiReaders';
+import { CFD_FILE_READERS } from './hostile/cfdFileReaders';
 import { XML_READERS } from './hostile/xmlReaders';
 
 export type { HostileReader } from './hostile/types';
@@ -31,5 +31,5 @@ export const HOSTILE_READERS: readonly HostileReader[] = [
   ...PLANT_DATA_READERS,
   ...CORE_READERS,
   ...FLIGHT_READERS,
-  ...UI_READERS,
+  ...CFD_FILE_READERS,
 ];

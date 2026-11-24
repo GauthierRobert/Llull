@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSliceFile, parseStreamlinesFile } from '@ui/viewport/3d/cfd/cfdFiles';
+import { parseSliceFile, parseStreamlinesFile } from '@aero/index';
 import { scaleFraction, sliceCorners, sliceTexels, streamlineSegments } from '@ui/viewport/3d/cfd/cfdPaint';
 import { sliceBytes, streamlinesBytes } from './../helpers/cfdFiles';
 

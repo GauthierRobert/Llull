@@ -70,6 +70,39 @@ describe('cfd_solve gridStudy', () => {
     expect(single.calls).toHaveLength(1);
   });
 
+  it('forwards quantity and safetyFactor of the transport to record_cfd_grid_study', async () => {
+    const host = hostOf(modelAt(32), store);
+    const runner = fakeRunner({ byGrid: (h) => 0.5 + 8 * h * h });
+    const outcome = await runCfdTool('cfd_solve', { caseId: 're100', gridStudy: true, quantity: 'cl', safetyFactor: 3 }, host, {
+      store,
+      runner,
+    });
+    expect(outcome.isError, outcome.summary).toBe(false);
+    expect(host.current().cfd?.studies?.['re100']).toMatchObject({ quantity: 'cl', safetyFactor: 3 });
+    const plain = hostOf(modelAt(32), store);
+    await runCfdTool('cfd_solve', { caseId: 're100', gridStudy: true }, plain, { store, runner });
+    expect(plain.current().cfd?.studies?.['re100']).toMatchObject({ quantity: 'cd', safetyFactor: 1.25 });
+  });
+
+  it('refuses a bad quantity / safetyFactor, or either without gridStudy, before any solve starts', async () => {
+    for (const bad of [
+      { gridStudy: true, quantity: 'CL' },
+      { gridStudy: true, safetyFactor: 20 },
+      { quantity: 'cl' },
+      { safetyFactor: 1.5 },
+    ]) {
+      const host = hostOf(modelAt(32), store);
+      const runner = fakeRunner();
+      const refused = await runCfdTool('cfd_solve', { caseId: 're100', ...bad }, host, { store, runner });
+      expect(refused, JSON.stringify(bad)).toMatchObject({
+        isError: true,
+        changed: false,
+        data: { code: 'CFD_PARAM_INVALID', gridStudy: true },
+      });
+      expect(runner.calls).toHaveLength(0);
+    }
+  });
+
   it('refuses by name before anything runs when a level leaves 8..2048 or is not an integer', async () => {
     for (const cells of [8, 16, 28 + 6]) {
       const host = hostOf(modelAt(cells), store);

@@ -3,7 +3,7 @@
 
 import { resultColor } from '@lib/isoBands';
 import type { Vec3 } from '@core/model/types';
-import type { SliceFile, StreamlinesFile } from './cfdFiles';
+import type { SliceFile, StreamlinesFile } from '@aero/index';
 
 export interface ValueRange {
   readonly min: number;

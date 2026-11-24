@@ -722,3 +722,22 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   `render_view overlay=cfd:...` (CLI lane), VC-CFD-40 (legend ranges are tested in `tests/component/FlowPanel.test.tsx`; the native-side check is open).
 - **Tests.** `tests/component/FlowPanel.test.tsx` (cases, param gathering and dispatch, solve / stop / failure, result, stale, unverified, study states, overlay
   queries, legend), `tests/unit/cfdOverlayFiles.test.ts` (decoders, quad, segments).
+
+### M3b CLI: gridStudy options and the CFD render (CLI lane) — 2026-11-23
+
+- **`cfd_solve gridStudy` takes `quantity` (cd | cl | cdAM2) and `safetyFactor` (1..10)**, forwarded as given to `record_cfd_grid_study` (the command's own defaults
+  apply when omitted: cd, 1.25). The dry run of the study command uses the same params, so a mismatch is refused before anything is recorded.
+- **`cfd_render`** (native transport, toolset flow; `server/src/cfd/flowRender.ts`) is the headless `render_view` with the flow overlay. Not a `render_view`
+  `overlay=cfd:...` kind: a core overlay (`RenderOverlay.draw`) sees the document and a point-cloud port only, never the stored result files, so the kind would
+  need a new overlay port in core (`OverlayView.ports`, the render context) plus a plugin overlay in `@aero`. The transport instead runs the same
+  `cfd_slice` / `cfd_streamlines` transports (so the trust and staleness refusals are the queries': CFD_NO_RESULT, CFD_RESULT_STALE, CFD_RESULT_MISSING,
+  CFD_SOLVER_MISSING, nothing rendered), decodes the stored LLSL / LLST files (`flowFiles.ts`), executes `render_view` with the other params and projects the layers
+  with the camera it reports (`makeProjector`, orthographic): the slice as one coloured polygon per sample (thinned to 96 a side), streamlines as speed-coloured
+  segments (at most 60 000), and a legend (field, unit, min .. max). Drawn over the surface, not depth-tested. `data` = render_view's data with the composed `svg`
+  and `data.cfd`; `--save view.png` rasterizes it. Tests `server/tests/cfdRender.test.ts`.
+- **Review round (CLI lane).** `cfd_render` refuses a turntable, `projection: perspective`, `fovDeg` and a perspective viewpoint with CFD_PARAM_INVALID (core draws no overlay there); the
+  svg provenance (`svgSha256`) is recomputed over the composed picture. `cfd_solve` refuses a bad `quantity` / `safetyFactor`, or either without `gridStudy`, before any solve
+  (bounds come from `record_cfd_grid_study`'s own schema, which also supplies the tool schema). The LLSL / LLST decoder is one pure module, `@aero/cfd/resultFiles`
+  (`parseSliceFile`, `parseStreamlinesFile`; also refuses a non-finite position), read by the viewport and by `cfd_render`; its hostile-input registration is `tests/helpers/hostile/cfdFileReaders.ts`.
+- **Follow-up (Lane 1 + aero):** a real `render_view` overlay kind `cfd` in `@aero` (a plugin `RenderOverlay` with `overlayOptions.cfd = { caseId, slice?, streamlines? }`) reading the
+  stored result files through a new result-file port in `ctx` (`OverlayView.ports`); `cfd_render` then reduces to that overlay and its transport.
