@@ -100,7 +100,7 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   designs); a document without it (every document saved before) keeps one face per ring edge on every path, sweeps added to it included, so its stored
   names keep resolving and the names inside one document stay consistent. Loading never adds the marker. The entity also carries `faceLayout: 'joined'`
   (set by `sweep_profile` from the document marker, only on a fitted sweep) because the kernel lowering sees the entity alone. Tests:
-  `tests/unit/sweep/faceLayout.test.ts`. MIGRATION: old documents stay on the per-edge layout (and its 12 s duct boolean) until a future explicit
+  `tests/unit/sweep/faceLayout.test.ts`. `clear_document` on an old document resets to a new document with the marker (its history is reset too, so no stored name goes stale). The marker is outside the release scope like `uid` (each entity keeps its own `faceLayout`), so content hashes do not depend on it. MIGRATION: old documents stay on the per-edge layout (and its 12 s duct boolean) until a future explicit
   `upgrade` command re-fits them and re-resolves their stored names; it is not built. No stored plan or golden in the repo names faces of a fitted sweep.
   The adaptive rule was checked on neighbours it now reaches through booleans: a torus and a filleted cube unioned with a sheet solid read their
   closed-form volumes to 1e-8 (`features_tests.rs`).
