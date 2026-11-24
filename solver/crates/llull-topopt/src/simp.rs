@@ -481,7 +481,18 @@ pub fn optimise(
     let mut mma = match settings.optimizer {
         Optimizer::Oc => None,
         Optimizer::Mma => Some(match &initial.mma {
-            Some((values, iteration)) => Mma::restore(free.len(), rows, values, *iteration).unwrap_or_else(|| Mma::new(free.len(), rows)),
+            Some((values, iteration)) => {
+                Mma::restore(free.len(), rows, values, *iteration, initial.backtracks).ok_or_else(|| TopError {
+                    code: "NATIVE_JOB_INPUT",
+                    message: format!(
+                        "mma.f64 length {} does not match {} free variables (expected {} or {})",
+                        values.len(),
+                        free.len(),
+                        4 * free.len(),
+                        4 * free.len() + 2
+                    ),
+                })?
+            }
             None => Mma::new(free.len(), rows),
         }),
     };

@@ -643,3 +643,47 @@ fn a_3d_run_resumes_bit_for_bit_across_backtracks_and_the_settle_window() {
     }
     let _ = std::fs::remove_dir_all(full);
 }
+
+fn resume_with_mma_values(
+    name: &str,
+    cut: usize,
+    edit: impl Fn(&mut Vec<f64>),
+) -> (PathBuf, Result<(Value, Vec<f32>, String), (String, String)>) {
+    let job = cantilever_min_volume(1000.0, json!({}));
+    let part = folder(name);
+    let mut first = job.clone();
+    first["settings"]["maxIterations"] = json!(cut);
+    run(&part, &first).unwrap();
+    let start = start_files(&part);
+    let mut values: Vec<f64> =
+        std::fs::read(part.join("mma.f64")).unwrap().chunks_exact(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect();
+    edit(&mut values);
+    let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
+    std::fs::write(part.join("mma.f64.start"), bytes).unwrap();
+    let mut state: Value = serde_json::from_slice(&std::fs::read(part.join("state.json")).unwrap()).unwrap();
+    state["mma"]["file"] = json!("mma.f64.start");
+    state["mma"]["length"] = json!(values.len());
+    std::fs::write(part.join("start_state.json"), serde_json::to_vec(&state).unwrap()).unwrap();
+    let outcome = run(&part, &with_start(job, &start, cut, 5));
+    (part, outcome)
+}
+
+/// A checkpoint of the plain 4 n layout written after backtracks (before the state carried the rewind count) still resumes, now as
+/// rewound and settled: the next checkpoint is in the extended layout.
+#[test]
+fn a_plain_layout_mma_state_after_a_backtrack_resumes_as_rewound() {
+    let (part, outcome) = resume_with_mma_values("old-layout", 22, |values| values.truncate(4 * 144));
+    outcome.unwrap();
+    let length = std::fs::read(part.join("mma.f64")).unwrap().len() / 8;
+    assert_eq!(length, 4 * 144 + 2, "rewinds and settle counter appended once the state has backtracks");
+    let _ = std::fs::remove_dir_all(part);
+}
+
+#[test]
+fn a_wrong_length_mma_state_is_refused_not_restarted() {
+    let (part, outcome) = resume_with_mma_values("bad-length", 5, |values| values.truncate(4 * 144 - 1));
+    let (code, message) = outcome.unwrap_err();
+    assert_eq!(code, "NATIVE_JOB_INPUT");
+    assert!(message.contains("mma.f64 length"), "{message}");
+    let _ = std::fs::remove_dir_all(part);
+}

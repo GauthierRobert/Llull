@@ -97,13 +97,15 @@ impl Mma {
         (values, self.iteration)
     }
 
-    /// Restores a [`Mma::state`]; `None` when the lengths do not match this optimiser.
-    pub fn restore(n: usize, m: usize, values: &[f64], iteration: usize) -> Option<Mma> {
+    /// Restores a [`Mma::state`]; `None` when the lengths do not match this optimiser. A plain 4 n layout written after `backtracks`
+    /// rewinds (before the state carried them) restores as that many rewinds, already settled.
+    pub fn restore(n: usize, m: usize, values: &[f64], iteration: usize, backtracks: usize) -> Option<Mma> {
         if values.len() != 4 * n && values.len() != 4 * n + 2 {
             return None;
         }
         let part = |k: usize| values[k * n..(k + 1) * n].to_vec();
-        let (narrowed, settled) = if values.len() == 4 * n { (0, 0) } else { (values[4 * n] as usize, values[4 * n + 1] as usize) };
+        let (narrowed, settled) =
+            if values.len() == 4 * n { (backtracks, SETTLE_STEPS) } else { (values[4 * n] as usize, values[4 * n + 1] as usize) };
         Some(Mma { n, m, low: part(0), upp: part(1), xold1: part(2), xold2: part(3), iteration, narrowed, settled })
     }
 
@@ -451,12 +453,12 @@ mod tests {
         }
         let (state, iteration) = mma.state();
         assert_eq!(state.len(), 8);
-        let mut restored = Mma::restore(2, 1, &state, iteration).unwrap();
+        let mut restored = Mma::restore(2, 1, &state, iteration, 0).unwrap();
         let (df0, f, df) = problem(&x);
         let from_restored = restored.step(&x, &df0, &f, &df, bounds);
         let from_original = mma.step(&x, &df0, &f, &df, bounds);
         assert_eq!(from_restored, from_original);
-        assert!(Mma::restore(2, 1, &state[..7], iteration).is_none());
+        assert!(Mma::restore(2, 1, &state[..7], iteration, 0).is_none());
     }
 
     /// Two coupled dense rows, the second never binding (a copy of the first shifted far into feasibility), give the one-row result
@@ -518,7 +520,7 @@ mod tests {
         assert!(mma.settling());
         let (values, iteration) = mma.state();
         assert_eq!(values.len(), 10);
-        let mut restored = Mma::restore(2, 1, &values, iteration).unwrap();
+        let mut restored = Mma::restore(2, 1, &values, iteration, 0).unwrap();
         assert!(restored.settling());
         for _ in 0..SETTLE_STEPS {
             assert!(restored.settling());
@@ -526,5 +528,19 @@ mod tests {
         }
         assert!(!restored.settling(), "released after SETTLE_STEPS steps");
         assert_eq!(restored.state().0.len(), 10, "the rewind count stays (it lowers the asymptote floor)");
+    }
+
+    #[test]
+    fn a_plain_layout_after_backtracks_restores_as_rewound_and_settled() {
+        let mut mma = Mma::new(2, 1);
+        let bounds = Bounds { xmin: 0.0, xmax: 1.0, move_limit: 0.2 };
+        mma.step(&[0.5, 0.5], &[1.0, -1.0], &[0.1], &[vec![1.0, 1.0]], bounds);
+        let (values, iteration) = mma.state();
+        let restored = Mma::restore(2, 1, &values, iteration, 3).unwrap();
+        assert!(!restored.settling());
+        let (extended, _) = restored.state();
+        assert_eq!(extended.len(), 10);
+        assert_eq!(&extended[8..], &[3.0, SETTLE_STEPS as f64]);
+        assert_eq!(Mma::restore(2, 1, &values, iteration, 0).unwrap().state().0.len(), 8);
     }
 }
