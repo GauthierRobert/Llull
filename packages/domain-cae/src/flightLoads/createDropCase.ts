@@ -1,6 +1,6 @@
 /** create_drop_case (14 FLL-M5, FR-FLL-06): the drop / hard-landing template of an explicit_dynamics case, composed from the explicit set-up commands. */
 
-// @invariant display-mesh: the contact point is the lowest vertex of the full-resolution tessellation (gap at most the chord error, max(0.1, 1e-3 x bounding-box diagonal) document units)
+// @invariant display-mesh: the contact point is the lowest vertex of the full-resolution tessellation (a curved part may start overlapping the wall by at most the chord error (sagitta), max(0.1, 1e-3 x bounding-box diagonal) document units; no impact-speed overestimate)
 import { codedRejection } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
 import { defineCommand, z } from '@core/commands/schema';
