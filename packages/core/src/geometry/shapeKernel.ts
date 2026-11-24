@@ -5,6 +5,8 @@
  * @invariant a handle carries its recipe: an evicted (or restarted-kernel) shape is rebuilt on use
  * @invariant a native shape is released exactly once, never while a call still reads it: eviction is deferred to the end of the outermost
  *   call (the cache may exceed `capacity` by that call's nodes)
+ * @invariant the cache grows to hold the leaves of a `many`-tool boolean (2 * many + 16, many <= MAX_BOOLEAN_TOOLS), so a list of more tools than
+ *   `capacity` evaluates each leaf once, also when re-evaluated
  * @invariant a cached failure (null) is dropped as soon as the native module reports degradation (`failureEpoch` grows), so a spurious null
  *   is retried instead of sticking
  * @failure an op returning null or throwing -> that recipe (and every recipe built on it) is null
@@ -24,7 +26,7 @@ import type {
   TessellationOptions,
 } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
-import { recipeKey } from './shapeRecipe';
+import { MAX_BOOLEAN_TOOLS, recipeKey } from './shapeRecipe';
 import { faceOpParamsOf } from './faceOpRecipe';
 import { embossParamsOf } from './embossRecipe';
 import type { EmbossParams } from '../model/wrap';
@@ -291,13 +293,26 @@ function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S
   };
 }
 
+/** Leaves of the union tree `b` (at most `limit`: the claimed `many` never sizes the cache beyond what the tree really holds). */
+function toolLeaves(b: ShapeRecipe, limit: number): number {
+  let leaves = 0;
+  const stack: ShapeRecipe[] = [b];
+  for (let node = stack.pop(); node !== undefined && leaves < limit; node = stack.pop()) {
+    if (node.op === 'boolean' && node.boolean === 'union') stack.push(node.a, node.b);
+    else leaves++;
+  }
+  return leaves;
+}
+
 const BOUNDS_CAPACITY = 4096;
 
 /**
  * Wrap native ops as a recipe-evaluating `GeometryKernel` with an LRU of `capacity` native shapes. Failed recipes (null) are cached too, so
  * a refused fillet is not retried on every replay.
  */
-export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKernel {
+export function kernelFromOps<S>(ops: KernelOps<S>, baseCapacity = 128): CachingKernel {
+  /** Grows (never shrinks) to keep every leaf of a many-tool boolean: a fixed bound would evict and rebuild them on re-evaluation. */
+  let capacity = baseCapacity;
   const shapes = new Map<string, S | null>();
   const meshes = new Map<string, MeshData | null>();
   const explicitMeshes = new Map<string, Map<string, MeshData>>();
@@ -337,6 +352,8 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       shapes.set(key, hit); // most recent
       return hit;
     }
+    if (recipe.op === 'boolean' && recipe.many !== undefined && recipe.many <= MAX_BOOLEAN_TOOLS)
+      capacity = Math.max(capacity, 2 * toolLeaves(recipe.b, recipe.many) + 16);
     let shape: S | null;
     try {
       builds++;

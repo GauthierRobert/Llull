@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 
 type OptionalKey = { [K in keyof CadDocument]-?: undefined extends CadDocument[K] ? K : never }[keyof CadDocument];
 /** Optional slices carried over by clear_document (document settings) — every other optional key must be cleared. */
-type KeptKey = 'kernelSettings' | 'siteContext' | 'nextStepNumber';
+type KeptKey = 'kernelSettings' | 'siteContext' | 'nextStepNumber' | 'sweepFaceLayout';
 
 /** Exhaustive by type: adding an optional key to CadDocument fails compilation here until a probe value is listed. */
 const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {

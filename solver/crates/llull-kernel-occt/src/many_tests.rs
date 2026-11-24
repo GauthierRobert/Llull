@@ -233,3 +233,18 @@ fn a_cancel_stops_only_the_request_it_names() {
     assert!(evaluator.evaluate(&many).unwrap().is_some());
     crate::clear_deadline();
 }
+
+#[test]
+fn a_list_of_more_tools_than_the_cache_holds_builds_each_leaf_once() {
+    let _serial = crate::serial_blends();
+    let mut evaluator = Evaluator::new(16);
+    let (base, tools) = (plate(20, 16), drills(20, 16)); // 320 tools
+    let many = node("subtract", &base, &tools, true);
+    assert!(evaluator.evaluate(&many).unwrap().is_some());
+    let built = evaluator.build_count();
+    assert!(evaluator.cached_count() > tools.len(), "every leaf stays cached");
+    for tool in &tools {
+        assert!(evaluator.evaluate(tool).unwrap().is_some());
+    }
+    assert_eq!(evaluator.build_count(), built, "re-evaluating the leaves rebuilds none");
+}

@@ -12,7 +12,8 @@
         "position": [0,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#3": {
         "id": "#3",
@@ -23,7 +24,8 @@
         "position": [30,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#4": {
         "id": "#4",
@@ -34,7 +36,8 @@
         "position": [60,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#5": {
         "id": "#5",
@@ -45,7 +48,8 @@
         "position": [90,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#6": {
         "id": "#6",
@@ -56,7 +60,8 @@
         "position": [120,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#7": {
         "id": "#7",
@@ -67,7 +72,8 @@
         "position": [150,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#8": {
         "id": "#8",
@@ -79,7 +85,8 @@
         "position": [200,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#9": {
         "id": "#9",
@@ -102,7 +109,8 @@
         "position": [50,300,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#11": {
         "id": "#11",
@@ -113,7 +121,8 @@
         "position": [300,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       }
     },
     "order": [
@@ -152,6 +161,7 @@
     },
     "groups": {},
     "units": "mm",
+    "sweepFaceLayout": "joined",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},

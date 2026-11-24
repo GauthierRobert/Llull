@@ -94,6 +94,7 @@
     "jointOrder": [],
     "driveRelations": {},
     "driveRelationOrder": [],
+    "sweepFaceLayout": "joined",
     "nextStepNumber": 5,
     "drawings": {
       "sheets": {

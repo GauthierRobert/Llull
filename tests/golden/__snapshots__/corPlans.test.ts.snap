@@ -674,6 +674,7 @@ exports[`PHY-13 galvanic_plate_check plan, golden (VC-COR-01.1, 02.2, 03, 08) > 
     "parameters": {},
     "recipes": {},
     "selection": [],
+    "sweepFaceLayout": "joined",
     "units": "mm",
   },
   "format": "llull-document",

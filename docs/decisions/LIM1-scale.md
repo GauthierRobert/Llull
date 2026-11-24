@@ -59,10 +59,50 @@ Gate run (`scaleGate.mjs`, liner + 160 pattern parts): 300 channels, plan 2.0 s 
   ~95 spans per sweep. Runs now also break at interior stations (`packages/core/src/geometry/sweepEval/fitted.ts`). Stand-in duct
   (two 3-station smooth sweeps, outer minus inner; Linux, 4 cores): 96 faces of 12-37 spans per sweep, boolean 2 min 06 s -> 15.4 s,
   result 76 k -> 10.8 k triangles, volume unchanged to 1.7e-8. The LLR-845 plan itself was not re-measured (not in the repo).
+- DONE: evaluator LRU > 256 tools. A fixed bound evicted the leaves of a long `many` list while its result was built, so a fallback or a
+  re-evaluation rebuilt them. Both evaluators now size their cache to the request: a `boolean` with `many` (<= 1000, `MAX_BOOLEAN_TOOLS`)
+  raises the capacity to `2 * leaves + 16` (leaves counted in the tree, never the claimed `many`) (leaves plus the balanced tree of the fallback), never shrinking (`Evaluator::reserve` in
+  `recipe/many.rs`; `kernelFromOps`). Chosen over pinning: the bound stays a plain LRU, memory is bounded by the schema cap, and a hostile
+  `many` never raises it. Test: `tests/unit/kernelManyToolsCache.test.ts` (300 tools, leaves built once), `many_tests.rs` (native, `cargo test -p llull-kernel-occt` green).
+- DONE: per-face colour on parametric primitives. `set_face_color` takes box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion and
+  revolution as well as mesh solids. A face is a smooth patch of the primitive's own tessellation (`geometry/faceColors.ts` `faceColorMesh`).
+  Selector (regeneration): a stored `near` point cannot follow a resize (the replayed command no-ops), and a patch ordinal or count renames faces
+  when a profile is reordered or a vertex is added. A picked patch is therefore stored as a resize-invariant SIGNATURE (`FaceColor.sig`, recorded
+  by the command as `faceSignatures`): the area-weighted mean normal read in the body's box coordinates (direction of normal (.) box size, at the length of the mean, so a per-axis resize such as a pyramid made 10 times taller leaves it unchanged), the patch centre and the patch's own box extents (its `span`) as fractions of the body's bounding box, and the sign of
+  normal . (centre - box middle) (outer or inner wall; a full cylinder wall has a zero mean normal and only this sign and the centre tell outer
+  from inner). Resolution needs EXACTLY ONE patch with the same sign, normals within 0.4, centres within 0.35 and spans within 0.1 (box fractions); several candidates (stepped coaxial walls of a revolution all have mean normal 0) are ambiguous and count as no match. Margins: separate patches meet at a crease of 30 degrees or more, so neighbouring facet normals differ by at least 0.52 (tolerance 0.4); perpendicular box sides differ by 1.41 in normal, opposite sides by 1.0 in centre; a unit-normal strip against a whole wall by 1; coaxial walls of radius 1 and 1.5 in a body of 6 by 0.17 in span. A stored signature that matches nothing colours nothing. Nothing is written back on
+  replay. No match (a revolution going from 32 to 6 segments) re-picks by `faceNear` (summary note, result still ok, so later regenerations do
+  not fail), and without `faceNear` the step changes nothing, which the replay reports as a step that no longer changes the document. Mesh
+  solids keep the `near` pick (their mesh is fixed). Collapsed-edge slivers (a profile touching the axis) may join a patch but never carry it
+  on, so the top of a revolved cylinder does not reach its bottom. `render_view` draws the kind's own quads / rings coloured by their nearest triangle (no diagonal seams);
+  glTF / GLB export and instance expansion (parametric non-uniform scale: picks scaled; baked: every coloured triangle re-picked on the baked mesh) carry them.
+  Stored colours are validated on load (at most 4096, only on kinds with faces, `sig` only on parametric solids with a unit-bounded normal, a centre inside the box and a sign of 1 or -1). A revolution with few segments (facets beyond 30 degrees) has one
+  patch per facet strip. The desktop viewport (`src/ui/viewport`) still draws a primitive in one colour: it must use `faceColorMesh` /
+  `faceColorTriangles` like `meshSolidGeometry.ts` and keep coloured primitives out of the shared prototype (UI lane).
+- DONE: fewer, longer fitted faces (`geometry/sweepEval/mergeFaces.ts`). The 24 cubic ring edges of a run chunk, each already fitted across the
+  stations, are joined along u into `FACE_GROUPS = 2` B-spline faces (double knot at a C1 junction, triple at a corner; equal to the edge faces,
+  pinned by `tests/unit/sweep/mergeFaces.test.ts`). One face per run is NOT used: a face closed on itself is not sewn to its own seam by the
+  kernel's sewing (`kernelSheets.ts` already cuts closed faces for that reason), so a ring is cut in two halves that sew to each other. Rational or
+  lower-degree sections (constant circles, profiles with arcs) keep one face per edge.
+  Accuracy: BRepGProp's fixed Gauss rule reads a multi-span bicubic face ~5e-5 off (the merged duct read 452975.6 and the outer sweep 2235883.6
+  where the per-edge layout read 452952.76 / 2235780.32), although an independent 5 x 5 Gauss quadrature of the fitted lateral faces gives the same
+  1940669.07485 for both layouts to 4e-12 (the geometry is identical). The sheet solid therefore asks for the adaptive mass rule
+  (`surfaces.cxx` `sheet_solid`: `refined_mass`, kept through booleans like a deformed body): duct 452952.76408 and outer 2235780.31773, within
+  2e-9 of the per-edge layout.
+  Measured (Linux, 4 cores shared with other work, `llull-kernel` release build, outer minus inner of the two 3-station smooth sweeps of
+  `tests/unit/sweep/stationBreaks.test.ts`, kernel.evaluate of the boolean): 12.9 / 12.8 / 12.1 s before (96 faces per sweep, 10 748 triangles),
+  3.3 / 3.4 / 2.9 s after (8 faces per sweep, 6 824 triangles).
+  Not measured: the LLR-845 plan.
+  Names (SC-N1): a sheet solid has no construction roles, so its faces are named `f<k>` by topology index and its edges `e(f<a>|f<b>)`; joining faces
+  renumbers them (an old `e(f0|f1)` would be another edge). The layout is therefore decided by the DOCUMENT, never by the replay flag:
+  `CadDocument.sweepFaceLayout: 'joined'` (set by `createEmptyDocument`, persisted, validated on load, carried by `replaySeed`) makes every fitted sweep
+  of that document join, on every path (a fresh call, `edit_step_params` with any params, `replay_history`, recipe expansion, `build_project`, `.lld`
+  designs); a document without it (every document saved before) keeps one face per ring edge on every path, sweeps added to it included, so its stored
+  names keep resolving and the names inside one document stay consistent. Loading never adds the marker. The entity also carries `faceLayout: 'joined'`
+  (set by `sweep_profile` from the document marker, only on a fitted sweep) because the kernel lowering sees the entity alone. Tests:
+  `tests/unit/sweep/faceLayout.test.ts`. `clear_document` on an old document resets to a new document with the marker (its history is reset too, so no stored name goes stale). The marker is outside the release scope like `uid` (each entity keeps its own `faceLayout`), so content hashes do not depend on it. MIGRATION: old documents stay on the per-edge layout (and its 12 s duct boolean) until a future explicit
+  `upgrade` command re-fits them and re-resolves their stored names; it is not built. No stored plan or golden in the repo names faces of a fitted sweep.
+  The adaptive rule was checked on neighbours it now reaches through booleans: a torus and a filleted cube unioned with a sheet solid read their
+  closed-form volumes to 1e-8 (`features_tests.rs`).
 
 ## Left
-
-- The remaining 15 s: the General Fuse still pairs 96 x 96 long strip faces; one face per run (the 24 ring edges as one closed
-  surface) would cut the pairs ~500x on smooth sections.
-- The evaluator LRU holds 256 shapes; a list of > 256 tools re-builds leaves when the result is re-evaluated after eviction.
-- Per-face colour on parametric primitives (board).

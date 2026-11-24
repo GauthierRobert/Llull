@@ -32,7 +32,8 @@
         "position": [0,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#5": {
         "id": "#5",
@@ -46,7 +47,8 @@
         "position": [0,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#6": {
         "id": "#6",
@@ -77,7 +79,8 @@
         "position": [200,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "faceLayout": "joined"
       },
       "#9": {
         "id": "#9",
@@ -145,6 +148,7 @@
     },
     "groups": {},
     "units": "mm",
+    "sweepFaceLayout": "joined",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},

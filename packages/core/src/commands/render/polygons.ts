@@ -4,8 +4,8 @@
  */
 
 import type { Entity, MeshData, SplineEntity, Vec2, Vec3 } from '../../model/types';
-import { applyEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
-import { ORIGIN, add3 } from '../../lib/vec3';
+import { applyEulerXYZ, inverseEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
+import { ORIGIN, add3, centroid3, sub3 } from '../../lib/vec3';
 import { curveDisplayPoints } from '../../geometry/nurbsCurve';
 import { surfaceTriangles } from '../../geometry/nurbsSurface';
 import { revolutionPolygons } from '../../geometry/revolution';
@@ -32,7 +32,7 @@ import { positiveSweep } from '../../lib/angle';
 import { arcPolyline } from '../../lib/arc';
 import { catmullRomBeziers, segmentPoint } from '../../geometry/curveSegments';
 import { planeToWorld } from '../../geometry/workPlane';
-import { faceColorTriangles } from '../../geometry/faceColors';
+import { faceColorMesh, faceColorsAt, faceColorsOf, faceColorTriangles } from '../../geometry/faceColors';
 
 // 3D solids
 
@@ -118,6 +118,16 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       e.color,
     ),
   ];
+  const primitiveColors = e.kind === 'mesh' ? undefined : faceColorsOf(e);
+  if (primitiveColors !== undefined) {
+    // the kind's own polygons (quads, rings), each in the colour of the triangle nearest to its centre
+    const { faceColors: _painted, ...plain } = e as Entity & { faceColors?: unknown };
+    const own = tessellateEntity(plain as Entity);
+    const mesh = faceColorMesh(e);
+    const centres = own.map((polygon) => inverseEulerXYZ(sub3(centroid3(polygon.verts), e.position), e.rotation));
+    const colors = faceColorsAt(mesh, primitiveColors, centres);
+    return own.map((polygon, i) => ({ ...polygon, color: colors[i] ?? polygon.color }));
+  }
   switch (e.kind) {
     case 'box':
       return rotated(boxFaces(e.position, e.size));

@@ -22,6 +22,11 @@ impl<V> Lru<V> {
         self.entries.is_empty()
     }
 
+    /// Raises the capacity to `minimum` when it is lower (never shrinks, so nothing is evicted).
+    pub fn ensure_capacity(&mut self, minimum: usize) {
+        self.capacity = self.capacity.max(minimum);
+    }
+
     /// The value under `key`, marked most recently used.
     pub fn get(&mut self, key: &str) -> Option<&V> {
         self.tick += 1;
@@ -74,6 +79,19 @@ mod tests {
         assert_eq!(cache.get("a"), Some(&1));
         assert_eq!(cache.get("c"), Some(&3));
         assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn ensure_capacity_grows_and_never_shrinks() {
+        let mut cache = Lru::new(2);
+        cache.ensure_capacity(4);
+        for k in 0..4 {
+            cache.insert(k.to_string(), k);
+        }
+        assert_eq!(cache.len(), 4);
+        cache.ensure_capacity(1);
+        cache.insert("x".to_string(), 9);
+        assert_eq!(cache.len(), 4, "a lower minimum keeps the larger capacity");
     }
 
     #[test]

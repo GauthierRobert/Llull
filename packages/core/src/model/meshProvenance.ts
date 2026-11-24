@@ -1,4 +1,5 @@
 /** Provenance and grouping of mesh triangles (07 MSH): where an imported mesh came from, and named triangle ranges. */
+import type { Vec3 } from './vectors';
 
 /** Provenance of imported or generated mesh triangles (07 MSH TECHNICAL §3). */
 export interface MeshSource {
@@ -58,4 +59,31 @@ export interface MeshAssetRef {
 /** Per-vertex display colours of a mesh solid (terrain tint): sRGB bytes, r, g, b for each vertex of `mesh.positions`, drawn over `color`; ignored unless 3 per vertex. */
 export interface VertexTint {
   vertexColors?: ReadonlyArray<number>;
+}
+
+/**
+ * What names a face of a parametric solid independently of its size: the area-weighted mean normal of its patch, the patch centre as fractions
+ * of the body's bounding box (0..1 per axis), its own box extents as fractions of the body's, and the sign of normal . (centre - body middle) (outer or inner wall). A resize keeps all three
+ * within the tolerances of `faceColors.ts`; two faces of one body never do (their normals or centres differ by 0.5 or more).
+ */
+export interface FaceSignature {
+  readonly normal: Vec3;
+  readonly centre: Vec3;
+  /** Extent of the patch's own box per axis, as fractions of the body's box (separates coaxial walls). */
+  readonly span: Vec3;
+  readonly outward: 1 | -1;
+}
+
+/** Colour of one face: the smooth patch around `near` (entity-local, before `position` / `rotation`) on a mesh solid; on a parametric solid the patch matching `sig`, else the one around `near`. */
+export interface FaceColor {
+  readonly near: Vec3;
+  /** Hex `#rrggbb`. */
+  readonly color: string;
+  /** Parametric solids only: signature of the picked patch; resolved on the current triangles, so a resize or profile edit keeps the face. */
+  readonly sig?: FaceSignature;
+}
+
+/** Per-face display colours (`set_face_color`), drawn over `color`; resolved on the current triangles (a mesh solid's `mesh`, a primitive's tessellation) by `faceColorTriangles`. */
+export interface FaceColored {
+  faceColors?: ReadonlyArray<FaceColor>;
 }

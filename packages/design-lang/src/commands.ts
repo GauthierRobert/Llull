@@ -9,6 +9,7 @@ import { commandError, exportRefusal, noop, rejection, report } from '@core/comm
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { stepIdSource } from '@lib/id';
 import { createEmptyDocument, type CadDocument, type FeatureStep } from '@core/model/types';
+import { withSweepLayoutOf } from '@core/model/documentSettings';
 import { MM_PER_UNIT } from '@core/model/units';
 import { attempt, DesignError, toCommandError } from './errors';
 import { addedRecordKeys, withoutOwnLayers, withoutOwnRecords } from './regenerate';
@@ -298,7 +299,7 @@ function designChecks(doc: CadDocument): CheckResult[] {
     recipes: doc.recipes,
   };
   const sandbox = (carried: Partial<CadDocument>, materials: CadDocument['materials']): CadDocument => ({
-    ...createEmptyDocument(),
+    ...withSweepLayoutOf(createEmptyDocument(), doc),
     ...carried,
     units: doc.units,
     parameters: doc.parameters,
@@ -428,7 +429,7 @@ export const expandDesign = defineCommand({
       const files: Record<string, string> = Object.fromEntries((step === undefined ? [] : embeddedOf(step)).map((m) => [m.path, m.text]));
       for (const [path, body] of Object.entries(modules ?? {})) files[normalizeModulePath(path, 0)] = body;
       const table = loadModules(statements, files);
-      const sandbox = { ...createEmptyDocument(), units: doc.units, parameters: doc.parameters };
+      const sandbox = { ...withSweepLayoutOf(createEmptyDocument(), doc), units: doc.units, parameters: doc.parameters };
       runDesign(prepareInputs(sandbox, statements, {}), statements, scratchContext(ctx), trace, table);
     });
     if (run instanceof DesignError) return designRejection(doc, 'expand_design', run);

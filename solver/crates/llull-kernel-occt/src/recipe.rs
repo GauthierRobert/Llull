@@ -344,6 +344,13 @@ impl Evaluator {
         true
     }
 
+    /// Makes the shape cache hold at least `nodes` entries: a node naming many tools keeps its leaves (and the balanced tree of its
+    /// fallback) alive together, so a fixed bound would evict and rebuild them. Callers bound `nodes` (`MAX_MANY`); it never shrinks.
+    pub(crate) fn reserve(&mut self, nodes: usize) {
+        self.cache.ensure_capacity(nodes);
+        self.reasons.ensure_capacity(nodes);
+    }
+
     /// Recipe nodes actually built (cache misses).
     pub fn build_count(&self) -> u64 {
         self.builds

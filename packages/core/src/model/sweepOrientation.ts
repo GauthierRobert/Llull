@@ -38,6 +38,8 @@ export interface SweepRail {
 
 /** The optional design-intent fields a sweep adds to its path and section (SWG): all absent means the plain twist-free sweep. */
 export interface SweepDesign {
+  /** 'joined': the fitted faces join the ring edges of a run (2 faces); absent: one face per ring edge, the layout stored face names of older documents refer to (set from `CadDocument.sweepFaceLayout`; the kernel lowering sees only the entity). */
+  faceLayout?: 'joined';
   /** How station rings blend along the arc length; absent = 'smooth' (smoothstep). Explicit => evaluated at refined samples, not only path frames. */
   stationBlend?: 'smooth' | 'linear';
   /** Section frame along the path; absent = 'minimal'. */
