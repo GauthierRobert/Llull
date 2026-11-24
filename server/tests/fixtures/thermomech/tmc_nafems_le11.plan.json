@@ -125,6 +125,9 @@
       "target": { "entityId": "$bar", "facesNear": [[0.6, 0.6, 1.7971067811865473]] }
     }
   },
-  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.1 } },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.1 }
+  },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "A", "point": [1.0, 0, 0], "quantity": "s_zz" } }
 ]

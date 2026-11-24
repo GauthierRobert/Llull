@@ -44,7 +44,8 @@ function gridStudyParamRefusal(caseId: string, args: Record<string, unknown>): C
     resultsHashes: ['x', 'x', 'x'],
     ...Object.fromEntries(given.map((key) => [key, args[key]])),
   });
-  if (checked === undefined || checked.success) return null;
+  if (checked === undefined) throw new Error('cfd_solve: record_cfd_grid_study is not registered (wiring bug)');
+  if (checked.success) return null;
   const issue = checked.error.issues[0];
   return refuse(`${issue?.path.join('.') ?? 'params'}: ${issue?.message ?? 'invalid'}`);
 }

@@ -68,7 +68,10 @@
       "source": { "citation": "test input of this validation case (not a material claim)" }
     }
   },
-  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.05 } },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.05 }
+  },
   {
     "command": "add_result_probe",
     "params": { "analysisId": "$an", "name": "hot_face", "point": [0.5, 0.5, 0], "quantity": "temperature" }

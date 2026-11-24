@@ -4,3 +4,4 @@ desktop/release/
 
 # Golden snapshots are written by compactJson (one-line arrays); prettier would expand them and every golden test would fail on format.
 tests/golden/__snapshots__/
+server/tests/__snapshots__/

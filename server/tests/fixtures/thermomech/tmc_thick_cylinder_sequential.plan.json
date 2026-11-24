@@ -99,7 +99,10 @@
       "target": { "entityId": "$bar", "facesNear": [[14.1421, 14.1421, 40.0]] }
     }
   },
-  { "command": "set_mesh_controls", "params": { "analysisId": "$th", "elementFamily": "tet", "order": 2, "globalSize": 2.0 } },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$th", "elementFamily": "tet", "order": 2, "globalSize": 2.0 }
+  },
   {
     "command": "create_analysis",
     "params": {
@@ -150,7 +153,10 @@
       "target": { "entityId": "$bar", "facesNear": [[10.6066, 10.6066, 0]] }
     }
   },
-  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 2.0 } },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 2.0 }
+  },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "bore_hoop", "point": [10, 0, 0], "quantity": "s_yy" } },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "outer_hoop", "point": [20, 0, 0], "quantity": "s_yy" } },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "bore_axial", "point": [10, 0, 0], "quantity": "s_zz" } }

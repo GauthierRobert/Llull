@@ -67,7 +67,10 @@
       "target": { "entityId": "$body", "facesNear": [[0.1, 0.005, 0.005]] }
     }
   },
-  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.02 } },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.02 }
+  },
   {
     "command": "add_result_probe",
     "params": { "analysisId": "$an", "name": "face", "point": [0.1, 0.005, 0.005], "quantity": "temperature" }

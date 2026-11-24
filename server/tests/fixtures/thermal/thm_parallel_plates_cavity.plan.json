@@ -87,5 +87,8 @@
       ]
     }
   },
-  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 1, "globalSize": 0.05 } }
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 1, "globalSize": 0.05 }
+  }
 ]
