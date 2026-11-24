@@ -3,7 +3,11 @@
  * spring m g (h + x) = k x^2 / 2 gives a peak spring force 478.703 N. The spring run itself needs the native solver (server/tests); here the
  * set-up the run starts from is checked against those closed forms.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { defaultContext } from '@core/commands/context';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import { entityTrianglePositions } from '@core/geometry/entityTriangles';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { execute } from '@core/commands/registry';
 import { buildExplicitJob } from '@cae/index';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
@@ -110,9 +114,11 @@ describe('create_drop_case', () => {
     const { doc, boxId } = dropVehicle();
     const line = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] });
     expect(execute(line.document, 'create_drop_case', levelDrop(line.affected[0] ?? '')).error?.code).toBe('FLL_DROP_PARTS');
-    expect(execute(doc, 'create_drop_case', levelDrop(boxId, { heightM: 0 })).error?.code).toBeDefined();
-    expect(execute(doc, 'create_drop_case', levelDrop(boxId, { partIds: [] })).rejected).toBe(true);
-    expect(execute(doc, 'create_drop_case', levelDrop(boxId, { gravityMps2: -1 })).rejected).toBe(true);
+    for (const overrides of [{ heightM: 0 }, { partIds: [] }, { gravityMps2: -1 }, { partIds: Array.from({ length: 65 }, () => boxId) }]) {
+      const result = execute(doc, 'create_drop_case', levelDrop(boxId, overrides));
+      expect(result.error?.code).toBe('CMD_INVALID_PARAMS');
+      expectNoOp(result, doc);
+    }
   });
 
   it('refuses an unsupported document unit through the nested step, leaving the document unchanged', () => {
@@ -147,5 +153,86 @@ describe('create_drop_case', () => {
     const b = execute(doc, 'create_drop_case', levelDrop(boxId));
     expect(a.affected).toEqual(b.affected);
     expect(JSON.stringify(a.document)).toBe(JSON.stringify(b.document));
+  });
+
+  it('tilted drop on a cylinder: the wall touches the lowest vertex, velocity and gravity are anti-parallel to the ground normal', () => {
+    const { doc } = dropVehicle();
+    const cylinder = execute(doc, 'add_cylinder', { radius: 40, height: 120, position: [0, 0, 100], axis: [1, 0.3, 0.2] });
+    const id = cylinder.affected[0] ?? '';
+    const result = execute(
+      cylinder.document,
+      'create_drop_case',
+      levelDrop(id, { orientation: 'tilted', tiltDegrees: 30, mesh: undefined }),
+    );
+    expect(result.error).toBeUndefined();
+    const data = result.data as {
+      analysisId: string;
+      wallId: string;
+      groundNormal: number[];
+      wallPoint: number[];
+      impactVelocityMps: number;
+    };
+    const n = data.groundNormal;
+    const entity = cylinder.document.entities[id];
+    if (entity === undefined) throw new Error('missing cylinder');
+    const gaps = [];
+    const positions = entityTrianglePositions(entity, cylinder.document);
+    for (let i = 0; i < positions.length; i += 3)
+      gaps.push(
+        (positions[i] ?? 0) * n[0]! +
+          (positions[i + 1] ?? 0) * n[1]! +
+          (positions[i + 2] ?? 0) * n[2]! -
+          (data.wallPoint[0]! * n[0]! + data.wallPoint[1]! * n[1]! + data.wallPoint[2]! * n[2]!),
+      );
+    expect(Math.min(...gaps)).toBeCloseTo(0, 9);
+    const explicit = result.document.analysis?.cases[data.analysisId]?.explicit;
+    const velocity = Object.values(explicit?.initialVelocities ?? {})[0]?.velocity ?? [0, 0, 0];
+    const gravity = explicit?.gravity ?? [0, 0, 0];
+    const speed = data.impactVelocityMps * 1000;
+    for (let axis = 0; axis < 3; axis += 1) {
+      expect(velocity[axis]).toBeCloseTo(-speed * n[axis]!, 6);
+      expect(gravity[axis]).toBeCloseTo(-G * 1000 * n[axis]!, 6);
+    }
+    expect(explicit?.rigidWalls[data.wallId]?.normal).toEqual(n);
+  });
+
+  it('a rotated box in a level drop touches the ground at t = 0 (support vertex, not the bounding box)', () => {
+    const { doc, boxId } = dropVehicle();
+    const turned = execute(doc, 'rotate_entity', { id: boxId, delta: [0.4, 0.3, 0] });
+    const result = execute(turned.document, 'create_drop_case', levelDrop(boxId, { mesh: undefined }));
+    expect(result.error).toBeUndefined();
+    const wallPoint = (result.data as { wallPoint: number[] }).wallPoint;
+    const entity = turned.document.entities[boxId];
+    if (entity === undefined) throw new Error('missing box');
+    const positions = entityTrianglePositions(entity, turned.document);
+    const zs = positions.filter((_, index) => index % 3 === 2);
+    expect(wallPoint[2]).toBeCloseTo(Math.min(...zs), 9);
+  });
+
+  it('refuses a part whose mesh has no vertices', () => {
+    const { doc, boxId } = dropVehicle();
+    const box = doc.entities[boxId];
+    if (box === undefined || box.kind !== 'box') throw new Error('missing box');
+    const { size: _size, ...rest } = box;
+    const empty = {
+      ...doc,
+      entities: { ...doc.entities, [boxId]: { ...rest, kind: 'mesh' as const, mesh: { positions: [], indices: [] } } },
+    } as typeof doc;
+    const result = execute(empty, 'create_drop_case', levelDrop(boxId));
+    expect(result.error?.code).toBe('FLL_DROP_PARTS');
+    expectNoOp(result, empty);
+  });
+
+  describe('with the Manifold kernel', () => {
+    let kernel: GeometryKernel;
+    beforeAll(async () => {
+      kernel = await createManifoldKernel();
+    });
+    it('reads the mass through the kernel (kernel-optional) and agrees with the kernel-free mass', () => {
+      const { doc, boxId } = dropVehicle();
+      const withKernel = execute(doc, 'create_drop_case', levelDrop(boxId), { ...defaultContext(), kernel });
+      expect(withKernel.error).toBeUndefined();
+      expect((withKernel.data as { massKg: number }).massKg).toBeCloseTo(1.115, 6);
+    });
   });
 });

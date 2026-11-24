@@ -1,13 +1,15 @@
 /** create_drop_case (14 FLL-M5, FR-FLL-06): the drop / hard-landing template of an explicit_dynamics case, composed from the explicit set-up commands. */
 
+// @invariant display-mesh: the contact point is the lowest vertex of the full-resolution tessellation (gap at most the chord error, max(0.1, 1e-3 x bounding-box diagonal) document units)
 import { codedRejection } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
-import { entityBoundsInDoc, boundsCorners } from '@core/geometry/bounds';
-import { is3D, type CadDocument } from '@core/model/types';
+import { entityTrianglePositions } from '@core/geometry/entityTriangles';
+import { is3D, type CadDocument, type Entity } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { appendAll } from '@lib/appendAll';
+import type { AnalysisCase } from '@core/model/analysis';
 import { caseOf } from '../shared/access';
 import { refuseFll } from './codes';
 import { analysedMassKg } from './rigidBalance';
@@ -43,18 +45,20 @@ function groundNormal(
   return [ay * Math.sin(angle), -ax * Math.sin(angle), Math.cos(angle)];
 }
 
-/** The point of the plane with normal `normal` that touches the lowest bounding-box corner of the parts (document units). */
+/** The point of the plane with normal `normal` that touches the support point of the parts: the world vertex with the least n . x (document units). */
 function touchingPoint(doc: CadDocument, partIds: readonly string[], normal: Vec3): Vec3 | null {
   let lowest: Vec3 | null = null;
   let depth = Infinity;
   for (const id of partIds) {
-    const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
-    if (entity === undefined) return null;
-    for (const corner of boundsCorners(entityBoundsInDoc(doc, entity))) {
-      const along = corner[0] * normal[0] + corner[1] * normal[1] + corner[2] * normal[2];
+    const positions = entityTrianglePositions(doc.entities[id] as Entity, doc);
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      const x = positions[i] as number;
+      const y = positions[i + 1] as number;
+      const z = positions[i + 2] as number;
+      const along = x * normal[0] + y * normal[1] + z * normal[2];
       if (along < depth) {
         depth = along;
-        lowest = corner;
+        lowest = [x, y, z];
       }
     }
   }
@@ -105,19 +109,21 @@ const applied = (value: Applied | CommandResult): value is Applied => !('summary
 
 /**
  * @affects doc.analysis.cases (adds 1 explicit_dynamics case: parts, controls, gravity, one initial velocity per part, one rigid wall; affected: [analysisId, wallId])
- * @invariant v0 = sqrt(2 g h) (VC-FLL-05) along -Z for every part; the wall is frictionless, normal = +Z (level) or +Z tilted, through the lowest bounding-box corner of the parts, so the parts touch it at t = 0 with the drop speed; ids `an-` / `rw-` / `iv-<step>.<k>`
+ * @invariant v0 = sqrt(2 g h) (VC-FLL-05) along -n for every part and gravity g along -n, n = the ground normal (+Z level; tilted: the attitude rotated, the ground seen in the part frame, so v0 and the energy are the true normal impact); the wall is frictionless through the support point (least n . x over the world vertices of the parts), so they touch it at t = 0; ids `an-` / `rw-` / `iv-<step>.<k>`
  * @invariant composed only of create_analysis, set_part_idealization, set_explicit_controls, set_initial_velocity and add_rigid_wall: a refusal of any step refuses the whole command with that step's code
- * @failure unknown / 2D / duplicate / no parts -> FLL_DROP_PARTS; tilt on level or a bad tilted angle / axis -> FLL_DROP_ORIENTATION; height or gravity not > 0 -> FLL_DROP_PARAM; a nested step refusal (EXP_*, FEA_*) keeps its own code (all refusals, unchanged doc)
+ * @invariant kernel-optional: mass exact with ctx.kernel, mesh integration without
+ * @failure unknown / 2D / duplicate part, or no finite vertices -> FLL_DROP_PARTS; tilt on level or a bad tilted angle / axis -> FLL_DROP_ORIENTATION; a nested step refusal (EXP_*, FEA_*) keeps its own code (all refusals, unchanged doc)
  */
 export const createDropCase = defineCommand({
   name: 'create_drop_case',
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Create the drop / hard-landing case of a vehicle (FR-FLL-06) as an explicit_dynamics analysis (solver llull_explicit) and return its id in ' +
     'affected[0] and the rigid wall id in affected[1]. The vehicle (`partIds`, 3D solids with a material) is released from `heightM` metres: ' +
-    'every part starts at the impact speed v0 = sqrt(2 g h) pointing down (-Z; data.impactVelocityMps, e.g. 3.1316 m/s for 0.5 m), gravity g acts ' +
-    'during the impact, and a frictionless rigid ground wall touches the lowest point of the parts (bounding-box corner) at t = 0, so the run ' +
+    'every part starts at the impact speed v0 = sqrt(2 g h) pointing down (data.impactVelocityMps, e.g. 3.1316 m/s for 0.5 m), gravity g acts along the same direction ' +
+    'during the impact, and a frictionless rigid ground wall touches the lowest vertex of the parts (support point along the ground normal) at t = 0, so the run ' +
     'simulates only the impact, not the fall. orientation level: horizontal ground (the vehicle as modelled, +Z up); tilted: the ground plane ' +
-    'is tilted `tiltDegrees` (0..90) about the horizontal axis `tiltAxis` [x, y] (the vehicle lands that much rolled / pitched the other way). ' +
+    'is tilted `tiltDegrees` (0..90) about the horizontal axis `tiltAxis` [x, y]: the vehicle lands rolled / pitched by that angle on level ground, expressed in the part frame, so velocity and gravity point along minus the ground normal (data.groundNormal). ' +
     'The document unit must be mm or m. endTime (time) bounds the simulated impact; historyInterval defaults to endTime / 200. Reports the vehicle ' +
     'mass (kg) and impact kinetic energy (J) when the parts have a material. Next: tune with set_explicit_controls / add_time_history, then the ' +
     'explicit_run transport and analysis_report / explicit_energy_check. Peak accelerations and stresses come from the run, not from this command.',
@@ -160,16 +166,15 @@ export const createDropCase = defineCommand({
     const fail = (code: string, message: string, ids: readonly string[] = [], paths: readonly string[] = []): CommandResult =>
       refuseFll(doc, 'create_drop_case', code, message, ids, paths);
     const gravity = params.gravityMps2 ?? STANDARD_GRAVITY;
-    if (!(heightM > 0) || !Number.isFinite(heightM) || !(gravity > 0) || !Number.isFinite(gravity))
-      return fail('FLL_DROP_PARAM', 'heightM and gravityMps2 must be finite and > 0', [], ['heightM']);
     const problem = partsProblem(doc, partIds);
     if (problem !== null) return fail('FLL_DROP_PARTS', problem, partIds, ['partIds']);
     const normal = groundNormal(orientation, params.tiltDegrees, params.tiltAxis);
     if (normal === null)
       return fail('FLL_DROP_ORIENTATION', `tilt does not fit orientation '${orientation}'`, [], ['orientation', 'tiltDegrees', 'tiltAxis']);
     const wallPoint = touchingPoint(doc, partIds, normal);
-    if (wallPoint === null) return fail('FLL_DROP_PARTS', 'the parts have no finite bounds', partIds, ['partIds']);
+    if (wallPoint === null) return fail('FLL_DROP_PARTS', 'the parts have no finite vertices (an empty mesh?)', partIds, ['partIds']);
     const dropped: Dropped = { impactVelocityMps: Math.sqrt(2 * gravity * heightM), normal, wallPoint };
+    const alongDrop = (magnitude: number): Vec3 => [0 - magnitude * normal[0], 0 - magnitude * normal[1], 0 - magnitude * normal[2]];
     const tiltText = params.tiltDegrees === undefined ? '' : ` ${params.tiltDegrees} deg`;
     const caseName = params.name ?? `drop ${heightM} m ${orientation}`;
 
@@ -194,13 +199,13 @@ export const createDropCase = defineCommand({
           analysisId,
           endTime: params.endTime,
           historyInterval: history,
-          gravity: { vector: [0, 0, -gravity], unit: 'm/s^2' },
+          gravity: { vector: alongDrop(gravity), unit: 'm/s^2' },
           ...(params.mesh !== undefined ? { mesh: params.mesh } : {}),
         },
       ],
       ...partIds.map((entityId): readonly [string, Record<string, unknown>] => [
         'set_initial_velocity',
-        { analysisId, entityId, velocity: { vector: [0, 0, -dropped.impactVelocityMps], unit: 'm/s' } },
+        { analysisId, entityId, velocity: { vector: alongDrop(dropped.impactVelocityMps), unit: 'm/s' } },
       ]),
       ['add_rigid_wall', { analysisId, name: 'ground', point: wallPoint, normal }],
     ];
@@ -210,7 +215,7 @@ export const createDropCase = defineCommand({
     }
     const wallId = affected[affected.length - 1] ?? '';
     const analysis = caseOf(current, analysisId);
-    const mass = analysis === undefined ? 'no analysis' : analysedMassKg(current, analysis, ctx);
+    const mass = analysedMassKg(current, analysis as AnalysisCase, ctx);
     const massKg = typeof mass === 'number' ? mass : null;
     const energyJ = massKg === null ? null : 0.5 * massKg * dropped.impactVelocityMps ** 2;
     return {

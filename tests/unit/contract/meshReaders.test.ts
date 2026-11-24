@@ -83,6 +83,7 @@ const AUDIT: Readonly<Record<string, Answer>> = {
     commands: ['insert_fastener_stack', 'insert_fastener_row', 'check_fastener_layout', 'select_fastener'],
   },
   'domain-aero/src/sheetmetal/foldPiece.ts': { derived: 'sheet-metal pieces are derived solids' },
+  'domain-cae/src/flightLoads/createDropCase.ts': { commands: ['create_drop_case'] },
   'domain-cae/src/flightLoads/print/properties.ts': {
     host: 'the deck writer (writeInp, run by the server) calls printedProperties: it refuses MESH_ASSET_LOD_ONLY on a display-only body and the server hands it withFullResolution (set_print_idealization also carries readsMeshTriangles)',
   },

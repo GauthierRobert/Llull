@@ -69,7 +69,6 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_DROP_PARTS: 'give partIds of existing 3D solids (the vehicle parts), each listed once, at most 64',
   FLL_DROP_ORIENTATION:
     "orientation 'level' takes no tilt; 'tilted' needs tiltDegrees in (0, 90) and a non-zero horizontal tiltAxis [x, y]",
-  FLL_DROP_PARAM: 'give heightM > 0 (metres) and gravityMps2 > 0 (m/s^2), both finite',
   FLL_DROP_STEP:
     'fix the step named in the message (the document unit must be mm or m, endTime a time > 0, a part needs a material to run)',
   FLL_SUPPORT_POINTS: 'the three support points must be finite and at least 1e-6 of their spread apart',
