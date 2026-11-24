@@ -10,6 +10,7 @@ import { createEmptyDocument, type CadDocument, type SweepEntity } from '@core/m
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { validateDocumentValues } from '@core/commands/persistence/validation';
 import { FACE_GROUPS } from '@core/geometry/sweepEval/mergeFaces';
+import { withSweepLayoutOf } from '@core/model/documentSettings';
 import { fitSweepFaces, fitToleranceOf } from '@core/geometry/sweepEval/fitted';
 
 const RING_EDGES = 24;
@@ -89,6 +90,14 @@ describe('fitted sweep face layout follows the document', () => {
       execute(createEmptyDocument(), 'build_project', { actions: [{ command: 'sweep_profile', params: PARAMS }] }).document,
     );
     expect(facesPerSweep(execute(built, 'replay_history', {}).document)).toEqual([faces]);
+  });
+
+  it('withSweepLayoutOf gives a fresh document the marker of its base, or none when the base has none', () => {
+    expect(withSweepLayoutOf(createEmptyDocument(), createEmptyDocument()).sweepFaceLayout).toBe('joined');
+    const none = withSweepLayoutOf(createEmptyDocument(), legacy(createEmptyDocument()));
+    expect(none.sweepFaceLayout).toBeUndefined();
+    expect('sweepFaceLayout' in none).toBe(false);
+    expect(withSweepLayoutOf(none, createEmptyDocument()).sweepFaceLayout).toBe('joined');
   });
 
   it('refuses a marker other than joined on load', () => {

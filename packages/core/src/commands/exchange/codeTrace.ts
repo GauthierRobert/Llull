@@ -5,6 +5,7 @@
  */
 
 import { type CadDocument, createEmptyDocument } from '../../model/types';
+import { withSweepLayoutOf } from '../../model/documentSettings';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { execute } from '../execute';
@@ -184,7 +185,7 @@ function validateTrace(trace: unknown): string | null {
 /** Fresh geometry, keeping view and organisation state the code does not describe. */
 function replaceBase(doc: CadDocument): CadDocument {
   return {
-    ...createEmptyDocument(),
+    ...withSweepLayoutOf(createEmptyDocument(), doc),
     camera: doc.camera,
     units: doc.units,
     displayPrecision: doc.displayPrecision,
