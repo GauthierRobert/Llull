@@ -11,7 +11,9 @@ fn folder(name: &str) -> PathBuf {
     dir
 }
 
-fn run(dir: &Path, job: &Value) -> Result<(Value, Vec<f32>, String), (String, String)> {
+type RunOutcome = Result<(Value, Vec<f32>, String), (String, String)>;
+
+fn run(dir: &Path, job: &Value) -> RunOutcome {
     std::fs::write(dir.join("job.json"), serde_json::to_vec(job).unwrap()).unwrap();
     let mut events = Vec::new();
     let result = llull_topopt::job::run(dir, &mut events).map_err(|e| (e.code.to_string(), e.message));
@@ -644,11 +646,7 @@ fn a_3d_run_resumes_bit_for_bit_across_backtracks_and_the_settle_window() {
     let _ = std::fs::remove_dir_all(full);
 }
 
-fn resume_with_mma_values(
-    name: &str,
-    cut: usize,
-    edit: impl Fn(&mut Vec<f64>),
-) -> (PathBuf, Result<(Value, Vec<f32>, String), (String, String)>) {
+fn resume_with_mma_values(name: &str, cut: usize, edit: impl Fn(&mut Vec<f64>)) -> (PathBuf, RunOutcome) {
     let job = cantilever_min_volume(1000.0, json!({}));
     let part = folder(name);
     let mut first = job.clone();
