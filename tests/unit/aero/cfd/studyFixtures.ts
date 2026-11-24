@@ -41,7 +41,8 @@ export function recordedGridStudy(kernel: GeometryKernel | null = null): Recorde
   const recorded = recordedSphere({}, kernel);
   const { geometryHash, kernel: kernelName } = recorded.artifact;
   const levels = [0.05, 0.1, 0.2].map((h) => studyLevel(h, 0.5 + 4 * h * h, { geometryHash, kernel: kernelName }));
-  const ctx = { ...recorded.ctx, cfdResults: portOf(levels) };
+  // the store holds the recorded result's bundle too, so a replay re-verifies record_cfd_results as well as the study
+  const ctx = { ...recorded.ctx, cfdResults: portOf([...levels, { artifact: recorded.artifact, hash: recorded.hash }]) };
   const hashes = levels.map((entry) => entry.hash);
   const result = execute(recorded.doc, 'record_cfd_grid_study', { caseId: 'c1', resultsHashes: hashes }, ctx);
   if (result.rejected === true) throw new Error(result.summary);
