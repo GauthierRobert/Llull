@@ -718,6 +718,21 @@ returned values up to 1.3e34 that the f32 V-cycle cast to inf. Two layers:
    bold) and the iteration is re-analysed. `state.json` carries `backtracks` and `acceptedCompliance` (both optional, absent for other runs) beside the MMA state, so
    a resumed run backtracks identically (tested with checkpoints before, on and after the backtrack iteration) and counts on. One warning per run,
    `TOP_DESIGN_BACKTRACK`, "backtracked N time(s) in this run (M in all; first of this run at iteration i)".
+
+**Stall after backtracks (as built).** The halved asymptotes alone could not narrow a step further (the asymptote distance has a floor of 0.01 of the
+range, above the variables of a near-void design, so the next step went all the way to the bound again) and, once they did, the small moves fell under
+`changeTol`: the 3D cantilever 12 × 4 × 3, E0 210000, `min_volume` `maxCompliance` 1000 (6 backtracks) ended `converged` at volume 0.0066 with compliance 308, a
+feasible design 3x below the limit. Two changes in `Mma` (`mma.rs`):
+1. each `rewind` also halves the minimum asymptote distance (`0.01 · range · 0.5^rewinds`; the count is kept for the rest of the run), so repeated backtracks
+   bisect onto the limit;
+2. `Mma::settling()` holds for `SETTLE_STEPS = 10` steps after a rewind and `simp.rs` does not report `converged` while it holds: the moves are small because the
+   asymptotes were narrowed, not because the design converged. Restoring (doubling) the asymptote width after N steps was tried (N = 2, 3, 5, 10, 20): it re-opened
+   the cliff (compliance 1e4 to 1e5 chaos, ended 1.2x to 4x over the limit), so the distances regrow only through the usual 1.2 per monotone step.
+`mma.f64` gains two values (`rewinds`, steps since the last one) only once a rewind happened (4 n + 2 values; plain runs keep 4 n and their bytes); `restore`
+accepts both. Measured: cantilever limit 1000 ends `converged` at volume 0.003277, compliance 998.96 (0.999 of the limit) in 25 iterations (before 0.0066 / 308);
+limit 10, formerly unsatisfied at 13.2226, ends feasible at 9.98 in 20 iterations; slack MBB 30 × 10 (1e5) still takes the Jacobi fallback and ends at compliance 99992 (volume 0.052, 71 iterations).
+Goldens bit-identical (no backtrack, so no rewind state): MBB 60 × 20 MMA 203.1556703851201 / 138 it, `min_volume` 30 × 10 373.2413141973718 / 45 it / volume
+0.3926080424755817. Resume is bit for bit across the backtracks and the settle window (`a_3d_run_resumes_bit_for_bit_across_backtracks_and_the_settle_window`).
 Result of the scenario: 70 iterations, converged, volume 0.0521, compliance 99999.8 (limit 1e5, satisfied), 0.47 s for two runs; before: `TOP_SOLVER_FAILED`; with the
 fallback alone the run finished at volume 0, compliance 1.2e11, `TOP_CONSTRAINT_UNSATISFIED`. 3D cantilever 12 × 4 × 3, E0 210000, `maxCompliance` 1000: 6
 backtracks, volume 0.0066, compliance 308, satisfied (the first design of this kind that an absolute `100 × limit` threshold missed: volume 0 at iteration 3);
