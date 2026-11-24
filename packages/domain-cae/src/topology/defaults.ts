@@ -6,6 +6,9 @@ import type { NamedValue, TopologyProjection, TopologySettings } from '@core/mod
 /** Force x length unit of a compliance in each analysis unit system. */
 export const COMPLIANCE_UNIT: Readonly<Record<UnitSystem, string>> = { 'N-mm-t-s': 'N*mm', 'N-m-kg-s': 'N*m', 'lbf-in-slinch-s': 'lbf*in' };
 
+/** Relative slack a constraint row may exceed its limit by and still be satisfied (the solver's `CONSTRAINT_TOLERANCE`: keep in step). */
+export const CONSTRAINT_TOLERANCE = 1e-4;
+
 /** Voxel count above which a study is refused (provisional: the per-device DOF cap is set from the VC-TOP-34 measurements). */
 export const TOPOLOGY_VOXEL_CAP = 4_000_000;
 /** History rows kept in a recorded summary. */

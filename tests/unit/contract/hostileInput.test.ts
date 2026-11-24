@@ -74,6 +74,15 @@ function sourceFiles(directory: string, found: string[] = []): string[] {
   return found;
 }
 
+/** Decoders of untrusted bytes in the hosts: the renderer's (`src/ui`: `parse*File`) and the backend's (`server/src`: `parse*` / `read*` taking bytes). Keys start with `../src/ui/` or `../server/src/`. */
+const HOST_READERS: ReadonlyArray<{ readonly directory: string; readonly reader: RegExp }> = [
+  { directory: path.resolve(PACKAGES, '../src/ui'), reader: /^export (?:async )?function (parse\w*File)\(/gm },
+  {
+    directory: path.resolve(PACKAGES, '../server/src'),
+    reader: /^export (?:async )?function ((?:read|parse)[A-Z0-9]\w*)\(\w+: (?:Uint8Array|Buffer)\b/gm,
+  },
+];
+
 function exportedReaders(): string[] {
   const keys: string[] = [];
   for (const dir of readdirSync(PACKAGES, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
@@ -84,6 +93,11 @@ function exportedReaders(): string[] {
         keys.push(`${file}:${match[1] as string}`);
     }
   }
+  for (const { directory, reader } of HOST_READERS)
+    for (const file of sourceFiles(directory)) {
+      const text = readFileSync(path.join(PACKAGES, file), 'utf8');
+      for (const match of text.matchAll(reader)) keys.push(`${file}:${match[1] as string}`);
+    }
   return keys;
 }
 

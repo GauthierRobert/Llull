@@ -530,6 +530,11 @@
       "file": "domain-aec/src/plant/equipment/commands/lugParams.ts",
       "match": "baseElevation: input.baseElevation ?? 0 }",
       "reason": "lugs support: the elevation of the bottom tangent line above the level defaults to 0 = on the level, a placement not an engineering input; named in defaulted (support.baseElevation) like the none support"
+    },
+    {
+      "file": "domain-aero/src/cfd/resultFiles.ts",
+      "match": "const vec3At = (floats: Float32Array, at: number): Vec3 =>",
+      "reason": "LLSL / LLST decoder: the index is in bounds by construction (the file length and counts are checked before any read), so `?? 0` only satisfies noUncheckedIndexedAccess; a non-finite value is refused, not defaulted"
     }
   ]
 }

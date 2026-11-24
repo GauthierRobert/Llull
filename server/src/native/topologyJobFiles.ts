@@ -100,6 +100,9 @@ export function topologyJobFiles(
     volumeFraction: job.volumeFraction,
     objective:
       job.objective.kind === 'min_volume' ? { kind: 'minVolume', maxCompliance: job.objective.maxCompliance } : { kind: 'minCompliance' },
+    ...(job.objective.kind === 'min_volume' && job.objective.displacementConstraints !== undefined
+      ? { displacementConstraints: job.objective.displacementConstraints }
+      : {}),
     active: 'active.u8',
     keepIn: 'keep_in.u8',
     keepOut: 'keep_out.u8',

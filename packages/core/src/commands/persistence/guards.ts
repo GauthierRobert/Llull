@@ -14,6 +14,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
 import { isHexColor } from '../../lib/isHexColor';
+import { FACE_COLORED_KINDS } from '../../geometry/faceColors';
 import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
 import { curvesProblem, isCurveSegment } from './curvesGuard';
@@ -48,6 +49,8 @@ function imageProblem(v: Record<string, unknown>): string | null {
 
 /** First structural problem of a saved sweep (path chain + section + SWG fields), or null. */
 function sweepProblem(v: Record<string, unknown>): string | null {
+  if (v['faceLayout'] !== undefined && v['faceLayout'] !== 'joined')
+    return `faceLayout must be 'joined' or absent, got ${JSON.stringify(v['faceLayout'])}`;
   return sweepGeometryProblem(v) ?? (Array.isArray(v['path']) ? sweepDesignProblem(v, v['path'] as CurveSegment<Vec3>[]) : null);
 }
 
@@ -159,6 +162,31 @@ export function validateLayer(v: unknown): v is Layer {
   );
 }
 
+const MAX_FACE_COLORS = 4096;
+
+/** A face signature: a normal of length at most 1, a centre inside the body box (fractions 0..1) and an outward sign of 1 or -1. */
+function validSignature(sig: unknown): boolean {
+  if (!isRecord(sig) || !isVec3(sig['normal']) || !isVec3(sig['centre']) || !isVec3(sig['span'])) return false;
+  const [nx, ny, nz] = sig['normal'];
+  return (
+    Math.hypot(nx, ny, nz) <= 1.0001 &&
+    sig['centre'].every((c) => c >= -0.001 && c <= 1.001) &&
+    sig['span'].every((c) => c >= -0.001 && c <= 1.001) &&
+    (sig['outward'] === 1 || sig['outward'] === -1)
+  );
+}
+
+function faceColorsProblem(kind: string, faceColors: unknown): string | null {
+  if (faceColors === undefined) return null;
+  if (!FACE_COLORED_KINDS.has(kind)) return `faceColors apply to mesh solids and parametric solids, not a ${kind}`;
+  const valid = (f: unknown): boolean =>
+    isRecord(f) && isVec3(f['near']) && isHexColor(f['color']) && (f['sig'] === undefined || (kind !== 'mesh' && validSignature(f['sig'])));
+  const ok = Array.isArray(faceColors) && faceColors.length <= MAX_FACE_COLORS && faceColors.every(valid);
+  return ok
+    ? null
+    : `faceColors must be an array of at most ${MAX_FACE_COLORS} { near: [x, y, z], color: "#rrggbb", sig?: { normal, centre and span (0..1 of the body box), outward: 1 | -1 } (parametric solids only) }`;
+}
+
 /** First problem of an entity's base fields, then its kind-specific fields, or null. */
 export function validateEntityValue(v: unknown): string | null {
   if (!isRecord(v)) return 'entity is not an object';
@@ -172,6 +200,8 @@ export function validateEntityValue(v: unknown): string | null {
   if (!isHexColor(color)) return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
   const decals = decalsProblem(v['decals']);
   if (decals !== null) return `entity ${id}: ${decals}`;
+  const faceColors = faceColorsProblem(kind, v['faceColors']);
+  if (faceColors !== null) return `entity ${id} (${kind}): ${faceColors}`;
   for (const field of POSITIVE_FIELDS[kind] ?? []) {
     const value = v[field];
     if (!isPositiveNumber(value)) return `entity ${id} (${kind}): ${field} must be finite and > 0, got ${String(value)}`;
@@ -358,12 +388,6 @@ function meshProblem(v: Record<string, unknown>): string | null {
     return `mesh.indices must be a flat array of triangle indices (at most ${MAX_IMPORT_TRIANGLES} triangles)`;
   if (!indices.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount))
     return `mesh.indices must be integers in [0, ${vertexCount})`;
-  const faceColors = v['faceColors'];
-  if (
-    faceColors !== undefined &&
-    (!Array.isArray(faceColors) || !faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color'])))
-  )
-    return 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
   const vertexColors = v['vertexColors'];
   if (
     vertexColors !== undefined &&

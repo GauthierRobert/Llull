@@ -277,6 +277,7 @@ exports[`PHY-20 vac_flat_spectrum_handoff plan, golden > reproduces VC-VAC-06 / 
     "parameters": {},
     "recipes": {},
     "selection": [],
+    "sweepFaceLayout": "joined",
     "units": "mm",
     "vibroacoustics": {
       "exposureOrder": [

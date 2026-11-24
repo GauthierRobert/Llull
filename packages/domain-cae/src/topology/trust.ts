@@ -30,6 +30,13 @@ const nothing = (state: TopologyState, problem: TrustedTopology['problem'] = nul
   problem,
 });
 
+/** `massG` follows the current material density (not an input of the hash without gravity): never compared, so older records stay trusted. */
+function withoutMass(summary: TopologyResultSummary): Omit<TopologyResultSummary, 'massG'> {
+  const { massG, ...rest } = summary;
+  void massG;
+  return rest;
+}
+
 /** State from the hashes alone (no artifact is read, so `solved` here still has to pass `trustedTopology` before any number is shown). */
 function topologyStateOf(doc: CadDocument, study: TopologyStudy): TopologyState {
   const result = study.result;
@@ -63,7 +70,7 @@ export function trustedTopology(doc: CadDocument, study: TopologyStudy, port: Fe
       : nothing('missing', { code: 'TOP_ARTIFACT_NOT_FOUND', message: fetched.message });
   const expected = topologySummary(doc, study, fetched.artifact, record.fieldHash);
   if (typeof expected === 'string') return nothing('untrusted', { code: 'TOP_SUMMARY_MISMATCH', message: expected });
-  const differing = differingKeys(record, expected);
+  const differing = differingKeys(withoutMass(record), withoutMass(expected));
   if (differing.length > 0)
     return nothing('untrusted', {
       code: 'TOP_SUMMARY_MISMATCH',

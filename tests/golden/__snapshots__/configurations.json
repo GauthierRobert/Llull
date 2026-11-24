@@ -76,6 +76,7 @@
     "jointOrder": [],
     "driveRelations": {},
     "driveRelationOrder": [],
+    "sweepFaceLayout": "joined",
     "nextStepNumber": 2
   }
 }

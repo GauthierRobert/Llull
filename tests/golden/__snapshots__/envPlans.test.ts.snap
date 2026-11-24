@@ -1074,6 +1074,7 @@ exports[`PHY-14 env_mission_end_to_end plan, golden > screens outgassing, moistu
       },
       "outgassingProfile": "nasa_gsfc_screening",
     },
+    "sweepFaceLayout": "joined",
     "units": "mm",
   },
   "format": "llull-document",

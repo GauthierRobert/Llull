@@ -1,7 +1,8 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
-import type { FaceGroup, MeshAssetRef, MeshSource, VertexTint } from './meshProvenance';
+import type { FaceColored, FaceGroup, MeshAssetRef, MeshSource, VertexTint } from './meshProvenance';
+export type { FaceColor, FaceSignature } from './meshProvenance';
 import type { EdgeBlendNode, FaceBlendParams, FullRoundParams, JointRadius } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
@@ -111,25 +112,25 @@ export interface BaseEntity extends EntityTags {
   decals?: ReadonlyArray<Decal>;
 }
 
-export interface BoxEntity extends BaseEntity {
+export interface BoxEntity extends BaseEntity, FaceColored {
   readonly kind: 'box';
   /** [width, height, depth]. */
   size: Vec3;
 }
 
-export interface CylinderEntity extends BaseEntity {
+export interface CylinderEntity extends BaseEntity, FaceColored {
   readonly kind: 'cylinder';
   radius: number;
   height: number;
 }
 
-export interface SphereEntity extends BaseEntity {
+export interface SphereEntity extends BaseEntity, FaceColored {
   readonly kind: 'sphere';
   radius: number;
 }
 
 /** Closed XY polygon extruded along Z. */
-export interface ExtrusionEntity extends BaseEntity {
+export interface ExtrusionEntity extends BaseEntity, FaceColored {
   readonly kind: 'extrusion';
   profile: ReadonlyArray<readonly [number, number]>;
   depth: number;
@@ -147,7 +148,7 @@ export interface ExtrusionEntity extends BaseEntity {
  * @invariant `brep`, when present, is the exact construction tree the kernel tessellated into `mesh` (before `position`/`rotation`); a
  *   command that rewrites `mesh` must rewrite or drop `brep`
  */
-export interface MeshSolidEntity extends BaseEntity, VertexTint {
+export interface MeshSolidEntity extends BaseEntity, VertexTint, FaceColored {
   readonly kind: 'mesh';
   mesh: MeshData;
   /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */
@@ -156,8 +157,6 @@ export interface MeshSolidEntity extends BaseEntity, VertexTint {
   stepSlab?: ShapeRecipe;
   /** Set only on the groove tool of a modelled thread (feature lowering): kernels skip post-boolean face merging on results built from it. */
   threadTool?: true;
-  /** Per-face display colours (`set_face_color`), drawn over `color`; resolved on the current `mesh` by `faceColorTriangles`. */
-  faceColors?: ReadonlyArray<FaceColor>;
   /** Where the triangles came from and whether that source is pinned (07 MSH); absent on kernel results and on `import_mesh` bodies. */
   meshSource?: MeshSource;
   /** Named triangle ranges from an import (OBJ groups, 3MF objects), `[start, end)` over the triangle order of `mesh.indices`. */
@@ -166,25 +165,15 @@ export interface MeshSolidEntity extends BaseEntity, VertexTint {
   asset?: MeshAssetRef;
 }
 
-/**
- * Colour of one face of a mesh solid. The face is the smooth patch of `mesh` around `near` (entity-local, before `position` / `rotation`):
- * the triangles connected to the one closest to `near` without crossing a crease, so it follows the face through regeneration.
- */
-export interface FaceColor {
-  readonly near: Vec3;
-  /** Hex `#rrggbb`. */
-  readonly color: string;
-}
-
 /** Base circle in XY centered at `position`, apex at +Z. */
-interface ConeEntity extends BaseEntity {
+interface ConeEntity extends BaseEntity, FaceColored {
   readonly kind: 'cone';
   radius: number;
   height: number;
 }
 
 /** Centered at `position`; valid when 0 < tubeRadius < ringRadius. */
-interface TorusEntity extends BaseEntity {
+interface TorusEntity extends BaseEntity, FaceColored {
   readonly kind: 'torus';
   /** Major radius: center to tube center. */
   ringRadius: number;
@@ -193,14 +182,14 @@ interface TorusEntity extends BaseEntity {
 }
 
 /** Right-triangular ramp: full height at z=0, tapering to zero at z=depth. `position` is the lower-front-left corner. */
-interface WedgeEntity extends BaseEntity {
+interface WedgeEntity extends BaseEntity, FaceColored {
   readonly kind: 'wedge';
   /** [width (X), height (Y), depth (Z)], all > 0. */
   size: Vec3;
 }
 
 /** Rectangular base centered at `position` (±baseWidth/2 in X, ±baseDepth/2 in Y), apex at +Z. */
-interface PyramidEntity extends BaseEntity {
+interface PyramidEntity extends BaseEntity, FaceColored {
   readonly kind: 'pyramid';
   baseWidth: number;
   baseDepth: number;
@@ -214,7 +203,7 @@ interface PyramidEntity extends BaseEntity {
  * @invariant segments >= 3
  * @see revolve_profile
  */
-export interface RevolutionEntity extends BaseEntity {
+export interface RevolutionEntity extends BaseEntity, FaceColored {
   readonly kind: 'revolution';
   profile: ReadonlyArray<readonly [number, number]>;
   /** Unit vector in local entity space. */
@@ -770,6 +759,7 @@ export function createEmptyDocument(): CadDocument {
     camera: { target: [0, 0, 0], azimuth: (3 * Math.PI) / 4, polar: Math.PI / 3, distance: 12 },
     groups: {},
     units: 'mm',
+    sweepFaceLayout: 'joined',
     displayPrecision: 3,
     parameters: {},
     animations: {},

@@ -319,6 +319,10 @@ impl<T: Real> Multigrid<T> {
 }
 
 impl<T: Real> Preconditioner for Multigrid<T> {
+    fn detects_divergence(&self) -> bool {
+        true
+    }
+
     fn precondition(&self, r: &[f64], z: &mut [f64]) {
         let mut works = self.work.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let (mut rhs, mut correction) = (std::mem::take(&mut works[0].rhs), std::mem::take(&mut works[0].correction));

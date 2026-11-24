@@ -4,6 +4,7 @@
  * come back through the read-only `compute_fatigue` command (which re-reads and checks the artifact). The document is never written.
  */
 
+import type { CfdResultPort } from '@core/model/cfdResult';
 import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { isEvaluationFailure, fatigueFieldArtifact, fatigueFieldInput, FIELD_COMPONENTS, readFatigueField } from '@cae/index';
 import type { FeArtifactCache } from '../fea/artifactStore';
@@ -16,6 +17,8 @@ const TOOL = 'fatigue_field';
 export interface NativeDeps {
   readonly store: FeArtifactCache;
   readonly runner: ComputeRunner;
+  /** The result port the host's `applyCommand` runs its commands with (`cfd_solve gridStudy` dry-runs its study command over the same one). */
+  readonly cfdResults?: CfdResultPort;
   readonly env?: NodeJS.ProcessEnv;
   /** One human-readable line per solver iteration (topology_solve; the CLI prints it with `--progress`). */
   readonly onProgress?: (line: string) => void;

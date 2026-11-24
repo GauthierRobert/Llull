@@ -11,7 +11,16 @@ use std::fmt;
 /// `z = M⁻¹ r` for a symmetric positive definite M; `z` must be 0 at the non-free DOFs.
 pub trait Preconditioner: Sync {
     fn precondition(&self, r: &[f64], z: &mut [f64]);
+
+    /// The residual growing past [`DIVERGENCE`] times its start ends the solve as [`SolveError::Diverged`] (a preconditioner that
+    /// cannot be trusted to recover, e.g. a multigrid on a near-void design); off for Jacobi, whose transients can be large.
+    fn detects_divergence(&self) -> bool {
+        false
+    }
 }
+
+/// Residual growth over the start that counts as divergence.
+const DIVERGENCE: f64 = 1.0e3;
 
 /// Diagonal (Jacobi) preconditioner.
 pub struct Jacobi {
@@ -51,6 +60,8 @@ pub enum SolveError {
     NotConverged { iterations: usize, relative_residual: f64 },
     /// A NaN or infinity appeared.
     NonFinite { iteration: usize },
+    /// The residual grew past 1e3 times its start (only for preconditioners that [detect it](Preconditioner::detects_divergence)).
+    Diverged { iteration: usize, relative_residual: f64 },
 }
 
 impl fmt::Display for SolveError {
@@ -64,6 +75,9 @@ impl fmt::Display for SolveError {
                 write!(f, "PCG did not converge in {iterations} iterations (relative residual {relative_residual:.3e})")
             }
             SolveError::NonFinite { iteration } => write!(f, "PCG produced a non-finite value at iteration {iteration}"),
+            SolveError::Diverged { iteration, relative_residual } => {
+                write!(f, "PCG diverged at iteration {iteration} (relative residual {relative_residual:.3e})")
+            }
         }
     }
 }
@@ -114,6 +128,7 @@ pub fn pcg(
     if residual <= tolerance {
         return Ok(SolveStats { iterations: 0, relative_residual: residual });
     }
+    let start_residual = residual;
     let mut z = vec![0.0; n];
     pre.precondition(&r, &mut z);
     let mut p = z.clone();
@@ -134,6 +149,9 @@ pub fn pcg(
         }
         if residual <= tolerance {
             return Ok(SolveStats { iterations: iteration, relative_residual: residual });
+        }
+        if residual > DIVERGENCE * start_residual && pre.detects_divergence() {
+            return Err(SolveError::Diverged { iteration, relative_residual: residual });
         }
         pre.precondition(&r, &mut z);
         let rz_next = dot(&r, &z);

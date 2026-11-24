@@ -1,0 +1,110 @@
+/* Flow panel (12 CFD): case form, run buttons, result / study readouts, and the on-model legend. */
+
+.flow__inputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.flow__buttons {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.flow__progress {
+  width: 100%;
+  height: 6px;
+}
+
+.flow__state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.flow__note {
+  margin: var(--space-2) 0;
+  padding: var(--space-1) var(--space-2);
+  border-left: 3px solid var(--border);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.flow__note--warn {
+  border-left-color: var(--warning);
+}
+
+.flow__note--bad {
+  border-left-color: var(--danger);
+}
+
+.flow__note--ok {
+  border-left-color: var(--success);
+}
+
+.flow__warnings {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.flow__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.flow__table th,
+.flow__table td {
+  padding: 2px var(--space-2);
+  text-align: left;
+  font-weight: 400;
+}
+
+.flow__table thead th {
+  color: var(--fg-subtle);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+}
+
+.flow__flag {
+  color: var(--warning);
+  font-size: var(--text-2xs);
+}
+
+.flow__details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.flow__details dt {
+  color: var(--fg-subtle);
+}
+
+.flow__details dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-legend__bar {
+  height: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+}
+
+.flow-legend__ends {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}

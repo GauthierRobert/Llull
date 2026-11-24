@@ -3,6 +3,7 @@
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
+import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CfdResultArtifact, CfdResultPort } from '@core/model/cfdResult';
 import type { CadDocument } from '@core/model/types';
 import type { CfdCase } from '@aero/cfd/types';
@@ -25,7 +26,7 @@ export interface Recorded {
 export const FIELD_SHA = 'a'.repeat(64);
 
 /** `artifactPatch` is applied to the artifact before it is hashed (e.g. a symmetry case). `caseOverrides` reach `withCase`. */
-export function recordedSphere(caseOverrides: Record<string, unknown> = {}): Recorded {
+export function recordedSphere(caseOverrides: Record<string, unknown> = {}, kernel: GeometryKernel | null = null): Recorded {
   const ball = addBody(metreDocument(), 'add_sphere', { radius: 0.5, position: [0, 0, 0] });
   const doc = withCase(ball.doc, [ball.id], {
     freestream: { speedMS: 2, air: { densityKgM3: 1, temperatureK: 288.15, viscosityPaS: 0.01 } },
@@ -34,7 +35,7 @@ export function recordedSphere(caseOverrides: Record<string, unknown> = {}): Rec
     ...caseOverrides,
   });
   const cfdCase = doc.cfd?.cases['c1'] as CfdCase;
-  const built = buildFlowJob(doc, cfdCase, null, { maxSteps: 100 });
+  const built = buildFlowJob(doc, cfdCase, kernel, { maxSteps: 100 });
   if (!built.ok) throw new Error(built.message);
   const { job } = built;
   const q = 0.5 * job.caseJson.flow.densityKgM3 * job.caseJson.flow.speedMS ** 2;
@@ -92,7 +93,7 @@ export function recordedSphere(caseOverrides: Record<string, unknown> = {}): Rec
   if (typeof artifact === 'string') throw new Error(artifact);
   const hash = sha256Hex(canonicalJson(artifact));
   const port: CfdResultPort = { get: (key) => (key === hash ? artifact : null) };
-  const ctx = { ...defaultContext(), cfdResults: port };
+  const ctx = { ...defaultContext(), kernel, cfdResults: port };
   const recorded = execute(
     doc,
     'record_cfd_results',

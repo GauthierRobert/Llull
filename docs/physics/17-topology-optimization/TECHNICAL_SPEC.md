@@ -563,7 +563,7 @@ GPU memory in 3D). `job.json` `dofCap` overrides. Next: measure on a desktop GPU
 
 **Compliance ratio and width samples (as built, TR-TOP-10 / TR-TOP-09).** `compare_to_topology` finds the first `static` 05 analysis that has the rebuilt solid as a part and reads it through `trustedRecord` (the 05 staleness hashes and artifact re-verification: only a `solved`, non-stale, artifact-verified result counts). The external work F^T u is rebuilt from the artifacts, because 05 records neither strain energy nor external work: the `fe_results` DISP field of each load case of the optimum, times the nodal forces of the case's `force` loads (the vector split over the nodes of the mesh node set `L_<loadId>`, `distribution: 'total'` | `'per_node'`, as the deck writer does). The weighted sum uses the study's load case weights (the optimum's own weighting); both values go to N\*mm (`N-mm-t-s` 1, `N-m-kg-s` 1000, `lbf-in-slinch-s` 112.98) and `complianceRatio = F^T u(rebuild) / c(optimum)`. It is checked against `complianceRatioTarget` (default `COMPLIANCE_RATIO_TARGET` = 1.15, named, to calibrate; >= 1 else TOP_SETUP_INVALID): above it is TOP_REBUILD_DEVIATION (status fail), within it with the IoU met is pass. With no usable result `complianceRatio` is null, `complianceStatus { available: false, code: 'TOP_REBUILD_NOT_ANALYSED', reason, message }` with `reason` one of `no_analysis | not_solved | stale | unverified | unsupported | optimum_zero` and the status is warn. `unsupported` = a load of the case that is not a nodal `force` (pressure, gravity, moment), a force without mesh nodes, a node without displacement, or a load case of the optimum missing in the rebuild analysis. `check_topology` raises the same two items per `rebuildEntityIds` entry (target fixed at the default). `suggest_rebuild.widthSamples`: an exact Euclidean distance transform (Felzenszwalb-Huttenlocher) of the section nodes at the threshold; local maxima at least one node from the void are the medial-axis candidates, thinned so none lies in a wider sample's inscribed disc (at most 200); `width` = 2 x the exact distance to the contour (document units, plus `widthMm`), widest first.
 
-**Open** (after §15): compliance ratio of rebuilds loaded by moments and of face / body loads on non-tetrahedral meshes, `massG`, the per-device DOF
+**Open** (after §15): compliance ratio of rebuilds loaded by moments and of face / body loads on non-tetrahedral meshes, the per-device DOF
 cap (`TOPOLOGY_VOXEL_CAP` is provisional; VC-TOP-34 on a desktop GPU not measured).
 
 ## 15. As built: V1 (TOP-V1, 2026-10-22)
@@ -667,7 +667,86 @@ real binary (a 300-iteration MBB run stopped at a 3 s deadline and resumed equal
 
 ### 15.7 Not built / left
 
-PHY-18 shape optimisation (M4 line of §10; depends on PHY-18 M2), unstructured SIMP on the 05 tet mesh (§11.5), VC-TOP-34 on a desktop GPU (the
-machine of this build was not measured: the cap stays provisional), displacement constraints for `min_volume` (compliance only), `massG`, a
-`TOP_GREY_HIGH` remediation that suggests the projection is in place. `docs/FEATURES.md` and the tool-schema snapshot were regenerated for
-`set_topology_objective` and the new parameters.
+PHY-18 shape optimisation (M4 line of §10; depends on PHY-18 M2), unstructured SIMP on the 05 tet mesh (§11.5; needs its own spec: the study,
+grid and artifact contracts are voxel based), VC-TOP-34 on a desktop GPU (the machine of this build was not measured: the cap stays
+provisional), a `TOP_GREY_HIGH` remediation that suggests the projection is in place. `docs/FEATURES.md` and the tool-schema snapshot were
+regenerated for `set_topology_objective` and the new parameters.
+
+### 15.8 Displacement constraints for `min_volume` and `massG` (TOP-V1b)
+
+**Shape.** `objective { kind: 'min_volume', maxCompliance, displacementConstraints?: [{ label?, target, component: 'ux'|'uy'|'uz',
+maxDisplacement, loadCase? }] }` on `create_topology_study` / `set_topology_objective` (an optional field: studies written before it load
+unchanged; the persistence check validates it when present, the input hash includes it only when present). `target` = the selectors of a keep-in
+region (`facesNear` / `edgesNear` / `pointsNear` of a design-domain entity); the constraint limits `|ū|`, the mean of the displacement component
+over the grid nodes the target maps to, in document length units, in load case `loadCase` (absent: every load case, one constraint each, labelled
+`<label>@<case>` with several cases). A component normal to the 2D plane is `TOP_TARGET_UNMAPPED`; `maxDisplacement <= 0`, a target without a
+point, an entity outside the design domain, a duplicate label and an unknown load case are `TOP_SETUP_INVALID` (the unknown load case at job
+build). `topology_report.rules` lists each; the result carries `constraints` rows `{ name: 'displacement', label, value: |ū|, limit, satisfied }`
+after the compliance row, and `check_topology` raises `TOP_CONSTRAINT_VIOLATED` naming the label.
+
+**Native** (`llull-topopt/src/displacement.rs`, job key `displacementConstraints: [{ label?, loadCase, dofs, maxDisplacement }]`, needs `optimizer:
+mma`): one more MMA row `ū² / limit² − 1 ≤ 0` (sign agnostic, O(1)). Gradient by the adjoint: `K λ = ℓ` (ℓ = ones / n at the DOFs; one extra PCG
+solve per constraint and iteration, cold started so a resumed run stays bit for bit), `dū/dx_e = −p (E0 − Emin) xPhys_e^(p−1) g λ_eᵀ k0 u_e + λ_eᵀ f_e`
+(the cross energy by polarisation of the element energies, the second term for gravity cases), then the same projection / filter / column chain as the
+compliance row. Verified against central finite differences on a 4 × 3 plate with gravity (`displacement::tests`, 1e-5 relative). A fixed DOF in the
+list counts as u = 0 in the mean (a face touching a clamp); a target held entirely by supports is `TOP_TARGET_UNMAPPED` (TS) / `NATIVE_JOB_INPUT`
+(native); a DOF outside the grid, an empty list, a limit <= 0, an unknown load case or OC are `NATIVE_JOB_INPUT`. `result.json` constraint rows carry
+`label`; the summary states displacement rows in document units (the solver's are in the analysis length unit).
+
+**Dual solver fix (found by review).** With two or more MMA rows the dual Newton step used the full Hessian including rows at their bound
+(λ_i = 0, g_i < 0, an inactive constraint), whose coupling distorted the step; the line search then failed and the loop ended at λ = 0, an
+objective-only step that drove the volume to 1. The step now solves on the free multipliers only (bound rows get a −1 diagonal, d_i = 0) and a
+rejected Newton step falls back to a projected-gradient step when m > 1. Single-row problems (every earlier run) take the old path: MBB 60 × 20 MMA
+203.1556703851201 in 138 iterations, `min_volume` MBB 30 × 10 373.2413141973718 in 45 iterations (the figures of §15.1 / §15.2 were from an earlier build; these
+are the measurements before and after this change, identical). Tested: two coupled dense rows, one inactive, equal the one-row run (`mma::tests`).
+Measured after the fix, MBB 30 × 10 `min_volume` density filter: tip capped at 0.7 of the free layout's → volume 0.482 (free 0.393), |ū| = cap
+(261.2691 against 261.2689); with a self-weight case and compliance limit 1e5, caps 400 / 300 / 230 → volume 0.382 / 0.443 / 0.540, |ū| = cap, every row
+satisfied; a displacement row resumes from a checkpoint bit for bit.
+
+**Near-void collapse (multigrid NaN, found by review; as built).** `min_volume`, MBB 30 × 10, `maxCompliance` 1e5 (a row nobody binds at the start) ended in
+`TOP_SOLVER_FAILED` "PCG produced a non-finite value at iteration 1" at iteration 4. Cause: MMA stripped material at the move limit (volume 0.5 → 0.3 → 0.1
+→ 0.037, then 0.0017); that step broke the load path (compliance 1.2e5 → 9.3e9) and on the resulting ~1e9-contrast Galerkin hierarchy the coarse direct solve
+returned values up to 1.3e34 that the f32 V-cycle cast to inf. Two layers:
+1. *Solver fallback* (`llull-voxfe/src/pcg.rs`, `llull-topopt/src/solver.rs`): a multigrid PCG that ends `NonFinite`, `Breakdown` or `Diverged` (new: the residual
+   grew past 1e3 × its start; only preconditioners that opt in, i.e. multigrid) is solved again from the same start with the Jacobi preconditioner; the warning
+   `TOP_SOLVER_FALLBACK` names the cause. Plain `NotConverged` is not retried (a slow but falling run would pay another 10000 iterations); a Jacobi failure stays
+   `TOP_SOLVER_FAILED`. A saturating clamp of the f32 cast of the coarse correction was tried and dropped: it only turned the immediate NonFinite into 10000
+   diverging V-cycles (0.99 s against 0.31 s for the scenario) before the same fallback.
+2. *Backtrack* (`simp.rs` `collapse_backtrack` + `Mma::rewind`): in a `min_volume` MMA run an analysed design is a collapse when its compliance violates the limit and
+   jumped past 100 × the last accepted design's (10 × once it is also 100 × the limit), or is non-finite: a broken load path, not a gradual violation; scale free.
+   The last step is taken back: the design returns to the one that step started from, the asymptote distances around it halve (the next step is about half as
+   bold) and the iteration is re-analysed. `state.json` carries `backtracks` and `acceptedCompliance` (both optional, absent for other runs) beside the MMA state, so
+   a resumed run backtracks identically (tested with checkpoints before, on and after the backtrack iteration) and counts on. One warning per run,
+   `TOP_DESIGN_BACKTRACK`, "backtracked N time(s) in this run (M in all; first of this run at iteration i)".
+
+**Stall after backtracks (as built).** The halved asymptotes alone could not narrow a step further (the asymptote distance has a floor of 0.01 of the
+range, above the variables of a near-void design, so the next step went all the way to the bound again) and, once they did, the small moves fell under
+`changeTol`: the 3D cantilever 12 × 4 × 3, E0 210000, `min_volume` `maxCompliance` 1000 (6 backtracks) ended `converged` at volume 0.0066 with compliance 308, a
+feasible design 3x below the limit. Two changes in `Mma` (`mma.rs`):
+1. each `rewind` also halves the minimum asymptote distance (`0.01 · range · 0.5^rewinds`; the count is kept for the rest of the run), so repeated backtracks
+   bisect onto the limit;
+2. `Mma::settling()` holds for `SETTLE_STEPS = 10` steps after a rewind and `simp.rs` does not report `converged` while it holds: the moves are small because the
+   asymptotes were narrowed, not because the design converged. Restoring (doubling) the asymptote width after N steps was tried (N = 2, 3, 5, 10, 20): it re-opened
+   the cliff (compliance 1e4 to 1e5 chaos, ended 1.2x to 4x over the limit), so the distances regrow only through the usual 1.2 per monotone step.
+`mma.f64` gains two values (`rewinds`, steps since the last one) only once a rewind happened (4 n + 2 values; plain runs keep 4 n and their bytes); `restore`
+accepts both. Measured: cantilever limit 1000 ends `converged` at volume 0.003277, compliance 998.96 (0.999 of the limit) in 25 iterations (before 0.0066 / 308);
+limit 10, formerly unsatisfied at 13.2226, ends feasible at 9.98 in 20 iterations; slack MBB 30 × 10 (1e5) still takes the Jacobi fallback and ends at compliance 99992 (volume 0.052, 71 iterations).
+Goldens bit-identical (no backtrack, so no rewind state): MBB 60 × 20 MMA 203.1556703851201 / 138 it, `min_volume` 30 × 10 373.2413141973718 / 45 it / volume
+0.3926080424755817. Resume is bit for bit across the backtracks and the settle window (`a_3d_run_resumes_bit_for_bit_across_backtracks_and_the_settle_window`).
+Result of the scenario: 70 iterations, converged, volume 0.0521, compliance 99999.8 (limit 1e5, satisfied), 0.47 s for two runs; before: `TOP_SOLVER_FAILED`; with the
+fallback alone the run finished at volume 0, compliance 1.2e11, `TOP_CONSTRAINT_UNSATISFIED`. 3D cantilever 12 × 4 × 3, E0 210000, `maxCompliance` 1000: 6
+backtracks, volume 0.0066, compliance 308, satisfied (the first design of this kind that an absolute `100 × limit` threshold missed: volume 0 at iteration 3);
+`maxCompliance` 10: 4 backtracks, ends `TOP_CONSTRAINT_UNSATISFIED` at 13.22 against 10 (pinned). MBB 60 × 20 MMA (203.1556703851201, 138 iterations) and
+`min_volume` 30 × 10 (373.2413141973718, 45 iterations, volume 0.3926080424755817) are bit-identical. Tests: `v1.rs` (`a_slack_compliance_row_…`,
+`a_3d_collapse_…` x2, `a_run_resumes_bit_for_bit_across_a_backtrack`), `solver::tests` (fallback only: NonFinite and Diverged cases equal the Jacobi solve), `mma::tests::rewind_…`.
+
+**Constraint tolerance and status.** One named `CONSTRAINT_TOLERANCE` = 1e-4 (relative) decides `satisfied` for every row (volume, compliance,
+displacement) in the solver and in the TS fallback (`defaults.ts`). A run that stops moving with a violated row keeps its status `converged` (the design stopped moving) and raises the warning
+`TOP_CONSTRAINT_UNSATISFIED` naming the row; `check_topology` fails it with `TOP_CONSTRAINT_VIOLATED` (a `min_volume` limit nobody can miss lets the design vanish).
+Transport: the host forwards `objective.displacementConstraints` of the job as the `displacementConstraints` of `job.json` and accepts `name:
+'displacement'` rows (`server/src/native/topologyJobFiles.ts`, `topologySolve.ts`).
+
+**`massG`** (`TopologyResultSummary.massG?`, §3): grams of the thresholded solid, `thresholdedVolume × Material.density` (density is g per cubic
+document unit); absent when the design domain has no single material with a density > 0. It is derived from the current material, so the trust
+check does not compare it (an older record without it stays `solved`, a density edit does not make the record `untrusted`). In the record /
+report summary text and `topology_report.result.massG`.

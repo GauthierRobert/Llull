@@ -40,6 +40,9 @@
 //! - `objective` (default `minCompliance`): `{ "kind": "minCompliance" }` minimises the weighted compliance under
 //!   `Σ xPhys ≤ volumeFraction · active`; `{ "kind": "minVolume", "maxCompliance": c }` minimises the volume fraction under
 //!   `c(x) ≤ maxCompliance` (needs `optimizer: mma`).
+//! - `displacementConstraints` (optional, needs `optimizer: mma`): `[{ "label": "tip", "loadCase": "lc1", "dofs": [2521],
+//!   "maxDisplacement": 0.5 }]` limits the mean displacement of the DOFs (`node·dim + c`) in that load case to ±`maxDisplacement` (one MMA row `ū² / limit² − 1 ≤ 0`, gradient by an adjoint solve); the result lists each as a
+//!   constraint `{ name: "displacement", label, value: |ū|, limit, satisfied }`. A fixed DOF in the list counts as u = 0 in the mean (a face touching a clamp); all of them fixed is an input error.
 //! - Masks (`active`, `keepIn`, `keepOut`): optional file names in the job folder, one byte per voxel in voxel order,
 //!   non-zero = set. `active` absent = every voxel active. Inactive voxels are removed from the system (no Emin) and their
 //!   nodes drop out; keep-in / keep-out on an inactive voxel are ignored; a voxel in both keep masks is an input error.
@@ -72,7 +75,7 @@
 //!
 //! One `progress` per iteration: `{"type":"progress","step":it,"total":maxIterations,"message":"…","it":it,
 //! "compliance":c,"volume":v,"change":Δ}`; `warning` `TOP_GPU_FALLBACK` (GPU asked for but not used, or a GPU solve fell
-//! back to the CPU twin) or `TOP_DEADLINE` (checkpointed); then `done` with the outputs and their sha256, or `error` with a
+//! back to the CPU twin), `TOP_DEADLINE` (checkpointed) or `TOP_CONSTRAINT_UNSATISFIED` (a constraint row ends violated; the status stays `converged`: the design stopped moving, check_topology fails on the row); then `done` with the outputs and their sha256, or `error` with a
 //! code: `NATIVE_JOB_IO`, `NATIVE_JOB_INPUT`, `TOP_GRID_TOO_LARGE`, `TOP_SOLVER_FAILED` (singular system / PCG not converged).
 //!
 //! # Outputs
@@ -81,7 +84,7 @@
 //! - `design.f64`: the design variables x as little-endian f64 (pass it back as `startDesign` to resume).
 //! - `displacements.f64`: per load case (in `loadCases` order) the displacements of the last iteration's solve, which every
 //!   solve starts from (warm start), little-endian f64, load cases × DOFs (pass it back as `startDisplacements`).
-//! - `state.json`: `{ iteration, projectionLevel, objectiveScale, mma: { file: "mma.f64", iteration } | null }` (pass it back
+//! - `state.json`: `{ iteration, projectionLevel, objectiveScale, mma: { file: "mma.f64", iteration } | null, backtracks?, acceptedCompliance? }` (pass it back
 //!   as `startState`, with `mma.f64` — 4 × free variables little-endian f64 — beside it).
 //! - `result.json`: [`ResultFile`] (camelCase): `version`, `status` (`converged | max_iterations | checkpoint`), `iterations`,
 //!   `compliance` (weighted, of the final xPhys), `lastIterationCompliance` (the last history row, top88's printed value),
@@ -93,11 +96,13 @@
 //!   `design`, `displacements`, `state`, `fieldSha256`, `warnings`. For the CPU twin every output is byte-identical across
 //!   runs and thread counts.
 
+use crate::displacement::DisplacementConstraint;
 use crate::filter::FilterKind;
 use crate::projection::Projection;
 use crate::simp::{
     optimise, Device, Engine, HistoryRow, LoadCase, Objective, Optimizer, OptimizerState, Problem, Settings, Start, Status, TopError, Voxel,
 };
+use crate::solver::{BACKTRACK_PREFIX, SOLVER_FALLBACK_PREFIX};
 use llull_protocol::{emit, sha256_hex, Event, Output};
 use llull_voxfe::{Grid, SolverKind};
 use serde::{Deserialize, Serialize};
@@ -154,6 +159,16 @@ pub struct LoadCaseSpec {
     pub forces: Option<String>,
     /// Force per fully solid voxel (`dimension` components).
     pub gravity: Option<Vec<f64>>,
+}
+
+/// One `displacementConstraints` entry: the mean displacement of the DOFs `dofs` in load case `loadCase` stays within ±`maxDisplacement`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DisplacementSpec {
+    pub label: Option<String>,
+    pub load_case: String,
+    pub dofs: Vec<usize>,
+    pub max_displacement: f64,
 }
 
 /// `objective` of `job.json`.
@@ -303,6 +318,8 @@ pub struct JobFile {
     pub volume_fraction: f64,
     #[serde(default = "default_objective")]
     pub objective: ObjectiveSpec,
+    #[serde(default)]
+    pub displacement_constraints: Vec<DisplacementSpec>,
     pub active: Option<String>,
     pub keep_in: Option<String>,
     pub keep_out: Option<String>,
@@ -345,6 +362,16 @@ pub struct StateFile {
     pub objective_scale: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mma: Option<MmaStateInfo>,
+    /// minVolume MMA: collapsed steps taken back so far.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub backtracks: usize,
+    /// minVolume MMA: the compliance of the last accepted design.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepted_compliance: Option<f64>,
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -412,6 +439,8 @@ pub struct ObjectiveInfo {
 #[serde(rename_all = "camelCase")]
 pub struct ConstraintInfo {
     pub name: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     pub value: f64,
     pub limit: f64,
     pub satisfied: bool,
@@ -598,7 +627,13 @@ fn state_of(folder: &Path, name: &str) -> Result<OptimizerState, TopError> {
         Some(info) => Some((read_f64s(folder, &info.file, info.length)?, info.iteration)),
         None => None,
     };
-    Ok(OptimizerState { mma, projection_level: state.projection_level, objective_scale: state.objective_scale })
+    Ok(OptimizerState {
+        mma,
+        projection_level: state.projection_level,
+        objective_scale: state.objective_scale,
+        backtracks: state.backtracks,
+        accepted_compliance: state.accepted_compliance,
+    })
 }
 
 /// Builds the problem, settings and optional start files from a parsed job.
@@ -649,7 +684,16 @@ pub fn problem_of(folder: &Path, job: &JobFile) -> Result<(Problem, Settings, St
         load_cases.push(LoadCase { name: spec.name.clone(), weight: spec.weight, forces, gravity: gravity_of(spec, dim)? });
     }
     let settings = settings_of(&job.settings);
+    let mut displacement_constraints = Vec::with_capacity(job.displacement_constraints.len());
+    for (index, spec) in job.displacement_constraints.iter().enumerate() {
+        let label = spec.label.clone().unwrap_or_else(|| format!("displacement-{}", index + 1));
+        let Some(load_case) = load_cases.iter().position(|c: &LoadCase| c.name == spec.load_case) else {
+            return Err(input(format!("displacement constraint '{label}': unknown load case '{}'", spec.load_case)));
+        };
+        displacement_constraints.push(DisplacementConstraint { label, load_case, dofs: spec.dofs.clone(), limit: spec.max_displacement });
+    }
     let problem = Problem {
+        displacement_constraints,
         grid,
         voxels,
         fixed,
@@ -725,8 +769,19 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
         }
         worker.join().unwrap_or_else(|_| Err(TopError { code: "TOP_SOLVER_FAILED", message: "the solver thread panicked".to_string() }))
     })?;
-    let mut warnings: Vec<WarningEntry> =
-        outcome.warnings.iter().map(|message| WarningEntry { code: "TOP_GPU_FALLBACK", message: message.clone() }).collect();
+    let mut warnings: Vec<WarningEntry> = outcome
+        .warnings
+        .iter()
+        .map(|message| {
+            if let Some(rest) = message.strip_prefix(SOLVER_FALLBACK_PREFIX) {
+                WarningEntry { code: "TOP_SOLVER_FALLBACK", message: rest.to_string() }
+            } else if let Some(rest) = message.strip_prefix(BACKTRACK_PREFIX) {
+                WarningEntry { code: "TOP_DESIGN_BACKTRACK", message: rest.to_string() }
+            } else {
+                WarningEntry { code: "TOP_GPU_FALLBACK", message: message.clone() }
+            }
+        })
+        .collect();
     let (device, deterministic, precision, adapter) = match &outcome.engine {
         Engine::Cpu => ("cpu", true, "f64", None),
         Engine::Gpu { adapter } => ("gpu", false, "f32-gpu+f64-refinement", Some(adapter.clone())),
@@ -746,6 +801,17 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
             ),
         });
     }
+    if let Some(row) = outcome.constraints.iter().find(|c| !c.satisfied) {
+        warnings.push(WarningEntry {
+            code: "TOP_CONSTRAINT_UNSATISFIED",
+            message: format!(
+                "constraint '{}' ends at {} against its limit {} (the design stopped moving without meeting it)",
+                row.label.as_deref().unwrap_or(row.name),
+                row.value,
+                row.limit
+            ),
+        });
+    }
     for warning in &warnings {
         let _ = emit(out, &Event::Warning { code: warning.code, message: &warning.message });
     }
@@ -762,6 +828,8 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
             iteration: *iteration,
             length: values.len(),
         }),
+        backtracks: outcome.state.backtracks,
+        accepted_compliance: outcome.state.accepted_compliance,
     };
     let mut state_json = serde_json::to_vec(&state).map_err(|error| input(format!("state.json: {error}")))?;
     state_json.push(b'\n');
@@ -790,7 +858,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
         constraints: outcome
             .constraints
             .iter()
-            .map(|c| ConstraintInfo { name: c.name, value: c.value, limit: c.limit, satisfied: c.satisfied })
+            .map(|c| ConstraintInfo { name: c.name, label: c.label.clone(), value: c.value, limit: c.limit, satisfied: c.satisfied })
             .collect(),
         optimizer: job.settings.optimizer,
         projection: match (job.settings.projection, outcome.beta) {

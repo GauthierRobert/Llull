@@ -4,6 +4,7 @@
  */
 
 import { type CadDocument, type FeatureStep, createEmptyDocument } from '../../model/types';
+import { withSweepLayoutOf } from '../../model/documentSettings';
 import { currentContext } from '../context';
 import { documentExtensions } from '../../plugins/host';
 import type { CommandDefinition, CommandError, CommandResult } from '../types';
@@ -124,7 +125,7 @@ const KERNEL_SETTINGS_COMMANDS: ReadonlySet<string> = new Set(['set_modeling_tol
 function replaySeed(base: CadDocument, history: FeatureStep[]): CadDocument {
   const live = liveStepKeys(history);
   return {
-    ...createEmptyDocument(),
+    ...withSweepLayoutOf(createEmptyDocument(), base),
     camera: base.camera,
     units: base.units,
     displayPrecision: base.displayPrecision,

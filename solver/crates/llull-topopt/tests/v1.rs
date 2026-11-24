@@ -11,7 +11,9 @@ fn folder(name: &str) -> PathBuf {
     dir
 }
 
-fn run(dir: &Path, job: &Value) -> Result<(Value, Vec<f32>, String), (String, String)> {
+type RunOutcome = Result<(Value, Vec<f32>, String), (String, String)>;
+
+fn run(dir: &Path, job: &Value) -> RunOutcome {
     std::fs::write(dir.join("job.json"), serde_json::to_vec(job).unwrap()).unwrap();
     let mut events = Vec::new();
     let result = llull_topopt::job::run(dir, &mut events).map_err(|e| (e.code.to_string(), e.message));
@@ -359,4 +361,327 @@ fn a_converging_iteration_at_the_final_beta_reports_converged_even_past_the_dead
 fn an_extruded_run_resumes_bit_for_bit_from_a_checkpoint() {
     let settings = json!({ "filter": { "kind": "density", "radius": 1.5 }, "extrusion": "z" });
     checkpoint_equals_whole("extrude-resume", cantilever(8, 4, 3, settings), 6, |_| {});
+}
+
+/// DOF of the y component of the top-left node of an `nx x ny` 2D grid (the MBB load point).
+fn tip_dof(nx: usize, ny: usize) -> usize {
+    2 * ((nx + 1) * ny) + 1
+}
+
+fn min_volume_job(nx: usize, ny: usize, limit: f64, constraints: Value) -> Value {
+    let mut job = mbb(nx, ny, json!({ "optimizer": "mma", "filter": { "kind": "density" } }));
+    job["objective"] = json!({ "kind": "minVolume", "maxCompliance": limit });
+    job["displacementConstraints"] = constraints;
+    job
+}
+
+#[test]
+fn displacement_constraint_limits_the_tip_and_costs_material() {
+    let reference = folder("disp-ref");
+    let (oc, _, _) = run(&reference, &mbb(30, 10, json!({ "filter": { "kind": "density" } }))).unwrap();
+    let limit = 1.5 * oc["compliance"].as_f64().unwrap();
+    let free_dir = folder("disp-free");
+    let (free, _, _) = run(&free_dir, &min_volume_job(30, 10, limit, json!([]))).unwrap();
+    assert_eq!(free["constraints"].as_array().unwrap().len(), 1);
+    // the unit tip load does work 1 * |u| = compliance of the single load case: the free layout deflects by about `compliance`
+    let tip = free["compliance"].as_f64().unwrap();
+    let cap = 0.7 * tip;
+    let dir = folder("disp");
+    let constraint = json!([{ "label": "tip", "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": cap }]);
+    let (result, _, _) = run(&dir, &min_volume_job(30, 10, limit, constraint)).unwrap();
+    let rows = result["constraints"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{rows:?}");
+    assert_eq!((rows[1]["name"].as_str(), rows[1]["label"].as_str()), (Some("displacement"), Some("tip")));
+    let value = rows[1]["value"].as_f64().unwrap();
+    eprintln!(
+        "displacement constraint: free volume {}, constrained volume {}, |u| {value} <= {cap} ({} iterations)",
+        free["volumeFraction"], result["volumeFraction"], result["iterations"]
+    );
+    assert_eq!(rows[1]["limit"].as_f64().unwrap(), cap);
+    assert_eq!(rows[1]["satisfied"], true, "|u| {value} above {cap}");
+    assert!(value <= cap * 1.01);
+    assert!(value >= 0.99 * cap, "the cap is meant to be active: |u| {value} against {cap}");
+    // for the unit load the compliance equals the tip displacement: the displacement limit is the tighter one
+    assert!(result["compliance"].as_f64().unwrap() <= cap * 1.01);
+    assert!(result["volumeFraction"].as_f64().unwrap() > free["volumeFraction"].as_f64().unwrap());
+    let again = folder("disp-again");
+    run(&again, &min_volume_job(30, 10, limit, constraint_of(cap))).unwrap();
+    assert_eq!(files(&dir, &["field.bin", "design.f64"]), files(&again, &["field.bin", "design.f64"]));
+    for d in [reference, free_dir, dir, again] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+fn constraint_of(cap: f64) -> Value {
+    json!([{ "label": "tip", "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": cap }])
+}
+
+#[test]
+fn displacement_constraint_rejects_bad_input() {
+    let dir = folder("disp-bad");
+    let ok = |extra: Value| min_volume_job(30, 10, 1000.0, extra);
+    let cases = [
+        (json!([{ "loadCase": "nope", "dofs": [1], "maxDisplacement": 1.0 }]), "unknown load case"),
+        (json!([{ "loadCase": "tip", "dofs": [], "maxDisplacement": 1.0 }]), "at least one DOF"),
+        (json!([{ "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": 0.0 }]), "must be > 0"),
+        (json!([{ "loadCase": "tip", "dofs": [0], "maxDisplacement": 1.0 }]), "every constrained DOF is fixed"),
+    ];
+    for (constraints, needle) in cases {
+        let (code, message) = run(&dir, &ok(constraints)).unwrap_err();
+        assert_eq!(code, "NATIVE_JOB_INPUT", "{message}");
+        assert!(message.contains(needle), "{message}");
+    }
+    // OC cannot hold the extra row
+    let mut oc = mbb(30, 10, json!({}));
+    oc["displacementConstraints"] = constraint_of(1.0);
+    let (code, message) = run(&dir, &oc).unwrap_err();
+    assert_eq!(code, "NATIVE_JOB_INPUT");
+    assert!(message.contains("mma"), "{message}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// min_volume with a self-weight case: the tip cap is the only binding row, so tightening it must cost material, and every row must hold.
+#[test]
+fn displacement_cap_with_a_self_weight_case_is_active_and_costs_material_monotonically() {
+    let mut volumes = Vec::new();
+    for cap in [400.0, 300.0, 230.0] {
+        let mut job = min_volume_job(30, 10, 1.0e5, constraint_of(cap));
+        job["loadCases"][0]["gravity"] = json!([0.0, -0.0002]);
+        let dir = folder(&format!("disp-gravity-{cap}"));
+        let (result, _, _) = run(&dir, &job).unwrap();
+        let rows = result["constraints"].as_array().unwrap();
+        eprintln!("gravity cap {cap}: volume {} rows {rows:?} status {}", result["volumeFraction"], result["status"]);
+        assert!(rows.iter().all(|row| row["satisfied"] == true), "{rows:?}");
+        let value = rows[1]["value"].as_f64().unwrap();
+        assert!(value >= 0.99 * cap, "the cap {cap} is meant to be active: |u| {value}");
+        volumes.push(result["volumeFraction"].as_f64().unwrap());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    assert!(volumes.windows(2).all(|pair| pair[1] > pair[0]), "volume must rise as the cap tightens: {volumes:?}");
+}
+
+#[test]
+fn a_displacement_row_resumes_bit_for_bit_from_a_checkpoint() {
+    let job = min_volume_job(30, 10, 1.0e5, constraint_of(300.0));
+    checkpoint_equals_whole("disp-resume", job, 6, |_| {});
+}
+
+#[test]
+fn a_target_that_touches_a_support_keeps_the_fixed_dofs_as_zero_in_the_mean() {
+    // the x = 0 column of the MBB is fixed in x: the mean over [fixed ux of node (0, 10), free ux of node (1, 10)] is half the free one,
+    // so a cap of 0.5 x the free value of that mean makes the constraint bind without a solver refusal
+    let free_dof = 2 + 2 * 31 * 10;
+    let fixed_dof = 2 * (31 * 10);
+    let probe = |dofs: Value, cap: f64| {
+        let dir = folder("disp-fixed-mix");
+        let constraint = json!([{ "label": "mix", "loadCase": "tip", "dofs": dofs, "maxDisplacement": cap }]);
+        let (result, _, _) = run(&dir, &min_volume_job(30, 10, 400.0, constraint)).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+        result["constraints"][1].clone()
+    };
+    let alone = probe(json!([free_dof]), 1.0e6);
+    let free_value = alone["value"].as_f64().unwrap();
+    assert!(free_value > 0.0);
+    let mixed = probe(json!([fixed_dof, free_dof]), 0.8 * free_value / 2.0);
+    assert_eq!((mixed["label"].as_str(), mixed["satisfied"].as_bool()), (Some("mix"), Some(true)), "{mixed}");
+    assert!(mixed["value"].as_f64().unwrap() >= 0.99 * mixed["limit"].as_f64().unwrap(), "{mixed}");
+}
+
+#[test]
+fn a_run_that_ends_with_a_violated_row_warns_and_keeps_its_status() {
+    // a compliance limit nobody can miss lets the design vanish; the displacement cap then cannot hold and the run says so
+    let dir = folder("unsatisfied");
+    let constraint = json!([{ "label": "tip", "loadCase": "tip", "dofs": [tip_dof(30, 10)], "maxDisplacement": 1.0e-6 }]);
+    let (result, _, events) = run(&dir, &min_volume_job(30, 10, 1.0e9, constraint)).unwrap();
+    let rows = result["constraints"].as_array().unwrap();
+    assert!(rows.iter().any(|row| row["satisfied"] == false), "{rows:?}");
+    assert_eq!(result["status"], "converged", "{result}");
+    assert!(events.contains("TOP_CONSTRAINT_UNSATISFIED"), "{events}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+fn cantilever_min_volume(limit: f64, extra: Value) -> Value {
+    let mut job = cantilever(12, 4, 3, json!({ "optimizer": "mma", "filter": { "kind": "density" } }));
+    job["objective"] = json!({ "kind": "minVolume", "maxCompliance": limit });
+    if let Some(map) = extra.as_object() {
+        for (key, value) in map {
+            job[key] = value.clone();
+        }
+    }
+    job
+}
+
+fn backtracks_in(events: &str) -> usize {
+    events
+        .lines()
+        .filter(|line| line.contains("TOP_DESIGN_BACKTRACK"))
+        .filter_map(|line| line.split("backtracked ").nth(1)?.split(' ').next()?.parse().ok())
+        .next()
+        .unwrap_or(0)
+}
+
+/// TOP-V1b follow-up: a slack compliance row (limit 1e5, MBB 30 x 10) let MMA strip the design to a broken load path; the near-void
+/// multigrid hierarchy then produced a NaN in the f32 preconditioner (TOP_SOLVER_FAILED). The run must end finite and say what it did.
+#[test]
+fn a_slack_compliance_row_does_not_collapse_the_design_into_a_solver_failure() {
+    let dir = folder("slack");
+    let (result, field, events) = run(&dir, &min_volume_job(30, 10, 1.0e5, json!([]))).unwrap();
+    let (volume, compliance) = (result["volumeFraction"].as_f64().unwrap(), result["compliance"].as_f64().unwrap());
+    eprintln!("slack: volume {volume}, compliance {compliance}, {} iterations, {}", result["iterations"], result["status"]);
+    assert!(volume.is_finite() && compliance.is_finite() && field.iter().all(|v| v.is_finite()), "{result}");
+    // the first steps strip the design to a broken load path: that step is taken back, the broken multigrid solve falls back to Jacobi
+    assert!(events.contains("TOP_DESIGN_BACKTRACK") && backtracks_in(&events) >= 1, "{events}");
+    assert!(events.contains("TOP_SOLVER_FALLBACK"), "{events}");
+    assert!(!events.contains("TOP_SOLVER_FAILED"), "{events}");
+    assert_eq!(result["constraints"][0]["satisfied"], true, "{result}");
+    assert!(compliance <= 1.0e5 * 1.0001, "compliance {compliance}");
+    assert!(volume > 0.01 && volume < 0.2, "volume {volume}");
+    // deterministic, like every CPU run
+    let again = folder("slack-again");
+    let (second, _, _) = run(&again, &min_volume_job(30, 10, 1.0e5, json!([]))).unwrap();
+    assert_eq!(second["volumeFraction"], result["volumeFraction"]);
+    assert_eq!(second["iterations"], result["iterations"]);
+    for d in [dir, again] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// The collapse rule is scale free (a jump over the last accepted design, with the row violated): a 3D cantilever in a large unit
+/// system, limit 1000 (the old absolute threshold of 100 x limit missed it: volume 0 at iteration 3) ends feasible.
+#[test]
+fn a_3d_collapse_under_a_large_limit_is_backtracked() {
+    let dir = folder("cantilever-1000");
+    let (result, field, events) = run(&dir, &cantilever_min_volume(1000.0, json!({}))).unwrap();
+    let (volume, compliance) = (result["volumeFraction"].as_f64().unwrap(), result["compliance"].as_f64().unwrap());
+    eprintln!("cantilever 1000: volume {volume}, compliance {compliance}, {} it, {}\n{events}", result["iterations"], result["status"]);
+    assert!(field.iter().all(|v| v.is_finite()) && backtracks_in(&events) >= 1, "{events}");
+    assert!(volume > 0.0 && result["constraints"][0]["satisfied"] == true, "the design must stay feasible: {result}");
+    // after the backtracks the row is the active one (a min-volume optimum), not a feasible design far below the limit
+    // (before: converged at volume 0.0066, compliance 308, after 6 backtracks and a shrunk step under changeTol)
+    assert!(compliance >= 0.99 * 1000.0, "the compliance row must be active, got {compliance}");
+    assert!(volume < 0.005, "volume {volume}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A tight limit (10, the design collapses repeatedly on the way): the backtracks keep halving the moves until the run lands on the
+/// limit instead of ending far from it (before: unsatisfied at 13.2226, TOP_CONSTRAINT_UNSATISFIED).
+#[test]
+fn a_3d_collapse_under_a_tight_limit_is_repaired_onto_the_limit() {
+    let dir = folder("cantilever-10");
+    let (result, field, events) = run(&dir, &cantilever_min_volume(10.0, json!({}))).unwrap();
+    eprintln!("cantilever 10: {} {} it\n{events}", result["constraints"], result["iterations"]);
+    assert!(field.iter().all(|v| v.is_finite()) && backtracks_in(&events) >= 1, "{events}");
+    assert!(!events.contains("TOP_SOLVER_FAILED") && !events.contains("TOP_CONSTRAINT_UNSATISFIED"), "{events}");
+    assert_eq!(result["constraints"][0]["satisfied"], true);
+    let value = result["constraints"][0]["value"].as_f64().unwrap();
+    assert!((9.9..=10.0001).contains(&value), "pinned at 9.98 against the limit 10, got {value}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A checkpoint right before and right after a backtrack iteration (the collapse of the slack scenario is analysed at iteration 4)
+/// resumes bit for bit, and the backtrack count in `state.json` carries over (no re-count).
+#[test]
+fn a_run_resumes_bit_for_bit_across_a_backtrack() {
+    let total = 9;
+    let job = min_volume_job(30, 10, 1.0e5, json!([]));
+    let full = folder("backtrack-full");
+    let mut whole = job.clone();
+    whole["settings"]["maxIterations"] = json!(total);
+    let (expected, _, whole_events) = run(&full, &whole).unwrap();
+    let state_of = |dir: &Path| -> Value { serde_json::from_slice(&std::fs::read(dir.join("state.json")).unwrap()).unwrap() };
+    assert!(state_of(&full)["backtracks"].as_u64().unwrap() >= 2, "{}", state_of(&full));
+    assert!(backtracks_in(&whole_events) >= 2);
+    for cut in [3, 4, 5] {
+        let part = folder(&format!("backtrack-part{cut}"));
+        let mut first = job.clone();
+        first["settings"]["maxIterations"] = json!(cut);
+        let (_, _, first_events) = run(&part, &first).unwrap();
+        let start = start_files(&part);
+        std::fs::copy(part.join("mma.f64"), part.join("mma.f64.start")).unwrap();
+        let mut state = state_of(&part);
+        state["mma"]["file"] = json!("mma.f64.start");
+        std::fs::write(part.join("start_state.json"), serde_json::to_vec(&state).unwrap()).unwrap();
+        let (result, _, second_events) = run(&part, &with_start(job.clone(), &start, cut, total - cut)).unwrap();
+        assert_eq!(result["iterations"], total - cut);
+        let names = ["design.f64", "field.bin", "displacements.f64", "mma.f64"];
+        assert_eq!(files(&full, &names), files(&part, &names), "cut at {cut}");
+        assert_eq!(state_of(&full), state_of(&part), "cut at {cut}");
+        assert_eq!(result["compliance"], expected["compliance"]);
+        // each run reports only its own backtracks; the totals add up to the whole run's
+        let (a, b) = (backtracks_in(&first_events), backtracks_in(&second_events));
+        assert_eq!(a + b, backtracks_in(&whole_events), "cut at {cut}: {first_events} / {second_events}");
+        let _ = std::fs::remove_dir_all(part);
+    }
+    let _ = std::fs::remove_dir_all(full);
+}
+
+/// 3D cantilever, limit 1000: the backtracks (iterations 3 to 18) and the settle window after them are cut through at several places;
+/// the resumed run equals the whole one byte for byte, MMA state (rewind count, settle counter) included.
+#[test]
+fn a_3d_run_resumes_bit_for_bit_across_backtracks_and_the_settle_window() {
+    let total = 30;
+    let job = cantilever_min_volume(1000.0, json!({}));
+    let full = folder("cant-full");
+    let mut whole = job.clone();
+    whole["settings"]["maxIterations"] = json!(total);
+    let (expected, _, _) = run(&full, &whole).unwrap();
+    let state_of = |dir: &Path| -> Value { serde_json::from_slice(&std::fs::read(dir.join("state.json")).unwrap()).unwrap() };
+    for cut in [4, 17, 22] {
+        let part = folder(&format!("cant-part{cut}"));
+        let mut first = job.clone();
+        first["settings"]["maxIterations"] = json!(cut);
+        run(&part, &first).unwrap();
+        let start = start_files(&part);
+        std::fs::copy(part.join("mma.f64"), part.join("mma.f64.start")).unwrap();
+        let mut state = state_of(&part);
+        state["mma"]["file"] = json!("mma.f64.start");
+        std::fs::write(part.join("start_state.json"), serde_json::to_vec(&state).unwrap()).unwrap();
+        let (result, _, _) = run(&part, &with_start(job.clone(), &start, cut, total - cut)).unwrap();
+        let names = ["design.f64", "field.bin", "displacements.f64", "mma.f64"];
+        assert_eq!(files(&full, &names), files(&part, &names), "cut at {cut}");
+        assert_eq!(state_of(&full), state_of(&part), "cut at {cut}");
+        assert_eq!(result["compliance"], expected["compliance"], "cut at {cut}");
+        let _ = std::fs::remove_dir_all(part);
+    }
+    let _ = std::fs::remove_dir_all(full);
+}
+
+fn resume_with_mma_values(name: &str, cut: usize, edit: impl Fn(&mut Vec<f64>)) -> (PathBuf, RunOutcome) {
+    let job = cantilever_min_volume(1000.0, json!({}));
+    let part = folder(name);
+    let mut first = job.clone();
+    first["settings"]["maxIterations"] = json!(cut);
+    run(&part, &first).unwrap();
+    let start = start_files(&part);
+    let mut values: Vec<f64> =
+        std::fs::read(part.join("mma.f64")).unwrap().chunks_exact(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect();
+    edit(&mut values);
+    let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
+    std::fs::write(part.join("mma.f64.start"), bytes).unwrap();
+    let mut state: Value = serde_json::from_slice(&std::fs::read(part.join("state.json")).unwrap()).unwrap();
+    state["mma"]["file"] = json!("mma.f64.start");
+    state["mma"]["length"] = json!(values.len());
+    std::fs::write(part.join("start_state.json"), serde_json::to_vec(&state).unwrap()).unwrap();
+    let outcome = run(&part, &with_start(job, &start, cut, 5));
+    (part, outcome)
+}
+
+/// A checkpoint of the plain 4 n layout written after backtracks (before the state carried the rewind count) still resumes, now as
+/// rewound and settled: the next checkpoint is in the extended layout.
+#[test]
+fn a_plain_layout_mma_state_after_a_backtrack_resumes_as_rewound() {
+    let (part, outcome) = resume_with_mma_values("old-layout", 22, |values| values.truncate(4 * 144));
+    outcome.unwrap();
+    let length = std::fs::read(part.join("mma.f64")).unwrap().len() / 8;
+    assert_eq!(length, 4 * 144 + 2, "rewinds and settle counter appended once the state has backtracks");
+    let _ = std::fs::remove_dir_all(part);
+}
+
+#[test]
+fn a_wrong_length_mma_state_is_refused_not_restarted() {
+    let (part, outcome) = resume_with_mma_values("bad-length", 5, |values| values.truncate(4 * 144 - 1));
+    let (code, message) = outcome.unwrap_err();
+    assert_eq!(code, "NATIVE_JOB_INPUT");
+    assert!(message.contains("mma.f64 length"), "{message}");
+    let _ = std::fs::remove_dir_all(part);
 }

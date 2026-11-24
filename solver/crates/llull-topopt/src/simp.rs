@@ -12,12 +12,13 @@
 //! (MMA only).
 
 use crate::design::DesignSpace;
+use crate::displacement::{self, DisplacementConstraint};
 use crate::filter::{Filter, FilterKind};
 use crate::loads::{gravity_work, with_gravity};
 use crate::mma::{Bounds, Mma};
 use crate::oc::{self, Design, Limits};
 use crate::projection::Projection;
-use crate::solver::{choose_backend, Solver};
+use crate::solver::{choose_backend, Solver, BACKTRACK_PREFIX};
 use llull_gpu::reduce::{max_abs, sum};
 use llull_voxfe::ke::element_matrix;
 use llull_voxfe::MIN_LEN;
@@ -70,6 +71,8 @@ pub struct Problem {
     pub voxel: f64,
     pub volume_fraction: f64,
     pub objective: Objective,
+    /// Extra constraints `|ū| ≤ limit` (MMA only).
+    pub displacement_constraints: Vec<DisplacementConstraint>,
 }
 
 /// Where the linear solves run.
@@ -169,6 +172,8 @@ pub enum Status {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Constraint {
     pub name: &'static str,
+    /// The label of a displacement constraint.
+    pub label: Option<String>,
     pub value: f64,
     pub limit: f64,
     pub satisfied: bool,
@@ -182,6 +187,10 @@ pub struct OptimizerState {
     pub projection_level: u32,
     /// The compliance the MMA objective is normalised by (the first iteration's).
     pub objective_scale: Option<f64>,
+    /// minVolume MMA: collapsed steps taken back so far (all runs of this design).
+    pub backtracks: usize,
+    /// minVolume MMA: the compliance of the last accepted (not backtracked) design.
+    pub accepted_compliance: Option<f64>,
 }
 
 /// Result of a run.
@@ -219,10 +228,44 @@ pub struct TopError {
     pub message: String,
 }
 
+/// Relative slack a constraint row may exceed its limit by and still count as satisfied (every row, the host's `check_topology` too).
+pub const CONSTRAINT_TOLERANCE: f64 = 1e-4;
+
+/// Compliance growth over the last accepted minVolume design that, with the limit violated, is a collapse.
+const COLLAPSE_FACTOR: f64 = 100.0;
+
+/// The smaller jump that counts once the compliance is also `COLLAPSE_FACTOR` times the limit.
+const COLLAPSE_FACTOR_FAR: f64 = 10.0;
+
+/// Takes the last MMA step back when its design collapsed: the compliance violates the limit and jumped past `COLLAPSE_FACTOR` times
+/// the last accepted design's (a broken load path, not a gradual violation). Writes the previous design into `vars`; false = accept.
+fn collapse_backtrack(
+    mma: &mut Mma,
+    free: &[usize],
+    vars: &mut [f64],
+    compliance: f64,
+    accepted: Option<f64>,
+    max_compliance: f64,
+) -> bool {
+    let jumped = accepted.is_some_and(|previous| {
+        let (jump, excess) = (compliance / previous, compliance / max_compliance);
+        !compliance.is_finite() || (excess > 1.0 && (jump > COLLAPSE_FACTOR || (jump > COLLAPSE_FACTOR_FAR && excess > COLLAPSE_FACTOR)))
+    });
+    if !jumped {
+        return false;
+    }
+    let current: Vec<f64> = free.iter().map(|&v| vars[v]).collect();
+    let Some(previous) = mma.rewind(&current) else { return false };
+    for (k, &v) in free.iter().enumerate() {
+        vars[v] = previous[k];
+    }
+    true
+}
+
 /// Smallest grid (DOFs) that `device: auto` sends to a hardware GPU.
 pub const AUTO_GPU_MIN_DOFS: usize = 500_000;
 
-fn element_scales(x_phys: &[f64], voxels: &[Voxel], problem: &Problem, settings: &Settings, geometric: f64) -> Vec<f64> {
+pub(crate) fn element_scales(x_phys: &[f64], voxels: &[Voxel], problem: &Problem, settings: &Settings, geometric: f64) -> Vec<f64> {
     let emin = settings.emin_ratio * problem.e0;
     x_phys
         .par_iter()
@@ -314,6 +357,10 @@ pub fn validate(problem: &Problem, settings: &Settings) -> Result<(), String> {
         if settings.optimizer != Optimizer::Mma {
             return Err("objective minVolume needs optimizer mma (OC handles the volume constraint only)".to_string());
         }
+    }
+    displacement::validate(&problem.displacement_constraints, problem)?;
+    if !problem.displacement_constraints.is_empty() && settings.optimizer != Optimizer::Mma {
+        return Err("displacement constraints need optimizer mma (OC handles the volume constraint only)".to_string());
     }
     if let Some(projection) = settings.projection {
         if settings.filter != FilterKind::Density {
@@ -430,14 +477,29 @@ pub fn optimise(
     let emin = settings.emin_ratio * problem.e0;
     let target = problem.volume_fraction * active_count as f64;
     let limits = Limits { move_limit: settings.move_limit, tolerance: settings.oc_tolerance, target };
+    let rows = 1 + problem.displacement_constraints.len();
     let mut mma = match settings.optimizer {
         Optimizer::Oc => None,
         Optimizer::Mma => Some(match &initial.mma {
-            Some((values, iteration)) => Mma::restore(free.len(), 1, values, *iteration).unwrap_or_else(|| Mma::new(free.len(), 1)),
-            None => Mma::new(free.len(), 1),
+            Some((values, iteration)) => {
+                Mma::restore(free.len(), rows, values, *iteration, initial.backtracks).ok_or_else(|| TopError {
+                    code: "NATIVE_JOB_INPUT",
+                    message: format!(
+                        "mma.f64 length {} does not match {} free variables (expected {} or {})",
+                        values.len(),
+                        free.len(),
+                        4 * free.len(),
+                        4 * free.len() + 2
+                    ),
+                })?
+            }
+            None => Mma::new(free.len(), rows),
         }),
     };
     let mut objective_scale = initial.objective_scale;
+    let mut backtracks = initial.backtracks;
+    let (mut run_backtracks, mut first_backtrack) = (0usize, 0usize);
+    let mut accepted_compliance = initial.accepted_compliance;
     let started = Instant::now();
     let mut history = Vec::new();
     let mut iterations = 0;
@@ -452,6 +514,24 @@ pub fn optimise(
         solver.set_scale(&op);
         let analysis = analyse(&op, &mut solver, problem, &x_phys, &active)?;
         let compliance = analysis.compliance;
+        // a minVolume step that disconnects the design is taken back (over the limit and a jump of 100x on the last accepted design's compliance, or 10x when also 100x the limit)
+        if let (Some(mma), Objective::MinVolume { max_compliance }) = (&mut mma, problem.objective) {
+            objective_scale.get_or_insert(compliance);
+            if collapse_backtrack(mma, &free, &mut vars, compliance, accepted_compliance, max_compliance) {
+                if run_backtracks == 0 {
+                    first_backtrack = settings.start_iteration + iterations;
+                }
+                (backtracks, run_backtracks) = (backtracks + 1, run_backtracks + 1);
+                let change = max_abs(&vars.iter().zip(&x).map(|(a, b)| a - b).collect::<Vec<f64>>());
+                x = expand(&vars);
+                x_phys = physical(&vars, beta);
+                let row = HistoryRow { it: iterations, compliance, volume: sum(&x_phys) / active_count as f64, change };
+                progress(&row);
+                history.push(row);
+                continue;
+            }
+            accepted_compliance = Some(compliance);
+        }
         let factor = -settings.penal * (problem.e0 - emin) * geometric;
         let has_gravity = !analysis.gravity.is_empty();
         let mut dc: Vec<f64> = (0..n)
@@ -483,6 +563,25 @@ pub fn optimise(
                 dv = filter.density_adjoint(&space.uniform(&dv));
             }
         }
+        let mut extra_rows: Vec<(f64, Vec<f64>)> = Vec::new();
+        for constraint in &problem.displacement_constraints {
+            let u = &solver.warm[constraint.load_case].clone();
+            let (value, limit) = (constraint.value(u), constraint.limit);
+            let raw = displacement::sensitivity(&op, &mut solver, problem, constraint, u, factor, &x_phys, &active, settings.penal)?;
+            let mut d: Vec<f64> =
+                (0..n).map(|e| if design[e] == Design::Free { 2.0 * value / (limit * limit) * raw[e] } else { 0.0 }).collect();
+            match settings.filter {
+                FilterKind::Sensitivity => d = filter.sensitivity(&x, &d),
+                FilterKind::Density => {
+                    if let (Some(projection), Some(beta)) = (settings.projection, beta) {
+                        let slope = projection.derivative(beta, &filtered(&x));
+                        d = d.iter().zip(&slope).map(|(a, s)| a * s).collect();
+                    }
+                    d = filter.density_adjoint(&space.uniform(&d));
+                }
+            }
+            extra_rows.push(((value / limit).powi(2) - 1.0, space.reduce_sum(&d)));
+        }
         let dc_v = space.reduce_sum(&dc);
         let dv_v = space.reduce_sum(&dv);
         let phys = |v: &[f64]| physical(v, beta);
@@ -495,7 +594,7 @@ pub fn optimise(
                 let scale = *objective_scale.get_or_insert(compliance);
                 let pick = |values: &[f64]| -> Vec<f64> { free.iter().map(|&v| values[v]).collect() };
                 let (xf, dc_f, dv_f) = (pick(&vars), pick(&dc_v), pick(&dv_v));
-                let (df0, f, df) = match problem.objective {
+                let (df0, mut f, mut df) = match problem.objective {
                     Objective::MinCompliance => (
                         dc_f.iter().map(|d| d / scale).collect::<Vec<f64>>(),
                         vec![sum(&x_phys) / target - 1.0],
@@ -507,6 +606,10 @@ pub fn optimise(
                         vec![dc_f.iter().map(|d| d / max_compliance).collect::<Vec<f64>>()],
                     ),
                 };
+                for (value, gradient) in &extra_rows {
+                    f.push(*value);
+                    df.push(free.iter().map(|&v| gradient[v]).collect());
+                }
                 let step = mma.step(&xf, &df0, &f, &df, Bounds { xmin: 0.0, xmax: 1.0, move_limit: settings.move_limit });
                 let mut next = vars.clone();
                 for (k, &v) in free.iter().enumerate() {
@@ -526,7 +629,7 @@ pub fn optimise(
         history.push(row);
         // convergence and β continuation first, so a checkpoint carries the level and xPhys the uninterrupted run would have
         let at_final_beta = settings.projection.is_none_or(|p| p.is_final(level));
-        let converged = change <= settings.change_tol;
+        let converged = change <= settings.change_tol && !mma.as_ref().is_some_and(Mma::settling);
         if converged && at_final_beta {
             break Status::Converged;
         }
@@ -545,6 +648,11 @@ pub fn optimise(
             break Status::Checkpoint;
         }
     };
+    if run_backtracks > 0 {
+        solver.warnings.push(format!(
+            "{BACKTRACK_PREFIX}backtracked {run_backtracks} time(s) in this run ({backtracks} in all; first of this run at iteration {first_backtrack}): a step disconnected the design (compliance over the limit and a jump of 100x on the last accepted design's, or 10x when already 100x over the limit); it was taken back and the moves shortened",
+        ));
+    }
     // the warm start of the next iteration: what a resumed run needs to continue bit for bit
     let displacements = solver.warm.clone();
     op.set_scale(element_scales(&x_phys, voxels, problem, settings, geometric));
@@ -558,21 +666,34 @@ pub fn optimise(
             compliance,
             vec![Constraint {
                 name: "volume",
+                label: None,
                 value: volume,
                 limit: problem.volume_fraction,
-                satisfied: volume <= problem.volume_fraction + 1e-9,
+                satisfied: volume <= problem.volume_fraction * (1.0 + CONSTRAINT_TOLERANCE),
             }],
         ),
         Objective::MinVolume { max_compliance } => (
             volume,
             vec![Constraint {
                 name: "compliance",
+                label: None,
                 value: compliance,
                 limit: max_compliance,
-                satisfied: compliance <= max_compliance * (1.0 + 1e-6),
+                satisfied: compliance <= max_compliance * (1.0 + CONSTRAINT_TOLERANCE),
             }],
         ),
     };
+    let mut constraints = constraints;
+    for constraint in &problem.displacement_constraints {
+        let value = constraint.value(&solver.warm[constraint.load_case]).abs();
+        constraints.push(Constraint {
+            name: "displacement",
+            label: Some(constraint.label.clone()),
+            value,
+            limit: constraint.limit,
+            satisfied: value <= constraint.limit * (1.0 + CONSTRAINT_TOLERANCE),
+        });
+    }
     Ok(Outcome {
         volume,
         grey: sum(&grey_terms) / active_count as f64,
@@ -590,6 +711,12 @@ pub fn optimise(
         objective_value,
         constraints,
         beta,
-        state: OptimizerState { mma: mma.as_ref().map(Mma::state), projection_level: level, objective_scale },
+        state: OptimizerState {
+            mma: mma.as_ref().map(Mma::state),
+            projection_level: level,
+            objective_scale,
+            backtracks,
+            accepted_compliance,
+        },
     })
 }

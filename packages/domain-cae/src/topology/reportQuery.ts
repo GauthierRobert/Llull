@@ -48,7 +48,7 @@ export const topologyReport = defineCommand({
     'Read-only report of a topology study: state (unsolved | solved | stale | missing | untrusted), the study definition, the named settings, ' +
     'the optimizer, the projection and the rules it runs under (manufacturing constraints, minimum member rule, objective), ' +
     'and - when solved - the verified result: compliance and its unit, iterations, status (converged | max_iterations), volume fraction, grey level ' +
-    '(share of intermediate densities), solid volume, per-load-case compliance, the objective value and each constraint (value, limit, satisfied), ' +
+    '(share of intermediate densities), solid volume and its mass in grams (massG, when the material has a density), per-load-case compliance, the objective value and each constraint (value, limit, satisfied), ' +
     'the last `historyRows` iteration rows, the solver and its provenance. ' +
     'A stale result (study or analysis changed since the run) shows no numbers: re-run topology_solve. The result is a concept shape that must be ' +
     'rebuilt with ordinary modelling commands (suggest_rebuild) and reviewed by an engineer; it is never releasable.',
@@ -92,7 +92,7 @@ export const topologyReport = defineCommand({
     const text =
       summary === null
         ? `topology_report: ${studyId} state ${trusted.state}${trusted.problem === null ? '' : ` (${trusted.problem.code}: ${trusted.problem.message})`}.`
-        : `topology_report: ${studyId} solved — ${summary.iterations} iterations (${summary.status}), compliance ${significantNumber(summary.compliance, 6)} ${summary.complianceUnit}, volume fraction ${significantNumber(summary.volumeFraction, 4)}, grey ${significantNumber(summary.grey, 3)}, solid volume ${significantNumber(summary.thresholdedVolume, 6)} ${summary.volumeUnit}; concept shape, review required.`;
+        : `topology_report: ${studyId} solved — ${summary.iterations} iterations (${summary.status}), compliance ${significantNumber(summary.compliance, 6)} ${summary.complianceUnit}, volume fraction ${significantNumber(summary.volumeFraction, 4)}, grey ${significantNumber(summary.grey, 3)}, solid volume ${significantNumber(summary.thresholdedVolume, 6)} ${summary.volumeUnit}${summary.massG === undefined ? '' : ` (${significantNumber(summary.massG, 6)} g)`}; concept shape, review required.`;
     return report(doc, text, data);
   },
 });

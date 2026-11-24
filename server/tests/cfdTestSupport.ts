@@ -71,6 +71,8 @@ export interface FakeOptions {
   readonly query?: (
     job: Record<string, unknown>,
   ) => { readonly json: unknown; readonly file?: Buffer } | { readonly fail: { code: string; message: string } };
+  /** The result grid takes the job's cell size and the drag is this function of it (a grid study over distinct levels). */
+  readonly byGrid?: (cellM: number) => number;
   /** Writes a field.bin whose header disagrees with result.json. */
   readonly wrongField?: boolean;
   /** Reports a sha256 for field.bin that is not the file's (the job and its output disagree). */
@@ -88,13 +90,13 @@ export interface FakeRunner extends ComputeRunner {
 }
 
 /** An LLFD field file of the fake result grid (20 x 12 x 12 cells of 0.125 m from [-1, -0.75, -0.75]). */
-export function fakeField(nx = 20): Buffer {
+export function fakeField(nx = 20, cellM = 0.125): Buffer {
   const [ny, nz] = [12, 12];
   const bytes = Buffer.alloc(56 + 17 * nx * ny * nz);
   bytes.write('LLFD', 0, 'latin1');
   bytes.writeUInt32LE(1, 4);
   [nx, ny, nz].forEach((n, k) => bytes.writeUInt32LE(n, 8 + 4 * k));
-  bytes.writeDoubleLE(0.125, 20);
+  bytes.writeDoubleLE(cellM, 20);
   [-1, -0.75, -0.75].forEach((o, k) => bytes.writeDoubleLE(o, 28 + 8 * k));
   return bytes;
 }
@@ -169,13 +171,16 @@ export function fakeRunner(options: FakeOptions = {}): FakeRunner {
         caseId: string;
         flow: { speedMS: number; densityKgM3: number };
         reference: { areaM2: number; lengthM: number };
+        grid: { cellM: number };
         bodies: Array<{ entityId: string }>;
         settings: { maxSteps: number };
         outputs: { slices: unknown[] };
       };
       const q = 0.5 * job.flow.densityKgM3 * job.flow.speedMS ** 2;
       const qArea = q * job.reference.areaM2;
-      const totalN = [0.5, 0.01, 0.02];
+      const cellM = options.byGrid === undefined ? 0.125 : job.grid.cellM;
+      const dragN = options.byGrid?.(cellM) ?? 0.5;
+      const totalN = [dragN, 0.01, 0.02];
       const converged = options.converged ?? true;
       const result = {
         version: 1,
@@ -194,17 +199,7 @@ export function fakeRunner(options: FakeOptions = {}): FakeRunner {
         precision: options.device === 'gpu' ? 'f32' : 'f64',
         halfModel: false,
         memory: { bytesPerCell: options.device === 'gpu' ? 204 : 395, gpuBytesPerCell: 204, cpuBytesPerCell: 395, bytes: 2880 * 395 },
-        grid: {
-          nx: 20,
-          ny: 12,
-          nz: 12,
-          cellM: 0.125,
-          cells: 2880,
-          fluidCells: 2800,
-          solidCells: 33,
-          oddRows: 0,
-          originM: [-1, -0.75, -0.75],
-        },
+        grid: { nx: 20, ny: 12, nz: 12, cellM, cells: 2880, fluidCells: 2800, solidCells: 33, oddRows: 0, originM: [-1, -0.75, -0.75] },
         lattice: {
           tau: 0.6,
           uLattice: 0.0577,
@@ -219,14 +214,14 @@ export function fakeRunner(options: FakeOptions = {}): FakeRunner {
         forces: {
           totalN,
           momentNm: [0, 0, 0],
-          dragN: 0.5,
+          dragN,
           liftN: 0.02,
           sideN: 0.01,
-          cd: 0.5 / qArea,
+          cd: dragN / qArea,
           cl: 0.02 / qArea,
           cs: 0.01 / qArea,
           cm: [0, 0, 0],
-          cdAM2: 0.5 / q,
+          cdAM2: dragN / q,
           dynamicPressurePa: q,
           referenceAreaM2: job.reference.areaM2,
           referenceLengthM: job.reference.lengthM,
@@ -247,7 +242,7 @@ export function fakeRunner(options: FakeOptions = {}): FakeRunner {
       };
       const outputs: Record<string, Buffer> = {
         'surface.bin': Buffer.from([76, 76, 83, 70, 1, 0, 0, 0]),
-        'field.bin': fakeField(options.wrongField === true ? 21 : 20),
+        'field.bin': fakeField(options.wrongField === true ? 21 : 20, cellM),
         'result.json': Buffer.from(JSON.stringify(result)),
       };
       job.outputs.slices.forEach((_, k) => {

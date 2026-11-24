@@ -21,7 +21,8 @@ import { recordedModel } from '../unit/plant/stress/m3Fixtures';
 import { scene as nozzleScene } from '../unit/plant/stress/nozzleFixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
 import { fixturePcf } from '../unit/plant/fabrication/fabricationFixtures';
-import { addBody, caseParams, metreDocument, ok } from '../unit/aero/cfd/fixtures';
+import { caseParams } from '../unit/aero/cfd/fixtures';
+import { recordedGridStudy } from '../unit/aero/cfd/studyFixtures';
 import { docWith, sampleCatalogFile } from '../unit/aero/fasteners/fixtures';
 import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
@@ -29,6 +30,7 @@ import { blocks, must, pairParams } from '../unit/cae/contact/support';
 import { creepCube, holdFrd, solveCube } from '../unit/cae/creep/support';
 import { amBar } from '../unit/cae/process/support';
 import { barModel } from '../unit/cae/explicit/support';
+import { dropVehicle, levelDrop } from '../unit/cae/explicit/dropCaseFixture';
 import { implicitAnalysis } from '../unit/cae/fieldMeshFixtures';
 import { BAR_PRINT, printedBar, recordCoupon } from '../unit/cae/printFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
@@ -346,10 +348,8 @@ function scanWithLedger(): CadDocument {
   return { ...doc, scan: { ...(doc.scan as NonNullable<CadDocument['scan']>), acceptanceLedger } };
 }
 
-function cfdDocument(): CadDocument {
-  const body = addBody(metreDocument(), 'add_box', { size: [1, 1, 1], position: [0, 0, 0], anchor: 'min' });
-  return ok(body.doc, 'create_cfd_case', caseParams([body.id])).document;
-}
+let gridStudySeed: ReturnType<typeof recordedGridStudy> | undefined;
+const gridStudyFixture = (): ReturnType<typeof recordedGridStudy> => (gridStudySeed ??= recordedGridStudy());
 
 /** The 05 bar with a verified convergence study (PHY-00 VNV-M3): the cae slice with its studies, behind an in-memory artifact port. */
 let lsqSeed: ReturnType<typeof studyBar> | undefined;
@@ -564,7 +564,8 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   cfd: {
     roots: ['cfd'],
-    build: cfdDocument,
+    build: () => gridStudyFixture().doc,
+    ctx: () => gridStudyFixture().ctx,
     query: { name: 'check_cfd', params: constant({}) },
     mutate: { name: 'create_cfd_case', params: (doc) => caseParams(Object.keys(doc.entities).slice(0, 1), { id: 'fuzz' }) },
   },
@@ -738,6 +739,25 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     query: { name: 'check_topology', params: (doc) => ({ studyId: studyId(doc) }) },
     mutate: { name: 'set_topology_settings', params: (doc) => ({ studyId: studyId(doc), penal: 3 }) },
   },
+  // PHY-17 V1b: a min_volume study with a displacement constraint (target, component, limit, label) in the objective
+  'topology#displacement': {
+    roots: ['analysis'],
+    build: () => {
+      const model = mbbModel();
+      return must(model.doc, 'set_topology_objective', {
+        studyId: model.studyId,
+        objective: {
+          kind: 'min_volume',
+          maxCompliance: 400,
+          displacementConstraints: [
+            { label: 'tip', target: { entityId: model.entityId, pointsNear: [[0, 20, 0]] }, component: 'uy', maxDisplacement: 0.5 },
+          ],
+        },
+      }).doc;
+    },
+    query: { name: 'check_topology', params: (doc) => ({ studyId: studyId(doc) }) },
+    mutate: { name: 'set_topology_settings', params: (doc) => ({ studyId: studyId(doc), penal: 3 }) },
+  },
   explicit: {
     roots: ['analysis'],
     build: () => {
@@ -768,6 +788,23 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     },
     query: { name: 'explicit_energy_check', params: (doc) => ({ analysisId: analysisId(doc) }) },
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz explicit', analysisType: 'explicit_dynamics' }) },
+  },
+  // 14 FLL-M5: the drop case (walls, gravity, one initial velocity per part) made by create_drop_case
+  'explicit#drop': {
+    roots: ['analysis'],
+    build: () => {
+      const { doc, boxId } = dropVehicle();
+      return must(doc, 'create_drop_case', levelDrop(boxId)).doc;
+    },
+    query: { name: 'explicit_energy_check', params: (doc) => ({ analysisId: analysisId(doc) }) },
+    mutate: {
+      name: 'set_initial_velocity',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        entityId: first(doc.analysis?.cases[analysisId(doc)]?.parts),
+        velocity: { vector: [0, 0, -1], unit: 'm/s' },
+      }),
+    },
   },
   implicit: {
     roots: ['implicit'],

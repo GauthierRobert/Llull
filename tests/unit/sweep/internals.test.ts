@@ -4,6 +4,7 @@ import { type CadDocument, type SweepEntity, createEmptyDocument } from '@core/m
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { curveChain } from '@core/geometry/nurbsChain';
+import { FACE_GROUPS } from '@core/geometry/sweepEval/mergeFaces';
 import { fitSweepFaces, fitToleranceOf } from '@core/geometry/sweepEval/fitted';
 import { framesAtSamples, orientedFrames, pathSamplesAt, sweepFrames } from '@core/geometry/sweepEval/frames';
 import { constantEdges, ringEdges } from '@core/geometry/sweepEval/sectionEdges';
@@ -203,7 +204,7 @@ describe('section edges and fitted faces', () => {
     expect('faces' in coneFit && coneFit.faces.length % 4).toBe(0);
   });
 
-  it('fits a station sweep with a linear blend (one face per ring Bézier)', () => {
+  it('fits a station sweep with a linear blend (one run: FACE_GROUPS faces, not one per ring Bézier)', () => {
     const tapered = sweepEntity({
       path: BAR,
       stations: [
@@ -213,7 +214,7 @@ describe('section edges and fitted faces', () => {
       stationBlend: 'linear',
     });
     const fit = fitSweepFaces(tapered, fitToleranceOf(tapered));
-    expect('faces' in fit && fit.faces.length).toBe(24);
+    expect('faces' in fit && fit.faces.length).toBe(FACE_GROUPS);
   });
 
   it('fits a twisted square ring round a closed path (faces meet where they started); fits a hollow section with a bore, refuses a bore with stations, an unreachable tolerance, a degenerate frame', () => {

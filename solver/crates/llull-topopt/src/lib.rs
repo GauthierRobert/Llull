@@ -7,12 +7,14 @@
 //! - [`oc`]: optimality-criteria bisection (l1 = 0, l2 = 1e9, tolerance 1e-3, move).
 //! - [`mma`]: method of moving asymptotes (Svanberg 1987), dual subproblem solver, resumable state.
 //! - [`design`]: design-variable space (identity, or one variable per column for the extrusion constraint).
+//! - [`displacement`]: displacement constraints (adjoint sensitivity, MMA constraint rows).
 //! - [`loads`]: design-dependent gravity loads.
 //! - [`simp`]: the loop (TECHNICAL_SPEC §5.1 / §5.2 / §15), devices `cpu | gpu | auto`, resume from a design and a state.
 //! - [`job`]: the job folder contract (`job.json` in; `field.bin`, `design.f64`, `displacements.f64`, `state.json`,
 //!   `result.json` out). Read its module doc for the schema.
 
 pub mod design;
+pub mod displacement;
 pub mod filter;
 pub mod job;
 pub mod loads;

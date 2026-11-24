@@ -1,5 +1,5 @@
 import { idOrNext } from '../../lib/explicitId';
-import type { BaseEntity, CadDocument, SweepEntity, Vec3 } from '../../model/types';
+import type { BaseEntity, CadDocument, Entity, SweepEntity, Vec3 } from '../../model/types';
 import type { SweepSection, SweepStation } from '../../model/sweepOrientation';
 import type { CommandResult } from '../types';
 import { defineCommand, untypedArray, z } from '../schema';
@@ -338,6 +338,9 @@ function runSweepProfile(
     layerId: existingLayerOrDefault(doc, params.layerId),
   });
   const sweepEntity = entity as SweepEntity;
+  // the document decides (never the replay flag): a document without the marker keeps the per-edge layout its stored face names refer to; only a fitted sweep has one
+  const placed: Entity =
+    doc.sweepFaceLayout === 'joined' && needsFittedFaces(sweepEntity) ? { ...sweepEntity, faceLayout: 'joined' } : entity;
   const design = sweepDesign(doc, sweepEntity, loop);
   if ('document' in design) return design;
   const fitRefusal = fitToleranceRefusal(doc, sweepEntity, params.fitTolerance);
@@ -355,7 +358,7 @@ function runSweepProfile(
   const length = polylineLength(sampleChain(path, false));
   return commitSolid(
     doc,
-    entity,
+    placed,
     `sweep_profile: created sweep "${id}" — ${sectionLabel(section, stations)} along a ${path.length}-segment path (≈${length.toFixed(3)} long)`,
   );
 }

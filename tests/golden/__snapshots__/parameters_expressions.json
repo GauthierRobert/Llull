@@ -51,6 +51,7 @@
     },
     "groups": {},
     "units": "mm",
+    "sweepFaceLayout": "joined",
     "displayPrecision": 3,
     "parameters": {
       "w": {

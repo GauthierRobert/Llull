@@ -849,6 +849,7 @@
     },
     "groups": {},
     "units": "m",
+    "sweepFaceLayout": "joined",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},

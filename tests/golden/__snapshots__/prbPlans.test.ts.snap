@@ -342,6 +342,7 @@ exports[`prb_box_mass plan (VC-PRB-06, VC-PRB-18) > the response, three bound va
     },
     "recipes": {},
     "selection": [],
+    "sweepFaceLayout": "joined",
     "units": "mm",
   },
   "format": "llull-document",

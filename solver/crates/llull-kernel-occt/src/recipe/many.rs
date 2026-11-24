@@ -58,6 +58,7 @@ impl Evaluator {
     }
 
     fn fuse_or_cut(&mut self, recipe: &Value, operation: BooleanOp, tools: &[Value], threaded: bool) -> Evaluated {
+        self.reserve(2 * tools.len() + 16);
         let Some(a) = self.child(recipe, "a")? else { return refused() };
         let mut shapes: Vec<Rc<crate::Shape>> = Vec::with_capacity(tools.len());
         for tool in tools {

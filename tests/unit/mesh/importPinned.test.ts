@@ -11,7 +11,13 @@ import { MESSY_OBJ } from '../../helpers/messyObj';
 
 const sha256 = (bytes: Uint8Array | string): string => createHash('sha256').update(bytes).digest('hex');
 const digest = (result: CommandResult): string =>
-  sha256(JSON.stringify([result.document, result.summary, result.affected, result.data ?? null, result.rejected ?? false]));
+  // the pins predate the document-level `sweepFaceLayout` marker, which no mesh import touches
+  sha256(
+    JSON.stringify(
+      [result.document, result.summary, result.affected, result.data ?? null, result.rejected ?? false],
+      (key, value: unknown) => (key === 'sweepFaceLayout' ? undefined : value),
+    ),
+  );
 
 const sphere = icosphere(10, 7);
 const triangleCount = sphere.indices.length / 3;
