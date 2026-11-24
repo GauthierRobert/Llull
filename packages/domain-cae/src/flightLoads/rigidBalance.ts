@@ -192,3 +192,9 @@ export function analysedCentre(doc: CadDocument, analysis: AnalysisCase, ctx?: M
   const mass = bodyMass(doc, analysis, length, ctx ?? {});
   return typeof mass === 'string' ? mass : scale(mass.centerOfMass, 1 / length);
 }
+
+/** Total mass in kg of the analysed solids (material density x volume), or the reason it cannot be computed. */
+export function analysedMassKg(doc: CadDocument, analysis: AnalysisCase, ctx?: MassContext): number | string {
+  const mass = bodyMass(doc, { ...analysis, unitSystem: 'N-m-kg-s' }, toMetres(doc, 1), ctx ?? {});
+  return typeof mass === 'string' ? mass : mass.mass;
+}
