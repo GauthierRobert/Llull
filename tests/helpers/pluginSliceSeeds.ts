@@ -30,6 +30,7 @@ import { blocks, must, pairParams } from '../unit/cae/contact/support';
 import { creepCube, holdFrd, solveCube } from '../unit/cae/creep/support';
 import { amBar } from '../unit/cae/process/support';
 import { barModel } from '../unit/cae/explicit/support';
+import { dropVehicle, levelDrop } from '../unit/cae/explicit/dropCaseFixture';
 import { implicitAnalysis } from '../unit/cae/fieldMeshFixtures';
 import { BAR_PRINT, printedBar, recordCoupon } from '../unit/cae/printFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
@@ -787,6 +788,23 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     },
     query: { name: 'explicit_energy_check', params: (doc) => ({ analysisId: analysisId(doc) }) },
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz explicit', analysisType: 'explicit_dynamics' }) },
+  },
+  // 14 FLL-M5: the drop case (walls, gravity, one initial velocity per part) made by create_drop_case
+  'explicit#drop': {
+    roots: ['analysis'],
+    build: () => {
+      const { doc, boxId } = dropVehicle();
+      return must(doc, 'create_drop_case', levelDrop(boxId)).doc;
+    },
+    query: { name: 'explicit_energy_check', params: (doc) => ({ analysisId: analysisId(doc) }) },
+    mutate: {
+      name: 'set_initial_velocity',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        entityId: first(doc.analysis?.cases[analysisId(doc)]?.parts),
+        velocity: { vector: [0, 0, -1], unit: 'm/s' },
+      }),
+    },
   },
   implicit: {
     roots: ['implicit'],
