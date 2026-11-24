@@ -203,8 +203,8 @@ describe('cfd_render', () => {
   it('refuses a stored file it cannot decode (CFD_SOLVER_FAILED)', async () => {
     const host = await solvedHost();
     // a valid length and sample count (the query transport checks those), but a NaN origin in the header: only the decoder refuses it
-    const broken = Uint8Array.from(sliceFile);
-    new DataView(broken.buffer).setFloat32(16, Number.NaN, true);
+    const broken = Buffer.from(sliceFile);
+    new DataView(broken.buffer, broken.byteOffset, broken.byteLength).setFloat32(16, Number.NaN, true);
     const damaged = fakeRunner({ query: () => ({ ...queryAnswers('slice'), file: broken }) });
     const refused = await runCfdRender({ caseId: 're100', slice }, host, { store, runner: damaged });
     expect(refused).toMatchObject({ isError: true, data: { code: 'CFD_SOLVER_FAILED' } });
