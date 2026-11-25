@@ -60,6 +60,21 @@ describe('add_pid_inline: split', () => {
     expect(valve.attributes).toEqual({ Note: { kind: 'text', value: 'x' } });
   });
 
+  it('refuses a point exactly 5 mm from the end of the line: a port on the nozzle would leave a segment of one point', () => {
+    const doc = feedPump();
+    const route: ReadonlyArray<readonly number[]> = segmentsOfLine(doc, SUCTION)[0]?.route ?? [];
+    const [before, end] = [route[route.length - 2] as readonly number[], route[route.length - 1] as readonly number[]];
+    const length = Math.hypot((end[0] as number) - (before[0] as number), (end[1] as number) - (before[1] as number));
+    const at = [0, 1].map((axis) => (end[axis] as number) - (5 * ((end[axis] as number) - (before[axis] as number))) / length);
+    const refused = expectRefusal(doc, 'add_pid_inline', inline(at, 'V'), 'PID_POINT_OFF_LINE', 'at');
+    expect(refused.summary).toContain('end of the line');
+    const start = route[0] as readonly number[];
+    const next = route[1] as readonly number[];
+    const first = Math.hypot((next[0] as number) - (start[0] as number), (next[1] as number) - (start[1] as number));
+    const atStart = [0, 1].map((axis) => (start[axis] as number) + (5 * ((next[axis] as number) - (start[axis] as number))) / first);
+    expectRefusal(doc, 'add_pid_inline', inline(atStart, 'V'), 'PID_POINT_OFF_LINE', 'at');
+  });
+
   it('refuses an unknown class (close names), a point off the line, a point near a bend or end, a used tag, an unknown line', () => {
     const doc = feedPump();
     const unknown = expectRefusal(doc, 'add_pid_inline', inline([100, 80], 'V', { class: 'BallValv' }), 'PID_CLASS_UNKNOWN', 'class');

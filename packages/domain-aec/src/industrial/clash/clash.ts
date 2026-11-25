@@ -84,7 +84,22 @@ function bearsOn(support: BuildingElement, other: BuildingElement): boolean {
   return support.category === 'pipeSupport' && (support.pipeId === other.id || support.memberId === other.id);
 }
 
-/** Intentional connections: a pipe ending on another pipe (tee / joint) or inside equipment, a support on its pipe / steel. */
+/** A part of a generated assembly (circular platform: brackets, grating, railing) is attached to the vessel the assembly follows. */
+function hostedBy(building: BuildingModel, part: BuildingElement, host: BuildingElement): boolean {
+  const assemblyId = 'assemblyId' in part ? part.assemblyId : undefined;
+  const assembly = assemblyId === undefined ? undefined : building.elements[assemblyId];
+  return assembly?.category === 'assembly' && assembly.hostId === host.id;
+}
+
+const hostedById = (building: BuildingModel, partId: string, hostId: string): boolean => {
+  const [part, host] = [building.elements[partId], building.elements[hostId]];
+  return part !== undefined && host !== undefined && hostedBy(building, part, host);
+};
+
+/**
+ * Intentional connections: a pipe ending on another pipe (tee / joint) or inside equipment, a support on its pipe / steel, the parts of
+ * a platform on the vessel that hosts it (the vessel is tested as its bounding box, whose corners reach past a round shell).
+ */
 function connected(
   doc: CadDocument,
   building: BuildingModel,
@@ -93,7 +108,7 @@ function connected(
   boxA: OrientedBox,
   boxB: OrientedBox,
 ): boolean {
-  if (bearsOn(a, b) || bearsOn(b, a)) return true;
+  if (bearsOn(a, b) || bearsOn(b, a) || hostedBy(building, a, b) || hostedBy(building, b, a)) return true;
   const runSize = (run: BuildingElement): number => (run.category === 'pipe' ? run.diameter : run.category === 'tray' ? run.width : 0);
   if (a.category === b.category && (a.category === 'pipe' || a.category === 'tray')) {
     const [pointsA, pointsB] = [pipeWorldPoints(building, a), pipeWorldPoints(building, b)];
@@ -170,7 +185,7 @@ export function findClashes(
   for (const clash of externalClashes(externalBodies(doc), solids, tolerance)) record(clash);
   const inScope = (levelId: string): boolean => levelIds === null || levelIds.has(levelId);
   const penetrations = [
-    ...slabPenetrations(building, inScope, tolerance),
+    ...slabPenetrations(building, inScope, tolerance).filter((hit) => !hostedById(building, hit.slabId, hit.elementId)),
     ...stairPenetrations(building, inScope, fromMm(doc, STAIR_HEADROOM_MM), tolerance),
   ];
   for (const penetration of penetrations) {
@@ -196,6 +211,7 @@ export function findClashes(
     for (const otherIndex of index === null ? solids.keys() : index.nearBox(zone)) {
       const other = solids[otherIndex] as Solid;
       if (other.elementId === solid.elementId || !CLEARANCE_OBSTACLES.has(other.category)) continue;
+      if (hostedById(building, other.elementId, equipment.id)) continue;
       const depth = boxOverlap(zone, other.box);
       if (depth > tolerance && !found.has(`hard:${[solid.elementId, other.elementId].sort().join(':')}`)) {
         record({ a: solid.elementId, b: other.elementId, kind: 'clearance', depth });

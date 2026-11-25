@@ -11,7 +11,7 @@ import { getPid, withPid } from '../state';
 /**
  * @affects plant.pid (one inline item; the segment under it is split in two: the first piece keeps its id, a new segment takes the second piece and the old end; tee references follow)
  * @invariant the item sits on the nearest segment leg (snapped, <= 5 mm away) with its two ports 5 mm either side; pieces inherit line, dn, class, flow, primary; dn / class default from the segment and are flagged `defaulted`; delete_pid_item heal restores the route exactly
- * @failure line unknown -> PID_ITEM_NOT_FOUND; class unknown -> PID_CLASS_UNKNOWN; point > 5 mm off the line or < 5 mm from a bend / end of its run -> PID_POINT_OFF_LINE; tag used -> PID_TAG_DUPLICATE; document unchanged
+ * @failure line unknown -> PID_ITEM_NOT_FOUND; class unknown -> PID_CLASS_UNKNOWN; point > 5 mm off the line, < 5 mm from a bend / end of its run, or exactly 5 mm from where the line starts or ends (a piece of line must stay on both sides) -> PID_POINT_OFF_LINE; tag used -> PID_TAG_DUPLICATE; document unchanged
  */
 export const addPidInline = defineCommand({
   name: 'add_pid_inline',
@@ -91,6 +91,16 @@ export const addPidInline = defineCommand({
       ...toValues(params.attributes),
     };
     const pieces = splitRoute(segment.route, hit);
+    if (pieces.first.length < 2 || pieces.second.length < 2)
+      return refuse(
+        doc,
+        name,
+        fail(
+          'PID_POINT_OFF_LINE',
+          `a port of the item would sit on the end of the line: keep the point more than ${INLINE_HALF_LENGTH} mm from where the line starts or ends`,
+          ['at'],
+        ),
+      );
     const inline: PidInline = {
       id: mintFree(pid),
       kind: 'inline',

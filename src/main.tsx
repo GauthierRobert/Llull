@@ -16,6 +16,7 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createManifoldMeshEngine } from '@kernel-manifold/manifoldMeshEngine';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
 import { refreshBackendKernelStatus } from '@ui/services/backendKernel';
+import { configureTextLayout } from '@ui/viewport/textFont';
 
 // Renderer kernel: Manifold (WASM, in-process) runs the commands this renderer executes itself (local mode while
 // the backend restarts, read-only queries, panel analyses). Exact B-rep work runs in the local backend (LLULL_KERNEL).
@@ -39,6 +40,7 @@ createManifoldMeshEngine()
   .catch((e: unknown) => console.error('Manifold mesh engine init failed', e));
 
 installDefaultPlugins();
+configureTextLayout();
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found.');

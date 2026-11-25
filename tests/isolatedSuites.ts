@@ -77,6 +77,7 @@ export const DOM_ISOLATED_SUITES: readonly string[] = [
   'tests/component/SweepMesh.test.tsx',
   'tests/component/SpaceMouseControl.test.tsx',
   'tests/component/NonlinearCurves.test.tsx',
+  'tests/component/TextLayoutConfig.test.tsx',
   'tests/component/TextRenderer2DMinSize.test.tsx',
   'tests/component/TopologyPanel.test.tsx',
   'tests/component/VerificationPanel.test.tsx',
