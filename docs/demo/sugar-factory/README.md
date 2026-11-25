@@ -7,7 +7,7 @@ layout are assumptions of the author, and every result llull reports stays "revi
 
 | File                           | What it builds                                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `plant.plan.json`              | The plant: 789 plan steps, about 6,200 entities                                                               |
+| `plant.plan.json`              | The plant: 861 plan steps, about 6,500 entities                                                               |
 | `bracket-fea.plan.json`        | A welded platform bracket with a static analysis set-up (mesh and solve are separate commands, see below)     |
 | `bracket-topology.plan.json`   | A design space with a topology study for the same kind of bracket                                             |
 
@@ -43,9 +43,10 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
   branches to effect 1 and two juice heaters.
 - Pipe stress model of the steam header and its branches (ASME B31.3), fabrication rules, numbered welds.
 - Boiling house: steel portal hall sized with `design_portal_frames` and `design_footings`, 10 t crane runway, four vacuum pans
-  fed from the syrup tank by a pan feed pump and a supported DN100 header with a gate valve at each pan.
-- P&IDs `PID-201` (diffuser recirculation), `PID-301` and `PID-302` (evaporation), `PID-401` (pan feed) whose tags and line
-  numbers match the 3D model.
+  fed from the syrup tank by a pan feed pump and a supported DN100 header with a gate valve at each pan; molasses header from
+  the six centrifugals to a pump and on to the molasses tank.
+- P&IDs `PID-201` (diffuser recirculation), `PID-301` and `PID-302` (evaporation), `PID-401` (pan feed), `PID-501` (molasses)
+  whose tags and line numbers match the 3D model.
 
 ## State of the checks (as built by the plan)
 
@@ -53,10 +54,10 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
 | ---------------------- | ---------------------------------------------------------------------------------------- |
 | `check_clashes`        | no clashes                                                                               |
 | `check_steel_members`  | all analysed members pass (max 0.95); platform brackets and posts are not analysed       |
-| `check_pipe_supports`  | 67 of 67 pipes pass the span table                                                       |
+| `check_pipe_supports`  | 74 of 74 pipes pass the span table                                                       |
 | `check_pipe_stress`    | pass (worst ratio 0.77)                                                                  |
 | `check_pid`            | 0 errors, 3 warnings (continuation lines after an off-page connector carry no number)    |
-| `check_pid_3d`         | 86 items matched; 12 objects (centrifugals, crystalliser, boiler, silo ...) have no P&ID |
+| `check_pid_3d`         | 101 items matched; 5 objects (boiler, turbo-alternator, crystalliser, silo, barometric leg) have no P&ID |
 
 ## Known limits
 
@@ -65,6 +66,7 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
   reference in the repository and stay unverified. Replace it with the project catalogue before using any quantity or dimension.
 - The mills, conveyors, boiler, silo and stack are plain solids, and the vapour ducts are simple DN600 pipe runs without fittings.
 - The support posts and brackets are placed to satisfy the span table; they are not designed members.
-- Centrifugals, crystalliser, molasses tank, boiler, turbo-alternator and silo are equipment only: no piping and no P&ID.
-- The 3D view paints at most 50,000 result triangles of an analysis; the bracket mesh has 141,000, so its contour is partial in the
+- Boiler, turbo-alternator, crystalliser and silo are equipment only: no piping and no P&ID (HP steam is outside the 200 degC
+  limit of the demo spec; massecuite and sugar handling are not piping).
+- The 3D view paints at most 50,000 result triangles of an analysis; the bracket result has more, so its contour is partial in the
   app (the `render_fea_results` plot is complete).
