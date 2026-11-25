@@ -68,5 +68,3 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
 - The support posts and brackets are placed to satisfy the span table; they are not designed members.
 - Boiler, turbo-alternator, crystalliser and silo are equipment only: no piping and no P&ID (HP steam is outside the 200 degC
   limit of the demo spec; massecuite and sugar handling are not piping).
-- The 3D view paints at most 50,000 result triangles of an analysis; the bracket result has more, so its contour is partial in the
-  app (the `render_fea_results` plot is complete).
