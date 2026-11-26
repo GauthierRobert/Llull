@@ -205,6 +205,12 @@ describe('llull run — --timeout', () => {
     expect(await runCli(['run', '-', '--timeout', '5', '--server', 'http://cad.local:3001'], c.io)).toBe(EXIT_COMMAND_ERROR);
     expect(c.out[0]).toMatch(/Timed out after 5s waiting for the llull server .*\(--timeout\)/);
   });
+
+  it('names --timeout when the default 120 s wait ran out on a --server call', async () => {
+    const c = capture({ stdin: PLAN, fetchImpl: () => Promise.reject(new DOMException('timed out', 'TimeoutError')) });
+    expect(await runCli(['run', '-', '--server', 'http://cad.local:3001'], c.io)).toBe(EXIT_COMMAND_ERROR);
+    expect(c.out[0]).toMatch(/Timed out after 120s waiting for the llull server .*add --timeout <seconds>/);
+  });
 });
 
 describe('formatDuration', () => {

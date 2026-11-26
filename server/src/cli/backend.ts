@@ -233,7 +233,7 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
         };
       const summary =
         error instanceof Error && error.name === 'TimeoutError'
-          ? `Timed out after ${timeoutMs / 1000}s waiting for the llull server at ${base}${options.timeoutSeconds !== undefined ? ' (--timeout)' : ''}; the server may still be running the command.`
+          ? `Timed out after ${timeoutMs / 1000}s waiting for the llull server at ${base}${options.timeoutSeconds !== undefined ? ' (--timeout)' : ''}; the server may still be running the command.${options.timeoutSeconds === undefined ? ' A long solve needs a longer wait: add --timeout <seconds>.' : ''}`
           : `Cannot reach the llull server at ${base}: ${errorMessage(error)} (start it with npm --prefix server run dev, or drop --server to work on a local file).`;
       return { summary, affected: [], isError: true, changed: false };
     }
