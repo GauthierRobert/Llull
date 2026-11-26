@@ -7,7 +7,7 @@ layout are assumptions of the author, and every result llull reports stays "revi
 
 | File                                | What it builds                                                                                            |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `plant-1-equipment-steel.plan.json` | Stage 1: catalogue and specs, equipment, structures, platforms (587 plan steps)                           |
+| `plant-1-equipment-steel.plan.json` | Stage 1: catalogue and specs, equipment, structures, platforms, machinery detail (828 plan steps)         |
 | `plant-2-piping-pid.plan.json`      | Stage 2, applied on the stage 1 document: routed piping, supports, stress model, P&IDs (470 plan steps)   |
 | `bracket-fea.plan.json`             | A welded platform bracket with a static analysis set-up (mesh and solve are separate commands, see below) |
 | `bracket-topology.plan.json`        | A design space with a topology study for the same kind of bracket                                         |
@@ -54,6 +54,13 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
 - P&IDs `PID-201` (diffuser recirculation, the diffuser drawn with `symbolSize`), `PID-301` and `PID-302` (evaporation),
   `PID-401` (pan feed), `PID-501` (molasses), `PID-801` (steam cycle) whose tags and line numbers match the 3D model.
 
+- Machinery detail from plain solids (no mechanical design, sizes assumed): bagasse boiler with buckstays, steam drum, boiler
+  bank / economiser pass with ash hoppers, air heater, FD and ID fans, bagasse cross conveyor and rotary feeders, three-section
+  stack; turbo-alternator train (turbine casing and valve chest, reduction gearbox, alternator, exciter, lube oil console); cane
+  feed tables, leveller and heavy-duty knives, shredder with its turbine drive; diffuser side stiffeners; juice clarifier with
+  flash tank and two rotary vacuum mud filters; centrifugal drives, wet sugar belt, rotary sugar dryer (tyres, trunnion rollers,
+  girth gear and pinion drive), bucket elevator and silo feed gallery.
+
 ## State of the checks (as built by the plan)
 
 | Check                 | Result                                                                                |
@@ -71,7 +78,8 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
   values were compared with the sourced tables of `docs/plant/*/validation/data` and are equal; the others have no
   sourced reference in the repository and stay unverified. The Class 600 NPS 10 flange of `SUGHP` equals the sourced ASME B16.5
   table (outside diameter, thickness, bolt circle, bolting, raised face); its hub length and gasket have no sourced reference. Replace it with the project catalogue before using any quantity or dimension.
-- The boiler, turbo-alternator, silo and stack are plain solids; the mills and conveyors are built from plain solids (no
-  mechanical design), and the vapour ducts are simple DN600 pipe runs without fittings.
+- Boiler, turbo-alternator, mills, conveyors, dryer, clarifier and filters are assemblies of plain solids for layout and
+  presentation: no mechanical design, and they are not tagged equipment (only the furnace `B-801` and the turbine base frame
+  `TG-801` are). The vapour ducts are simple DN600 pipe runs without fittings.
 - The support posts and brackets are placed to satisfy the span table; they are not designed members.
 - The crystalliser and the silo are equipment only (massecuite and sugar handling are not piping). Boiler feed water, condensate and bagasse handling are not modelled.

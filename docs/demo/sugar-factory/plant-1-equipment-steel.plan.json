@@ -1954,24 +1954,6 @@
     },
     {
       "command": "add_box",
-      "params": { "size": [9000, 8000, 9000], "position": [-30000, 5750, 0], "anchor": "base-center", "color": "#44566b" },
-      "as": "shr"
-    },
-    { "command": "set_entity_name", "params": { "id": "$shr", "name": "SH-101 heavy-duty shredder house" } },
-    {
-      "command": "add_cylinder",
-      "params": { "radius": 1300, "height": 3400, "position": [-30000, 5750, 9900], "axis": [0, 1, 0], "color": "#b03a2e" }
-    },
-    {
-      "command": "add_box",
-      "params": { "size": [3600, 3000, 3000], "position": [-30000, 11550, 0], "anchor": "base-center", "color": "#1f5fa8" }
-    },
-    {
-      "command": "add_cylinder",
-      "params": { "radius": 350, "height": 2200, "position": [-30000, 9750, 1500], "axis": [0, 1, 0], "color": "#3d4a57" }
-    },
-    {
-      "command": "add_box",
       "params": {
         "size": [26779.843166082956, 3200, 60],
         "position": [-13000.0, 5750, 7300.0],
@@ -4611,12 +4593,6 @@
     },
     { "command": "set_entity_name", "params": { "id": "$drv", "name": "Diffuser main drive (hydraulic, variable speed)" } },
     {
-      "command": "add_box",
-      "params": { "size": [5000, 3000, 3000], "position": [66000, 13000, 0], "anchor": "base-center", "color": "#7a5c2e" },
-      "as": "pw"
-    },
-    { "command": "set_entity_name", "params": { "id": "$pw", "name": "Press water tank" } },
-    {
       "command": "add_access_platform",
       "params": {
         "bounds": [
@@ -6896,20 +6872,24 @@
     {
       "command": "add_equipment",
       "params": {
-        "name": "Bagasse boiler 150 t/h",
+        "name": "Bagasse boiler 150 t/h - furnace",
         "mark": "B-801",
-        "location": [108000, -6000],
-        "size": [16000, 12000, 26000],
+        "location": [104500, -6000],
+        "size": [9000, 10000, 22000],
+        "clearance": 0,
         "weight": 0
       }
     },
     {
-      "command": "add_cylinder",
-      "params": { "radius": 1700, "height": 55000, "position": [122000, -6000, 0], "anchor": "base-center", "color": "#8d99a6" }
-    },
-    {
       "command": "add_equipment",
-      "params": { "name": "Turbo-alternator 25 MW", "mark": "TG-801", "location": [90000, -6000], "size": [12000, 5000, 4500], "weight": 0 }
+      "params": {
+        "name": "Turbo-alternator 25 MW - turbine base frame",
+        "mark": "TG-801",
+        "location": [90000, -6000],
+        "size": [12000, 5000, 1500],
+        "clearance": 0,
+        "weight": 0
+      }
     },
     {
       "command": "add_nozzle",
@@ -7122,6 +7102,1332 @@
         "end": [98000, -5000, 19700],
         "note": "pipe support post"
       }
+    },
+    {
+      "repeat": { "count": 6, "as": "i" },
+      "actions": [
+        { "command": "add_box", "params": { "size": [9400, 10400, 300], "position": [104500, -6000, "=3500+i*3200"], "color": "#5a6b7a" } }
+      ]
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [450, 450, 25600], "position": [99750, -11250, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [450, 450, 25600], "position": [99750, -750, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [450, 450, 25600], "position": [109250, -11250, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [450, 450, 25600], "position": [109250, -750, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9950, 500, 800], "position": [104500, -11250, 25200], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9950, 500, 800], "position": [104500, -750, 25200], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [500, 10950, 600], "position": [100500, -6000, 25100], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [500, 10950, 600], "position": [104500, -6000, 25100], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [500, 10950, 600], "position": [108500, -6000, 25100], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 950,
+        "height": 11400,
+        "position": [104000, -6000, 23400],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      },
+      "as": "m1"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m1", "name": "B-801 steam drum" } },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 160, "height": 1300, "position": [104000, -8500, 24300], "color": "#3d4a57", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 160, "height": 1300, "position": [104000, -3500, 24300], "color": "#3d4a57", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 450, "height": 2200, "position": [104000, -8500, 25600], "color": "#b8c2cc", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 180, "height": 22400, "position": [99720, -10200, 600], "color": "#3d4a57", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 180, "height": 22400, "position": [99720, -1800, 600], "color": "#3d4a57", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [4200, 9000, 13000], "position": [111200, -6000, 7000], "color": "#b8c2cc", "anchor": "base-center" },
+      "as": "m2"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m2", "name": "B-801 boiler bank and economiser pass" } },
+    {
+      "command": "add_pyramid",
+      "params": {
+        "baseWidth": 4200,
+        "baseDepth": 4400,
+        "height": 3000,
+        "position": [111200, -8250, 7000],
+        "rotation": [3.141592653589793, 0, 0],
+        "color": "#44566b"
+      }
+    },
+    {
+      "command": "add_pyramid",
+      "params": {
+        "baseWidth": 4200,
+        "baseDepth": 4400,
+        "height": 3000,
+        "position": [111200, -3750, 7000],
+        "rotation": [3.141592653589793, 0, 0],
+        "color": "#44566b"
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 7000], "position": [109300, -10300, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 7000], "position": [109300, -1700, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 7000], "position": [113100, -10300, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 7000], "position": [113100, -1700, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [2000, 7000, 2200], "position": [109600, -6000, 20600], "color": "#b8c2cc", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [3600, 9000, 8000], "position": [115300, -6000, 3500], "color": "#b8c2cc", "anchor": "base-center" },
+      "as": "m3"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m3", "name": "B-801 tubular air heater" } },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3500], "position": [113800, -10200, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3500], "position": [113800, -1800, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3500], "position": [116800, -10200, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3500], "position": [116800, -1800, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [2400, 6000, 2000], "position": [113900, -6000, 10500], "color": "#b8c2cc", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [2600, 3200, 3000], "position": [118300, -6000, 3500], "color": "#b8c2cc", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1700,
+        "height": 1500,
+        "position": [118400, -6000, 1750],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      },
+      "as": "m4"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m4", "name": "ID fan" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 500,
+        "height": 1800,
+        "position": [118400, -3700, 1750],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 180,
+        "height": 900,
+        "position": [118400, -4900, 1750],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [2400, 5200, 300], "position": [118400, -5000, 0], "color": "#9aa0a6", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1900, 2600, 2600], "position": [120300, -6000, 2600], "color": "#b8c2cc", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1300,
+        "height": 1300,
+        "position": [104500, -13300, 1600],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      },
+      "as": "m5"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m5", "name": "FD fan" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 450,
+        "height": 1700,
+        "position": [106300, -13300, 1600],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1400, 1100, 5200], "position": [103300, -11600, 1500], "color": "#b8c2cc", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [4600, 2600, 300], "position": [105000, -13300, 0], "color": "#9aa0a6", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9400, 1300, 80], "position": [104500, -11950, 8000], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9400, 40, 1100], "position": [104500, -12580, 8590], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9400, 1300, 80], "position": [104500, -11950, 14000], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9400, 40, 1100], "position": [104500, -12580, 14590], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9400, 1300, 80], "position": [104500, -11950, 20000], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9400, 40, 1100], "position": [104500, -12580, 20590], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [900, 1300, 20000], "position": [110200, -11950, 0], "color": "#5a6b7a", "anchor": "base-center" },
+      "as": "m6"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m6", "name": "Boiler stair tower" } },
+    {
+      "command": "add_box",
+      "params": { "size": [1700, 1700, 1300], "position": [101700, 5750, 8950], "color": "#2f6f4f", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1800, 6600, 60], "position": [102000, 2900, 8600], "color": "#26302b", "anchor": "center" },
+      "as": "m7"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m7", "name": "CV-105 bagasse cross conveyor - belt" } },
+    {
+      "command": "add_box",
+      "params": { "size": [1800, 6600, 40], "position": [102000, 2900, 8200], "color": "#26302b", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [30, 6600, 450], "position": [101040, 2900, 8830], "color": "#2f6f4f", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [30, 6600, 450], "position": [102960, 2900, 8830], "color": "#2f6f4f", "anchor": "center" }
+    },
+    {
+      "repeat": { "count": 5, "as": "i" },
+      "actions": [
+        {
+          "command": "add_cylinder",
+          "params": { "radius": 85, "height": 1900, "position": [102000, "=600+i*1300", 8480], "axis": [1, 0, 0], "color": "#8a9aa8" }
+        }
+      ]
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 8200], "position": [100950, 1500, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 8200], "position": [103050, 1500, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 8200], "position": [100950, 4600, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 8200], "position": [103050, 4600, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [8200, 1500, 1600], "position": [104500, -150, 7700], "color": "#2f6f4f", "anchor": "center" },
+      "as": "m8"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m8", "name": "Bagasse feed hopper" } },
+    {
+      "repeat": { "count": 4, "as": "i" },
+      "actions": [
+        { "command": "add_box", "params": { "size": [900, 1000, 1500], "position": ["=101500+i*2000", -600, 6300], "color": "#2f6f4f" } },
+        {
+          "command": "add_cylinder",
+          "params": { "radius": 350, "height": 900, "position": ["=101500+i*2000", -650, 6950], "axis": [1, 0, 0], "color": "#b03a2e" }
+        }
+      ]
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 2000, "height": 18000, "position": [122000, -6000, 0], "color": "#8d99a6", "anchor": "base-center" },
+      "as": "m9"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m9", "name": "Stack section" } },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 1700, "height": 18000, "position": [122000, -6000, 18000], "color": "#8d99a6", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 1400, "height": 19000, "position": [122000, -6000, 36000], "color": "#8d99a6", "anchor": "base-center" }
+    },
+    { "command": "add_torus", "params": { "ringRadius": 2080, "tubeRadius": 120, "position": [122000, -6000, 18000], "color": "#3d4a57" } },
+    { "command": "add_torus", "params": { "ringRadius": 1780, "tubeRadius": 120, "position": [122000, -6000, 36000], "color": "#3d4a57" } },
+    { "command": "add_torus", "params": { "ringRadius": 1480, "tubeRadius": 120, "position": [122000, -6000, 54800], "color": "#3d4a57" } },
+    { "command": "add_torus", "params": { "ringRadius": 2300, "tubeRadius": 90, "position": [122000, -6000, 45000], "color": "#c9a227" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1700,
+        "height": 2400,
+        "position": [85700, -6000, 3000],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      },
+      "as": "m10"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m10", "name": "TG-801 exhaust casing" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1250,
+        "height": 5000,
+        "position": [89400, -6000, 3000],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      },
+      "as": "m11"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m11", "name": "TG-801 turbine casing" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 900,
+        "height": 1700,
+        "position": [92700, -6000, 3000],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1700, 2400, 1500], "position": [94000, -6000, 3950], "color": "#44566b", "anchor": "center" },
+      "as": "m12"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m12", "name": "TG-801 emergency stop and governing valve chest" } },
+    {
+      "command": "add_box",
+      "params": { "size": [7600, 3300, 220], "position": [88700, -6000, 3000], "color": "#3d4a57", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1000, 1500, 1700], "position": [95300, -6000, 2350], "color": "#1f5fa8", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [600, 2600, 1500], "position": [86500, -6000, 2250], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [600, 2600, 1500], "position": [91500, -6000, 2250], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 220,
+        "height": 19400,
+        "position": [86000, -6000, 3000],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [8600, 5000, 1500], "position": [79700, -6000, 0], "color": "#9aa0a6", "anchor": "base-center" },
+      "as": "m13"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m13", "name": "Gearbox and alternator plinth" } },
+    {
+      "command": "add_box",
+      "params": { "size": [2400, 2800, 2600], "position": [82500, -6000, 2800], "color": "#1f5fa8", "anchor": "center" },
+      "as": "m14"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m14", "name": "Reduction gearbox" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 450,
+        "height": 700,
+        "position": [83950, -6000, 3000],
+        "color": "#c9a227",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 450,
+        "height": 700,
+        "position": [81000, -6000, 3000],
+        "color": "#c9a227",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1450,
+        "height": 4200,
+        "position": [78600, -6000, 3000],
+        "color": "#2e6f8f",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      },
+      "as": "m15"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m15", "name": "Alternator 25 MW" } },
+    {
+      "command": "add_box",
+      "params": { "size": [4200, 3200, 1300], "position": [78600, -6000, 2150], "color": "#2e6f8f", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [3600, 2400, 900], "position": [78600, -6000, 4850], "color": "#b8c2cc", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1200, 800, 1200], "position": [78600, -4200, 3000], "color": "#44566b", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 550,
+        "height": 1000,
+        "position": [75950, -6000, 3000],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [3000, 1600, 1500], "position": [88000, -10200, 0], "color": "#1f5fa8", "anchor": "base-center" },
+      "as": "m16"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m16", "name": "Lube oil console" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 600,
+        "height": 2200,
+        "position": [90500, -10200, 700],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [9000, 7000, 300],
+        "position": [-58000, 150, 2700],
+        "color": "#2f6f4f",
+        "anchor": "center",
+        "rotation": [0.25, 0, 0]
+      },
+      "as": "m17"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m17", "name": "Cane feed table" } },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 3500], "position": [-61500, -2850, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 3500], "position": [-54500, -2850, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 500,
+        "height": 1400,
+        "position": [-52800, 150, 2500],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [9000, 7000, 300],
+        "position": [-58000, 11350, 2700],
+        "color": "#2f6f4f",
+        "anchor": "center",
+        "rotation": [-0.25, 0, 0]
+      },
+      "as": "m18"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m18", "name": "Cane feed table" } },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 3500], "position": [-61500, 14350, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 3500], "position": [-54500, 14350, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 500,
+        "height": 1400,
+        "position": [-52800, 11350, 2500],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1050,
+        "height": 3400,
+        "position": [-52000, 5750, 5004.545454545454],
+        "color": "#44566b",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      },
+      "as": "m19"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m19", "name": "Cane leveller knives" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 450,
+        "height": 1500,
+        "position": [-52000, 8850, 5004.545454545454],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 160,
+        "height": 900,
+        "position": [-52000, 7850, 5004.545454545454],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1050,
+        "height": 3400,
+        "position": [-44000, 5750, 7448.181818181818],
+        "color": "#44566b",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      },
+      "as": "m20"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m20", "name": "Heavy-duty cane knives" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 450,
+        "height": 1500,
+        "position": [-44000, 8850, 7448.181818181818],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 160,
+        "height": 900,
+        "position": [-44000, 7850, 7448.181818181818],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [9000, 8000, 1200], "position": [-30000, 5750, 0], "color": "#9aa0a6", "anchor": "base-center" },
+      "as": "m21"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m21", "name": "SH-101 shredder foundation" } },
+    {
+      "command": "add_box",
+      "params": { "size": [500, 500, 3600], "position": [-33500, 2950, 1200], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [500, 500, 3600], "position": [-33500, 8550, 1200], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [500, 500, 3600], "position": [-26500, 2950, 1200], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [500, 500, 3600], "position": [-26500, 8550, 1200], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [8000, 6600, 300], "position": [-30000, 5750, 4800], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [4400, 4000, 2200], "position": [-30000, 5750, 5800], "color": "#44566b", "anchor": "center" },
+      "as": "m22"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m22", "name": "SH-101 heavy-duty shredder casing" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1900,
+        "height": 3800,
+        "position": [-30000, 5750, 6600],
+        "color": "#b03a2e",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      },
+      "as": "m23"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m23", "name": "SH-101 shredder rotor hood" } },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [3200, 3400, 2800],
+        "position": [-32300, 5750, 8700],
+        "color": "#2f6f4f",
+        "anchor": "center",
+        "rotation": [0, 0.5, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [2600, 3400, 2800],
+        "position": [-27300, 5750, 3900],
+        "color": "#2f6f4f",
+        "anchor": "center",
+        "rotation": [0, -0.6, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 250,
+        "height": 6200,
+        "position": [-30000, 10750, 6600],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [4400, 5600, 400], "position": [-30000, 13150, 4900], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 4700], "position": [-31900, 10750, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 4700], "position": [-31900, 15550, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 4700], "position": [-28100, 10750, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [400, 400, 4700], "position": [-28100, 15550, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1800, 1800, 1900], "position": [-30000, 11350, 6050], "color": "#1f5fa8", "anchor": "center" },
+      "as": "m24"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m24", "name": "Shredder gearbox" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1100,
+        "height": 2600,
+        "position": [-30000, 14150, 6400],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      },
+      "as": "m25"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m25", "name": "Shredder drive turbine" } },
+    {
+      "repeat": { "count": 30, "as": "i" },
+      "actions": [
+        { "command": "add_box", "params": { "size": [180, 160, 5000], "position": ["=2000+i*2000", -80, 7900], "color": "#a87f1c" } }
+      ]
+    },
+    {
+      "repeat": { "count": 30, "as": "i" },
+      "actions": [
+        { "command": "add_box", "params": { "size": [180, 160, 5000], "position": ["=2000+i*2000", 11580, 7900], "color": "#a87f1c" } }
+      ]
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [58000, 4500, 450], "position": [31000, 5750, 11400], "color": "#b8921f", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 1800, "height": 4200, "position": [66000, 13000, 0], "color": "#7a5c2e", "anchor": "base-center" },
+      "as": "m26"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m26", "name": "Press water tank" } },
+    {
+      "repeat": { "count": 6, "as": "i" },
+      "actions": [
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 420,
+            "height": 1300,
+            "position": ["=85000+i*4000", 57000, 2600],
+            "anchor": "base-center",
+            "color": "#1f5fa8"
+          }
+        },
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 480,
+            "height": 200,
+            "position": ["=85000+i*4000", 57000, 3900],
+            "anchor": "base-center",
+            "color": "#3d4a57"
+          }
+        },
+        {
+          "command": "add_box",
+          "params": { "size": [1000, 1100, 900], "position": ["=85000+i*4000", 58400, 1300], "rotation": [0.5, 0, 0], "color": "#b8c2cc" }
+        }
+      ]
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [27200, 1000, 50], "position": [97400, 59000, 1100], "color": "#26302b", "anchor": "center" },
+      "as": "m27"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m27", "name": "CV-701 wet sugar belt" } },
+    {
+      "command": "add_box",
+      "params": { "size": [27200, 1000, 40], "position": [97400, 59000, 750], "color": "#26302b", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [27200, 30, 300], "position": [97400, 58440, 1250], "color": "#2f6f4f", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [27200, 30, 300], "position": [97400, 59560, 1250], "color": "#2f6f4f", "anchor": "center" }
+    },
+    {
+      "repeat": { "count": 18, "as": "i" },
+      "actions": [
+        {
+          "command": "add_cylinder",
+          "params": { "radius": 70, "height": 1100, "position": ["=84500+i*1500", 59000, 1010], "axis": [0, 1, 0], "color": "#8a9aa8" }
+        }
+      ]
+    },
+    {
+      "repeat": { "count": 9, "as": "i" },
+      "actions": [
+        {
+          "command": "add_box",
+          "params": { "size": [150, 1300, 700], "position": ["=85500+i*3000", 59000, 0], "anchor": "base-center", "color": "#5a6b7a" }
+        }
+      ]
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 300,
+        "height": 1200,
+        "position": [111000, 59000, 820],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [800, 700, 700], "position": [110800, 60100, 820], "color": "#1f5fa8", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1200, 3000, 3600], "position": [111500, 59000, 3300], "color": "#44566b", "anchor": "center" },
+      "as": "m28"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m28", "name": "DR-701 dryer feed hood" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1300,
+        "height": 8000,
+        "position": [116000, 59000, 3600],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      },
+      "as": "m29"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m29", "name": "DR-701 rotary sugar dryer drum" } },
+    {
+      "command": "add_torus",
+      "params": { "ringRadius": 1400, "tubeRadius": 130, "position": [113800, 59000, 3600], "axis": [1, 0, 0], "color": "#3d4a57" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 330,
+        "height": 420,
+        "position": [113800, 58070, 1989],
+        "color": "#b03a2e",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 330,
+        "height": 420,
+        "position": [113800, 59930, 1989],
+        "color": "#b03a2e",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1200, 3200, 1650], "position": [113800, 59000, 0], "color": "#9aa0a6", "anchor": "base-center" }
+    },
+    {
+      "command": "add_torus",
+      "params": { "ringRadius": 1400, "tubeRadius": 130, "position": [118200, 59000, 3600], "axis": [1, 0, 0], "color": "#3d4a57" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 330,
+        "height": 420,
+        "position": [118200, 58070, 1989],
+        "color": "#b03a2e",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 330,
+        "height": 420,
+        "position": [118200, 59930, 1989],
+        "color": "#b03a2e",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1200, 3200, 1650], "position": [118200, 59000, 0], "color": "#9aa0a6", "anchor": "base-center" }
+    },
+    {
+      "command": "add_spur_gear",
+      "params": {
+        "module": 32,
+        "teeth": 96,
+        "faceWidth": 300,
+        "bore": 1290,
+        "position": [115850, 59000, 3600],
+        "rotation": [0, 1.5707963267948966, 0],
+        "color": "#c9a227",
+        "name": "DR-701 girth gear"
+      },
+      "as": "gg"
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 300,
+        "height": 360,
+        "position": [116000, 60300, 2300],
+        "color": "#c9a227",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [3200, 1400, 1800], "position": [116900, 60500, 0], "color": "#9aa0a6", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1200, 900, 900], "position": [116900, 60500, 2250], "color": "#1f5fa8", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 300,
+        "height": 900,
+        "position": [118000, 60500, 2250],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1400, 3000, 4400], "position": [120600, 59000, 2900], "color": "#44566b", "anchor": "center" },
+      "as": "m30"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m30", "name": "DR-701 dryer discharge hood" } },
+    {
+      "command": "add_box",
+      "params": { "size": [1600, 1600, 1600], "position": [111500, 61600, 0], "color": "#1f5fa8", "anchor": "base-center" },
+      "as": "m31"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m31", "name": "Dryer air heater and fan" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 450,
+        "height": 1500,
+        "position": [111500, 60700, 3200],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [0, 1, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 700, "height": 2600, "position": [120600, 61300, 5200], "color": "#b8c2cc", "anchor": "base-center" },
+      "as": "m32"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m32", "name": "Dust cyclone" } },
+    {
+      "command": "add_cone",
+      "params": {
+        "radius": 700,
+        "height": 1800,
+        "position": [120600, 61300, 5200],
+        "rotation": [3.141592653589793, 0, 0],
+        "color": "#b8c2cc"
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1200, 900, 37500], "position": [121000, 56800, 0], "color": "#b8c2cc", "anchor": "base-center" },
+      "as": "m33"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m33", "name": "EL-701 sugar bucket elevator" } },
+    {
+      "command": "add_box",
+      "params": { "size": [1900, 1400, 1500], "position": [121000, 56800, 37500], "color": "#1f5fa8", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [1200, 1200, 1600],
+        "position": [120800, 57800, 1500],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "rotation": [0.6, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [14340.153416194682, 1800, 2000],
+        "position": [126500.0, 61400.0, 36500],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "rotation": [0, 0, 0.6965239885843405]
+      },
+      "as": "m34"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m34", "name": "CV-702 silo feed gallery" } },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 1500, "height": 2600, "position": [132000, 66000, 34000], "color": "#b8c2cc", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [1200, 1000, 1000], "position": [100200, 50000, 1400], "color": "#1f5fa8", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 300,
+        "height": 900,
+        "position": [101200, 50000, 1400],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 6000, "height": 5000, "position": [-30000, 30000, 3000], "color": "#c98a3a", "anchor": "base-center" },
+      "as": "m35"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m35", "name": "CL-150 juice clarifier" } },
+    {
+      "command": "add_cone",
+      "params": {
+        "radius": 6000,
+        "height": 2300,
+        "position": [-30000, 30000, 3000],
+        "rotation": [3.141592653589793, 0, 0],
+        "color": "#c98a3a"
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-24250.0, 30000.0, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-25020.353928239478, 32875.0, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-27125.0, 34979.64607176052, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-30000.0, 35750.0, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-32875.0, 34979.64607176052, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-34979.64607176052, 32875.0, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-35750.0, 30000.0, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-34979.64607176052, 27125.0, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-32875.0, 25020.353928239478, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-30000.0, 24250.0, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [350, 350, 3000], "position": [-27125.0, 25020.353928239478, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [350, 350, 3000],
+        "position": [-25020.353928239478, 27124.999999999996, 0],
+        "color": "#5a6b7a",
+        "anchor": "base-center"
+      }
+    },
+    { "command": "add_torus", "params": { "ringRadius": 6100, "tubeRadius": 180, "position": [-30000, 30000, 7700], "color": "#3d4a57" } },
+    { "command": "add_cone", "params": { "radius": 6000, "height": 700, "position": [-30000, 30000, 8000], "color": "#c98a3a" } },
+    {
+      "command": "add_box",
+      "params": { "size": [12600, 1200, 300], "position": [-30000, 30000, 8250], "color": "#5a6b7a", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [12600, 40, 1000], "position": [-30000, 30620, 8900], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [12600, 40, 1000], "position": [-30000, 29380, 8900], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 500, "height": 1400, "position": [-30000, 30000, 8400], "color": "#1f5fa8", "anchor": "base-center" },
+      "as": "m36"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m36", "name": "Clarifier rake drive" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 250,
+        "height": 900,
+        "position": [-29100, 30000, 8700],
+        "color": "#1f5fa8",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 1400, "height": 3200, "position": [-30000, 30000, 10400], "color": "#c98a3a", "anchor": "base-center" },
+      "as": "m37"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m37", "name": "Flash tank" } },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 2000], "position": [-30900, 29100, 8400], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 2000], "position": [-30900, 30900, 8400], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 2000], "position": [-29100, 29100, 8400], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [200, 200, 2000], "position": [-29100, 30900, 8400], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [5200, 3400, 1700], "position": [-47000, 19000, 1300], "color": "#44566b", "anchor": "base-center" },
+      "as": "m38"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m38", "name": "RVF-161 filter trough" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1500,
+        "height": 4800,
+        "position": [-47000, 19000, 3100],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      },
+      "as": "m39"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m39", "name": "RVF-161 rotary vacuum mud filter drum" } },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-49300, 17600, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-49300, 20400, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-44700, 17600, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-44700, 20400, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 380,
+        "height": 500,
+        "position": [-44350, 19000, 3100],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [900, 900, 900], "position": [-43600, 19000, 3100], "color": "#1f5fa8", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [900, 1200, 2650], "position": [-43600, 19000, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [4800, 300, 200], "position": [-47000, 17350, 2600], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 300,
+        "height": 6400,
+        "position": [-47000, 16900, 1500],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 500, "height": 2600, "position": [-50400, 19900, 0], "color": "#b8c2cc", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [5200, 3400, 1700], "position": [-47000, 24500, 1300], "color": "#44566b", "anchor": "base-center" },
+      "as": "m40"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m40", "name": "RVF-162 filter trough" } },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 1500,
+        "height": 4800,
+        "position": [-47000, 24500, 3100],
+        "color": "#b8c2cc",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      },
+      "as": "m41"
+    },
+    { "command": "set_entity_name", "params": { "id": "$m41", "name": "RVF-162 rotary vacuum mud filter drum" } },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-49300, 23100, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-49300, 25900, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-44700, 23100, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [250, 250, 1300], "position": [-44700, 25900, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 380,
+        "height": 500,
+        "position": [-44350, 24500, 3100],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [900, 900, 900], "position": [-43600, 24500, 3100], "color": "#1f5fa8", "anchor": "center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [900, 1200, 2650], "position": [-43600, 24500, 0], "color": "#5a6b7a", "anchor": "base-center" }
+    },
+    {
+      "command": "add_box",
+      "params": { "size": [4800, 300, 200], "position": [-47000, 22850, 2600], "color": "#c9a227", "anchor": "center" }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 300,
+        "height": 6400,
+        "position": [-47000, 22400, 1500],
+        "color": "#3d4a57",
+        "anchor": "center",
+        "axis": [1, 0, 0]
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": { "radius": 500, "height": 2600, "position": [-50400, 25400, 0], "color": "#b8c2cc", "anchor": "base-center" }
     }
   ]
 }
