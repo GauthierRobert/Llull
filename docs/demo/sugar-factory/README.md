@@ -75,4 +75,3 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
 - The support posts and brackets are placed to satisfy the span table; they are not designed members.
 - The crystalliser and the silo are equipment only (massecuite and sugar handling are not piping). The HP steam line is outside
   the pipe stress model; boiler feed water, condensate and bagasse handling are not modelled.
-- The 2D plan view of the whole plant is slow to open on a machine without a GPU (software rendering).
