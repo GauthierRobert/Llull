@@ -918,7 +918,7 @@
                   "boltCircle": 431.8,
                   "boltCount": 16,
                   "boltDiameter": 31.75,
-                  "raisedFaceDiameter": 323.8,
+                  "raisedFaceDiameter": 323.9,
                   "lengthThroughHub": 152.4,
                   "provenance": {
                     "sourceId": "DEMO",
@@ -7077,21 +7077,15 @@
     },
     {
       "command": "add_steel_member",
-      "params": {
-        "profile": "HEB200",
-        "role": "column",
-        "start": [96900, -6000, 0],
-        "end": [96900, -6000, 7290],
-        "note": "pipe support post"
-      }
+      "params": { "profile": "HEB200", "role": "column", "start": [96000, 0, 0], "end": [96000, 0, 7290], "note": "pipe support post" }
     },
     {
       "command": "add_steel_member",
       "params": {
         "profile": "IPE160",
         "role": "beam",
-        "start": [96900, -6450, 7370],
-        "end": [96900, -5550, 7370],
+        "start": [96000, -450, 7370],
+        "end": [96000, 450, 7370],
         "note": "pipe support beam"
       }
     },
@@ -7100,8 +7094,32 @@
       "params": {
         "profile": "HEB200",
         "role": "column",
-        "start": [98000, -5250, 0],
-        "end": [98000, -5250, 19000],
+        "start": [94000, -2000, 0],
+        "end": [94000, -2000, 7290],
+        "note": "pipe support post"
+      }
+    },
+    {
+      "command": "add_steel_member",
+      "params": {
+        "profile": "IPE160",
+        "role": "beam",
+        "start": [93550, -2000, 7370],
+        "end": [94450, -2000, 7370],
+        "note": "pipe support beam"
+      }
+    },
+    {
+      "command": "add_steel_member",
+      "params": { "profile": "HEB200", "role": "column", "start": [98000, 750, 0], "end": [98000, 750, 19000], "note": "pipe support post" }
+    },
+    {
+      "command": "add_steel_member",
+      "params": {
+        "profile": "HEB200",
+        "role": "column",
+        "start": [98000, -5000, 0],
+        "end": [98000, -5000, 19700],
         "note": "pipe support post"
       }
     }

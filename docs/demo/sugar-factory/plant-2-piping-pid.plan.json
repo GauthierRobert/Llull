@@ -2338,21 +2338,35 @@
         "to": { "portId": "TG-801:HS" },
         "legs": [
           { "direction": "-X", "length": 2000 },
+          { "direction": "+Y", "length": 6000 },
           { "direction": "-Z", "length": 12200 },
-          { "direction": "-X", "length": 4000 }
+          { "direction": "-X", "length": 4000 },
+          { "direction": "-Y", "length": 6000 }
         ]
       },
       "as": "rhs"
     },
-    { "command": "add_pipe_support", "params": { "runId": "$rhs", "at": [[96900, -6000, 7800]], "type": "shoe", "maxReach": 500 } },
-    { "command": "add_pipe_support", "params": { "runId": "$rhs", "at": [[98000, -6000, 14000]], "type": "anchor", "maxReach": 900 } },
     {
       "command": "add_pipe_support",
       "params": {
         "runId": "$rhs",
         "at": [
-          [98000, -6000, 17200],
-          [98000, -6000, 10800]
+          [96000, 0, 7800],
+          [94000, -2000, 7800]
+        ],
+        "type": "shoe",
+        "maxReach": 500
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rhs", "at": [[98000, -5000, 20000]], "type": "shoe", "maxReach": 500 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rhs", "at": [[98000, 0, 14000]], "type": "anchor", "maxReach": 900 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rhs",
+        "at": [
+          [98000, 0, 17200],
+          [98000, 0, 10800]
         ],
         "type": "guide",
         "maxReach": 900
@@ -2471,6 +2485,41 @@
     { "command": "add_stress_restraint", "params": { "modelId": "$sm", "at": { "pipeId": "$br2", "atMm": 24933 }, "kind": "anchor" } },
     { "command": "set_stress_load_cases", "params": { "modelId": "$sm", "preset": "b31.3-default" } },
     { "command": "check_pipe_stress", "params": { "modelId": "$sm" } },
+    {
+      "command": "create_stress_model",
+      "params": {
+        "name": "HP steam HS-8001 boiler to turbo-alternator",
+        "pipeIds": ["$rhs"],
+        "rule": "B31.3-2022",
+        "frictionCoefficient": 0.1
+      },
+      "as": "sm2"
+    },
+    {
+      "command": "set_pipe_operating_conditions",
+      "params": {
+        "modelId": "$sm2",
+        "installTempC": 21,
+        "temperatures": [{ "name": "T1", "tempC": 420 }],
+        "pressures": [{ "name": "P1", "gaugeBar": 45 }],
+        "fluidDensityKgM3": 15,
+        "corrosionAllowanceMm": 1.5,
+        "millTolerancePct": 12.5,
+        "cycles": 7000,
+        "insulation": { "thicknessMm": 120, "densityKgM3": 100 },
+        "material": {
+          "youngsModulusMPa": 203000,
+          "ShMPa": 79,
+          "ScMPa": 137.9,
+          "thermal": { "table": "carbon-steel-c1" },
+          "ferrousLowStrength": true
+        }
+      }
+    },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm2", "at": { "pipeId": "$rhs", "atMm": 0 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm2", "at": { "pipeId": "$rhs", "atMm": 33000 }, "kind": "anchor" } },
+    { "command": "set_stress_load_cases", "params": { "modelId": "$sm2", "preset": "b31.3-default" } },
+    { "command": "check_pipe_stress", "params": { "modelId": "$sm2" } },
     { "command": "check_piping", "params": {} },
     {
       "command": "create_pid_sheet",

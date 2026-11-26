@@ -1,6 +1,6 @@
 import { resetStore } from '../helpers/componentEntities';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { useLayoutStore, useStore } from '@ui/store';
 import { useScanViewStore } from '@ui/store/scanViewStore';
 import { ScanPanel } from '@ui/panels/scan/ScanPanel';
@@ -15,6 +15,10 @@ function attachCloud(): string {
   if (id === undefined) throw new Error(`attach failed: ${result.summary}`);
   return id;
 }
+
+// The shared unmount of tests/setupDom.ts reaches only the first file of a worker when several workers run (vitest evaluates
+// the setup file once per worker there): this suite queries by text, so it unmounts its own renders.
+afterEach(cleanup);
 
 describe('ScanPanel', () => {
   beforeEach(() => {
