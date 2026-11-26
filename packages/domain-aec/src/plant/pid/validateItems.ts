@@ -133,8 +133,13 @@ function kindErrors(
       .filter((field) => item[field] !== undefined && typeof item[field] !== 'string')
       .map((field) => `${path}.${field} must be a string`);
   switch (item['kind']) {
-    case 'equipment':
-      return reference('parentId', ['equipment'], true);
+    case 'equipment': {
+      const size = item['symbolSize'];
+      const sized =
+        size === undefined ||
+        (Array.isArray(size) && size.length === 2 && size.every((side) => typeof side === 'number' && side >= 5 && side <= 2000));
+      return [...reference('parentId', ['equipment'], true), ...(sized ? [] : [`${path}.symbolSize must be two lengths from 5 to 2000`])];
+    }
     case 'nozzle':
       return [
         ...reference('equipmentId', ['equipment']),

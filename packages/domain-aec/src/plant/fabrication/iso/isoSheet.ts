@@ -145,6 +145,12 @@ function tablePrimitives(tables: readonly IsoTable[], left: number, top: number)
   return out;
 }
 
+/** Title block value cut to the width of its cell (3.2 mm text, about 0.55 em per character), ending in an ellipsis. */
+function fitCell(value: string, cellWidth: number): string {
+  const room = Math.max(4, Math.floor((cellWidth - 4) / (3.2 * 0.55)));
+  return value.length > room ? `${value.slice(0, room - 1)}…` : value;
+}
+
 export function titleBlock(width: number, lines: ReadonlyArray<ReadonlyArray<readonly [string, string]>>): IsoPrimitive[] {
   const blockWidth = Math.min(180, width - 30);
   const x = width - 10 - blockWidth;
@@ -154,7 +160,7 @@ export function titleBlock(width: number, lines: ReadonlyArray<ReadonlyArray<rea
     const y = 52 - 14 * row;
     if (row > 0) out.push({ t: 'line', layer: 'ISO-FRAME', a: [x, y], b: [x + blockWidth, y] });
     cells.forEach(([label, value], at) => {
-      out.push(text([x + at * column + 2, y - 3.5], 2, label), text([x + at * column + 2, y - 9], 3.2, value));
+      out.push(text([x + at * column + 2, y - 3.5], 2, label), text([x + at * column + 2, y - 9], 3.2, fitCell(value, column)));
     });
   });
   for (const at of [1, 2]) out.push({ t: 'line', layer: 'ISO-FRAME', a: [x + at * column, 10], b: [x + at * column, 52] });

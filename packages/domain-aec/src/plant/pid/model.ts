@@ -78,6 +78,8 @@ export interface PidEquipment extends PidItemBase {
   readonly kind: 'equipment';
   /** Sub-equipment: the equipment it sits in. */
   readonly parentId?: string;
+  /** Symbol box [width, height] in sheet mm when the class box is replaced (a long diffuser, a wide header vessel). */
+  readonly symbolSize?: Vec2;
 }
 
 export interface PidNozzle extends PidItemBase {

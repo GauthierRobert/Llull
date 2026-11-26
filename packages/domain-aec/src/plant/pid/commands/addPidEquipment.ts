@@ -1,6 +1,6 @@
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { equipmentClass } from '../authoring/classes';
+import { equipmentClass, equipmentHalfExtents } from '../authoring/classes';
 import { makeNozzle, nozzleOffset, nozzleParam, portOf, sideKey } from '../authoring/nozzles';
 import { Draft, checkTag, fail, findSheet, isFail, refuse, mintFree } from '../authoring/refs';
 import { attributesParam, toValues } from '../authoring/values';
@@ -9,8 +9,8 @@ import { getPid, withPid } from '../state';
 
 /**
  * @affects plant.pid (one equipment item and its nozzles)
- * @invariant tag unique in the document; nozzle sub-tags unique per equipment; ports lie on the symbol box (half extents by class) rotated about the centre
- * @failure sheet unknown -> PID_SHEET_NOT_FOUND; class not in the library -> PID_CLASS_UNKNOWN (close names); tag used -> PID_TAG_DUPLICATE; bad tag -> PID_TAG_FORMAT; repeated sub-tag -> PID_TAG_DUPLICATE; document unchanged
+ * @invariant tag unique in the document; nozzle sub-tags unique per equipment; ports lie on the symbol box (half extents by class, or symbolSize / 2) rotated about the centre
+ * @failure sheet unknown -> PID_SHEET_NOT_FOUND; class not in the library -> PID_CLASS_UNKNOWN (close names); tag used -> PID_TAG_DUPLICATE; bad tag -> PID_TAG_FORMAT; symbolSize outside 5..2000 mm -> PID_PARAM_INVALID; repeated sub-tag -> PID_TAG_DUPLICATE; document unchanged
  */
 export const addPidEquipment = defineCommand({
   name: 'add_pid_equipment',
@@ -19,7 +19,7 @@ export const addPidEquipment = defineCommand({
     'ProcessColumn, CentrifugalPump, ReciprocatingPump, RotaryPump, PlateHeatExchanger, TubularHeatExchanger, Compressor, Blower, Fan, Filter, Agitator, Mixer ...). ' +
     '`at` is the symbol centre in sheet millimetres (+y up). Each nozzle is placed on a side (left, right, top = +y, bottom = -y) or at an offset from the centre; ' +
     'its port is the connection point lines attach to. Returns affected = [equipment id, nozzle ids in order]; the equipment id is affected[0]. data = { equipment, nozzles: ' +
-    '[{ id, subTag, port }] }. Refusals (document unchanged): PID_SHEET_NOT_FOUND, PID_CLASS_UNKNOWN (close names listed), PID_TAG_DUPLICATE, PID_TAG_FORMAT. ' +
+    '[{ id, subTag, port }] }. `symbolSize` [width, height] replaces the class box for a long or wide item. Refusals (document unchanged): PID_SHEET_NOT_FOUND, PID_CLASS_UNKNOWN (close names listed), PID_TAG_DUPLICATE, PID_TAG_FORMAT, PID_PARAM_INVALID. ' +
     'Next: add_pid_line from {tag, nozzle}.',
   params: z.object({
     sheet: z.string().min(1).describe('Sheet number (e.g. "PID-001") or sheet id (the alias of create_pid_sheet).'),
@@ -30,6 +30,9 @@ export const addPidEquipment = defineCommand({
       .number()
       .optional()
       .describe('Rotation in degrees counter-clockwise about the centre (default 0); nozzle ports rotate with it.'),
+    symbolSize: vec2(
+      'Symbol box [width, height] in sheet millimetres, each from 5 to 2000, instead of the box of the class (e.g. [1100, 40] for a long diffuser): side nozzles sit on this box and the built-in symbol is drawn at this size (a project symbol from define_pid_symbol is not used then).',
+    ).optional(),
     attributes: attributesParam,
     nozzles: z.array(nozzleParam).optional().describe('Nozzles to create with the equipment: { subTag, side, dn?, access? }.'),
   }),
@@ -42,6 +45,13 @@ export const addPidEquipment = defineCommand({
     if (isFail(dexpiClass)) return refuse(doc, name, dexpiClass);
     const tag = checkTag(pid, params.tag, 'equipment', 'tag');
     if (isFail(tag)) return refuse(doc, name, tag);
+    const size = params.symbolSize;
+    if (size !== undefined && !size.every((side) => Number.isFinite(side) && side >= 5 && side <= 2000))
+      return refuse(
+        doc,
+        name,
+        fail('PID_PARAM_INVALID', `symbolSize [${size.join(', ')}] must be two lengths from 5 to 2000 mm`, ['symbolSize']),
+      );
     const specs = params.nozzles ?? [];
     const repeated = specs.find((spec, i) => specs.findIndex((other) => other.subTag === spec.subTag) !== i);
     if (repeated !== undefined)
@@ -55,6 +65,7 @@ export const addPidEquipment = defineCommand({
       dexpiClass,
       tag,
       attributes: toValues(params.attributes),
+      ...(size === undefined ? {} : { symbolSize: size }),
     };
     const perSide = new Map<string, number>();
     for (const spec of specs) perSide.set(sideKey(spec.side), (perSide.get(sideKey(spec.side)) ?? 0) + 1);
@@ -67,7 +78,7 @@ export const addPidEquipment = defineCommand({
         mintFree(pid),
         equipment,
         spec,
-        portOf(equipment, nozzleOffset(dexpiClass, spec.side, index, perSide.get(key) ?? 1)),
+        portOf(equipment, nozzleOffset(equipmentHalfExtents(equipment), spec.side, index, perSide.get(key) ?? 1)),
       );
     });
     const draft = new Draft(pid);

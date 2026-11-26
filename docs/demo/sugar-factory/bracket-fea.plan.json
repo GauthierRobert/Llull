@@ -1,1 +1,104 @@
-{"actions": [{"command": "set_units", "params": {"units": "mm"}}, {"command": "add_box", "as": "web", "params": {"size": [800, 25, 395], "position": [0, 57.5, 0], "anchor": "min", "color": "#8fa3b5"}}, {"command": "add_box", "as": "top", "params": {"size": [800, 140, 25], "position": [0, 0, 395], "anchor": "min"}}, {"command": "add_box", "as": "back", "params": {"size": [25, 140, 420], "position": [-25, 0, 0], "anchor": "min"}}, {"command": "add_box", "as": "cut", "params": {"size": [1500, 60, 1500], "position": [760, 70, -430], "rotation": [0, -0.4636, 0], "anchor": "center"}}, {"command": "boolean", "as": "w2", "params": {"op": "subtract", "a": "$web", "b": "$cut"}}, {"command": "boolean", "as": "br", "params": {"op": "union", "a": "$w2", "b": ["$top", "$back"]}}, {"command": "set_entity_name", "params": {"id": "$br", "name": "BK - ring platform bracket (welded T, S355)"}}, {"command": "define_material_record", "params": {"id": "s355", "designation": "S355 structural steel", "specs": [], "licence": "company-proprietary", "exportMarking": {"regime": "none"}}}, {"command": "set_material_property", "params": {"material": "s355", "property": "E", "value": 210000, "unit": "MPa", "basis": "company", "source": {"citation": "EN 10025-2 S355 nominal elastic constants (demo input)"}, "preferred": true}}, {"command": "set_material_property", "params": {"material": "s355", "property": "nu", "value": 0.3, "unit": "-", "basis": "company", "source": {"citation": "EN 10025-2 S355 nominal elastic constants (demo input)"}, "preferred": true}}, {"command": "set_material_property", "params": {"material": "s355", "property": "density", "value": 7.85, "unit": "g/cm^3", "basis": "company", "source": {"citation": "EN 10025-2 S355 nominal elastic constants (demo input)"}, "preferred": true}}, {"command": "create_material", "params": {"name": "s355", "density": 0.00785, "color": "#8fa3b5"}}, {"command": "assign_material", "params": {"materialName": "s355", "entityIds": ["$br"]}}, {"command": "create_analysis", "as": "an", "params": {"name": "Platform bracket, grating load + 10 kN post load", "analysisType": "static", "unitSystem": "N-mm-t-s"}}, {"command": "set_part_idealization", "params": {"analysisId": "$an", "entityId": "$br", "idealization": "solid"}}, {"command": "set_mesh_controls", "params": {"analysisId": "$an", "order": 2, "globalSize": 10, "minSize": 5}}, {"command": "add_fea_constraint", "params": {"analysisId": "$an", "name": "back plate welded to the vessel shell", "kind": "fixed", "target": {"entityId": "$br", "facesNear": [[-25, 70, 210]]}}}, {"command": "add_fea_load", "params": {"analysisId": "$an", "name": "grating reaction on the top flange", "kind": "pressure", "magnitude": 0.06, "target": {"entityId": "$br", "facesNear": [[400, 70, 420]]}}}, {"command": "add_fea_load", "params": {"analysisId": "$an", "name": "handrail post load at the tip", "kind": "force", "vector": [0, 0, -10000], "target": {"entityId": "$br", "edgesNear": [[800, 70, 420]]}}}]}
+{
+  "actions": [
+    { "command": "set_units", "params": { "units": "mm" } },
+    {
+      "command": "add_box",
+      "as": "web",
+      "params": { "size": [800, 25, 395], "position": [0, 57.5, 0], "anchor": "min", "color": "#8fa3b5" }
+    },
+    { "command": "add_box", "as": "top", "params": { "size": [800, 140, 25], "position": [0, 0, 395], "anchor": "min" } },
+    { "command": "add_box", "as": "back", "params": { "size": [25, 140, 420], "position": [-25, 0, 0], "anchor": "min" } },
+    {
+      "command": "add_box",
+      "as": "cut",
+      "params": { "size": [1500, 60, 1500], "position": [760, 70, -430], "rotation": [0, -0.4636, 0], "anchor": "center" }
+    },
+    { "command": "boolean", "as": "w2", "params": { "op": "subtract", "a": "$web", "b": "$cut" } },
+    { "command": "boolean", "as": "br", "params": { "op": "union", "a": "$w2", "b": ["$top", "$back"] } },
+    { "command": "set_entity_name", "params": { "id": "$br", "name": "BK - ring platform bracket (welded T, S355)" } },
+    {
+      "command": "define_material_record",
+      "params": {
+        "id": "s355",
+        "designation": "S355 structural steel",
+        "specs": [],
+        "licence": "company-proprietary",
+        "exportMarking": { "regime": "none" }
+      }
+    },
+    {
+      "command": "set_material_property",
+      "params": {
+        "material": "s355",
+        "property": "E",
+        "value": 210000,
+        "unit": "MPa",
+        "basis": "company",
+        "source": { "citation": "EN 10025-2 S355 nominal elastic constants (demo input)" },
+        "preferred": true
+      }
+    },
+    {
+      "command": "set_material_property",
+      "params": {
+        "material": "s355",
+        "property": "nu",
+        "value": 0.3,
+        "unit": "-",
+        "basis": "company",
+        "source": { "citation": "EN 10025-2 S355 nominal elastic constants (demo input)" },
+        "preferred": true
+      }
+    },
+    {
+      "command": "set_material_property",
+      "params": {
+        "material": "s355",
+        "property": "density",
+        "value": 7.85,
+        "unit": "g/cm^3",
+        "basis": "company",
+        "source": { "citation": "EN 10025-2 S355 nominal elastic constants (demo input)" },
+        "preferred": true
+      }
+    },
+    { "command": "create_material", "params": { "name": "s355", "density": 0.00785, "color": "#8fa3b5" } },
+    { "command": "assign_material", "params": { "materialName": "s355", "entityIds": ["$br"] } },
+    {
+      "command": "create_analysis",
+      "as": "an",
+      "params": { "name": "Platform bracket, grating load + 10 kN post load", "analysisType": "static", "unitSystem": "N-mm-t-s" }
+    },
+    { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$br", "idealization": "solid" } },
+    { "command": "set_mesh_controls", "params": { "analysisId": "$an", "order": 2, "globalSize": 10, "minSize": 5 } },
+    {
+      "command": "add_fea_constraint",
+      "params": {
+        "analysisId": "$an",
+        "name": "back plate welded to the vessel shell",
+        "kind": "fixed",
+        "target": { "entityId": "$br", "facesNear": [[-25, 70, 210]] }
+      }
+    },
+    {
+      "command": "add_fea_load",
+      "params": {
+        "analysisId": "$an",
+        "name": "grating reaction on the top flange",
+        "kind": "pressure",
+        "magnitude": 0.06,
+        "target": { "entityId": "$br", "facesNear": [[400, 70, 420]] }
+      }
+    },
+    {
+      "command": "add_fea_load",
+      "params": {
+        "analysisId": "$an",
+        "name": "handrail post load at the tip",
+        "kind": "force",
+        "vector": [0, 0, -10000],
+        "target": { "entityId": "$br", "edgesNear": [[800, 70, 420]] }
+      }
+    }
+  ]
+}

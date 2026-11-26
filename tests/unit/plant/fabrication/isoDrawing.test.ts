@@ -10,6 +10,7 @@ import { lineAnnotations, mmText, roundMm, runDimensions } from '@aec/plant/fabr
 import { buildIsoGraph, classifyDirection, type IsoGraph } from '@aec/plant/fabrication/iso/isoGraph';
 import { MIN_DRAWN_MM, layoutIso } from '@aec/plant/fabrication/iso/isoLayout';
 import { TRUE_ISO_SCALE, axisAngles, depthOf, projectIso } from '@aec/plant/fabrication/iso/isoProjection';
+import { titleBlock } from '@aec/plant/fabrication/iso/isoSheet';
 import { fixturePcf } from './fabricationFixtures';
 
 const pipe = (id: string, a: Vec3, b: Vec3): NetworkComponent => ({
@@ -413,5 +414,30 @@ describe('not-to-scale layout', () => {
       expect([crossing.a, crossing.b]).toContain(crossing.farther);
     }
     expect(JSON.stringify(layoutIso(buildIsoGraph(chain(ring)), 'up_right', AREA))).toBe(JSON.stringify(layout));
+  });
+});
+
+describe('title block', () => {
+  const values = (primitives: ReturnType<typeof titleBlock>): string[] =>
+    primitives.flatMap((primitive) => (primitive.t === 'text' ? [primitive.text] : []));
+
+  it('cuts a value longer than its cell and ends it in an ellipsis, short values stay', () => {
+    const long = 'Cane sugar factory 13 000 TCD - diffuser extraction and evaporation';
+    const texts = values(
+      titleBlock(594, [
+        [
+          ['PROJECT', long],
+          ['LINE', 'HS-8001-250'],
+          ['SPEC', 'SUGHP'],
+        ],
+      ]),
+    );
+    const cut = texts.find((value) => value.startsWith('Cane sugar'));
+    expect(cut).toBeDefined();
+    expect(cut).not.toBe(long);
+    expect(cut?.endsWith('…')).toBe(true);
+    expect((cut?.length ?? 0) * 3.2 * 0.55).toBeLessThanOrEqual(60 - 4);
+    expect(texts).toContain('HS-8001-250');
+    expect(texts).toContain('SUGHP');
   });
 });

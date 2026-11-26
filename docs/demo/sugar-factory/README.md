@@ -5,16 +5,18 @@ layout are assumptions of the author, and every result llull reports stays "revi
 
 ## Files
 
-| File                           | What it builds                                                                                                |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `plant.plan.json`              | The plant: 861 plan steps, about 6,500 entities                                                               |
-| `bracket-fea.plan.json`        | A welded platform bracket with a static analysis set-up (mesh and solve are separate commands, see below)     |
-| `bracket-topology.plan.json`   | A design space with a topology study for the same kind of bracket                                             |
+| File                                | What it builds                                                                                            |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `plant-1-equipment-steel.plan.json` | Stage 1: catalogue and specs, equipment, structures, platforms (584 plan steps)                           |
+| `plant-2-piping-pid.plan.json`      | Stage 2, applied on the stage 1 document: routed piping, supports, stress model, P&IDs (463 plan steps)   |
+| `bracket-fea.plan.json`             | A welded platform bracket with a static analysis set-up (mesh and solve are separate commands, see below) |
+| `bracket-topology.plan.json`        | A design space with a topology study for the same kind of bracket                                         |
 
 ## Run it
 
 ```bash
-node server/bin/llull.cjs run docs/demo/sugar-factory/plant.plan.json --doc sugar.llull.json   # or --app with the desktop app open
+node server/bin/llull.cjs run docs/demo/sugar-factory/plant-1-equipment-steel.plan.json --doc sugar.llull.json   # or --app with the desktop app open
+node server/bin/llull.cjs run docs/demo/sugar-factory/plant-2-piping-pid.plan.json --doc sugar.llull.json       # a plan holds at most 1000 steps, hence two files
 node server/bin/llull.cjs check_clashes --doc sugar.llull.json
 node server/bin/llull.cjs check_steel_members --doc sugar.llull.json
 node server/bin/llull.cjs check_pid --doc sugar.llull.json
@@ -33,7 +35,8 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
 ## What is in the plant
 
 - Cane diffuser `DF-101` (62 m x 11.5 m, 1,500 t operating weight assumed) on a braced steel support with five column lines,
-  14 stage hoppers, operating platform and stair, lifting drum, two dewatering mills, feed and bagasse conveyors.
+  14 stage hoppers, operating platform and stair, lifting drum; two dewatering mills (housings, rolls, drives, chutes) and belt
+  conveyors with stringers, trestles, idlers and head drives, a cane shredder.
 - 14 stage recirculation loops routed on the spec: suction from the hopper nozzle with a gate valve, pump, discharge riser with a
   gate and a check valve up to the distribution pipe over the bed; posts, shoes, riser anchors and guides.
 - Five-effect evaporation station: parametric vessels with nozzles, ring platforms, vapour ducts, three juice heaters, barometric
@@ -45,26 +48,31 @@ node server/bin/llull.cjs render_fea_results analysisId=an-15.1 field=von_mises 
 - Boiling house: steel portal hall sized with `design_portal_frames` and `design_footings`, 10 t crane runway, four vacuum pans
   fed from the syrup tank by a pan feed pump and a supported DN100 header with a gate valve at each pan; molasses header from
   the six centrifugals to a pump and on to the molasses tank.
-- P&IDs `PID-201` (diffuser recirculation), `PID-301` and `PID-302` (evaporation), `PID-401` (pan feed), `PID-501` (molasses)
-  whose tags and line numbers match the 3D model.
+- Steam cycle: LP steam header from the turbo-alternator exhaust to the pipe rack on T-posts; HP steam line `HS-8001-250` from the
+  boiler to the turbine on the butt-weld spec `SUGHP` (schedule 80, Class 600 flange at the turbine nozzle) with a riser anchor
+  and guides.
+- P&IDs `PID-201` (diffuser recirculation, the diffuser drawn with `symbolSize`), `PID-301` and `PID-302` (evaporation),
+  `PID-401` (pan feed), `PID-501` (molasses), `PID-801` (steam cycle) whose tags and line numbers match the 3D model.
 
 ## State of the checks (as built by the plan)
 
-| Check                  | Result                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------- |
-| `check_clashes`        | no clashes                                                                               |
-| `check_steel_members`  | all analysed members pass (max 0.95); platform brackets and posts are not analysed       |
-| `check_pipe_supports`  | 74 of 74 pipes pass the span table                                                       |
-| `check_pipe_stress`    | pass (worst ratio 0.77)                                                                  |
-| `check_pid`            | 0 errors, 3 warnings (continuation lines after an off-page connector carry no number)    |
-| `check_pid_3d`         | 101 items matched; 5 objects (boiler, turbo-alternator, crystalliser, silo, barometric leg) have no P&ID |
+| Check                 | Result                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `check_clashes`       | no clashes                                                                            |
+| `check_steel_members` | all analysed members pass (max 0.95); platform brackets and posts are not analysed    |
+| `check_pipe_supports` | 75 of 75 pipes pass the span table                                                    |
+| `check_pipe_stress`   | pass (worst ratio 0.76)                                                               |
+| `check_pid`           | 0 errors, 4 warnings (continuation lines after an off-page connector carry no number) |
+| `check_pid_3d`        | pass: 107 items matched, nothing unmatched on either side                             |
 
 ## Known limits
 
-- The piping catalogue `sugar-demo-cs150` inside the plan was typed in by the author from published ASME tables. 69 of its 202
-  values were compared with the sourced tables of `docs/plant/*/validation/data` and are equal; the other 133 have no sourced
-  reference in the repository and stay unverified. Replace it with the project catalogue before using any quantity or dimension.
-- The mills, conveyors, boiler, silo and stack are plain solids, and the vapour ducts are simple DN600 pipe runs without fittings.
+- The piping catalogue `sugar-demo-cs150` inside the plan was typed in by the author from published ASME tables. 69 of its
+  values were compared with the sourced tables of `docs/plant/*/validation/data` and are equal; the others (including the Class 600
+  NPS 10 flange set of `SUGHP`) have no sourced reference in the repository and stay unverified. Replace it with the project catalogue before using any quantity or dimension.
+- The boiler, turbo-alternator, silo and stack are plain solids; the mills and conveyors are built from plain solids (no
+  mechanical design), and the vapour ducts are simple DN600 pipe runs without fittings.
 - The support posts and brackets are placed to satisfy the span table; they are not designed members.
-- Boiler, turbo-alternator, crystalliser and silo are equipment only: no piping and no P&ID (HP steam is outside the 200 degC
-  limit of the demo spec; massecuite and sugar handling are not piping).
+- The crystalliser and the silo are equipment only (massecuite and sugar handling are not piping). The HP steam line is outside
+  the pipe stress model; boiler feed water, condensate and bagasse handling are not modelled.
+- The 2D plan view of the whole plant is slow to open on a machine without a GPU (software rendering).
