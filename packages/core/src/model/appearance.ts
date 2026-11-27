@@ -7,7 +7,7 @@
 /** Texture file formats `import_texture` reads (the header is parsed for the size; pixels are decoded by the renderers). */
 export const TEXTURE_FORMATS = ['png', 'jpeg', 'hdr'] as const;
 
-export type TextureFormat = (typeof TEXTURE_FORMATS)[number];
+type TextureFormat = (typeof TEXTURE_FORMATS)[number];
 
 /** `srgb` = colour data (base colour, emission); `linear` = data maps (roughness, metalness, normal) and HDR radiance. */
 export type TextureColorSpace = 'srgb' | 'linear';

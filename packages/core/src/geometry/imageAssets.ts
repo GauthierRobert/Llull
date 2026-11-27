@@ -11,3 +11,14 @@ export interface ImageAssetPort {
   /** Store `bytes` (sha256 -> key); writing the same bytes twice is a no-op. Returns the key. */
   writeImage(bytes: Uint8Array): string;
 }
+
+let installed: ImageAssetPort | null = null;
+
+/** Install (or clear with null) the host's image asset store; `defaultContext` hands it to commands as `ctx.imageAssets`. */
+export function setImageAssetPort(port: ImageAssetPort | null): void {
+  installed = port;
+}
+
+export function getImageAssetPort(): ImageAssetPort | null {
+  return installed;
+}

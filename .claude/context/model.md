@@ -87,6 +87,7 @@ interface CadDocument {
   nextStepNumber?: number;                      // next step-<n>; absent ⇒ 1; never reused
   configurations: Record<string, Configuration>;
   materials: Record<string, Material>;
+  appearance?: AppearanceModel;                 // RV1: textures (TextureRecord: key = sha256 in the host image asset store, never the bytes) + scene environment
   recipes: Record<string, Recipe>;
   components: Record<string, Component>;
   constraints: Record<string, Constraint>;      constraintOrder: string[];
@@ -108,6 +109,10 @@ interface FeatureStep {
 interface Layer { readonly id: string; name: string; visible: boolean; locked: boolean; color?: string }  // locked: `execute` refuses any command that adds, changes or removes an entity on it, or moves one onto/off it (LAYER_LOCKED, commands/layerLock.ts); plugin-derived entities are exempt by design (the lock binds user-authored entities: editing a wall whose derived mesh sits on a locked layer is allowed); a nested execute is judged by the enclosing command on its final result
 interface CameraState { target: Vec3; azimuth: number; polar: number; distance: number } // spherical orbit
 const DEFAULT_LAYER_ID = 'layer-default';
+// Appearance (RV1 RV-M1, model/appearance.ts): Material.appearance / BaseEntity.appearance (visual override; mass keeps materialId) = layered
+//   metal-roughness channels, each a value or a texture id; MeshData.uvs / normals optional (geometry/meshUvs.ts derives box-projected / area-weighted
+//   when absent); library model/appearanceLibrary.ts; commands import_texture, set_material_appearance, apply_appearance, list_appearances,
+//   set_environment (commands/appearance/, toolset materials); image bytes via ctx.imageAssets (GET /assets/image/<key> on the backend).
 createEmptyDocument(): CadDocument   // one default layer 'Layer 0', every table empty
 ```
 

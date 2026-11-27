@@ -85,6 +85,7 @@ const PIPING_TOOLS = words('add_pipe_run add_pipe_support add_cable_tray check_p
 /** Core material records, properties and libraries (08 MAT, PHY-01); the material-selection plugin adds its commands to the same toolset. */
 const MATERIALS_CORE_TOOLS = words(
   'create_material assign_material define_material_record set_material_property get_material get_material_allowable convert_quantity import_material_library delete_material_library resolve_material_libraries diff_material_libraries set_export_marking check_materials register_material_library ' +
+    'import_texture set_material_appearance apply_appearance list_appearances set_environment ' +
     'define_property_model delete_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model delete_material_model define_constitutive_set check_material_models',
 );
 

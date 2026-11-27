@@ -32,6 +32,7 @@ import { displayCommands } from './display/catalog';
 import { instanceArrayCommands } from './instanceArray/catalog';
 import { materialLabCommands } from './materiallab/catalog';
 import { materialCommands } from './materials/catalog';
+import { appearanceCommands } from './appearance/catalog';
 import { surfaceCommands } from './surface/catalog';
 import { meshCommands } from './mesh/catalog';
 import { deformCommands } from './deform/catalog';
@@ -62,6 +63,7 @@ registerCommands('core', [
   ...instanceArrayCommands,
   ...materialLabCommands,
   ...materialCommands,
+  ...appearanceCommands,
   ...surfaceCommands,
   ...meshCommands,
   ...deformCommands,

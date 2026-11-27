@@ -1,0 +1,164 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "box",
+        "size": [4,2,1],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#6b8f9c",
+        "materialId": "steel_s355"
+      },
+      "#3": {
+        "id": "#3",
+        "kind": "box",
+        "size": [1,1,1],
+        "position": [6,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#dff0f5",
+        "appearance": {"baseColor":{"value":"#dff0f5"},"metalness":{"value":0},"roughness":{"value":0.05},"transmission":{"value":1},"ior":1.5,"libraryId":"glass"}
+      }
+    },
+    "order": [
+      "#1",
+      "#3"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "sweepFaceLayout": "joined",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#4",
+        "name": "create_material",
+        "params": {"name":"steel_s355","density":7850,"densityUnit":"kg/m^3","color":"#999999"},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#5",
+        "name": "set_material_appearance",
+        "params": {"material":"steel_s355","metalness":1,"roughness":{"value":0.35},"baseColor":"#8a8d91"},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#6",
+        "name": "create_material",
+        "params": {"name":"paint","density":1200,"densityUnit":"kg/m^3"},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#7",
+        "name": "apply_appearance",
+        "params": {"appearance":"painted","material":"paint","color":"#1e5aa8"},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#8",
+        "name": "add_box",
+        "params": {"size":[4,2,1]},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#9",
+        "name": "add_box",
+        "params": {"size":[1,1,1],"position":[6,0,0]},
+        "suppressed": false,
+        "affected": ["#3"]
+      },
+      {
+        "id": "#10",
+        "name": "assign_material",
+        "params": {"materialName":"steel_s355","entityIds":["#1"]},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#11",
+        "name": "apply_appearance",
+        "params": {"appearance":"glass","entityIds":["#3"]},
+        "suppressed": false,
+        "affected": ["#3"]
+      },
+      {
+        "id": "#12",
+        "name": "set_environment",
+        "params": {"source":"color","color":"#d8e6f2","intensity":0.8},
+        "suppressed": false,
+        "affected": []
+      }
+    ],
+    "configurations": {},
+    "materials": {
+      "steel_s355": {
+        "name": "steel_s355",
+        "density": 0.00785,
+        "densityUnit": "kg/m^3",
+        "color": "#8a8d91",
+        "metalness": 1,
+        "roughness": 0.35,
+        "appearance": {"metalness":{"value":1},"roughness":{"value":0.35},"baseColor":{"value":"#8a8d91"}}
+      },
+      "paint": {
+        "name": "paint",
+        "density": 0.0012,
+        "densityUnit": "kg/m^3",
+        "color": "#1e5aa8",
+        "metalness": 0,
+        "roughness": 0.4,
+        "appearance": {"baseColor":{"value":"#1e5aa8"},"metalness":{"value":0},"roughness":{"value":0.4},"coat":{"value":0.3},"coatRoughness":0.1,"libraryId":"painted"}
+      }
+    },
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 10,
+    "appearance": {
+      "textures": {},
+      "textureOrder": [],
+      "environment": {
+        "source": "color",
+        "color": "#d8e6f2",
+        "intensity": 0.8
+      }
+    }
+  }
+}
