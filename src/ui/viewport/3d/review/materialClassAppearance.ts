@@ -18,11 +18,12 @@ export function entityPbrMaterial(
   const material = entity.materialId === undefined ? undefined : doc.materials[entity.materialId];
   const cls = is3D(entity) ? assignedMaterialClassIn(doc.display, entity.id) : undefined;
   if (cls === undefined) return material;
-  const { finish } = material ?? {};
+  const { finish, appearance } = material ?? {};
   return {
     color: material?.color ?? entity.color,
     metalness: cls.metalness,
     roughness: cls.roughness,
     ...(finish !== undefined && { finish }),
+    ...(appearance !== undefined && { appearance }),
   };
 }

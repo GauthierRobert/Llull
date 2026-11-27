@@ -31,6 +31,7 @@ import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { SiteSky } from './SiteSky';
+import { SceneEnvironment, useEnvironmentLook } from './appearance/SceneEnvironment';
 import { CANVAS_DPR_RANGE, RenderRig } from './RenderRig';
 import { CaptureRig } from './capture/CaptureRig';
 import { MechanismOverlay } from './MechanismOverlay';
@@ -91,6 +92,10 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   const ambientOcclusion = quality.ambientOcclusion;
   const effects = edges || ambientOcclusion;
   const palette = useViewportPalette();
+  // `doc.appearance.environment` (RV-M2): background colour / HDR; absent = today's palette background.
+  const environment = useEnvironmentLook(palette.background);
+  // The effect chain composites a plain-colour backdrop only: with it on, an HDR lights the scene but does not draw the backdrop.
+  const hdrBackground = environment.hdr && !effects;
 
   // Initial camera only: CameraReactor applies later changes imperatively.
   const [initialCamera] = useState(() => {
@@ -106,7 +111,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
   return (
     <>
-      <color attach="background" args={[palette.background]} />
+      {!hdrBackground && <color attach="background" args={[environment.look.background]} />}
+      <SceneEnvironment look={environment.look} hdrBackground={hdrBackground} />
 
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention); OrbitControls
           orbits about the camera's up. */}

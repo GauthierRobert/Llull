@@ -10,6 +10,7 @@ import {
   type CommandTool,
   type CommandToolSection,
   annotateSections,
+  sceneSections,
   inspectSections,
   modifySections,
   openCommandTool,
@@ -141,7 +142,7 @@ export function flyoutSections(group: ToolGroupId, close: () => void): FlyoutSec
     case 'sketch':
       return [drawSection(close), ...commandSections(annotateSections(), close)];
     case 'solid':
-      return [solidSection(close)];
+      return [solidSection(close), ...commandSections(sceneSections(), close)];
     case 'modify': {
       const solids = commandSections(modifySections(), close);
       // The sketch edits come first while drafting, last while modelling.
