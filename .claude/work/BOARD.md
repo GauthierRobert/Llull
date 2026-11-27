@@ -266,7 +266,6 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - ENG-4 (blocked validation plans in `tests/unit/contract/blockedPlanCommands.json`) is split per pack in "Aero + FEA program" below; no aerospace plan is blocked any more.
 - `[TODO]` **ENG-5** Fatigue/fracture: FE hot-spot stress (`FAT_RESULTS_MISSING`), `fe_seam` cracks + interaction integral, `compute_k_from_fe`, retardation, surface cracks.
 
-- `[TODO]` **QG-DRAWINGS-WIRE** `npm run quality:drawings` (21 parts, about 1 min) is not part of `npm run check`: a kernel regression there went unnoticed (fixed 2026-11-27, the face merge after a boolean now runs on a copy; regression `server/tests/coaxialBossUnion.test.ts`). Wire the gate to run when `solver/` changes.
 
 ## Realistic visualisation (spec: `docs/decisions/RV1-realistic-visualisation.md`; gap to Blender measured 2026-11-27)
 
