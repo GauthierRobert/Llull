@@ -50,20 +50,25 @@ enough to check it rather than redo it.
 ### Piping (90 minutes)
 
 1. **Find your way.** Locate line `JC-1002-250` in the 3D view and on P&ID `PID-301`. Is it obvious which is which?
-2. **Change a route.** Move the LP steam header `LS-2001-300` 500 mm sideways on the rack, or add an elbow pair. Do the supports and
-   branches follow? Run `check_clashes` and `check_pipe_supports` again.
+2. **Change a route.** Move the pan feed line `SY-4002-100` 600 mm sideways (`edit_route`, operation `move_pi`). A move is accepted when
+   the legs of the route can absorb it and refused, with the reason, when they cannot. Read the answer: the branches stretch with the
+   line, the supports move with the pipe, and each support that has left its steel is named as detached. Run `check_clashes` and
+   `check_pipe_supports` again. Is that the behaviour you want?
 3. **Add a line.** Route a new DN100 line from a free pump nozzle to a tank nozzle of your choice with a gate valve and a check valve.
 4. **Isometric.** Export the isometric of your new line (`export_isometric`). Compare it with the isometric you brought: dimensions,
    weld numbers, bill of material, cut list. What is missing for your fabricator?
-5. **Stress.** Open the Stress panel. Change the HP steam line temperature from 420 to 450 degrees C and re-check. Does the result move
-   the way you expect? Is the report (`pipe_stress_report`) something you could attach to a calculation note?
+5. **Stress.** Open the Stress panel. Change the HP steam line temperature from 420 to 450 degrees C and re-check. llull asks for the
+   whole set of conditions again, material and allowable stresses included, because the allowable changes with temperature: give
+   the value of your code table at 450. Does the result move the way you expect? Is the report (`pipe_stress_report`) something you
+   could attach to a calculation note?
 6. **Break it.** Put a pipe through a beam on purpose. Does `check_clashes` find it and name both items clearly?
 
 ### Structural (60 minutes)
 
 1. **Read the check.** Run `check_steel_members` and open the result of the most loaded member (`BR41`). Can you follow the
    verification clause by clause, and does it match a hand check?
-2. **Change a section.** Replace one rack column by a lighter profile until it fails. Is the failure reported where you expect?
+2. **Change a section.** Replace one loaded column by a lighter profile until it fails (`update_steel_member`). Is the failure reported
+   where you expect, with the clause and the numbers?
 3. **Loads.** Find what load a pipe support puts on its beam. Is the load path from pipe to foundation visible?
 4. **Compare.** Rebuild one bent of the rack you brought from your past job and compare utilisations with your calculation.
 5. **Deliverable.** Export a plan or an IFC of the steel. Would your detailer accept it?
@@ -74,7 +79,25 @@ enough to check it rather than redo it.
 2. **Edit.** Add a pressure transmitter and a control valve with its controller on a line of `PID-301`. Run `check_pid`.
 3. **Consistency.** Rename a line on the P&ID only, then run `check_pid_3d`. Does it report the mismatch with the 3D model?
 4. **Compare.** Redraw ten items of the P&ID you brought. How long did it take compared with your current tool?
-5. **Data.** Export the line list and the equipment list. Are the columns the ones your office issues?
+5. **Data.** Export the line list and the equipment list (`pid_report kind=line_list --save lines.csv`, `kind=equipment_list`). Are the
+   columns the ones your office issues?
+
+## Dry run by the author (2026-11-27)
+
+Before giving this kit to anyone, its tasks were run once through the `llull` command line by the author of the demo, who is not a
+plant engineer. It is not a substitute for the pilot; it only removes obstacles an engineer should not have to find.
+
+| Task                             | Result of the dry run                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Piping 2, move a line            | works; the branches follow, moved and detached supports are named                                      |
+| Piping 5, change the temperature | the conditions must be restated in full (by design, see the task)                                      |
+| Piping 6, pipe through a beam    | found, both items named                                                                                |
+| Structural 1, read a check       | the governing clause and its numbers are printed                                                       |
+| Structural 2, lighter section    | fails where expected; the check line printed "≤" on a failing member and a resistance of "0 kN": fixed |
+| Process 2 and 3, edit and rename | one command each; the mismatch with the 3D model is reported from both sides                           |
+| Process 5, lists                 | the lists existed but could not be saved as a file: fixed                                              |
+
+Not dry-run: the tasks that compare with your own past work, and everything done by mouse in the app rather than by command.
 
 ## What we already know is weak
 
