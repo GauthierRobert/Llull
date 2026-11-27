@@ -270,8 +270,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 ## Realistic visualisation (spec: `docs/decisions/RV1-realistic-visualisation.md`; gap to Blender measured 2026-11-27)
 
 - `[TODO]` **RV-M3** path-traced `render_realistic` (new crate `llull-pathtrace`, EXR + tone-mapped PNG, denoiser); owner decision 2026-11-27 "yes, plan it" (RV1 section 6). Deps: RV-M1, RV-M2.
-- `[TODO]` **RV-M1** appearance data: `MeshData` uvs / normals, image asset store, `import_texture`, `set_material_appearance`, offline appearance library (Lane 1 + Lane 4).
-- `[TODO]` **RV-M2** `light` and `camera` entity kinds, `set_environment` with HDR files (Lane 1 + Lane 2). Deps: RV-M1.
+- `[WIP]` **RV-M1** appearance data: `MeshData` uvs / normals, image asset store, `import_texture`, `set_material_appearance`, offline appearance library (Lane 1 + Lane 4).
+- `[WIP]` **RV-M2** `light` and `camera` entity kinds, `set_environment` with HDR files (Lane 1 + Lane 2). Deps: RV-M1.
 - `[TODO]` **RV-M4** viewport: HDR environment, instance-array members drawn, real-GPU human gate (Lane 2). Deps: RV-M2.
 - `[TODO]` **RV-M5** `link_document` external references with overrides, tiled mesh streaming (Lane 1 + Lane 4).
 - `[TODO]` **RV-M6** `export_usd` / `import_usd`; glTF import with textures, hierarchy, Draco / meshopt (Lane 4). Deps: RV-M1.
