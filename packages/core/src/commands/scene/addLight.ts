@@ -1,4 +1,6 @@
-import type { LightEntity } from '../../model/types';
+import type { CadDocument, LightEntity } from '../../model/types';
+import type { Vec3 } from '../../model/vectors';
+import { toMetres } from '../../model/units';
 import { LIGHT_TYPES, type LightType } from '../../model/sceneKinds';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, layerIdField, looseVec3, nameField, z } from '../schema';
@@ -10,7 +12,18 @@ import { resolveAim, sceneRejection } from './shared';
 import { lightFieldsProblem } from './validate';
 
 const DEFAULT_COLOR = '#ffffff';
-const DEFAULT_INTENSITY: Readonly<Record<LightType, number>> = { sun: 3, point: 1000, spot: 1000, area: 100 };
+/** Irradiance (W/m2) a light without an explicit intensity delivers at its target (1 m away without one): the default sun's. */
+const DEFAULT_IRRADIANCE = 3;
+
+/**
+ * Intensity giving DEFAULT_IRRADIANCE at `distanceMetres`: sun = the irradiance itself; point / spot = E·4π·d² (isotropic emitter);
+ * area = E·π·d² (Lambertian emitter, on-axis far field). Three significant digits.
+ */
+function defaultIntensity(lightType: LightType, distanceMetres: number): number {
+  if (lightType === 'sun') return DEFAULT_IRRADIANCE;
+  const solidAngle = lightType === 'area' ? Math.PI : 4 * Math.PI;
+  return Number((DEFAULT_IRRADIANCE * solidAngle * distanceMetres * distanceMetres).toPrecision(3));
+}
 const SUN_ANGULAR_RADIUS = 0.00465;
 const DEFAULT_CONE_ANGLE = Math.PI / 4;
 const DEFAULT_BLEND = 0.15;
@@ -28,7 +41,7 @@ export const addLight = defineCommand({
     'lightType: "sun" (parallel rays; position only places its glyph, the aim gives the direction), "point" (omnidirectional), ' +
     '"spot" (cone of coneAngle radians, soft edge blend) or "area" (width x height rectangle in the local XY plane emitting toward local -Z). ' +
     'Aim: give `target` (a world point the light shines toward) OR `rotation` (Euler radians; local -Z is the aim axis); with neither the light shines straight down (-Z). ' +
-    'Units: sun intensity is irradiance in W/m2 (default 3), the others radiant power in W (defaults point 1000, spot 1000, area 100); ' +
+    'Units: sun intensity is irradiance in W/m2 (default 3), the others radiant power in W; without an intensity a point / spot / area light gets the power that gives the default sun irradiance (3 W/m2) at its target (1 m away when no target), so the default suits the scale of the document; ' +
     'color is the light color #rrggbb (default white); radius softens shadows (point/spot: emitter radius in document units; sun: angular radius in radians, default 0.00465 = the real sun disc; 0 = hard). ' +
     'Lights are drawn as glyphs by the viewport and are used by render_realistic (planned); render_view shading does not change. ' +
     'Errors: SCENE_LIGHT_INVALID (non-finite position / target, target equal to position, intensity < 0, spot coneAngle outside (0, pi/2] or blend outside [0, 1], area without width and height > 0, coneAngle / blend on a non-spot, width / height on a non-area).',
@@ -43,7 +56,9 @@ export const addLight = defineCommand({
     ).optional(),
     intensity: z
       .number()
-      .describe('Intensity >= 0: sun W/m2, point / spot / area W. Defaults: sun 3, point 1000, spot 1000, area 100.')
+      .describe(
+        'Intensity >= 0: sun W/m2, point / spot / area W. Default: sun 3; point / spot 3·4π·d², area 3·π·d² W with d the distance to target in metres (1 m without target), i.e. 3 W/m2 at the target.',
+      )
       .optional(),
     color: colorField(DEFAULT_COLOR),
     radius: z
@@ -66,7 +81,7 @@ export const addLight = defineCommand({
     const lightColor = params.color ?? DEFAULT_COLOR;
     const fields = {
       lightType,
-      intensity: params.intensity ?? DEFAULT_INTENSITY[lightType],
+      intensity: params.intensity ?? defaultIntensity(lightType, aimDistanceMetres(doc, position, params.target)),
       lightColor,
       radius: params.radius ?? (lightType === 'sun' ? SUN_ANGULAR_RADIUS : 0),
       castShadows: params.castShadows ?? true,
@@ -98,3 +113,9 @@ export const addLight = defineCommand({
     );
   },
 });
+
+/** Distance from `position` to `target` in metres; 1 m without a target. */
+function aimDistanceMetres(doc: CadDocument, position: Vec3, target: Vec3 | undefined): number {
+  if (target === undefined) return 1;
+  return toMetres(doc, Math.hypot(target[0] - position[0], target[1] - position[1], target[2] - position[2]));
+}

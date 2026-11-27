@@ -64,6 +64,23 @@ describe('add_light', () => {
     expectPure(doc, () => execute(doc, 'add_light', { lightType: 'sun' }));
   });
 
+  it('default power gives the default sun irradiance (3 W/m2) at the target, whatever the document scale', () => {
+    const doc = createEmptyDocument();
+    const at = (lightType: string, position: number[], target?: number[]): number => {
+      const size = lightType === 'area' ? { width: 100, height: 50 } : {};
+      const result = execute(doc, 'add_light', { lightType, position, ...size, ...(target !== undefined ? { target } : {}) });
+      return light(result.document, result.affected[0]!).intensity;
+    };
+    expect(at('point', [0, 0, 500], [0, 0, 0])).toBe(Number((3 * 4 * Math.PI * 0.25).toPrecision(3)));
+    expect(at('spot', [0, 0, 2000], [0, 0, 0])).toBe(Number((3 * 4 * Math.PI * 4).toPrecision(3)));
+    expect(at('area', [0, 0, 1000], [0, 0, 0])).toBe(Number((3 * Math.PI).toPrecision(3)));
+    expect(at('point', [0, 0, 5])).toBe(Number((3 * 4 * Math.PI).toPrecision(3)));
+    const metres = { ...doc, units: 'm' as const };
+    const far = execute(metres, 'add_light', { lightType: 'point', position: [0, 0, 2], target: [0, 0, 0] });
+    expect(light(far.document, far.affected[0]!).intensity).toBe(Number((3 * 4 * Math.PI * 4).toPrecision(3)));
+    expect(at('sun', [0, 0, 5])).toBe(3);
+  });
+
   it('spot, area and point carry their own fields', () => {
     let doc = createEmptyDocument();
     const spot = execute(doc, 'add_light', {
