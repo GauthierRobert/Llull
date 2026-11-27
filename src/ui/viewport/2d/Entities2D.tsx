@@ -3,12 +3,14 @@
 
 import { useMemo } from 'react';
 import { type Entity, type EntityId, type LineEntity, is2D } from '@core/model/types';
+import { isSceneObject } from '@core/model/sceneKinds';
 import { NurbsCurveLine } from '../3d/entities/NurbsCurveLine';
 import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
 import { useStableList } from '../useStableByKey';
 import { BatchedLines2D } from './BatchedLines2D';
 import { Shape2DRenderer } from './Shape2DRenderer';
+import { SceneObjectSymbol2D } from './entities/SceneObjectSymbol2D';
 import { SolidsTechnicalView2D } from './SolidsTechnicalView2D';
 import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
@@ -40,14 +42,14 @@ export function Entities2D(): React.ReactElement {
     [order, entities, layers, hiddenLayerIds, hiddenEntityIds],
   );
   // Stable through selection changes and unrelated edits: the projection reruns only when a solid changes.
-  const solids = useStableList(useMemo(() => visible.filter((entity) => !is2D(entity)), [visible]));
+  const solids = useStableList(useMemo(() => visible.filter((entity) => !is2D(entity) && !isSceneObject(entity)), [visible]));
 
   // Unselected lines share ONE batched draw call; selected lines keep their own renderer for the highlight.
   const { batchedLines, individual } = useMemo(() => {
     const lines: LineEntity[] = [];
     const rest: Array<{ entity: Entity; selected: boolean }> = [];
     for (const entity of visible) {
-      if (!is2D(entity) && entity.kind !== 'nurbs_curve') continue;
+      if (!is2D(entity) && entity.kind !== 'nurbs_curve' && !isSceneObject(entity)) continue;
       const selected = selectedIds.has(entity.id);
       if (entity.kind === 'line' && !selected && !transitions.has(entity.id)) lines.push(entity);
       else rest.push({ entity, selected });
@@ -63,6 +65,8 @@ export function Entities2D(): React.ReactElement {
         <LiveTransitionGroup key={entity.id} entity={entity}>
           {entity.kind === 'nurbs_curve' ? (
             <NurbsCurveLine entity={entity} selected={selected} />
+          ) : entity.kind === 'light' || entity.kind === 'camera' ? (
+            <SceneObjectSymbol2D entity={entity} selected={selected} />
           ) : (
             <Shape2DRenderer entity={entity} selected={selected} />
           )}

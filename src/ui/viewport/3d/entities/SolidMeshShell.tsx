@@ -1,6 +1,6 @@
 // Shared shell of every 3D solid branch: selection click, display-mode material, BVH raycasting, disposal (R9).
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { BaseEntity } from '@core/model/types';
 import { selectOnClick } from '@ui/viewport/selectClick';
@@ -11,6 +11,8 @@ import { useViewportStore } from '@ui/store';
 import { useGhostStore } from '@ui/store/ghostStore';
 import { useTintStore } from '@ui/store/tintStore';
 import { setOnSelectionLayer } from '../effects/selectionLayer';
+import { AppearanceMaterial } from '../appearance/AppearanceMaterial';
+import { useSolidAppearance } from '../appearance/useSolidAppearance';
 
 export interface SolidSurface {
   roughness: number;
@@ -29,7 +31,7 @@ export interface SolidMeshKindProps<E extends BaseEntity> {
 }
 
 interface SolidMeshShellProps {
-  entity: Pick<BaseEntity, 'id' | 'position' | 'rotation' | 'color'>;
+  entity: Pick<BaseEntity, 'id' | 'position' | 'rotation' | 'color' | 'appearance'>;
   geometry: THREE.BufferGeometry;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
@@ -84,12 +86,24 @@ export function SolidMeshShell({
     ghosted,
   });
   const displayMode = useViewportStore((s) => s.displayMode);
-  const finishScale = pbrMaterial?.finish?.scale;
-  const textures = useFinishTextures(pbrMaterial);
-  // Finish maps need UVs: box-projected per geometry / tile size, before the frame draws.
+  // Resolution order: entity appearance, material appearance, procedural finish, plain colour / metalness / roughness.
+  const appearance = useSolidAppearance(entity, pbrMaterial, {
+    color: pbrMaterial?.color ?? color,
+    metalness: pbrMaterial?.metalness ?? surface.metalness,
+    roughness: pbrMaterial?.roughness ?? surface.roughness,
+  });
+  const finishScale = appearance === null ? pbrMaterial?.finish?.scale : undefined;
+  const textures = useFinishTextures(appearance === null ? pbrMaterial : undefined);
+  const uvScale = appearance?.needsUvs === true ? appearance.plan.uvScale : finishScale;
+  // Image / finish maps need UVs: stored ones are kept, otherwise box-projected per geometry / tile size, before the frame draws.
   useLayoutEffect(() => {
-    if (finishScale !== undefined) applyBoxUvs(geometry, finishScale);
-  }, [geometry, finishScale]);
+    if (uvScale !== undefined && geometry.userData['storedUvs'] !== true) applyBoxUvs(geometry, uvScale);
+  }, [geometry, uvScale]);
+  const glassThickness = useMemo(() => {
+    geometry.computeBoundingSphere();
+    return (geometry.boundingSphere?.radius ?? 0) * 0.5;
+  }, [geometry]);
+  const appearanceActive = appearance !== null && displayMode === 'shaded' && !ghosted && tint === undefined;
   const textured = textures !== null && displayMode === 'shaded' && !ghosted && tint === undefined;
 
   return (
@@ -104,7 +118,15 @@ export function SolidMeshShell({
       receiveShadow
     >
       {/* Pushed back so lines drawn on the surface (contours, outlines) stay visible. */}
-      {textured ? (
+      {appearanceActive ? (
+        <AppearanceMaterial
+          plan={appearance.plan}
+          maps={appearance.maps}
+          selectionEmissive={selected ? { color: matProps.emissive, intensity: matProps.emissiveIntensity } : undefined}
+          thickness={glassThickness}
+          side={doubleSided ? THREE.DoubleSide : matProps.side}
+        />
+      ) : textured ? (
         <meshPhysicalMaterial
           {...matProps}
           color="#ffffff"

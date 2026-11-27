@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Entity } from '@core/model/types';
 import { AxisFields, PropRow, ScalarRow } from './propertyFields';
+import { cameraRows, lightRows } from './appearance/sceneObjectRows';
 
 export function dimensionRows(entity: Entity): React.ReactElement | null {
   switch (entity.kind) {
@@ -68,6 +69,10 @@ export function dimensionRows(entity: Entity): React.ReactElement | null {
           </PropRow>
         </>
       );
+    case 'light':
+      return lightRows(entity);
+    case 'camera':
+      return cameraRows(entity);
     default:
       return null;
   }

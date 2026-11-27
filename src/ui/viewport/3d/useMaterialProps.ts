@@ -16,7 +16,7 @@ import {
 import { displayMetalness } from './displayMetalness';
 
 /** Document-material fields that drive a mesh's PBR surface. */
-export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness' | 'finish'>;
+export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness' | 'finish' | 'appearance'>;
 
 interface MaterialProps {
   color: string;
