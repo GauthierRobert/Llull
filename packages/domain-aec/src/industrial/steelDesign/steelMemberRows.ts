@@ -9,6 +9,7 @@ import { round } from '../../shared/numeric';
 import { highestUtilisation } from '../common/utilisation';
 import { sectionResistance } from './steelDesign';
 import { compressionClass, isBeamShape, type SteelBar } from './steelMemberBars';
+import { verdictSign } from './verdictSign';
 
 /** Combination name of the gravity checks. */
 export const ULS_COMBINATION = 'ULS 1.35 G + 1.5 Q';
@@ -36,7 +37,7 @@ export const shearCheckLine = (
   name: 'shear (§6.2.6)',
   utilisation,
   combination,
-  detail: `${subject}: V ${shearEdKn.toFixed(1)} kN ≤ Vpl,Rd ${shearRdKn.toFixed(0)} kN`,
+  detail: `${subject}: V ${shearEdKn.toFixed(1)} kN ${verdictSign(shearEdKn, shearRdKn)} Vpl,Rd ${shearRdKn.toFixed(0)} kN`,
 });
 
 /** SLS deflection check line against `limit` (mm); `label` names the limit, e.g. "L/250". */

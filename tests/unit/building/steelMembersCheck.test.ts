@@ -563,3 +563,20 @@ describe('beam check internals', () => {
     expect(skippedRow(bar, 'why').detail).toBe('why');
   });
 });
+
+describe('check line of a failing column', () => {
+  it('prints ">" between the effect and the resistance, and a resistance that is not rounded to zero', () => {
+    let doc = squareBay({ equipmentKg: 20000 });
+    const data0 = check(doc);
+    const heavy = rowsByRole(data0, 'column')[0];
+    expect(heavy?.ok).toBe(true);
+    expect(heavy?.detail).toMatch(/N \d+ kN ≤ Nb,Rd \d+ kN/);
+    doc = step(doc, 'update_steel_member', { memberId: heavy?.id, profile: 'IPE80' });
+    const failing = rowOf(check(doc), heavy?.mark ?? '');
+    expect(failing.ok).toBe(false);
+    expect(failing.utilisation).toBeGreaterThan(1);
+    expect(failing.detail).toMatch(/N \d+ kN > N(b|pl),Rd [\d.]+ kN/);
+    expect(failing.detail).not.toMatch(/Rd 0 kN/);
+    expect(failing.detail).not.toContain('≤');
+  });
+});

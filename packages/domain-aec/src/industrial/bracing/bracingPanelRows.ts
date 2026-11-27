@@ -22,6 +22,7 @@ import {
   refusedRow,
 } from './bracingModel';
 import { maxOf, minOf } from '@lib/arrayExtrema';
+import { verdictSign } from '../steelDesign/verdictSign';
 
 export interface BracingInputs {
   readonly windPressure: number;
@@ -263,7 +264,7 @@ export function panelRows(context: PanelContext, panel: Panel, rows: BracingRow[
   rows.push(
     diagonalRow(
       tension,
-      `tension-only ${member.profile}: V ${shear.toFixed(1)} kN / cos θ ${(dy / length).toFixed(2)} = ${tension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (bay ${panel.bay} mm)`,
+      `tension-only ${member.profile}: V ${shear.toFixed(1)} kN / cos θ ${(dy / length).toFixed(2)} = ${tension.toFixed(1)} kN ${verdictSign(tension, npl)} Npl,Rd ${npl.toFixed(1)} kN (bay ${panel.bay} mm)`,
     ),
   );
   if (craneForce !== null && craneShare > 0) {
