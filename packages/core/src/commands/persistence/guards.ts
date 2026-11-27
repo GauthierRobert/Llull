@@ -459,6 +459,8 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   ellipse: (v) => vec2Problem(v, 'center'),
   rectangle: noProblem,
   point: noProblem,
+  light: noProblem,
+  camera: noProblem,
   text: textProblem,
   dimension: dimensionProblem,
   instance: (v) => {

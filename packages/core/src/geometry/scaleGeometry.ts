@@ -188,5 +188,8 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
       const scale = scale3(e.scale ?? [1, 1, 1], f);
       return { scaled: { ...e, scale }, dims: `new scale [${scale.join(', ')}]` };
     }
+    case 'light':
+    case 'camera':
+      return { scaled: e, dims: 'no geometry (scene object)' };
   }
 }

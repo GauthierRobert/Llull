@@ -41,6 +41,8 @@ import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
 import type { DocumentSettingsFields } from './documentSettings';
+import { type CameraFields, type LightFields, type SceneKind, isSceneObject } from './sceneKinds';
+import type { AppearanceModel } from './appearance';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -88,7 +90,7 @@ export const SHAPE2D_KINDS = [
 
 export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
 
-export type EntityKind = SolidKind | Shape2DKind | CurveKind | SheetKind | 'instance';
+export type EntityKind = SolidKind | Shape2DKind | CurveKind | SheetKind | SceneKind | 'instance';
 
 export interface BaseEntity extends EntityTags {
   readonly id: EntityId;
@@ -110,6 +112,8 @@ export interface BaseEntity extends EntityTags {
   patternSourceId?: string;
   /** Decals painted on this solid (entity-local frame); set by `add_decal`. */
   decals?: ReadonlyArray<Decal>;
+  /** Visual-only appearance override (RV-M1 `apply_appearance`), drawn over the material's; mass and analysis keep `materialId`. */
+  appearance?: import('./appearance').Appearance;
 }
 
 export interface BoxEntity extends BaseEntity, FaceColored {
@@ -423,6 +427,16 @@ export interface ImageEntity extends BaseEntity {
   locked: boolean;
 }
 
+/** Light source (RV-M2 `add_light`); no geometry. @see sceneKinds.ts */
+export interface LightEntity extends BaseEntity, LightFields {
+  readonly kind: 'light';
+}
+
+/** Physical camera (RV-M2 `add_camera`); no geometry. @see sceneKinds.ts */
+export interface CameraEntity extends BaseEntity, CameraFields {
+  readonly kind: 'camera';
+}
+
 /**
  * Placed reference to a Component definition; geometry is never copied.
  * @invariant componentId exists in CadDocument.components
@@ -463,6 +477,8 @@ export type Entity =
   | TextEntity
   | DimensionEntity
   | ImageEntity
+  | LightEntity
+  | CameraEntity
   | InstanceEntity;
 
 const SHAPE2D_KIND_SET: ReadonlySet<string> = new Set(SHAPE2D_KINDS);
@@ -471,9 +487,9 @@ export function is2D(e: Entity): e is Extract<Entity, { kind: Shape2DKind }> {
   return SHAPE2D_KIND_SET.has(e.kind);
 }
 
-/** True for solids, meshes, instances and images; false for planar shapes and 3D curves (no volume, no kernel leaf). */
+/** True for solids, meshes, instances and images; false for planar shapes, 3D curves, sheets and scene objects (no volume, no kernel leaf). */
 export function is3D(e: Entity): boolean {
-  return !SHAPE2D_KIND_SET.has(e.kind) && !isCurve3D(e) && !isSheet(e);
+  return !SHAPE2D_KIND_SET.has(e.kind) && !isCurve3D(e) && !isSheet(e) && !isSceneObject(e);
 }
 
 export interface Layer {
@@ -680,6 +696,8 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   review?: ReviewModel;
   /** Absent until the first display command (`define_colour_profile`, `apply_service_colour_scheme`; plant 09 VIS). */
   display?: DisplayModel;
+  /** Textures and scene environment (RV1 RV-M1 / RV-M2); absent until the first `import_texture` / `set_environment`. */
+  appearance?: AppearanceModel;
   /** Absent until the first `add_instance_array`: packed placements of a Component, no Entity per instance (plant 09 VIS-M8j, VIS1). */
   instanceArrays?: Record<string, InstanceArray>;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
@@ -737,6 +755,8 @@ export interface Material {
   roughness: number;
   /** Procedural surface texture (albedo + normal + roughness maps); absent = plain PBR colour. */
   finish?: MaterialFinish;
+  /** Layered appearance with image textures (RV-M1 `set_material_appearance` / `apply_appearance`); its base colour value is also `color`. */
+  appearance?: import('./appearance').Appearance;
   /** Property models (PHY-01: k(T), cp(T), E(T), …) defined with define_property_model; read through `propertyModelEval`. */
   readonly propertyModels?: readonly PropertyModel[];
   /** Constitutive / durability laws (PHY-02: add_material_model); read through `materialLaws/*`. */
@@ -781,6 +801,10 @@ export function createEmptyDocument(): CadDocument {
 export interface MeshData {
   readonly positions: ReadonlyArray<number>;
   readonly indices: ReadonlyArray<number>;
+  /** Texture coordinates, 2 per vertex (RV-M1); absent = box-projected by the renderer (`geometry/meshUvs.ts`). Ignored unless the length is 2 × vertexCount. */
+  readonly uvs?: ReadonlyArray<number>;
+  /** Unit vertex normals, 3 per vertex (RV-M1); absent = derived from the faces. Ignored unless the length equals `positions`. */
+  readonly normals?: ReadonlyArray<number>;
 }
 
 export type BooleanOp = 'union' | 'subtract' | 'intersect';

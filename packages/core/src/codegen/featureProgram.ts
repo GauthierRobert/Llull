@@ -142,6 +142,8 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
       return skinShape(entity, doc, trace);
     case 'mesh':
     case 'instance':
+    case 'light':
+    case 'camera':
       return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
   }
 }

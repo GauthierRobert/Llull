@@ -316,6 +316,8 @@ export interface ExecutionContext {
   readonly pointClouds?: PointCloudPort | null;
   /** Content-addressed mesh asset store of this machine (07 MSH FR-MSH-02); null/absent = big meshes refuse with MESH_ASSET_UNAVAILABLE. */
   readonly meshAssets?: MeshAssetPort | null;
+  /** Content-addressed image asset store of this machine (RV1 RV-M1 textures); null/absent = `import_texture fileKey` refuses with TEXTURE_ASSET_UNAVAILABLE. */
+  readonly imageAssets?: import('../geometry/imageAssets').ImageAssetPort | null;
   /** Files of this host for exports too large to return as a string (`export_3mf` toFile); null/absent = such exports stay in memory and refuse above their ceiling. */
   readonly exportFiles?: ExportFilePort | null;
   /** The llull version of the host running the command (the server / CLI package version), stamped into export provenance; null/absent = not a llull host (exports write null). */
