@@ -34,6 +34,8 @@ import {
 } from '../limits';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
 import { hypotOf } from '../../lib/hypotOf';
+import { SCENE_KINDS } from '../../model/sceneKinds';
+import { cameraFieldsProblem, lightFieldsProblem } from '../scene/validate';
 
 /** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
 function imageProblem(v: Record<string, unknown>): string | null {
@@ -148,7 +150,14 @@ function stationsProblem(stations: unknown): string | null {
   return problem === null ? null : `stations ${problem}`;
 }
 
-const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, ...SHEET_KINDS, 'instance']);
+const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([
+  ...SOLID_KINDS,
+  ...SHAPE2D_KINDS,
+  ...CURVE_KINDS,
+  ...SHEET_KINDS,
+  ...SCENE_KINDS,
+  'instance',
+]);
 
 export function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;
@@ -459,8 +468,8 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   ellipse: (v) => vec2Problem(v, 'center'),
   rectangle: noProblem,
   point: noProblem,
-  light: noProblem,
-  camera: noProblem,
+  light: lightFieldsProblem,
+  camera: cameraFieldsProblem,
   text: textProblem,
   dimension: dimensionProblem,
   instance: (v) => {

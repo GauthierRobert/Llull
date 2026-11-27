@@ -1,4 +1,5 @@
 import type { CadDocument, Entity, ImageEntity } from '../../model/types';
+import { isSceneObject } from '../../model/sceneKinds';
 import { ORIGIN, centroid3 } from '../../lib/vec3';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { boundsCenter, boundsRadius } from '../../geometry/bounds';
@@ -53,6 +54,8 @@ export function renderDocument(
   options: RenderOptions = {},
 ): RenderViewData {
   const snapshot = computeSceneSnapshot(doc);
+  // Lights and cameras are not drawn, so they are not counted in the picture either.
+  const drawnEntityCount = snapshot.entities.filter((summary) => !isSceneObject(summary)).length;
   const bounds = options.frame !== undefined ? options.frame : snapshot.bounds;
   const radius = bounds ? boundsRadius(bounds) : 5; // 5 frames an empty scene
   const center = options.target ?? (bounds ? boundsCenter(bounds) : ORIGIN);
@@ -115,7 +118,7 @@ export function renderDocument(
     width,
     height,
     view,
-    snapshot.entityCount,
+    drawnEntityCount,
     background,
     rasterSettings,
     caption,
@@ -125,7 +128,7 @@ export function renderDocument(
     view,
     width,
     height,
-    entityCount: snapshot.entityCount,
+    entityCount: drawnEntityCount,
     bounds,
     camera: cam,
     orthoHalf,

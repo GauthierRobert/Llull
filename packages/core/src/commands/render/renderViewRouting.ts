@@ -48,6 +48,7 @@ interface RoutedParams {
   readonly cut?: unknown;
   readonly overlay?: unknown;
   readonly viewpointId?: string | undefined;
+  readonly camera?: string | undefined;
   readonly hide2D?: boolean | undefined;
   readonly colourProfileId?: string | undefined;
   readonly sectionBoxId?: string | undefined;
@@ -70,6 +71,7 @@ const plain = (p: RoutedParams): boolean =>
     p.cut,
     p.overlay,
     p.viewpointId,
+    p.camera,
     p.colourProfileId,
     p.sectionBoxId,
     p.issueId,

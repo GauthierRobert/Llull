@@ -246,7 +246,8 @@ function renderOnce(doc: CadDocument, params: RenderViewParams, ctx: ExecutionCo
   const requestedKinds = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
   const overlayOptions = resolveOverlayOptions(doc, params.overlayOptions, requestedKinds);
   if (!('options' in overlayOptions)) return overlayOptions;
-  const view: ViewName = options.direction || params.viewpointId !== undefined ? 'custom' : (params.view ?? 'iso');
+  const view: ViewName =
+    options.direction || params.viewpointId !== undefined || params.camera !== undefined ? 'custom' : (params.view ?? 'iso');
   const width = clampPixels(params.width, 800);
   const height = clampPixels(params.height, 600);
   const samples =
@@ -371,7 +372,9 @@ export const renderView = defineCommand({
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
     'showLabels (entity id/name labels + key-point markers, default off), overlay ("cage": the cage edges and vertices of subdivision solids, "net": the control net of nurbs_surface sheets and the control polygon of nurbs_curve entities, drawn over the picture, not occluded; one kind or an array of both; with `isolate` only the isolated entities; orthographic views only). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
     'Plugin overlay kinds take their options in `overlayOptions` ({ <kind>: options }; per-kind options: see the plugin tool docs); what a kind drew is in data.overlays.<kind>.detail. ' +
-    'OVER BUDGET (the polygon budget decimated or skipped entities): a PLAIN request (none of turntable, isolate, section, cut, overlay, viewpointId, colourProfileId / sectionBoxId / review shading, hide2D, mode "vector", projection, fovDeg, title, showLabels, showDimensions or an explicit renderer) is drawn by the open desktop viewport when the host has one (`--app`: all geometry, perspective, app lighting; data.routedTo "viewport"), else by the native GPU raster when the scene has at most 1,000,000 polygons (data.routedTo "raster"; provisional limit), else the best effort stays with the warning RENDER_BUDGET_EXCEEDED and data.drawnShare (share of polygons drawn) in data.warnings. A routed picture is not a reference: data.deterministic false, no svgSha256; the summary says how it differs. Pass renderer "reference" to keep the TypeScript raster (svgSha256) and only the warning. ' +
+    'OVER BUDGET (the polygon budget decimated or skipped entities): a PLAIN request (none of turntable, isolate, section, cut, overlay, viewpointId, camera, colourProfileId / sectionBoxId / review shading, hide2D, mode "vector", projection, fovDeg, title, showLabels, showDimensions or an explicit renderer) is drawn by the open desktop viewport when the host has one (`--app`: all geometry, perspective, app lighting; data.routedTo "viewport"), else by the native GPU raster when the scene has at most 1,000,000 polygons (data.routedTo "raster"; provisional limit), else the best effort stays with the warning RENDER_BUDGET_EXCEEDED and data.drawnShare (share of polygons drawn) in data.warnings. A routed picture is not a reference: data.deterministic false, no svgSha256; the summary says how it differs. Pass renderer "reference" to keep the TypeScript raster (svgSha256) and only the warning. ' +
+    'Camera entity: `camera` (an add_camera id) renders a perspective view from that camera (data.cameraId; unknown id SCENE_CAMERA_NOT_FOUND, another kind SCENE_NOT_A_CAMERA). ' +
+    'Lights (add_light) do not change this render: it stays the deterministic technical raster; lights and cameras are not drawn or framed, and are used by the viewport and by render_realistic (planned). ' +
     'Does NOT modify the document; `affected` is always [].',
   params: renderViewParams,
   run: (doc, params, ctx): CommandResult => {

@@ -5,6 +5,7 @@
  * `data`. Designed so AI agents (CLI) can filter and locate entities by meaning rather than juggling generated ids.
  */
 
+import { SCENE_KINDS } from '../../model/sceneKinds';
 import { type CadDocument, type Entity, type EntityKind, SHAPE2D_KINDS, SOLID_KINDS } from '../../model/types';
 import { CURVE_KINDS } from '../../model/curveKinds';
 import type { CommandResult } from '../types';
@@ -18,7 +19,7 @@ import type { Bounds } from '../../geometry/bounds';
 import { distanceSq3 } from '../../lib/vec3';
 
 /** Every entity kind a `kind` filter can name. */
-const FILTERABLE_KINDS = [...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, 'instance'] as const;
+const FILTERABLE_KINDS = [...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, ...SCENE_KINDS, 'instance'] as const;
 
 /** A compact descriptor of one matched entity, safe to return in `data`. */
 interface EntityMatch {

@@ -18,6 +18,7 @@ import {
   type SceneSnapshot,
 } from './sceneTypes';
 import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
+import { isSceneObject } from '../../model/sceneKinds';
 import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing, dimensionStyleOf, dimensionText } from '../../geometry/dimensionAnnotation';
 
 function summarizeDimension(doc: CadDocument, e: DimensionEntity): DimensionSummary {
@@ -47,7 +48,8 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     // Instances have no own geometry: their AABB comes from the referenced component.
     const bounds = entityBoundsInDoc(doc, e);
     entities.push({ id: e.id, kind: e.kind, layerId: e.layerId, position: e.position, bounds });
-    sceneBounds = sceneBounds ? mergeBounds(sceneBounds, bounds) : bounds;
+    // Lights and cameras are not geometry: a far sun glyph must not stretch the framing.
+    if (!isSceneObject(e)) sceneBounds = sceneBounds ? mergeBounds(sceneBounds, bounds) : bounds;
     if (e.kind === 'dimension') dimensions.push(summarizeDimension(doc, e));
     if (e.kind === 'text') texts.push({ id: e.id, content: e.content, position: e.position, height: e.height });
     layerCounts[e.layerId] = (layerCounts[e.layerId] ?? 0) + 1;
