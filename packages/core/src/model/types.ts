@@ -5,8 +5,6 @@ import type { FaceColored, FaceGroup, MeshAssetRef, MeshSource, VertexTint } fro
 export type { FaceColor, FaceSignature } from './meshProvenance';
 import type { EdgeBlendNode, FaceBlendParams, FullRoundParams, JointRadius } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
-import type { PropertyModel } from './propertyModel';
-import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { CageBoundary, CageElementIds, CageEdgeSharpness, CageSymmetry, CageVertexSharpness } from './subdivisionCage';
 import type { ExactLeafRecipe } from './sheetSolid';
@@ -28,8 +26,7 @@ import type { CurveSegment } from './curve';
 import type { RegionHatch } from './regionHatch';
 import type { DocumentExtensions } from './documentExtensions';
 import type { DocumentKernelSettings } from './documentKernelSettings';
-import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
-import type { MaterialFinish } from './materialFinish';
+import type { MaterialLibraryEntry } from './materialLibrary';
 export { FINISH_PATTERNS, type FinishPattern, type MaterialFinish } from './materialFinish';
 import type { FeatureParams, PartRef } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
@@ -41,6 +38,9 @@ import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
 import type { DocumentSettingsFields } from './documentSettings';
+import type { Material } from './material';
+import type { MeshData } from './meshData';
+export type { Material, MeshData };
 import { type CameraFields, type LightFields, type SceneKind, isSceneObject } from './sceneKinds';
 import type { AppearanceModel } from './appearance';
 
@@ -733,40 +733,6 @@ export interface DocumentBlob {
   readonly size: number;
 }
 
-/**
- * Physical + PBR material. `density` is mass per (document unit)³ so mass = volume × density (mm document: g/mm³, steel ≈ 0.00785).
- * Replaced via `create_material`.
- * @invariant density > 0 and finite (0 only on a `record` material with no density value yet, or an unresolved private stub); color matches
- *   /^#[0-9a-fA-F]{6}$/; metalness, roughness in [0, 1]
- */
-export interface Material {
-  readonly name: string;
-  density: number;
-  /** Unit `density` was given in at creation (create_material `densityUnit`); absent = given directly in g/(document unit)³. Still no source. */
-  readonly densityUnit?: string;
-  /** Where the density comes from (FR-FPR-73): a material with a source is not reported as unsourced by the dynamics mass. */
-  readonly source?: string;
-  /** Quality of `source`: A measured / verified, B published datasheet, C reconstructed or unchecked. */
-  readonly grade?: 'A' | 'B' | 'C';
-  /** Aerospace material record (08 MAT M2): designation, specs, licence, export marking, library origin. Absent on a legacy material. */
-  readonly record?: MaterialRecordInfo;
-  color: string;
-  metalness: number;
-  roughness: number;
-  /** Procedural surface texture (albedo + normal + roughness maps); absent = plain PBR colour. */
-  finish?: MaterialFinish;
-  /** Layered appearance with image textures (RV-M1 `set_material_appearance` / `apply_appearance`); its base colour value is also `color`. */
-  appearance?: import('./appearance').Appearance;
-  /** Property models (PHY-01: k(T), cp(T), E(T), …) defined with define_property_model; read through `propertyModelEval`. */
-  readonly propertyModels?: readonly PropertyModel[];
-  /** Constitutive / durability laws (PHY-02: add_material_model); read through `materialLaws/*`. */
-  readonly materialModels?: readonly MaterialModel[];
-  /** Named combinations of material models an analysis picks (PHY-02: define_constitutive_set). */
-  readonly constitutiveSets?: readonly ConstitutiveSet[];
-  /** Id of the set used when a query names none. */
-  readonly defaultConstitutiveSet?: string;
-}
-
 export const DEFAULT_LAYER_ID = 'layer-default';
 
 export function createEmptyDocument(): CadDocument {
@@ -795,16 +761,6 @@ export function createEmptyDocument(): CadDocument {
     driveRelations: {},
     driveRelationOrder: [],
   };
-}
-
-/** World-space triangle mesh. `positions`: flat xyz triples (length 3 × vertexCount); `indices`: flat triangle vertex indices. */
-export interface MeshData {
-  readonly positions: ReadonlyArray<number>;
-  readonly indices: ReadonlyArray<number>;
-  /** Texture coordinates, 2 per vertex (RV-M1); absent = box-projected by the renderer (`geometry/meshUvs.ts`). Ignored unless the length is 2 × vertexCount. */
-  readonly uvs?: ReadonlyArray<number>;
-  /** Unit vertex normals, 3 per vertex (RV-M1); absent = derived from the faces. Ignored unless the length equals `positions`. */
-  readonly normals?: ReadonlyArray<number>;
 }
 
 export type BooleanOp = 'union' | 'subtract' | 'intersect';
