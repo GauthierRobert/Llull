@@ -13,7 +13,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    // the drawing gate (21 real parts rebuilt on the native kernel, about 20 s) is part of the suite: a kernel regression there went unnoticed while it ran only as `npm run quality:drawings`
+    include: ['tests/**/*.test.ts', 'tests/quality/drawingCorpus.gate.ts'],
     setupFiles: ['./tests/setup.ts'],
     globalSetup: ['../tests/requireToolTeardown.ts'],
     // Live OpenCascade / Manifold solves (booleans, fillets, STEP) take seconds each.

@@ -26,6 +26,7 @@
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
 #include "llull-kernel-occt/cpp/mass_patch.hxx"
@@ -1358,11 +1359,17 @@ bool is_valid_shape(const Shape &shape) {
 
 std::unique_ptr<Shape> unified_shape(const Shape &shape) {
   try {
-    ShapeUpgrade_UnifySameDomain unifier(shape.shape, Standard_True, Standard_True, Standard_False);
+    // on a copy with its own geometry, as boolean_op (facade.cxx): the merge must not edit edges `shape` shares with other shapes
+    BRepBuilderAPI_Copy copy(shape.shape, Standard_True, Standard_False);
+    const TopoDS_Shape isolated = copy.Shape();
+    const std::vector<naming::Named> original{naming::named(shape)};
+    const std::vector<naming::Named> inputs{
+        naming::Named{isolated, naming::inherit(isolated, original, naming::history_of(original, copy), "copy")}};
+    ShapeUpgrade_UnifySameDomain unifier(isolated, Standard_True, Standard_True, Standard_False);
     unifier.AllowInternalEdges(Standard_False);
     unifier.Build();
-    const std::vector<naming::Named> inputs{naming::named(shape)};
     const TopoDS_Shape result = unifier.Shape();
+    if (result.IsNull() || !BRepCheck_Analyzer(result, Standard_True).IsValid()) throw Standard_Failure("unify: invalid result");
     return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, unifier.History(), "unify")), shape);
   } catch (const Standard_Failure &) {
     return keep_mass_rule(naming::wrap_named(shape.shape, naming::face_names(shape)), shape);

@@ -15,6 +15,7 @@
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -347,11 +348,20 @@ std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operat
   if (unify) {
     try {
       // Merge the faces a boolean split so face / edge indices stay stable for later fillets.
-      ShapeUpgrade_UnifySameDomain unifier(result, Standard_True, Standard_True, Standard_False);
+      // The merge works on a copy of the boolean result with its own geometry. Run on the result itself it edits edges the result
+      // shares with the operands (an edge between two faces of one surface gets the double parameter curve of a seam): when the
+      // merged solid then came out invalid, the result kept as the fallback, and the cached operands, were already damaged and
+      // meshed open (a boss coaxial with a cylindrical face of the body: the union was refused although it had succeeded).
+      BRepBuilderAPI_Copy copy(result, Standard_True, Standard_False);
+      const TopoDS_Shape isolated = copy.Shape();
+      const std::vector<Named> original{Named{result, names}};
+      const std::vector<Named> split{Named{isolated, naming::inherit(isolated, original, naming::history_of(original, copy), "copy")}};
+      ShapeUpgrade_UnifySameDomain unifier(isolated, Standard_True, Standard_True, Standard_False);
       unifier.AllowInternalEdges(Standard_False);
       unifier.Build();
       const TopoDS_Shape unified = unifier.Shape();
-      const std::vector<Named> split{Named{result, names}};
+      // a merge that breaks the solid is dropped: the untouched boolean result is returned
+      if (unified.IsNull() || !BRepCheck_Analyzer(unified, Standard_True).IsValid()) throw Standard_Failure("unify: invalid result");
       return flagged(naming::wrap_named(unified, naming::inherit(unified, split, unifier.History(), "unify")), a.refined_mass || b.refined_mass);
     } catch (const Standard_Failure &) {
       // fall through: the boolean result itself

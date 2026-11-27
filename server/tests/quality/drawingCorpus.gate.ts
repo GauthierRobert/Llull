@@ -5,16 +5,16 @@
  * checks the exact B-rep volume (the drawing's mass answer / the reference solid) and the overall
  * extents, so a kernel or command regression that changes geometry fails here.
  *
- *   npm run quality:drawings
+ *   npm run quality:drawings   (also part of `npm --prefix server test`)
  */
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, expect, it } from 'vitest';
 import { createEmptyDocument, is3D, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { createNativeTestKernel } from '../kernelTestSupport';
+import { createNativeTestKernel, describeNative } from '../kernelTestSupport';
 
 const DIR = path.resolve(__dirname, '../../../quality/drawings');
 
@@ -30,8 +30,6 @@ interface DrawingPart {
 }
 
 const manifest = JSON.parse(readFileSync(path.join(DIR, 'manifest.json'), 'utf8')) as { readonly parts: readonly DrawingPart[] };
-
-beforeAll(async () => setGeometryKernel(createNativeTestKernel()), 120_000);
 
 function build(id: string): CadDocument {
   const actions: unknown = JSON.parse(readFileSync(path.join(DIR, 'plans', `${id}.json`), 'utf8'));
@@ -69,7 +67,10 @@ function sortedExtents(doc: CadDocument): number[] {
   return max.map((value, axis) => value - (min[axis] ?? 0)).sort((a, b) => a - b);
 }
 
-describe('drawing corpus: plans rebuild the real parts', () => {
+// skipped (and recorded) without the built native kernel, like every native suite
+describeNative('drawing corpus: plans rebuild the real parts', () => {
+  beforeAll(async () => setGeometryKernel(createNativeTestKernel()), 120_000);
+
   it.each(manifest.parts.map((part) => [part.id, part] as const))('%s', (_id, part) => {
     const doc = build(part.id);
     const volume = solidVolume(doc);

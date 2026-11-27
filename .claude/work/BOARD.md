@@ -266,7 +266,18 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - ENG-4 (blocked validation plans in `tests/unit/contract/blockedPlanCommands.json`) is split per pack in "Aero + FEA program" below; no aerospace plan is blocked any more.
 - `[TODO]` **ENG-5** Fatigue/fracture: FE hot-spot stress (`FAT_RESULTS_MISSING`), `fe_seam` cracks + interaction integral, `compute_k_from_fe`, retardation, surface cracks.
 
-- `[TODO]` **KRN-PERIODIC-SHIFT** (Lane 1 kernel, owner-visible: `npm run quality:drawings` is 20/21) - `ttt-24-SPO-06-Buffer_Stand` aborts at step 17: `boolean union ... has no usable mesh`. Measured 2026-11-26: the union itself is a valid solid (BRepCheck valid, 310508.18 mm3), but a boss coaxial with the body's cylindrical top (same radius and axis, 1.27 mm overlap at x 53.975..55.245) leaves the shared strip face (cylinder, 87.1458 mm2) with parametric range u [0, 2pi] instead of [0, 2.932]; BRepMesh gives it 4 triangles off its boundary, so `mesh.rs` `mesh_with` finds 32 open edges (one closed loop around that strip) and refuses. UnifySameDomain makes the last step invalid but is not the only cause. Tried and insufficient: fuzzy retry (result is sound), keeping the unmerged result, a `unify: false` recipe flag + a healed-copy mesh attempt (ShapeFix, FixShifted + FixPeriodicDegenerated): step 17 then passes but step 23 fails the same way, the damaged face stays in the solid. Fix at the source: heal faces of periodic surfaces after the boolean in `boolean_op` / `boolean_many.cxx` keeping face names; add a Rust regression (arc-top body + coaxial cylinder + a further union -> `display_mesh` closed). The gate is not in `npm run check`: wire it to run when `solver/` changes.
+
+## Realistic visualisation (spec: `docs/decisions/RV1-realistic-visualisation.md`; gap to Blender measured 2026-11-27)
+
+- `[TODO]` **RV-M3** path-traced `render_realistic` (new crate `llull-pathtrace`, EXR + tone-mapped PNG, denoiser); owner decision 2026-11-27 "yes, plan it" (RV1 section 6). Deps: RV-M1, RV-M2.
+- `[TODO]` **RV-M1** appearance data: `MeshData` uvs / normals, image asset store, `import_texture`, `set_material_appearance`, offline appearance library (Lane 1 + Lane 4).
+- `[TODO]` **RV-M2** `light` and `camera` entity kinds, `set_environment` with HDR files (Lane 1 + Lane 2). Deps: RV-M1.
+- `[TODO]` **RV-M4** viewport: HDR environment, instance-array members drawn, real-GPU human gate (Lane 2). Deps: RV-M2.
+- `[TODO]` **RV-M5** `link_document` external references with overrides, tiled mesh streaming (Lane 1 + Lane 4).
+- `[TODO]` **RV-M6** `export_usd` / `import_usd`; glTF import with textures, hierarchy, Draco / meshopt (Lane 4). Deps: RV-M1.
+- `[TODO]` **RV-M7** local data sources bound to tags, `colour_by_live_value`, time-series replay, EPSG reference systems (Lane 1).
+- `[TODO]` **RV-M8** keyframes on placement / camera / light, `scatter_on_surface` (Lane 1). Deps: RV-M2.
+- Validation layers V0 to V7 (RV1 section 7) ship with each milestone; V3 needs a pinned reference corpus rendered once by Cycles.
 
 ## Product backlog (no spec yet — write one before starting)
 

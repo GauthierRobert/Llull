@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include <BRepAlgoAPI_Cut.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
@@ -63,10 +64,16 @@ std::unique_ptr<Shape> run_many(const Shape &a, const ToolList &tools, bool unif
   std::unique_ptr<Shape> made;
   if (unify) {
     try {
-      ShapeUpgrade_UnifySameDomain unifier(result, Standard_True, Standard_True, Standard_False);
+      // on a copy with its own geometry, as boolean_op (facade.cxx): the merge must not edit edges shared with the operands
+      BRepBuilderAPI_Copy copy(result, Standard_True, Standard_False);
+      const TopoDS_Shape isolated = copy.Shape();
+      const std::vector<naming::Named> original{naming::Named{result, names}};
+      const std::vector<naming::Named> split{
+          naming::Named{isolated, naming::inherit(isolated, original, naming::history_of(original, copy), "copy")}};
+      ShapeUpgrade_UnifySameDomain unifier(isolated, Standard_True, Standard_True, Standard_False);
       unifier.AllowInternalEdges(Standard_False);
       unifier.Build();
-      const std::vector<naming::Named> split{naming::Named{result, names}};
+      if (unifier.Shape().IsNull() || !BRepCheck_Analyzer(unifier.Shape(), Standard_True).IsValid()) throw Standard_Failure("unify: invalid result");
       made = naming::wrap_named(unifier.Shape(), naming::inherit(unifier.Shape(), split, unifier.History(), "unify"));
     } catch (const Standard_Failure &) {
       made = nullptr;

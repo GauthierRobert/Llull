@@ -11,6 +11,7 @@ import { type ColumnNode } from './steelFraming';
 import { selfWeightPerMetre, type SteelBar } from './steelMemberBars';
 import { analysedRow, columnSection, metres, ULS_COMBINATION, type CheckLine, type MemberRow } from './steelMemberRows';
 import { maxOf } from '@lib/arrayExtrema';
+import { resistanceText, verdictSign } from './verdictSign';
 
 /** Beam ends whose axes differ by less than this are one level, mm. */
 const LEVEL_TOLERANCE = 300;
@@ -81,7 +82,7 @@ export function checkColumn(column: SteelBar, segments: ReadonlyArray<ColumnSegm
         name: 'cross-section compression (§6.2.4)',
         utilisation: sectionUtilisation,
         combination: ULS_COMBINATION,
-        detail: `${profile.name} class ${sectionClass}, z ${metres(segment.from)}–${metres(segment.to)} m: N ${segment.axial.toFixed(0)} kN ≤ Npl,Rd ${(resistance.axial / 1000).toFixed(0)} kN`,
+        detail: `${profile.name} class ${sectionClass}, z ${metres(segment.from)}–${metres(segment.to)} m: N ${segment.axial.toFixed(0)} kN ${verdictSign(axial, resistance.axial)} Npl,Rd ${resistanceText(resistance.axial / 1000)} kN`,
       };
     }
     const result = memberBuckling(profile, column.fy, axial, 0, { major: length, minor: length });
@@ -91,7 +92,7 @@ export function checkColumn(column: SteelBar, segments: ReadonlyArray<ColumnSegm
         name: 'flexural buckling (§6.3.1)',
         utilisation: result.utilisation,
         combination: ULS_COMBINATION,
-        detail: `${profile.name} (${curveText(profile.shape, profile.h / profile.b > 1.2)}), z ${metres(segment.from)}–${metres(segment.to)} m, Lcr ${metres(length)} m: N ${segment.axial.toFixed(0)} kN ≤ Nb,Rd ${((chi * resistance.axial) / 1000).toFixed(0)} kN (χ ${chi.toFixed(2)})`,
+        detail: `${profile.name} (${curveText(profile.shape, profile.h / profile.b > 1.2)}), z ${metres(segment.from)}–${metres(segment.to)} m, Lcr ${metres(length)} m: N ${segment.axial.toFixed(0)} kN ${verdictSign(axial, chi * resistance.axial)} Nb,Rd ${resistanceText((chi * resistance.axial) / 1000)} kN (χ ${chi.toFixed(chi < 0.1 ? 3 : 2)})`,
       };
     }
   }

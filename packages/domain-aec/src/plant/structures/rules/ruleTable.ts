@@ -4,7 +4,7 @@
  * Grade policy: A rows gate (fail), B rows only warn, C rows are never loaded.
  */
 
-import table from './accessRules.json';
+import table from './accessRules.json' with { type: 'json' };
 
 /** Date of the table; every finding reports it. Change it whenever a row changes (OSHA 2036 repeal, ISO rows promoted). */
 export const RULE_TABLE_VERSION = '2026-10-18';

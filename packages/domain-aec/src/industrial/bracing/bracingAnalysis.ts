@@ -27,6 +27,7 @@ import {
 } from './bracingPanelRows';
 import { maxOf, minOf } from '@lib/arrayExtrema';
 import { appendAll } from '@lib/appendAll';
+import { verdictSign } from '../steelDesign/verdictSign';
 
 /** Steel members of `levelId` with endpoints in mm. */
 export function locateMembers(doc: CadDocument, levelId: string): Located[] {
@@ -76,7 +77,7 @@ function gablePostRows(
         moment,
         momentResistance,
         utilisation: Math.max(moment / momentResistance, reaction / shearResistance),
-        check: `${post.member.profile} (y ${round(planeY, 0)} mm): q ${load.toFixed(2)} kN/m, h ${height.toFixed(2)} m, M ${moment.toFixed(1)} ≤ Mpl,Rd ${momentResistance.toFixed(1)} kNm, V ${reaction.toFixed(1)} ≤ Vpl,Rd ${shearResistance.toFixed(1)} kN`,
+        check: `${post.member.profile} (y ${round(planeY, 0)} mm): q ${load.toFixed(2)} kN/m, h ${height.toFixed(2)} m, M ${moment.toFixed(1)} ${verdictSign(moment, momentResistance)} Mpl,Rd ${momentResistance.toFixed(1)} kNm, V ${reaction.toFixed(1)} ≤ Vpl,Rd ${shearResistance.toFixed(1)} kN`,
       });
     });
   }
