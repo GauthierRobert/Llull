@@ -279,6 +279,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **RV-M8** keyframes on placement / camera / light, `scatter_on_surface` (Lane 1). Deps: RV-M2.
 - Validation layers V0 to V7 (RV1 section 7) ship with each milestone; V3 needs a pinned reference corpus rendered once by Cycles.
 
+- `[TODO]` **PROD-UI-STALE** (Lane 5) `npm run production:ui` cannot pass today: measured 2026-11-27 with the container's Chromium, 4 of 4 scenarios fail, 3 at `tests/production/ui/exports.ts` `saveProject` waiting 30 s for a download. The page snapshot shows the redesigned top bar (3D / 2D, Shortcuts, More): the button "Save project to a JSON file" the driver clicks is no longer on it (UX1 shell). The scripted driver of the same scenarios is 13 of 13. Retarget the UI driver to Electron (LC1) or update its locators; until then the UI column of docs/PRODUCTION_GATE.md is not evidence.
+
 ## Product backlog (no spec yet — write one before starting)
 
 - `[TODO]` **S3b** left after S3 (2026-11-07, docs/decisions/S3-hatch-region.md): pick-point hatch over loose lines (planar face finding), hatch import from DXF, more standard hatch patterns (ANSI/ISO), a hatch-edit command, `explode` of a region, associative regions (today editing a source shape does not update the region). _Lane 1+3_
