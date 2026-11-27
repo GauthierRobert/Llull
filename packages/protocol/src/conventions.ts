@@ -147,6 +147,7 @@ wildly unexpected orientation. Always use radians.
 | \`add_cone\`        | Create a cone (base-center anchor)                 |
 | \`add_torus\`       | Create a torus/donut (center anchor)               |
 | \`add_wedge\`       | Create a wedge/ramp (lower-front-left anchor)      |
+| \`add_light\` / \`add_camera\` | Scene objects (no geometry): sun/point/spot/area light, physical camera; \`render_view camera: <id>\` looks through it |
 | \`add_pyramid\`     | Create a rectangular pyramid (base-center anchor)  |
 | \`sweep_profile\`   | Pipe/tube/rail along a path; \`stations\` = tapered/variable section |
 | \`loft_sections\`   | Skin a solid through 2+ sections (round→square, tapered bodies) |

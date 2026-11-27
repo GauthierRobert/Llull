@@ -4,6 +4,8 @@ import type { CadDocument, Entity } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
+import { isSceneObject } from '../../model/sceneKinds';
+import { cameraFieldsProblem, lightFieldsProblem } from '../scene/validate';
 import { regionNetArea } from '../../geometry/region';
 import { len3 } from '../../lib/vec3';
 import { isPositiveNumber } from '../../lib/isFiniteNumber';
@@ -40,8 +42,17 @@ const issue = (severity: IssueSeverity, code: string, message: string, entityId?
   ...(entityId !== undefined ? { entityId } : {}),
 });
 
+/** A light / camera with an out-of-range field (a document edited by hand or an old command bug), as a `degenerate_size` error. */
+function checkSceneObject(e: Entity): Issue[] {
+  const problem = e.kind === 'light' ? lightFieldsProblem({ ...e }) : e.kind === 'camera' ? cameraFieldsProblem({ ...e }) : null;
+  return problem === null
+    ? []
+    : [issue('error', 'degenerate_size', `${e.kind === 'light' ? 'Light' : 'Camera'} entity '${e.id}': ${problem}.`, e.id)];
+}
+
 /** Degenerate geometry: sizes, radii, and depths that are not finite and > 0 (`POSITIVE_FIELDS`). */
 function checkDegenerateGeometry(e: Entity): Issue[] {
+  if (isSceneObject(e)) return checkSceneObject(e);
   const label = e.kind.charAt(0).toUpperCase() + e.kind.slice(1);
   const degenerate = (detail: string): Issue => issue('error', 'degenerate_size', `${label} entity '${e.id}' ${detail}.`, e.id);
   const fields: Record<string, unknown> = { ...e };
@@ -193,7 +204,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number, kernel: G
       ...checkDegenerateGeometry(entity),
       ...checkInsufficientPoints(entity),
       ...checkOpenProfile(entity),
-      ...checkFarFromOrigin(entity, doc, farThreshold),
+      ...(isSceneObject(entity) ? [] : checkFarFromOrigin(entity, doc, farThreshold)),
     ]),
     ...checkEmptyLayers(doc),
     ...checkOrphanedGroupMembers(doc),

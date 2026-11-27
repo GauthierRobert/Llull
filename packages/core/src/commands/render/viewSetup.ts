@@ -4,7 +4,11 @@
  * @pure
  */
 
-import type { CadDocument, Vec3 } from '../../model/types';
+import type { CadDocument, CameraEntity, Vec3 } from '../../model/types';
+import { cameraVerticalFov } from '../../model/sceneKinds';
+import { aimDirection, upDirection } from '../../lib/lookAt';
+import { toDegrees } from '../../lib/angle';
+import { cameraFieldsProblem } from '../scene/validate';
 import type { ViewpointCamera } from '../../model/review';
 import { VIEWPORT_FOV_DEGREES } from '../../model/viewport';
 import { boundsCenter, boundsRadius } from '../../geometry/bounds';
@@ -42,16 +46,49 @@ interface ViewParams {
   readonly projection?: 'orthographic' | 'perspective' | undefined;
   readonly fovDeg?: number | undefined;
   readonly viewpointId?: string | undefined;
+  readonly camera?: string | undefined;
 }
 
 export type ViewSetup =
   | { readonly projection: 'orthographic' | 'perspective'; readonly view?: ExplicitView }
-  | { readonly code: 'VIS_VIEWPOINT_NOT_FOUND' | 'VIS_CAMERA_INVALID'; readonly message: string };
+  | { readonly code: ViewSetupCode; readonly message: string };
+
+type ViewSetupCode =
+  | 'VIS_VIEWPOINT_NOT_FOUND'
+  | 'VIS_CAMERA_INVALID'
+  | 'SCENE_CAMERA_NOT_FOUND'
+  | 'SCENE_NOT_A_CAMERA'
+  | 'SCENE_CAMERA_INVALID';
+
+/** Perspective view from a camera entity: its position, aim and up, and the vertical field of view of its sensor / focal length. */
+function cameraEntityView(entity: CameraEntity, center: Vec3): ExplicitView | string {
+  const problem = cameraFieldsProblem({ ...entity });
+  if (problem !== null) return problem;
+  const fovDeg = toDegrees(cameraVerticalFov(entity));
+  const camera: ViewpointCamera = {
+    projection: 'perspective',
+    eye: entity.position,
+    direction: aimDirection(entity.rotation),
+    up: upDirection(entity.rotation),
+    fovDeg,
+  };
+  return viewpointView(camera, 0, 0, center);
+}
 
 /** Explicit camera for a viewpoint or a perspective view; no `view` = the historical framed orthographic camera. */
 export function resolveViewSetup(doc: CadDocument, params: ViewParams, width: number, height: number): ViewSetup {
   const snapshot = computeSceneSnapshot(doc);
   const center = params.target ?? (snapshot.bounds ? boundsCenter(snapshot.bounds) : ORIGIN);
+  if (params.camera !== undefined) {
+    if (params.viewpointId !== undefined) return { code: 'VIS_CAMERA_INVALID', message: 'give camera or viewpointId, not both' };
+    const entity = doc.entities[params.camera];
+    if (entity === undefined) return { code: 'SCENE_CAMERA_NOT_FOUND', message: `no entity '${params.camera}'` };
+    if (entity.kind !== 'camera')
+      return { code: 'SCENE_NOT_A_CAMERA', message: `entity '${params.camera}' is kind '${entity.kind}', not a camera` };
+    const view = cameraEntityView(entity, center);
+    if (typeof view === 'string') return { code: 'SCENE_CAMERA_INVALID', message: `camera '${params.camera}': ${view}` };
+    return { projection: 'perspective', view };
+  }
   if (params.viewpointId !== undefined) {
     const viewpoint = doc.review?.viewpoints[params.viewpointId];
     if (viewpoint === undefined) return { code: 'VIS_VIEWPOINT_NOT_FOUND', message: `no viewpoint '${params.viewpointId}'` };

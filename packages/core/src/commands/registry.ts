@@ -36,6 +36,7 @@ import { surfaceCommands } from './surface/catalog';
 import { meshCommands } from './mesh/catalog';
 import { deformCommands } from './deform/catalog';
 import { wrapCommands } from './wrap/catalog';
+import { sceneCommands } from './scene/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -66,6 +67,7 @@ registerCommands('core', [
   ...meshCommands,
   ...deformCommands,
   ...wrapCommands,
+  ...sceneCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

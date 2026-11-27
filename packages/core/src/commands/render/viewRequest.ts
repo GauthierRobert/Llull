@@ -27,6 +27,12 @@ export const viewParams = {
     .string()
     .optional()
     .describe('Render from a saved viewpoint (save_viewpoint): its camera replaces view / direction / target / zoom / projection.'),
+  camera: z
+    .string()
+    .optional()
+    .describe(
+      'Render from a camera entity (add_camera): perspective, from its position along its aim with its up vector, with the vertical field of view of its focal length and sensor (the image aspect comes from width / height). Replaces view / direction / zoom / projection / fovDeg; not with viewpointId, turntable, isolate or section. Unknown id: SCENE_CAMERA_NOT_FOUND; another kind: SCENE_NOT_A_CAMERA. Depth of field and exposure are not drawn here (render_realistic, planned); lights do not change this render.',
+    ),
   renderer: z
     .enum(['reference', 'native'])
     .optional()
@@ -44,6 +50,7 @@ interface ViewRequest {
   readonly projection?: 'orthographic' | 'perspective' | undefined;
   readonly fovDeg?: number | undefined;
   readonly viewpointId?: string | undefined;
+  readonly camera?: string | undefined;
   readonly renderer?: 'reference' | 'native' | undefined;
   readonly turntable?: unknown;
   readonly isolate?: unknown;
@@ -69,7 +76,8 @@ export function prepareView(
   ctx: ExecutionContext | undefined,
 ): PreparedView {
   const setup = resolveViewSetup(doc, { ...params, zoom: options.zoom }, width, height);
-  if ('code' in setup) return { ...setup, paths: [params.viewpointId !== undefined ? 'viewpointId' : 'fovDeg'] };
+  if ('code' in setup)
+    return { ...setup, paths: [params.camera !== undefined ? 'camera' : params.viewpointId !== undefined ? 'viewpointId' : 'fovDeg'] };
   const perspective = setup.projection === 'perspective';
   if (perspective && options.mode === 'vector')
     return { code: 'VIS_RENDER_INVALID', message: 'perspective renders are raster-only (omit mode or use "raster")', paths: ['mode'] };
@@ -80,7 +88,11 @@ export function prepareView(
       paths: ['projection'],
     };
   if (setup.view !== undefined) options.view = setup.view;
-  const data = { projection: setup.projection, ...(params.viewpointId !== undefined ? { viewpointId: params.viewpointId } : {}) };
+  const data = {
+    projection: setup.projection,
+    ...(params.viewpointId !== undefined ? { viewpointId: params.viewpointId } : {}),
+    ...(params.camera !== undefined ? { cameraId: params.camera } : {}),
+  };
   if (params.renderer !== 'native')
     return { perspective, finish: (d, summary, base) => report(d, summary, { ...base, ...data, ...referenceProvenance(base.svg) }) };
   if (options.mode === 'vector')

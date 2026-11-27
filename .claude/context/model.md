@@ -18,7 +18,8 @@ type SolidKind = (typeof SOLID_KINDS)[number];  // 'box' | 'cylinder' | 'sphere'
                // | 'subdivision'
 type Shape2DKind = (typeof SHAPE2D_KINDS)[number];  // 'line' | 'polyline' | 'arc' | 'circle'
                // | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'region' | 'text' | 'dimension' | 'image'
-type EntityKind = SolidKind | Shape2DKind | 'instance';
+type SceneKind = (typeof SCENE_KINDS)[number];  // 'light' | 'camera' (model/sceneKinds.ts; no geometry, neither is2D nor is3D)
+type EntityKind = SolidKind | Shape2DKind | SceneKind | 'instance';
 ```
 
 ## Entities (discriminated union on `kind`)
@@ -64,6 +65,8 @@ DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'diamet
 ImageEntity      'image'      dataUrl (png/jpeg base64); pixelWidth/Height; width/height (units, lower-left at position); opacity; locked — raster underlay, pixel (0,0) = top-left (geometry/imageUnderlay.ts)
 // CurveSegment<P> (model/curve.ts): {type:'line', points:[a,b]} | {type:'arc', points:[start,through,end]} | {type:'bezier', points:[p0,p1,p2,p3]}
 // Assembly
+LightEntity      'light'      lightType: sun|point|spot|area; intensity (sun W/m², others W); lightColor; radius; coneAngle?/blend? (spot); width?/height? (area); castShadows — local -Z is the aim, position places it; add_light / edit_light (commands/scene/)
+CameraEntity     'camera'     focalLength, sensorWidth, sensorHeight (mm); focusDistance; fStop? — looks along local -Z, local +Y up; add_camera / edit_camera; render_view `camera: <id>`. Scene objects are skipped by geometry, exports and scene bounds (isSceneObject)
 InstanceEntity   'instance'   componentId; scale?: Vec3
 ```
 

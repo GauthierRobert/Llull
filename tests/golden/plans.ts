@@ -418,6 +418,33 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'set_camera', params: { azimuth: 0.5, polar: 1, distance: 30 } },
     { command: 'animate', params: { targetId: '$b', mode: 'spin', speed: 1 } },
   ],
+  scene_lights_cameras: [
+    { command: 'add_box', params: { size: [4, 2, 1], position: [0, 0, 0] }, as: 'b' },
+    {
+      command: 'add_light',
+      params: { lightType: 'sun', position: [0, 0, 50], target: [0, 0, 0], name: 'Sun', castShadows: true },
+      as: 'sun',
+    },
+    {
+      command: 'add_light',
+      params: {
+        lightType: 'spot',
+        position: [3, -3, 4],
+        target: [0, 0, 0.5],
+        coneAngle: 0.6,
+        blend: 0.2,
+        intensity: 800,
+        color: '#ffd9a0',
+      },
+      as: 'spot',
+    },
+    { command: 'add_light', params: { lightType: 'area', position: [0, 0, 5], width: 2, height: 1 }, as: 'panel' },
+    { command: 'add_camera', params: { position: [8, -8, 5], target: [0, 0, 0.5], focalLength: 35, fStop: 4, name: 'Hero' }, as: 'cam' },
+    { command: 'edit_light', params: { id: '$spot', intensity: 1200 } },
+    { command: 'edit_camera', params: { id: '$cam', focalLength: 50 } },
+    { command: 'array_linear', params: { id: '$panel', count: 2, offset: [0, 4, 0] } },
+    { command: 'render_view', params: { camera: '$cam', width: 200, height: 150 } },
+  ],
   building_shell_from_primitives: [
     { command: 'add_layer', params: { name: 'Walls' }, as: 'lw' },
     { command: 'add_box', params: { size: [10, 0.3, 3], position: [0, 0, 1.5] }, as: 'w1' },

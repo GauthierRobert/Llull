@@ -4,6 +4,7 @@
  * or a null result is a no-op.
  */
 
+import { isSceneObject } from '../../model/sceneKinds';
 import { type CadDocument, type Entity, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -111,7 +112,15 @@ function runBoolean(
   const missing = ids.find((_, i) => !operands[i]);
   if (missing !== undefined) return noop(doc, `${opName}: entity '${missing}' not found.`);
   const flat = ids.find((_, i) => !is3D(operands[i] as Entity));
-  if (flat !== undefined) return noop(doc, `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`);
+  if (flat !== undefined) {
+    const flatEntity = doc.entities[flat] as Entity;
+    return noop(
+      doc,
+      isSceneObject(flatEntity)
+        ? `${opName}: entity '${flat}' is a ${flatEntity.kind} (a scene object with no geometry); boolean operations require 3D solids.`
+        : `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`,
+    );
+  }
   const instanced = ids.find((_, i) => (operands[i] as Entity).kind === 'instance');
   if (instanced !== undefined && engine === 'mesh')
     return noop(
