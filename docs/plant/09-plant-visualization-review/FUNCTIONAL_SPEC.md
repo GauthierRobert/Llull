@@ -98,7 +98,8 @@ Out of scope:
 - P&ID colouring (04-pid-schematics).
 - Point clouds (10-pointcloud-brownfield).
 - VR headsets.
-- Physically-based offline path tracing. `render_view` stays a deterministic rasteriser.
+- Physically-based offline path tracing inside `render_view`: it stays a deterministic rasteriser. A separate, non-reference
+  command `render_realistic` is planned by owner decision (2026-11-27, `docs/decisions/RV1-realistic-visualisation.md` RV-M3).
 
 ## 5. Functional requirements
 

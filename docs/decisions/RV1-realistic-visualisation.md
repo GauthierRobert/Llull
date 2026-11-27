@@ -1,8 +1,8 @@
 # RV1 — Realistic visualisation and large scenes: the gap to Blender (2026-11-27)
 
-**Status:** proposal, written at the owner's request ("why does Blender succeed with big, very realistic 3D models and digital
+**Status:** planned (owner decision of §6, 2026-11-27); nothing built. Written at the owner's request ("why does Blender succeed with big, very realistic 3D models and digital
 twins, what are we missing; evaluate the gap, verify it against what we have, write the specs and the validation layers").
-Nothing here is built. §6 needs one owner decision before any work starts.
+Nothing here is built.
 
 ## 1. The short answer
 
@@ -152,10 +152,11 @@ network (AF-41).
 
 Order: M1 → M2 → M3 give the first realistic image; M4 and M6 follow; M5, M7, M8 are independent.
 
-## 6. Owner decision needed
+## 6. Owner decision (2026-11-27)
 
-Spec 09 lists physically based path tracing as out of scope. RV-M3 adds it as a separate command and leaves `render_view`
-deterministic. **Confirm that a second, non-reference renderer is wanted** before M3 starts; M1, M2, M4, M5 and M6 do not depend on it.
+Asked whether a second, photo-realistic renderer is wanted beside the deterministic `render_view`, the owner answered **"Yes, plan
+it"**. RV-M3 is therefore in scope as planned work: a new command `render_realistic`, `render_view` unchanged. Spec 09 is amended
+to say so. Order stays M1 (appearance data) → M2 (lights, cameras, environment) → M3; nothing is built yet.
 
 ## 7. Validation layers
 

@@ -12,6 +12,8 @@ layout are assumptions of the author, and every result llull reports stays "revi
 | `bracket-fea.plan.json`             | A welded platform bracket with a static analysis set-up (mesh and solve are separate commands, see below) |
 | `bracket-topology.plan.json`        | A design space with a topology study for the same kind of bracket                                         |
 
+To evaluate llull on this model with real engineers, use the pilot kit: [`PILOT.md`](PILOT.md).
+
 ## Run it
 
 ```bash
