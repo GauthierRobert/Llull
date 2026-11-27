@@ -54,6 +54,9 @@ export async function exportPackage(
 /** Top bar "Save": the project file the office archives. */
 export async function saveProject(session: UiSession): Promise<string> {
   await session.deselect();
-  const file = await session.download(() => session.page.getByRole('button', { name: 'Save project to a JSON file' }).click());
+  // The shell keeps New / Open / Save in the "More" menu of the top bar (UX1): open it when the button is not shown.
+  const save = session.page.getByRole('button', { name: 'Save project to a JSON file' });
+  if (!(await save.isVisible())) await session.page.getByRole('button', { name: 'More', exact: true }).click();
+  const file = await session.download(() => save.click());
   return file.text;
 }

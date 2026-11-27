@@ -96,7 +96,13 @@ export class CivilUiDriver {
         await this.page.getByLabel('Survey format').selectOption(text(args['format']));
         await this.page.getByLabel('Survey unit').selectOption(text(args['sourceUnit']));
         await this.fill('Point group name', text(args['name']));
-        return this.act('import survey', 'Import points');
+        // the submit button counts the lines once a file is loaded ("Import 911 lines"), "Import points" while the box is empty
+        return this.session.acting('import survey', () =>
+          this.page
+            .getByRole('form', { name: 'Import survey points' })
+            .getByRole('button', { name: /^Import (points|\d+ lines?)$/ })
+            .click(),
+        );
       case 'create_surface':
         await this.fill('Surface name', text(args['name']));
         await this.fill('Contour interval', text(args['contourInterval']));
