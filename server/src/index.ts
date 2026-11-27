@@ -3,6 +3,7 @@
  *   GET /health            liveness + active kernel (`kernel`), { active, requested, fallbackReason } (`kernelStatus`), autosave; Host allowlist; `insecure: true` when token-less
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/step   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
+ *   GET /assets/image/:key  `imageAssetRoutes.ts` (texture bytes of the image asset store)
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
  *
  * Env: PORT (3001), HOST (127.0.0.1; loopback only: the backend is local, one per machine, LC1), LLULL_BODY_LIMIT (2mb),
@@ -23,6 +24,7 @@ import { getActiveKernelName, getKernelStatus } from './geometryKernel';
 import { getAutosaveStatus } from './liveDocument';
 import { buildLiveRouter } from './liveRoutes';
 import { buildCfdFileRouter } from './cfdFileRoutes';
+import { buildImageAssetRouter } from './imageAssetRoutes';
 import { buildViewportRouter } from './viewport/captureRoutes';
 import { buildRecoveryRouter } from './recoveryRoutes';
 import { buildPreviewRouter } from './previewRoutes';
@@ -99,6 +101,7 @@ const exchange = exchangeOptionsWithDwg();
 
 app.use(buildLiveRouter(restLimiter));
 app.use(buildCfdFileRouter(restLimiter));
+app.use(buildImageAssetRouter(restLimiter));
 app.use(buildViewportRouter(restLimiter));
 app.use(buildRecoveryRouter(restLimiter));
 app.use(buildPreviewRouter(restLimiter));

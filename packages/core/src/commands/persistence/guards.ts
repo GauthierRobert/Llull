@@ -1,3 +1,4 @@
+import { appearanceShapeProblem, meshAttributeProblem } from './appearanceValidation';
 import { storedMaterialModelsProblem } from '../document/materialModelStored';
 import { getMeshAssetPort } from '../../geometry/mesh/assets';
 import type { MeshAssetRef } from '../../model/meshProvenance';
@@ -266,6 +267,10 @@ function baseOptionalProblem(v: Record<string, unknown>): string | null {
   if (v['name'] !== undefined && typeof v['name'] !== 'string') return 'name must be a string';
   if (v['materialId'] !== undefined && typeof v['materialId'] !== 'string') return 'materialId must be a string';
   if (v['patternSourceId'] !== undefined && typeof v['patternSourceId'] !== 'string') return 'patternSourceId must be a string';
+  if (v['appearance'] !== undefined) {
+    const problem = appearanceShapeProblem('appearance', v['appearance']);
+    if (problem !== null) return problem;
+  }
   if (v['fastener'] !== undefined && v['fastener'] !== true) return 'fastener must be true when present';
   if (v['fastener'] === true && v['kind'] !== 'instance' && !(SOLID_KINDS as readonly string[]).includes(String(v['kind'])))
     return 'fastener applies to 3D solids and instances only';
@@ -405,6 +410,8 @@ function meshProblem(v: Record<string, unknown>): string | null {
       !vertexColors.every((c) => isFiniteNumber(c) && c >= 0 && c <= 255))
   )
     return 'vertexColors must be 3 numbers in [0, 255] per mesh vertex';
+  const attributes = meshAttributeProblem(mesh, vertexCount);
+  if (attributes !== null) return attributes;
   const provenance = meshProvenanceProblem(v, indices.length / 3);
   if (provenance !== null) return provenance;
   const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
@@ -516,6 +523,10 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
       v['propertyModels'],
     );
     if (laws !== null) return laws;
+  }
+  if (v['appearance'] !== undefined) {
+    const problem = appearanceShapeProblem(`material '${name}'.appearance`, v['appearance']);
+    if (problem !== null) return problem;
   }
   const finish = v['finish'];
   if (finish === undefined) return null;

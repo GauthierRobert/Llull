@@ -1369,6 +1369,22 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
   ],
   // PHY-21 reference single-cylinder engine (VC-FPR-24; validation/README §4)
   dynamics_reference_engine: referenceEnginePlan,
+  // RV1 RV-M1: material appearance, library appearances (material and entity override), flat colour environment; no files needed
+  appearance_materials: [
+    { command: 'create_material', params: { name: 'steel_s355', density: 7850, densityUnit: 'kg/m^3', color: '#999999' } },
+    {
+      command: 'set_material_appearance',
+      params: { material: 'steel_s355', metalness: 1, roughness: { value: 0.35 }, baseColor: '#8a8d91' },
+    },
+    { command: 'create_material', params: { name: 'paint', density: 1200, densityUnit: 'kg/m^3' } },
+    { command: 'apply_appearance', params: { appearance: 'painted', material: 'paint', color: '#1e5aa8' } },
+    { command: 'add_box', params: { size: [4, 2, 1] }, as: 'beam' },
+    { command: 'add_box', params: { size: [1, 1, 1], position: [6, 0, 0] }, as: 'window' },
+    { command: 'assign_material', params: { materialName: 'steel_s355', entityIds: ['$beam'] } },
+    { command: 'apply_appearance', params: { appearance: 'glass', entityIds: ['$window'] } },
+    { command: 'set_environment', params: { source: 'color', color: '#d8e6f2', intensity: 0.8 } },
+    { command: 'list_appearances', params: {} },
+  ],
   kernel_boolean_union: [
     { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
     { command: 'add_box', params: { size: [2, 2, 2], position: [1, 1, 1] }, as: 'b' },

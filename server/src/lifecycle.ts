@@ -13,6 +13,8 @@ import { installArtifactPort } from '@implicit/index';
 import { defaultFeArtifactStore } from './fea/artifactStore';
 import { installFieldEngine } from './native/fieldEngine';
 import { defaultMeshAssetStore } from './meshAssets/store';
+import { defaultImageAssetStore } from './imageAssets/store';
+import { setImageAssetPort } from '@core/geometry/imageAssets';
 import { installGeometryQueryEngine } from './native/geometryQueryEngine';
 import { installSpatialIndex } from './native/spatialIndexPort';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
@@ -79,6 +81,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
   installGeometryQueryEngine();
   installSpatialIndex();
   setMeshAssetPort(defaultMeshAssetStore());
+  setImageAssetPort(defaultImageAssetStore());
   installArtifactPort(defaultFeArtifactStore());
   installFieldEngine();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
