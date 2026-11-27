@@ -1,0 +1,4263 @@
+{
+  "actions": [
+    { "command": "set_piping_settings", "params": { "lineNumberTemplate": "{service}-{sequence}-{dn}" } },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "T-101",
+        "mark": "N1",
+        "dn": 300,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "shell", "elevation": 704, "orientationDeg": 90 },
+        "projection": 5200
+      }
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "T-102",
+        "mark": "N1",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "shell", "elevation": 2994, "orientationDeg": 270 },
+        "projection": 4200
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JC",
+        "sequence": "1001",
+        "spec": "SUG150",
+        "dn": 300,
+        "from": "T-101",
+        "to": "P-101A/B",
+        "designTempC": 95,
+        "designPressureBarG": 6,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "l1"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$l1",
+        "from": { "portId": "T-101:N1" },
+        "to": { "portId": "P-101A:SUC" },
+        "inline": [{ "type": "valveGate", "tag": "HV-1001A", "at": { "leg": 0, "centreDistance": 2600 } }]
+      },
+      "as": "r1"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JC",
+        "sequence": "1011",
+        "spec": "SUG150",
+        "dn": 300,
+        "from": "JC-1001",
+        "to": "P-101B",
+        "designTempC": 95,
+        "designPressureBarG": 6,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "l1b"
+    },
+    {
+      "command": "add_branch",
+      "params": {
+        "runId": "$r1",
+        "lineId": "$l1b",
+        "at": { "point": [-7500, 27000, 710] },
+        "dn": 300,
+        "legs": [{ "direction": "+Y", "length": 3500 }],
+        "to": { "portId": "P-101B:SUC" }
+      },
+      "as": "r1b"
+    },
+    {
+      "command": "insert_inline_component",
+      "params": { "runId": "$r1b", "type": "valveGate", "tag": "HV-1001B", "at": { "leg": 1, "centreDistance": 1800 } }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JC",
+        "sequence": "1002",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "P-101A/B",
+        "to": "E-301",
+        "designTempC": 115,
+        "designPressureBarG": 10,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "l2"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$l2",
+        "from": { "portId": "P-101A:DIS" },
+        "to": { "portId": "E-301:N1" },
+        "legs": [{ "direction": "+Z", "length": 4690 }],
+        "inline": [
+          { "type": "valveCheck", "tag": "CV-1002A", "at": { "leg": 0, "centreDistance": 1700 } },
+          { "type": "valveGate", "tag": "HV-1002A", "at": { "leg": 0, "centreDistance": 3300 }, "stemDirection": [0, -1, 0] },
+          { "type": "instrument", "tag": "FE-301", "at": { "leg": 1, "centreDistance": 3300 }, "lengthMm": 400 },
+          { "type": "valveGlobe", "tag": "FV-301", "at": { "leg": 1, "centreDistance": 5200 } }
+        ]
+      },
+      "as": "r2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JC",
+        "sequence": "1012",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "P-101B",
+        "to": "JC-1002",
+        "designTempC": 115,
+        "designPressureBarG": 10,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "l2b"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$l2b",
+        "from": { "onRun": { "runId": "$r2", "at": { "point": [-3175, 27000, 6000] } } },
+        "to": { "portId": "P-101B:DIS" },
+        "legs": [{ "direction": "+Y", "length": 3500 }]
+      },
+      "as": "r2b"
+    },
+    {
+      "command": "insert_inline_component",
+      "params": {
+        "runId": "$r2b",
+        "type": "valveGate",
+        "tag": "HV-1002B",
+        "at": { "leg": 1, "centreDistance": 1500 },
+        "stemDirection": [0, -1, 0]
+      }
+    },
+    {
+      "command": "insert_inline_component",
+      "params": { "runId": "$r2b", "type": "valveCheck", "tag": "CV-1002B", "at": { "leg": 1, "centreDistance": 3000 } }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JT",
+        "sequence": "103",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "E-301",
+        "to": "E-302",
+        "designTempC": 125,
+        "designPressureBarG": 6,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "t0"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$t0",
+        "from": { "portId": "E-301:N2" },
+        "to": { "portId": "E-302:N1" },
+        "legs": [
+          { "direction": "+X", "length": 2600 },
+          { "direction": "+Z", "length": 1700 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-103", "at": { "leg": 0, "centreDistance": 1300 } }]
+      },
+      "as": "rt0"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JT",
+        "sequence": "104",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "E-302",
+        "to": "E-303",
+        "designTempC": 125,
+        "designPressureBarG": 6,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "t1"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$t1",
+        "from": { "portId": "E-302:N2" },
+        "to": { "portId": "E-303:N1" },
+        "legs": [
+          { "direction": "+X", "length": 2600 },
+          { "direction": "+Z", "length": 1700 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-104", "at": { "leg": 0, "centreDistance": 1300 } }]
+      },
+      "as": "rt1"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JT",
+        "sequence": "105",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "E-303",
+        "to": "E-304",
+        "designTempC": 125,
+        "designPressureBarG": 6,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "t2"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$t2",
+        "from": { "portId": "E-303:N2" },
+        "to": { "portId": "E-304:N1" },
+        "legs": [
+          { "direction": "+X", "length": 2600 },
+          { "direction": "+Z", "length": 1700 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-105", "at": { "leg": 0, "centreDistance": 1300 } }]
+      },
+      "as": "rt2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JT",
+        "sequence": "106",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "E-304",
+        "to": "E-305",
+        "designTempC": 125,
+        "designPressureBarG": 6,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "t3"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$t3",
+        "from": { "portId": "E-304:N2" },
+        "to": { "portId": "E-305:N1" },
+        "legs": [
+          { "direction": "+X", "length": 2600 },
+          { "direction": "+Z", "length": 1700 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-106", "at": { "leg": 0, "centreDistance": 1300 } }]
+      },
+      "as": "rt3"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "SY",
+        "sequence": "1007",
+        "spec": "SUG150",
+        "dn": 150,
+        "from": "E-305",
+        "to": "P-102A",
+        "designTempC": 95,
+        "designPressureBarG": 6,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "l7"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$l7",
+        "from": { "portId": "E-305:N2" },
+        "to": { "portId": "P-102A:SUC" },
+        "legs": [
+          { "direction": "+X", "length": 2500 },
+          { "direction": "-Z", "length": 3750 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-1007", "at": { "leg": 0, "centreDistance": 1250 } }]
+      },
+      "as": "r7"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "SY",
+        "sequence": "1008",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "P-102A",
+        "to": "T-102",
+        "designTempC": 95,
+        "designPressureBarG": 10,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "l8"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$l8",
+        "from": { "portId": "P-102A:DIS" },
+        "to": { "portId": "T-102:N1" },
+        "legs": [{ "direction": "+Z", "length": 2000 }],
+        "inline": [
+          { "type": "valveCheck", "tag": "CV-1008", "at": { "leg": 1, "centreDistance": 1500 } },
+          { "type": "valveGate", "tag": "HV-1008", "at": { "leg": 1, "centreDistance": 2800 } }
+        ]
+      },
+      "as": "r8"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "201",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-201",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js1"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js1",
+        "from": { "portId": "DF-101:J01" },
+        "to": { "portId": "P-201:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-201", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs1"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs1",
+        "at": [
+          [3500, 3600, 2400],
+          [4400, 1000, 2400],
+          [4400, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "301",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-201",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd1"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd1",
+        "from": { "portId": "P-201:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-301", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-301", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd1"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd1", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb1"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd1",
+        "at": [
+          [5200, 200, 12300],
+          [5200, 4300, 12300],
+          [5200, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd1", "at": [[5200, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd1",
+        "at": [
+          [5200, -2900, 3900],
+          [5200, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "202",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-202",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js2"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js2",
+        "from": { "portId": "DF-101:J02" },
+        "to": { "portId": "P-202:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-202", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs2"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs2",
+        "at": [
+          [7700, 3600, 2400],
+          [8600, 1000, 2400],
+          [8600, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "302",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-202",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd2"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd2",
+        "from": { "portId": "P-202:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-302", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-302", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd2"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd2", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb2"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd2",
+        "at": [
+          [9400, 200, 12300],
+          [9400, 4300, 12300],
+          [9400, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd2", "at": [[9400, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd2",
+        "at": [
+          [9400, -2900, 3900],
+          [9400, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "203",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-203",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js3"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js3",
+        "from": { "portId": "DF-101:J03" },
+        "to": { "portId": "P-203:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-203", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs3"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs3",
+        "at": [
+          [12800, 3600, 2400],
+          [13700, 1000, 2400],
+          [13700, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "303",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-203",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd3"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd3",
+        "from": { "portId": "P-203:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-303", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-303", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd3"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd3", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb3"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd3",
+        "at": [
+          [14500, 200, 12300],
+          [14500, 4300, 12300],
+          [14500, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd3", "at": [[14500, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd3",
+        "at": [
+          [14500, -2900, 3900],
+          [14500, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "204",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-204",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js4"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js4",
+        "from": { "portId": "DF-101:J04" },
+        "to": { "portId": "P-204:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 1400 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-204", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs4"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs4",
+        "at": [
+          [16100, 3600, 2400],
+          [17500, 1000, 2400],
+          [17500, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "304",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-204",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd4"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd4",
+        "from": { "portId": "P-204:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-304", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-304", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd4"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd4", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb4"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd4",
+        "at": [
+          [18300, 200, 12300],
+          [18300, 4300, 12300],
+          [18300, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd4", "at": [[18300, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd4",
+        "at": [
+          [18300, -2900, 3900],
+          [18300, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "205",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-205",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js5"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js5",
+        "from": { "portId": "DF-101:J05" },
+        "to": { "portId": "P-205:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-205", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs5"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs5",
+        "at": [
+          [20300, 3600, 2400],
+          [21200, 1000, 2400],
+          [21200, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "305",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-205",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd5"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd5",
+        "from": { "portId": "P-205:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-305", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-305", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd5"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd5", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb5"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd5",
+        "at": [
+          [22000, 200, 12300],
+          [22000, 4300, 12300],
+          [22000, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd5", "at": [[22000, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd5",
+        "at": [
+          [22000, -2900, 3900],
+          [22000, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "206",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-206",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js6"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js6",
+        "from": { "portId": "DF-101:J06" },
+        "to": { "portId": "P-206:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 10250 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-206", "at": { "leg": 1, "centreDistance": 9250 } }]
+      },
+      "as": "rs6"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs6",
+        "at": [
+          [25400, 3600, 2400],
+          [25400, 1000, 2400],
+          [25400, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "306",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-206",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd6"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd6",
+        "from": { "portId": "P-206:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-306", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-306", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd6"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd6", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb6"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd6",
+        "at": [
+          [26200, 200, 12300],
+          [26200, 4300, 12300],
+          [26200, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd6", "at": [[26200, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd6",
+        "at": [
+          [26200, -2900, 3900],
+          [26200, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "207",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-207",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js7"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js7",
+        "from": { "portId": "DF-101:J07" },
+        "to": { "portId": "P-207:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-207", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs7"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs7",
+        "at": [
+          [28700, 3600, 2400],
+          [29600, 1000, 2400],
+          [29600, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "307",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-207",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd7"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd7",
+        "from": { "portId": "P-207:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-307", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-307", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd7"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd7", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb7"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd7",
+        "at": [
+          [30400, 200, 12300],
+          [30400, 4300, 12300],
+          [30400, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd7", "at": [[30400, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd7",
+        "at": [
+          [30400, -2900, 3900],
+          [30400, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "208",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-208",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js8"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js8",
+        "from": { "portId": "DF-101:J08" },
+        "to": { "portId": "P-208:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-208", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs8"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs8",
+        "at": [
+          [32900, 3600, 2400],
+          [33800, 1000, 2400],
+          [33800, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "308",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-208",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd8"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd8",
+        "from": { "portId": "P-208:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-308", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-308", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd8"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd8", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb8"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd8",
+        "at": [
+          [34600, 200, 12300],
+          [34600, 4300, 12300],
+          [34600, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd8", "at": [[34600, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd8",
+        "at": [
+          [34600, -2900, 3900],
+          [34600, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "209",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-209",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js9"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js9",
+        "from": { "portId": "DF-101:J09" },
+        "to": { "portId": "P-209:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 10250 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-209", "at": { "leg": 1, "centreDistance": 9250 } }]
+      },
+      "as": "rs9"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs9",
+        "at": [
+          [38000, 3600, 2400],
+          [38000, 1000, 2400],
+          [38000, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "309",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-209",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd9"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd9",
+        "from": { "portId": "P-209:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-309", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-309", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd9"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd9", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb9"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd9",
+        "at": [
+          [38800, 200, 12300],
+          [38800, 4300, 12300],
+          [38800, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd9", "at": [[38800, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd9",
+        "at": [
+          [38800, -2900, 3900],
+          [38800, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "210",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-210",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js10"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js10",
+        "from": { "portId": "DF-101:J10" },
+        "to": { "portId": "P-210:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-210", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs10"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs10",
+        "at": [
+          [41300, 3600, 2400],
+          [42200, 1000, 2400],
+          [42200, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "310",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-210",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd10"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd10",
+        "from": { "portId": "P-210:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-310", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-310", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd10"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd10", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb10"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd10",
+        "at": [
+          [43000, 200, 12300],
+          [43000, 4300, 12300],
+          [43000, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd10", "at": [[43000, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd10",
+        "at": [
+          [43000, -2900, 3900],
+          [43000, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "211",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-211",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js11"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js11",
+        "from": { "portId": "DF-101:J11" },
+        "to": { "portId": "P-211:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-211", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs11"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs11",
+        "at": [
+          [45500, 3600, 2400],
+          [46400, 1000, 2400],
+          [46400, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "311",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-211",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd11"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd11",
+        "from": { "portId": "P-211:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-311", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-311", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd11"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd11", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb11"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd11",
+        "at": [
+          [47200, 200, 12300],
+          [47200, 4300, 12300],
+          [47200, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd11", "at": [[47200, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd11",
+        "at": [
+          [47200, -2900, 3900],
+          [47200, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "212",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-212",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js12"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js12",
+        "from": { "portId": "DF-101:J12" },
+        "to": { "portId": "P-212:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 10250 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-212", "at": { "leg": 1, "centreDistance": 9250 } }]
+      },
+      "as": "rs12"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs12",
+        "at": [
+          [50600, 3600, 2400],
+          [50600, 1000, 2400],
+          [50600, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "312",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-212",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd12"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd12",
+        "from": { "portId": "P-212:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-312", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-312", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd12"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd12", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb12"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd12",
+        "at": [
+          [51400, 200, 12300],
+          [51400, 4300, 12300],
+          [51400, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd12", "at": [[51400, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd12",
+        "at": [
+          [51400, -2900, 3900],
+          [51400, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "213",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-213",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js13"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js13",
+        "from": { "portId": "DF-101:J13" },
+        "to": { "portId": "P-213:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-213", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs13"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs13",
+        "at": [
+          [53900, 3600, 2400],
+          [54800, 1000, 2400],
+          [54800, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "313",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-213",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd13"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd13",
+        "from": { "portId": "P-213:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-313", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-313", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd13"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd13", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb13"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd13",
+        "at": [
+          [55600, 200, 12300],
+          [55600, 4300, 12300],
+          [55600, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd13", "at": [[55600, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd13",
+        "at": [
+          [55600, -2900, 3900],
+          [55600, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "214",
+        "spec": "SUG150",
+        "dn": 250,
+        "from": "DF-101",
+        "to": "P-214",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "js14"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$js14",
+        "from": { "portId": "DF-101:J14" },
+        "to": { "portId": "P-214:SUC" },
+        "legs": [
+          { "direction": "-Z", "length": 950 },
+          { "direction": "-Y", "length": 2750 },
+          { "direction": "+X", "length": 1900 },
+          { "direction": "-Y", "length": 7500 },
+          { "direction": "-Z", "length": 1800 }
+        ],
+        "inline": [{ "type": "valveGate", "tag": "HV-214", "at": { "leg": 3, "centreDistance": 6500 } }]
+      },
+      "as": "rs14"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rs14",
+        "at": [
+          [58100, 3600, 2400],
+          [60000, 1000, 2400],
+          [60000, -1500, 2400]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "JR",
+        "sequence": "314",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "P-214",
+        "to": "DF-101",
+        "designTempC": 80,
+        "designPressureBarG": 6
+      },
+      "as": "jd14"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$jd14",
+        "from": { "portId": "P-214:DIS" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 1600 },
+          { "direction": "+Z", "length": 9700 },
+          { "direction": "+Y", "length": 11900 },
+          { "direction": "-Z", "length": 450 }
+        ],
+        "inline": [
+          { "type": "valveGate", "tag": "HV-314", "at": { "leg": 1, "centreDistance": 800 } },
+          { "type": "valveCheck", "tag": "CV-314", "at": { "leg": 2, "centreDistance": 1500 } }
+        ]
+      },
+      "as": "rd14"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rd14", "at": { "leg": 3, "distance": 5400 }, "dn": 200, "legs": [{ "direction": "-Z", "length": 450 }] },
+      "as": "rb14"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd14",
+        "at": [
+          [60800, 200, 12300],
+          [60800, 4300, 12300],
+          [60800, 7200, 12300]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rd14", "at": [[60800, -2900, 6300]], "type": "anchor", "maxReach": 700 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rd14",
+        "at": [
+          [60800, -2900, 3900],
+          [60800, -2900, 9800]
+        ],
+        "type": "guide",
+        "maxReach": 700
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "LS",
+        "sequence": "2001",
+        "spec": "SUG150",
+        "dn": 300,
+        "from": "TG-801",
+        "to": "E-301 / H-201 / H-202",
+        "designTempC": 150,
+        "designPressureBarG": 3.5,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "ls"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-S1", "position": [-2000, 16000, 8262], "direction": [1, 0, 0], "dn": 300, "endType": "BW", "kind": "tie_in" },
+      "as": "s1"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$ls",
+        "from": { "portId": "TG-801:EX" },
+        "to": { "portId": "$s1" },
+        "legs": [
+          { "direction": "+Z", "length": 3462 },
+          { "direction": "+Y", "length": 22000 },
+          { "direction": "-X", "length": 47000 },
+          { "direction": "+Y", "length": 2400 },
+          { "direction": "-X", "length": 4000 },
+          { "direction": "-Y", "length": 2400 }
+        ]
+      },
+      "as": "hdr"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "LS",
+        "sequence": "2002",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "LS-2001",
+        "to": "E-301",
+        "designTempC": 150,
+        "designPressureBarG": 3.5,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "lb0"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$hdr", "lineId": "$lb0", "at": { "point": [6000, 16000, 8262] }, "dn": 200, "to": { "portId": "E-301:N3" } },
+      "as": "br0"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "LS",
+        "sequence": "2003",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "LS-2001",
+        "to": "H-201",
+        "designTempC": 150,
+        "designPressureBarG": 3.5,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "lb1"
+    },
+    {
+      "command": "add_branch",
+      "params": {
+        "runId": "$hdr",
+        "lineId": "$lb1",
+        "at": { "point": [11060, 16000, 8262] },
+        "dn": 200,
+        "legs": [{ "direction": "+Y", "length": 21000 }],
+        "to": { "portId": "H-201:S1" }
+      },
+      "as": "br1"
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$br1", "spacing": 6000, "snapToSteel": true, "type": "shoe" } },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "LS",
+        "sequence": "2004",
+        "spec": "SUG150",
+        "dn": 200,
+        "from": "LS-2001",
+        "to": "H-202",
+        "designTempC": 150,
+        "designPressureBarG": 3.5,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "lb2"
+    },
+    {
+      "command": "add_branch",
+      "params": {
+        "runId": "$hdr",
+        "lineId": "$lb2",
+        "at": { "point": [21060, 16000, 8262] },
+        "dn": 200,
+        "legs": [{ "direction": "+Y", "length": 21000 }],
+        "to": { "portId": "H-202:S1" }
+      },
+      "as": "br2"
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$br2", "spacing": 6000, "snapToSteel": true, "type": "shoe" } },
+    { "command": "add_pipe_support", "params": { "runId": "$hdr", "spacing": 6000, "snapToSteel": true, "type": "shoe", "maxReach": 250 } },
+    { "command": "add_pipe_support", "params": { "line": "V-301-600", "at": [[10400, 27000, 17200]], "type": "shoe", "maxReach": 300 } },
+    { "command": "add_pipe_support", "params": { "line": "V-301-600", "at": [[11000, 27000, 13500]], "type": "guide", "maxReach": 1100 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rt0", "at": [[10900, 27000, 4300]], "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "line": "V-302-600", "at": [[20400, 27000, 17200]], "type": "shoe", "maxReach": 300 } },
+    { "command": "add_pipe_support", "params": { "line": "V-302-600", "at": [[21000, 27000, 13500]], "type": "guide", "maxReach": 1100 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rt1", "at": [[20900, 27000, 4300]], "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "line": "V-303-600", "at": [[30400, 27000, 17200]], "type": "shoe", "maxReach": 300 } },
+    { "command": "add_pipe_support", "params": { "line": "V-303-600", "at": [[31000, 27000, 13500]], "type": "guide", "maxReach": 1100 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rt2", "at": [[30900, 27000, 4300]], "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "line": "V-304-600", "at": [[40400, 27000, 17200]], "type": "shoe", "maxReach": 300 } },
+    { "command": "add_pipe_support", "params": { "line": "V-304-600", "at": [[41000, 27000, 13500]], "type": "guide", "maxReach": 1100 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rt3", "at": [[40900, 27000, 4300]], "type": "shoe", "maxReach": 400 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "line": "V-305-600",
+        "at": [
+          [46000, 31500, 19500],
+          [49000, 36000, 16000]
+        ],
+        "type": "shoe",
+        "maxReach": 300
+      }
+    },
+    { "command": "add_pipe_support", "params": { "line": "CW-306-600", "at": [[56500, 36000, 6400]], "type": "anchor", "maxReach": 900 } },
+    { "command": "add_pipe_support", "params": { "line": "CW-306-600", "at": [[56500, 36000, 4600]], "type": "guide", "maxReach": 900 } },
+    { "command": "add_pipe_support", "params": { "runId": "$r2", "at": [[-1000, 27000, 6000]], "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "runId": "$r2", "at": [[-5175, 27000, 3850]], "type": "guide", "maxReach": 1700 } },
+    { "command": "add_pipe_support", "params": { "runId": "$r2b", "at": [[-3175, 30500, 3800]], "type": "guide", "maxReach": 1700 } },
+    { "command": "add_pipe_support", "params": { "runId": "$r1b", "at": [[-7500, 29000, 710]], "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "runId": "$r7", "at": [[51400, 27000, 2500]], "type": "anchor", "maxReach": 800 } },
+    { "command": "add_pipe_support", "params": { "runId": "$r8", "at": [[58300, 27000, 3000]], "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "runId": "$br1", "at": [[11060, 37000, 6000]], "type": "guide", "maxReach": 1900 } },
+    { "command": "add_pipe_support", "params": { "runId": "$br2", "at": [[21060, 37000, 6000]], "type": "guide", "maxReach": 1900 } },
+    { "command": "add_pipe_support", "params": { "runId": "$br0", "at": [[6000, 21500, 8262]], "type": "shoe", "maxReach": 400 } },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "T-102",
+        "mark": "N2",
+        "dn": 150,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "shell", "elevation": 544, "orientationDeg": 90 },
+        "projection": 4200
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "SY",
+        "sequence": "4001",
+        "spec": "SUG150",
+        "dn": 150,
+        "from": "T-102",
+        "to": "P-401",
+        "designTempC": 80,
+        "designPressureBarG": 4
+      },
+      "as": "p1"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$p1",
+        "from": { "portId": "T-102:N2" },
+        "to": { "portId": "P-401:SUC" },
+        "inline": [{ "type": "valveGate", "tag": "HV-4001", "at": { "leg": 0, "centreDistance": 880 } }]
+      },
+      "as": "rp1"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "SY",
+        "sequence": "4002",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "P-401",
+        "to": "VP-402",
+        "designTempC": 80,
+        "designPressureBarG": 8
+      },
+      "as": "p2"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$p2",
+        "from": { "portId": "P-401:DIS" },
+        "to": { "portId": "VP-402:N1" },
+        "legs": [
+          { "direction": "+Z", "length": 7000 },
+          { "direction": "+X", "length": 13860 },
+          { "direction": "+Y", "length": 16000 }
+        ],
+        "inline": [
+          { "type": "valveCheck", "tag": "CV-4002", "at": { "leg": 0, "centreDistance": 1500 } },
+          { "type": "valveGate", "tag": "HV-4002", "at": { "leg": 3, "centreDistance": 700 } }
+        ]
+      },
+      "as": "rp2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "SY",
+        "sequence": "4003",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "SY-4002",
+        "to": "VP-401",
+        "designTempC": 80,
+        "designPressureBarG": 8
+      },
+      "as": "p3"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rp2", "lineId": "$p3", "at": { "point": [84000, 31000, 8000] }, "dn": 100, "to": { "portId": "VP-401:N1" } },
+      "as": "rp3"
+    },
+    {
+      "command": "insert_inline_component",
+      "params": { "runId": "$rp3", "type": "valveGate", "tag": "HV-4003", "at": { "leg": 0, "centreDistance": 700 } }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "SY",
+        "sequence": "4004",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "SY-4002",
+        "to": "VP-404",
+        "designTempC": 80,
+        "designPressureBarG": 8
+      },
+      "as": "p4"
+    },
+    {
+      "command": "add_branch",
+      "params": {
+        "runId": "$rp2",
+        "lineId": "$p4",
+        "at": { "point": [84000, 37000, 8000] },
+        "dn": 100,
+        "legs": [
+          { "direction": "+X", "length": 11000 },
+          { "direction": "+Y", "length": 6000 }
+        ],
+        "to": { "portId": "VP-404:N1" }
+      },
+      "as": "rp4"
+    },
+    {
+      "command": "insert_inline_component",
+      "params": { "runId": "$rp4", "type": "valveGate", "tag": "HV-4004", "at": { "leg": 2, "centreDistance": 1500 } }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "SY",
+        "sequence": "4005",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "SY-4004",
+        "to": "VP-403",
+        "designTempC": 80,
+        "designPressureBarG": 8
+      },
+      "as": "p5"
+    },
+    {
+      "command": "add_branch",
+      "params": {
+        "runId": "$rp4",
+        "lineId": "$p5",
+        "at": { "point": [94000, 37000, 8000] },
+        "dn": 100,
+        "legs": [{ "direction": "-Y", "length": 6000 }],
+        "to": { "portId": "VP-403:N1" }
+      },
+      "as": "rp5"
+    },
+    {
+      "command": "insert_inline_component",
+      "params": { "runId": "$rp5", "type": "valveGate", "tag": "HV-4005", "at": { "leg": 1, "centreDistance": 2500 } }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rp2", "spacing": 4000, "snapToSteel": true, "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rp4", "spacing": 4000, "snapToSteel": true, "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rp5", "spacing": 4000, "snapToSteel": true, "type": "shoe", "maxReach": 400 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rp2", "at": [[70140, 27000, 4500]], "type": "anchor", "maxReach": 1600 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rp2", "at": [[70140, 27000, 6800]], "type": "guide", "maxReach": 1600 } },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "T-601",
+        "mark": "N1",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "shell", "elevation": 7994, "orientationDeg": 270 },
+        "projection": 8100
+      }
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "ML",
+        "sequence": "5001",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "CF-501",
+        "to": "P-601",
+        "designTempC": 60,
+        "designPressureBarG": 3
+      },
+      "as": "m1"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$m1",
+        "from": { "portId": "CF-501:M1" },
+        "to": { "portId": "P-601:SUC" },
+        "legs": [{ "direction": "-Y", "length": 900 }],
+        "inline": [{ "type": "valveGate", "tag": "HV-5001", "at": { "leg": 1, "centreDistance": 19500 } }]
+      },
+      "as": "rm1"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "ML",
+        "sequence": "5002",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "CF-502",
+        "to": "ML-5001",
+        "designTempC": 60,
+        "designPressureBarG": 3
+      },
+      "as": "m2"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rm1", "lineId": "$m2", "at": { "point": [89000, 55000, 550] }, "dn": 100, "to": { "portId": "CF-502:M1" } },
+      "as": "rm2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "ML",
+        "sequence": "5003",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "CF-503",
+        "to": "ML-5001",
+        "designTempC": 60,
+        "designPressureBarG": 3
+      },
+      "as": "m3"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rm1", "lineId": "$m3", "at": { "point": [93000, 55000, 550] }, "dn": 100, "to": { "portId": "CF-503:M1" } },
+      "as": "rm3"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "ML",
+        "sequence": "5004",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "CF-504",
+        "to": "ML-5001",
+        "designTempC": 60,
+        "designPressureBarG": 3
+      },
+      "as": "m4"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rm1", "lineId": "$m4", "at": { "point": [97000, 55000, 550] }, "dn": 100, "to": { "portId": "CF-504:M1" } },
+      "as": "rm4"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "ML",
+        "sequence": "5005",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "CF-505",
+        "to": "ML-5001",
+        "designTempC": 60,
+        "designPressureBarG": 3
+      },
+      "as": "m5"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rm1", "lineId": "$m5", "at": { "point": [101000, 55000, 550] }, "dn": 100, "to": { "portId": "CF-505:M1" } },
+      "as": "rm5"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "ML",
+        "sequence": "5006",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "CF-506",
+        "to": "ML-5001",
+        "designTempC": 60,
+        "designPressureBarG": 3
+      },
+      "as": "m6"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$rm1", "lineId": "$m6", "at": { "point": [105000, 55000, 550] }, "dn": 100, "to": { "portId": "CF-506:M1" } },
+      "as": "rm6"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "ML",
+        "sequence": "5010",
+        "spec": "SUG150",
+        "dn": 100,
+        "from": "P-601",
+        "to": "T-601",
+        "designTempC": 60,
+        "designPressureBarG": 8
+      },
+      "as": "m10"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$m10",
+        "from": { "portId": "P-601:DIS" },
+        "to": { "portId": "T-601:N1" },
+        "legs": [
+          { "direction": "+Z", "length": 7000 },
+          { "direction": "+X", "length": 6860 },
+          { "direction": "-Y", "length": 21000 }
+        ],
+        "inline": [
+          { "type": "valveCheck", "tag": "CV-5010", "at": { "leg": 0, "centreDistance": 1500 } },
+          { "type": "valveGate", "tag": "HV-5010", "at": { "leg": 3, "centreDistance": 4500 } }
+        ]
+      },
+      "as": "rm10"
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rm1", "spacing": 4000, "snapToSteel": true, "type": "shoe", "maxReach": 400 } },
+    {
+      "command": "add_pipe_support",
+      "params": { "runId": "$rm10", "spacing": 4000, "snapToSteel": true, "type": "shoe", "maxReach": 400 }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rm10", "at": [[107140, 55000, 4500]], "type": "anchor", "maxReach": 1600 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rm10", "at": [[107140, 55000, 6800]], "type": "guide", "maxReach": 1600 } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "B-801:HS", "position": [100000, -6000, 20000], "direction": [-1, 0, 0], "dn": 250, "endType": "BW" },
+      "as": "hs1"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "HS",
+        "sequence": "8001",
+        "spec": "SUGHP",
+        "dn": 250,
+        "designTempC": 420,
+        "designPressureBarG": 45,
+        "insulation": { "code": "H", "thickness": "fromSpec" },
+        "from": "B-801",
+        "to": "TG-801"
+      },
+      "as": "hsl"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$hsl",
+        "from": { "portId": "$hs1" },
+        "to": { "portId": "TG-801:HS" },
+        "legs": [
+          { "direction": "-X", "length": 2000 },
+          { "direction": "+Y", "length": 6000 },
+          { "direction": "-Z", "length": 12200 },
+          { "direction": "-X", "length": 4000 },
+          { "direction": "-Y", "length": 6000 }
+        ]
+      },
+      "as": "rhs"
+    },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rhs",
+        "at": [
+          [96000, 0, 7800],
+          [94000, -2000, 7800]
+        ],
+        "type": "shoe",
+        "maxReach": 500
+      }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$rhs", "at": [[98000, -5000, 20000]], "type": "shoe", "maxReach": 500 } },
+    { "command": "add_pipe_support", "params": { "runId": "$rhs", "at": [[98000, 0, 14000]], "type": "anchor", "maxReach": 900 } },
+    {
+      "command": "add_pipe_support",
+      "params": {
+        "runId": "$rhs",
+        "at": [
+          [98000, 0, 17200],
+          [98000, 0, 10800]
+        ],
+        "type": "guide",
+        "maxReach": 900
+      }
+    },
+    {
+      "command": "set_fabrication_rules",
+      "params": {
+        "source": "demo shop standard (assumed)",
+        "weldGapMm": 3,
+        "fieldFitAllowanceMm": 100,
+        "minCutPieceMm": 150,
+        "maxSpoolLengthMm": 12000,
+        "maxSpoolWidthMm": 3000,
+        "maxSpoolHeightMm": 3000
+      }
+    },
+    {
+      "command": "number_welds",
+      "params": {
+        "lineIds": [
+          "$l1",
+          "$l2",
+          "$t0",
+          "$t1",
+          "$t2",
+          "$t3",
+          "$l7",
+          "$l8",
+          "$ls",
+          "$lb0",
+          "$lb1",
+          "$lb2",
+          "$l1b",
+          "$l2b",
+          "$js1",
+          "$jd1",
+          "$js2",
+          "$jd2",
+          "$js3",
+          "$jd3",
+          "$js4",
+          "$jd4",
+          "$js5",
+          "$jd5",
+          "$js6",
+          "$jd6",
+          "$js7",
+          "$jd7",
+          "$js8",
+          "$jd8",
+          "$js9",
+          "$jd9",
+          "$js10",
+          "$jd10",
+          "$js11",
+          "$jd11",
+          "$js12",
+          "$jd12",
+          "$js13",
+          "$jd13",
+          "$js14",
+          "$jd14",
+          "$p1",
+          "$p2",
+          "$p3",
+          "$p4",
+          "$p5",
+          "$m1",
+          "$m2",
+          "$m3",
+          "$m4",
+          "$m5",
+          "$m6",
+          "$m10",
+          "$hsl"
+        ]
+      }
+    },
+    {
+      "command": "create_stress_model",
+      "params": {
+        "name": "LP steam header LS-2001 and branches",
+        "pipeIds": ["$hdr", "$br0", "$br1", "$br2"],
+        "rule": "B31.3-2022",
+        "frictionCoefficient": 0.1
+      },
+      "as": "sm"
+    },
+    {
+      "command": "set_pipe_operating_conditions",
+      "params": {
+        "modelId": "$sm",
+        "installTempC": 21,
+        "temperatures": [{ "name": "T1", "tempC": 150 }],
+        "pressures": [{ "name": "P1", "gaugeBar": 3.5 }],
+        "fluidDensityKgM3": 2,
+        "corrosionAllowanceMm": 1.5,
+        "millTolerancePct": 12.5,
+        "cycles": 7000,
+        "insulation": { "thicknessMm": 80, "densityKgM3": 100 },
+        "material": {
+          "youngsModulusMPa": 203000,
+          "ShMPa": 137.9,
+          "ScMPa": 137.9,
+          "thermal": { "table": "carbon-steel-c1" },
+          "ferrousLowStrength": true
+        }
+      }
+    },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm", "at": { "pipeId": "$hdr", "atMm": 0 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm", "at": { "pipeId": "$hdr", "atMm": 115800 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm", "at": { "pipeId": "$hdr", "atMm": 44000 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm", "at": { "pipeId": "$br0", "atMm": 7700 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm", "at": { "pipeId": "$br1", "atMm": 24933 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm", "at": { "pipeId": "$br2", "atMm": 24933 }, "kind": "anchor" } },
+    { "command": "set_stress_load_cases", "params": { "modelId": "$sm", "preset": "b31.3-default" } },
+    { "command": "check_pipe_stress", "params": { "modelId": "$sm" } },
+    {
+      "command": "create_stress_model",
+      "params": {
+        "name": "HP steam HS-8001 boiler to turbo-alternator",
+        "pipeIds": ["$rhs"],
+        "rule": "B31.3-2022",
+        "frictionCoefficient": 0.1
+      },
+      "as": "sm2"
+    },
+    {
+      "command": "set_pipe_operating_conditions",
+      "params": {
+        "modelId": "$sm2",
+        "installTempC": 21,
+        "temperatures": [{ "name": "T1", "tempC": 420 }],
+        "pressures": [{ "name": "P1", "gaugeBar": 45 }],
+        "fluidDensityKgM3": 15,
+        "corrosionAllowanceMm": 1.5,
+        "millTolerancePct": 12.5,
+        "cycles": 7000,
+        "insulation": { "thicknessMm": 120, "densityKgM3": 100 },
+        "material": {
+          "youngsModulusMPa": 203000,
+          "ShMPa": 79,
+          "ScMPa": 137.9,
+          "thermal": { "table": "carbon-steel-c1" },
+          "ferrousLowStrength": true
+        }
+      }
+    },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm2", "at": { "pipeId": "$rhs", "atMm": 0 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$sm2", "at": { "pipeId": "$rhs", "atMm": 33000 }, "kind": "anchor" } },
+    { "command": "set_stress_load_cases", "params": { "modelId": "$sm2", "preset": "b31.3-default" } },
+    { "command": "check_pipe_stress", "params": { "modelId": "$sm2" } },
+    { "command": "check_piping", "params": {} },
+    {
+      "command": "create_pid_sheet",
+      "params": {
+        "number": "PID-301",
+        "title": "Evaporation station - clear juice feed, effects 1-3, LP steam",
+        "paper": "A2",
+        "convention": "ISA-5.1"
+      },
+      "as": "s1"
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "Tank",
+        "tag": "T-101",
+        "at": [60, 250],
+        "nozzles": [{ "subTag": "N1", "side": "bottom", "dn": 300 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "CentrifugalPump",
+        "tag": "P-101A",
+        "at": [150, 130],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 300 },
+          { "subTag": "DIS", "side": "top", "dn": 250 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "CentrifugalPump",
+        "tag": "P-101B",
+        "at": [150, 60],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 300 },
+          { "subTag": "DIS", "side": "right", "dn": 250 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "PressureVessel",
+        "tag": "E-301",
+        "at": [330, 210],
+        "nozzles": [
+          { "subTag": "N1", "side": "left", "dn": 250 },
+          { "subTag": "N2", "side": "right", "dn": 250 },
+          { "subTag": "N3", "side": "bottom", "dn": 200 },
+          { "subTag": "N4", "side": "top", "dn": 600 },
+          { "subTag": "N5", "side": "top", "dn": 50 },
+          { "subTag": "N6", "side": "bottom", "dn": 50 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "PI-301", "at": [354, 288], "location": "field", "measures": { "tag": "E-301", "nozzle": "N5" } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "LT-301", "at": [354, 150], "location": "field", "measures": { "tag": "E-301", "nozzle": "N6" } }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "PressureVessel",
+        "tag": "E-302",
+        "at": [430, 210],
+        "nozzles": [
+          { "subTag": "N1", "side": "left", "dn": 250 },
+          { "subTag": "N2", "side": "right", "dn": 250 },
+          { "subTag": "N3", "side": "bottom", "dn": 600 },
+          { "subTag": "N4", "side": "top", "dn": 600 },
+          { "subTag": "N5", "side": "top", "dn": 50 },
+          { "subTag": "N6", "side": "bottom", "dn": 50 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "PI-302", "at": [454, 288], "location": "field", "measures": { "tag": "E-302", "nozzle": "N5" } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "LT-302", "at": [454, 150], "location": "field", "measures": { "tag": "E-302", "nozzle": "N6" } }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "PressureVessel",
+        "tag": "E-303",
+        "at": [530, 210],
+        "nozzles": [
+          { "subTag": "N1", "side": "left", "dn": 250 },
+          { "subTag": "N2", "side": "right", "dn": 250 },
+          { "subTag": "N3", "side": "bottom", "dn": 600 },
+          { "subTag": "N4", "side": "top", "dn": 600 },
+          { "subTag": "N5", "side": "top", "dn": 50 },
+          { "subTag": "N6", "side": "bottom", "dn": 50 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "PI-303", "at": [554, 288], "location": "field", "measures": { "tag": "E-303", "nozzle": "N5" } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "LT-303", "at": [554, 150], "location": "field", "measures": { "tag": "E-303", "nozzle": "N6" } }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "TubularHeatExchanger",
+        "tag": "H-201",
+        "at": [150, 330],
+        "nozzles": [{ "subTag": "S1", "side": "top", "dn": 200 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s1",
+        "class": "TubularHeatExchanger",
+        "tag": "H-202",
+        "at": [240, 330],
+        "nozzles": [{ "subTag": "S1", "side": "top", "dn": 200 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": { "sheet": "$s1", "class": "TubularHeatExchanger", "tag": "H-203", "at": [60, 330], "nozzles": [] }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "P-101A", "nozzle": "SUC" },
+        "dn": 300,
+        "pipingClass": "SUG150",
+        "fluidCode": "JC",
+        "from": { "tag": "T-101", "nozzle": "N1" },
+        "lineNumber": "JC-1001-300",
+        "via": [[60, 130]]
+      },
+      "as": "s"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "P-101B", "nozzle": "SUC" },
+        "dn": 300,
+        "pipingClass": "SUG150",
+        "fluidCode": "JC",
+        "from": { "line": "$s", "at": [95, 130] },
+        "lineNumber": "JC-1011-300",
+        "via": [[95, 60]]
+      },
+      "as": "sb"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "E-301", "nozzle": "N1" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JC",
+        "from": { "tag": "P-101A", "nozzle": "DIS" },
+        "lineNumber": "JC-1002-250",
+        "via": [[150, 210]]
+      },
+      "as": "d"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "line": "$d", "at": [205, 210] },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JC",
+        "from": { "tag": "P-101B", "nozzle": "DIS" },
+        "lineNumber": "JC-1012-250",
+        "via": [[205, 60]]
+      },
+      "as": "db"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "E-302", "nozzle": "N1" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JT",
+        "from": { "tag": "E-301", "nozzle": "N2" },
+        "lineNumber": "JT-103-250"
+      },
+      "as": "t1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "E-303", "nozzle": "N1" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JT",
+        "from": { "tag": "E-302", "nozzle": "N2" },
+        "lineNumber": "JT-104-250"
+      },
+      "as": "t2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "opc": "OPC-1", "targetSheet": "PID-302" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JT",
+        "from": { "tag": "E-303", "nozzle": "N2" },
+        "lineNumber": "JT-105-250",
+        "via": [[580, 210]]
+      },
+      "as": "t3"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "E-302", "nozzle": "N3" },
+        "dn": 600,
+        "pipingClass": "SUG150",
+        "fluidCode": "V",
+        "from": { "tag": "E-301", "nozzle": "N4" },
+        "lineNumber": "V-301-600",
+        "via": [
+          [325.5, 305],
+          [385, 305],
+          [385, 118],
+          [425.5, 118]
+        ]
+      },
+      "as": "v1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "E-303", "nozzle": "N3" },
+        "dn": 600,
+        "pipingClass": "SUG150",
+        "fluidCode": "V",
+        "from": { "tag": "E-302", "nozzle": "N4" },
+        "lineNumber": "V-302-600",
+        "via": [
+          [425.5, 305],
+          [485, 305],
+          [485, 118],
+          [525.5, 118]
+        ]
+      },
+      "as": "v2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "opc": "OPC-2", "targetSheet": "PID-302" },
+        "dn": 600,
+        "pipingClass": "SUG150",
+        "fluidCode": "V",
+        "from": { "tag": "E-303", "nozzle": "N4" },
+        "lineNumber": "V-303-600",
+        "via": [
+          [525.5, 305],
+          [580, 305]
+        ]
+      },
+      "as": "v3"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "free": [320, 385] },
+        "dn": 300,
+        "pipingClass": "SUG150",
+        "fluidCode": "LS",
+        "from": { "opc": "OPC-4", "targetSheet": "PID-801", "at": [20, 385] },
+        "lineNumber": "LS-2001-300"
+      },
+      "as": "ls"
+    },
+    { "command": "update_pid_item", "params": { "item": "$ls[1]", "set": { "attributes": { "endOfLine": "battery limit" } } } },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "E-301", "nozzle": "N3" },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "LS",
+        "from": { "line": "$ls", "at": [300, 385] },
+        "lineNumber": "LS-2002-200",
+        "via": [
+          [300, 118],
+          [325.5, 118]
+        ]
+      },
+      "as": "lb0"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "H-201", "nozzle": "S1" },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "LS",
+        "from": { "line": "$ls", "at": [150, 385] },
+        "lineNumber": "LS-2003-200"
+      },
+      "as": "lb1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s1",
+        "to": { "tag": "H-202", "nozzle": "S1" },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "LS",
+        "from": { "line": "$ls", "at": [240, 385] },
+        "lineNumber": "LS-2004-200"
+      },
+      "as": "lb2"
+    },
+    { "command": "add_pid_inline", "params": { "line": "$s", "at": [118, 130], "class": "GateValve", "tag": "HV-1001A" } },
+    { "command": "add_pid_inline", "params": { "line": "$sb", "at": [118, 60], "class": "GateValve", "tag": "HV-1001B" } },
+    { "command": "add_pid_inline", "params": { "line": "$d", "at": [150, 160], "class": "SwingCheckValve", "tag": "CV-1002A" } },
+    { "command": "add_pid_inline", "params": { "line": "$d", "at": [150, 188], "class": "GateValve", "tag": "HV-1002A" } },
+    { "command": "add_pid_inline", "params": { "line": "$db", "at": [205, 95], "class": "SwingCheckValve", "tag": "CV-1002B" } },
+    { "command": "add_pid_inline", "params": { "line": "$db", "at": [205, 150], "class": "GateValve", "tag": "HV-1002B" } },
+    { "command": "add_pid_inline", "params": { "line": "$d", "at": [240, 210], "class": "RestrictionOrifice", "tag": "FE-301" } },
+    { "command": "add_pid_inline", "params": { "line": "$d", "at": [275, 210], "class": "GlobeValve", "tag": "FV-301", "operated": true } },
+    { "command": "add_pid_inline", "params": { "line": "$t3", "at": [562, 210], "class": "GateValve", "tag": "HV-105" } },
+    { "command": "add_pid_inline", "params": { "line": "$t1", "at": [365, 210], "class": "GateValve", "tag": "HV-103" } },
+    { "command": "add_pid_inline", "params": { "line": "$t2", "at": [465, 210], "class": "GateValve", "tag": "HV-104" } },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "FT-301", "at": [226, 240], "location": "field", "measures": { "line": "$d", "at": [226, 210] } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s1", "tag": "FIC-301", "at": [226, 275], "location": "central", "display": "shared" }
+    },
+    { "command": "add_pid_signal_line", "params": { "from": "FT-301", "to": "FIC-301", "kind": "electric" } },
+    {
+      "command": "add_pid_actuating_system",
+      "params": { "valve": "FV-301", "actuator": "diaphragm", "failAction": "FC", "controller": "FIC-301" }
+    },
+    {
+      "command": "create_pid_sheet",
+      "params": {
+        "number": "PID-302",
+        "title": "Evaporation station - effects 4-5, condenser, syrup",
+        "paper": "A2",
+        "convention": "ISA-5.1"
+      },
+      "as": "s2"
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s2",
+        "class": "PressureVessel",
+        "tag": "E-304",
+        "at": [170, 210],
+        "nozzles": [
+          { "subTag": "N1", "side": "left", "dn": 250 },
+          { "subTag": "N2", "side": "right", "dn": 250 },
+          { "subTag": "N3", "side": "bottom", "dn": 600 },
+          { "subTag": "N4", "side": "top", "dn": 600 },
+          { "subTag": "N5", "side": "top", "dn": 50 },
+          { "subTag": "N6", "side": "bottom", "dn": 50 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s2", "tag": "PI-304", "at": [194, 288], "location": "field", "measures": { "tag": "E-304", "nozzle": "N5" } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s2", "tag": "LT-304", "at": [194, 150], "location": "field", "measures": { "tag": "E-304", "nozzle": "N6" } }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s2",
+        "class": "PressureVessel",
+        "tag": "E-305",
+        "at": [300, 210],
+        "nozzles": [
+          { "subTag": "N1", "side": "left", "dn": 250 },
+          { "subTag": "N2", "side": "right", "dn": 150 },
+          { "subTag": "N3", "side": "bottom", "dn": 600 },
+          { "subTag": "N4", "side": "top", "dn": 600 },
+          { "subTag": "N5", "side": "top", "dn": 50 },
+          { "subTag": "N6", "side": "bottom", "dn": 50 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s2", "tag": "PI-305", "at": [324, 288], "location": "field", "measures": { "tag": "E-305", "nozzle": "N5" } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s2", "tag": "LT-305", "at": [324, 150], "location": "field", "measures": { "tag": "E-305", "nozzle": "N6" } }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s2",
+        "class": "PressureVessel",
+        "tag": "C-301",
+        "at": [420, 330],
+        "nozzles": [
+          { "subTag": "N1", "side": "left", "dn": 600 },
+          { "subTag": "N2", "side": "bottom", "dn": 600 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s2",
+        "class": "CentrifugalPump",
+        "tag": "P-102A",
+        "at": [400, 120],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 150 },
+          { "subTag": "DIS", "side": "top", "dn": 100 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s2",
+        "class": "Tank",
+        "tag": "T-102",
+        "at": [510, 230],
+        "nozzles": [
+          { "subTag": "N1", "side": "left", "dn": 100 },
+          { "subTag": "N2", "side": "bottom", "dn": 150 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "tag": "E-304", "nozzle": "N1" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JT",
+        "from": { "opc": "OPC-1", "targetSheet": "PID-301", "at": [40, 210] }
+      },
+      "as": "j1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "tag": "E-304", "nozzle": "N3" },
+        "dn": 600,
+        "pipingClass": "SUG150",
+        "fluidCode": "V",
+        "from": { "opc": "OPC-2", "targetSheet": "PID-301", "at": [40, 118] },
+        "via": [[165.5, 118]]
+      },
+      "as": "w1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "tag": "E-305", "nozzle": "N1" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JT",
+        "from": { "tag": "E-304", "nozzle": "N2" },
+        "lineNumber": "JT-106-250"
+      },
+      "as": "j2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "tag": "E-305", "nozzle": "N3" },
+        "dn": 600,
+        "pipingClass": "SUG150",
+        "fluidCode": "V",
+        "from": { "tag": "E-304", "nozzle": "N4" },
+        "lineNumber": "V-304-600",
+        "via": [
+          [165.5, 305],
+          [235, 305],
+          [235, 118],
+          [295.5, 118]
+        ]
+      },
+      "as": "w2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "tag": "C-301", "nozzle": "N1" },
+        "dn": 600,
+        "pipingClass": "SUG150",
+        "fluidCode": "V",
+        "from": { "tag": "E-305", "nozzle": "N4" },
+        "lineNumber": "V-305-600",
+        "via": [[295.5, 330]]
+      },
+      "as": "w3"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "tag": "P-102A", "nozzle": "SUC" },
+        "dn": 150,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "tag": "E-305", "nozzle": "N2" },
+        "lineNumber": "SY-1007-150",
+        "via": [
+          [355, 210],
+          [355, 120]
+        ]
+      },
+      "as": "y1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "tag": "T-102", "nozzle": "N1" },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "tag": "P-102A", "nozzle": "DIS" },
+        "lineNumber": "SY-1008-100",
+        "via": [[400, 230]]
+      },
+      "as": "y2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "opc": "OPC-3", "targetSheet": "PID-401" },
+        "dn": 150,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "tag": "T-102", "nozzle": "N2" },
+        "lineNumber": "SY-4001-150",
+        "via": [
+          [510, 120],
+          [570, 120]
+        ]
+      },
+      "as": "y3"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s2",
+        "to": { "free": [420, 262] },
+        "dn": 600,
+        "pipingClass": "SUG150",
+        "fluidCode": "CW",
+        "from": { "tag": "C-301", "nozzle": "N2" },
+        "lineNumber": "CW-306-600"
+      },
+      "as": "cw"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$cw[1]", "set": { "attributes": { "endOfLine": "barometric leg to the seal pit" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$j2", "at": [212, 210], "class": "GateValve", "tag": "HV-106" } },
+    { "command": "add_pid_inline", "params": { "line": "$y1", "at": [340, 210], "class": "GateValve", "tag": "HV-1007" } },
+    { "command": "add_pid_inline", "params": { "line": "$y2", "at": [430, 230], "class": "SwingCheckValve", "tag": "CV-1008" } },
+    { "command": "add_pid_inline", "params": { "line": "$y2", "at": [465, 230], "class": "GateValve", "tag": "HV-1008" } },
+    {
+      "command": "create_pid_sheet",
+      "params": { "number": "PID-401", "title": "Boiling house - syrup feed to the vacuum pans", "paper": "A2", "convention": "ISA-5.1" },
+      "as": "s4"
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s4",
+        "class": "CentrifugalPump",
+        "tag": "P-401",
+        "at": [130, 120],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 150 },
+          { "subTag": "DIS", "side": "top", "dn": 100 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s4",
+        "class": "PressureVessel",
+        "tag": "VP-401",
+        "at": [300, 300],
+        "nozzles": [{ "subTag": "N1", "side": "left", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s4",
+        "class": "PressureVessel",
+        "tag": "VP-402",
+        "at": [300, 150],
+        "nozzles": [{ "subTag": "N1", "side": "left", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s4",
+        "class": "PressureVessel",
+        "tag": "VP-403",
+        "at": [470, 300],
+        "nozzles": [{ "subTag": "N1", "side": "left", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s4",
+        "class": "PressureVessel",
+        "tag": "VP-404",
+        "at": [470, 150],
+        "nozzles": [{ "subTag": "N1", "side": "left", "dn": 100 }]
+      }
+    },
+    { "command": "add_pid_equipment", "params": { "sheet": "$s4", "class": "Chamber", "tag": "CR-451", "at": [130, 330], "nozzles": [] } },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s4",
+        "to": { "tag": "P-401", "nozzle": "SUC" },
+        "dn": 150,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "opc": "OPC-3", "targetSheet": "PID-302", "at": [40, 120] }
+      },
+      "as": "q1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s4",
+        "to": { "tag": "VP-402", "nozzle": "N1" },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "tag": "P-401", "nozzle": "DIS" },
+        "lineNumber": "SY-4002-100",
+        "via": [
+          [130, 225],
+          [220, 225],
+          [220, 150]
+        ]
+      },
+      "as": "q2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s4",
+        "to": { "tag": "VP-401", "nozzle": "N1" },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "line": "$q2", "at": [220, 190] },
+        "lineNumber": "SY-4003-100",
+        "via": [
+          [250, 190],
+          [250, 300]
+        ]
+      },
+      "as": "q3"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s4",
+        "to": { "tag": "VP-404", "nozzle": "N1" },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "line": "$q2", "at": [175, 225] },
+        "lineNumber": "SY-4004-100",
+        "via": [
+          [175, 60],
+          [400, 60],
+          [400, 150]
+        ]
+      },
+      "as": "q4"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s4",
+        "to": { "tag": "VP-403", "nozzle": "N1" },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "SY",
+        "from": { "line": "$q4", "at": [380, 60] },
+        "lineNumber": "SY-4005-100",
+        "via": [
+          [380, 52],
+          [430, 52],
+          [430, 300]
+        ]
+      },
+      "as": "q5"
+    },
+    { "command": "add_pid_inline", "params": { "line": "$q1", "at": [85, 120], "class": "GateValve", "tag": "HV-4001" } },
+    { "command": "add_pid_inline", "params": { "line": "$q2", "at": [130, 180], "class": "SwingCheckValve", "tag": "CV-4002" } },
+    { "command": "add_pid_inline", "params": { "line": "$q2", "at": [250, 150], "class": "GateValve", "tag": "HV-4002" } },
+    { "command": "add_pid_inline", "params": { "line": "$q3", "at": [270, 300], "class": "GateValve", "tag": "HV-4003" } },
+    { "command": "add_pid_inline", "params": { "line": "$q4", "at": [425, 150], "class": "GateValve", "tag": "HV-4004" } },
+    { "command": "add_pid_inline", "params": { "line": "$q5", "at": [445, 300], "class": "GateValve", "tag": "HV-4005" } },
+    {
+      "command": "create_pid_sheet",
+      "params": {
+        "number": "PID-501",
+        "title": "Boiling house - molasses from the centrifugals to the molasses tank",
+        "paper": "A2",
+        "convention": "ISA-5.1"
+      },
+      "as": "s5"
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "Chamber",
+        "tag": "CF-501",
+        "at": [70, 300],
+        "nozzles": [{ "subTag": "M1", "side": "bottom", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "Chamber",
+        "tag": "CF-502",
+        "at": [130, 300],
+        "nozzles": [{ "subTag": "M1", "side": "bottom", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "Chamber",
+        "tag": "CF-503",
+        "at": [190, 300],
+        "nozzles": [{ "subTag": "M1", "side": "bottom", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "Chamber",
+        "tag": "CF-504",
+        "at": [250, 300],
+        "nozzles": [{ "subTag": "M1", "side": "bottom", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "Chamber",
+        "tag": "CF-505",
+        "at": [310, 300],
+        "nozzles": [{ "subTag": "M1", "side": "bottom", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "Chamber",
+        "tag": "CF-506",
+        "at": [370, 300],
+        "nozzles": [{ "subTag": "M1", "side": "bottom", "dn": 100 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "CentrifugalPump",
+        "tag": "P-601",
+        "at": [450, 150],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 100 },
+          { "subTag": "DIS", "side": "top", "dn": 100 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s5",
+        "class": "Tank",
+        "tag": "T-601",
+        "at": [520, 300],
+        "nozzles": [{ "subTag": "N1", "side": "left", "dn": 100 }]
+      }
+    },
+    { "command": "add_pid_equipment", "params": { "sheet": "$s5", "class": "Chamber", "tag": "S-701", "at": [520, 120], "nozzles": [] } },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s5",
+        "to": { "tag": "P-601", "nozzle": "SUC" },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "ML",
+        "from": { "tag": "CF-501", "nozzle": "M1" },
+        "lineNumber": "ML-5001-100",
+        "via": [[70, 150]]
+      },
+      "as": "m1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s5",
+        "to": { "line": "$m1", "at": [130, 150] },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "ML",
+        "from": { "tag": "CF-502", "nozzle": "M1" },
+        "lineNumber": "ML-5002-100"
+      },
+      "as": "m2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s5",
+        "to": { "line": "$m1", "at": [190, 150] },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "ML",
+        "from": { "tag": "CF-503", "nozzle": "M1" },
+        "lineNumber": "ML-5003-100"
+      },
+      "as": "m3"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s5",
+        "to": { "line": "$m1", "at": [250, 150] },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "ML",
+        "from": { "tag": "CF-504", "nozzle": "M1" },
+        "lineNumber": "ML-5004-100"
+      },
+      "as": "m4"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s5",
+        "to": { "line": "$m1", "at": [310, 150] },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "ML",
+        "from": { "tag": "CF-505", "nozzle": "M1" },
+        "lineNumber": "ML-5005-100"
+      },
+      "as": "m5"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s5",
+        "to": { "line": "$m1", "at": [370, 150] },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "ML",
+        "from": { "tag": "CF-506", "nozzle": "M1" },
+        "lineNumber": "ML-5006-100"
+      },
+      "as": "m6"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s5",
+        "to": { "tag": "T-601", "nozzle": "N1" },
+        "dn": 100,
+        "pipingClass": "SUG150",
+        "fluidCode": "ML",
+        "from": { "tag": "P-601", "nozzle": "DIS" },
+        "lineNumber": "ML-5010-100",
+        "via": [[450, 300]]
+      },
+      "as": "m10"
+    },
+    { "command": "add_pid_inline", "params": { "line": "$m1", "at": [405, 150], "class": "GateValve", "tag": "HV-5001" } },
+    { "command": "add_pid_inline", "params": { "line": "$m10", "at": [450, 210], "class": "SwingCheckValve", "tag": "CV-5010" } },
+    { "command": "add_pid_inline", "params": { "line": "$m10", "at": [475, 300], "class": "GateValve", "tag": "HV-5010" } },
+    {
+      "command": "create_pid_sheet",
+      "params": {
+        "number": "PID-201",
+        "title": "Cane diffuser DF-101 - stage juice recirculation, stages 1-14",
+        "paper": "A0",
+        "convention": "ISA-5.1"
+      },
+      "as": "s0"
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "Chamber",
+        "tag": "DF-101",
+        "at": [590, 640],
+        "symbolSize": [1130, 40],
+        "nozzles": [
+          { "subTag": "J01", "side": [-520, -20], "dn": 250 },
+          { "subTag": "J02", "side": [-442, -20], "dn": 250 },
+          { "subTag": "J03", "side": [-364, -20], "dn": 250 },
+          { "subTag": "J04", "side": [-286, -20], "dn": 250 },
+          { "subTag": "J05", "side": [-208, -20], "dn": 250 },
+          { "subTag": "J06", "side": [-130, -20], "dn": 250 },
+          { "subTag": "J07", "side": [-52, -20], "dn": 250 },
+          { "subTag": "J08", "side": [26, -20], "dn": 250 },
+          { "subTag": "J09", "side": [104, -20], "dn": 250 },
+          { "subTag": "J10", "side": [182, -20], "dn": 250 },
+          { "subTag": "J11", "side": [260, -20], "dn": 250 },
+          { "subTag": "J12", "side": [338, -20], "dn": 250 },
+          { "subTag": "J13", "side": [416, -20], "dn": 250 },
+          { "subTag": "J14", "side": [494, -20], "dn": 250 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-201",
+        "at": [96, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-201", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-201-250",
+        "via": [[70, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J01" }
+      },
+      "as": "ps1"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [126, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-301-200",
+        "via": [[126, 200]],
+        "from": { "tag": "P-201", "nozzle": "DIS" }
+      },
+      "as": "pd1"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd1[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps1", "at": [70, 400], "class": "GateValve", "tag": "HV-201" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd1", "at": [126, 300], "class": "GateValve", "tag": "HV-301" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd1", "at": [126, 380], "class": "SwingCheckValve", "tag": "CV-301" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-202",
+        "at": [174, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-202", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-202-250",
+        "via": [[148, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J02" }
+      },
+      "as": "ps2"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [204, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-302-200",
+        "via": [[204, 200]],
+        "from": { "tag": "P-202", "nozzle": "DIS" }
+      },
+      "as": "pd2"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd2[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps2", "at": [148, 400], "class": "GateValve", "tag": "HV-202" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd2", "at": [204, 300], "class": "GateValve", "tag": "HV-302" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd2", "at": [204, 380], "class": "SwingCheckValve", "tag": "CV-302" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-203",
+        "at": [252, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-203", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-203-250",
+        "via": [[226, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J03" }
+      },
+      "as": "ps3"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [282, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-303-200",
+        "via": [[282, 200]],
+        "from": { "tag": "P-203", "nozzle": "DIS" }
+      },
+      "as": "pd3"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd3[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps3", "at": [226, 400], "class": "GateValve", "tag": "HV-203" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd3", "at": [282, 300], "class": "GateValve", "tag": "HV-303" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd3", "at": [282, 380], "class": "SwingCheckValve", "tag": "CV-303" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-204",
+        "at": [330, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-204", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-204-250",
+        "via": [[304, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J04" }
+      },
+      "as": "ps4"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [360, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-304-200",
+        "via": [[360, 200]],
+        "from": { "tag": "P-204", "nozzle": "DIS" }
+      },
+      "as": "pd4"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd4[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps4", "at": [304, 400], "class": "GateValve", "tag": "HV-204" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd4", "at": [360, 300], "class": "GateValve", "tag": "HV-304" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd4", "at": [360, 380], "class": "SwingCheckValve", "tag": "CV-304" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-205",
+        "at": [408, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-205", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-205-250",
+        "via": [[382, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J05" }
+      },
+      "as": "ps5"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [438, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-305-200",
+        "via": [[438, 200]],
+        "from": { "tag": "P-205", "nozzle": "DIS" }
+      },
+      "as": "pd5"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd5[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps5", "at": [382, 400], "class": "GateValve", "tag": "HV-205" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd5", "at": [438, 300], "class": "GateValve", "tag": "HV-305" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd5", "at": [438, 380], "class": "SwingCheckValve", "tag": "CV-305" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-206",
+        "at": [486, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-206", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-206-250",
+        "via": [[460, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J06" }
+      },
+      "as": "ps6"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [516, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-306-200",
+        "via": [[516, 200]],
+        "from": { "tag": "P-206", "nozzle": "DIS" }
+      },
+      "as": "pd6"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd6[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps6", "at": [460, 400], "class": "GateValve", "tag": "HV-206" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd6", "at": [516, 300], "class": "GateValve", "tag": "HV-306" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd6", "at": [516, 380], "class": "SwingCheckValve", "tag": "CV-306" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-207",
+        "at": [564, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-207", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-207-250",
+        "via": [[538, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J07" }
+      },
+      "as": "ps7"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [594, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-307-200",
+        "via": [[594, 200]],
+        "from": { "tag": "P-207", "nozzle": "DIS" }
+      },
+      "as": "pd7"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd7[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps7", "at": [538, 400], "class": "GateValve", "tag": "HV-207" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd7", "at": [594, 300], "class": "GateValve", "tag": "HV-307" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd7", "at": [594, 380], "class": "SwingCheckValve", "tag": "CV-307" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-208",
+        "at": [642, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-208", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-208-250",
+        "via": [[616, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J08" }
+      },
+      "as": "ps8"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [672, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-308-200",
+        "via": [[672, 200]],
+        "from": { "tag": "P-208", "nozzle": "DIS" }
+      },
+      "as": "pd8"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd8[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps8", "at": [616, 400], "class": "GateValve", "tag": "HV-208" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd8", "at": [672, 300], "class": "GateValve", "tag": "HV-308" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd8", "at": [672, 380], "class": "SwingCheckValve", "tag": "CV-308" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-209",
+        "at": [720, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-209", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-209-250",
+        "via": [[694, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J09" }
+      },
+      "as": "ps9"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [750, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-309-200",
+        "via": [[750, 200]],
+        "from": { "tag": "P-209", "nozzle": "DIS" }
+      },
+      "as": "pd9"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd9[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps9", "at": [694, 400], "class": "GateValve", "tag": "HV-209" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd9", "at": [750, 300], "class": "GateValve", "tag": "HV-309" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd9", "at": [750, 380], "class": "SwingCheckValve", "tag": "CV-309" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-210",
+        "at": [798, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-210", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-210-250",
+        "via": [[772, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J10" }
+      },
+      "as": "ps10"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [828, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-310-200",
+        "via": [[828, 200]],
+        "from": { "tag": "P-210", "nozzle": "DIS" }
+      },
+      "as": "pd10"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd10[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps10", "at": [772, 400], "class": "GateValve", "tag": "HV-210" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd10", "at": [828, 300], "class": "GateValve", "tag": "HV-310" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd10", "at": [828, 380], "class": "SwingCheckValve", "tag": "CV-310" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-211",
+        "at": [876, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-211", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-211-250",
+        "via": [[850, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J11" }
+      },
+      "as": "ps11"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [906, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-311-200",
+        "via": [[906, 200]],
+        "from": { "tag": "P-211", "nozzle": "DIS" }
+      },
+      "as": "pd11"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd11[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps11", "at": [850, 400], "class": "GateValve", "tag": "HV-211" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd11", "at": [906, 300], "class": "GateValve", "tag": "HV-311" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd11", "at": [906, 380], "class": "SwingCheckValve", "tag": "CV-311" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-212",
+        "at": [954, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-212", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-212-250",
+        "via": [[928, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J12" }
+      },
+      "as": "ps12"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [984, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-312-200",
+        "via": [[984, 200]],
+        "from": { "tag": "P-212", "nozzle": "DIS" }
+      },
+      "as": "pd12"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd12[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps12", "at": [928, 400], "class": "GateValve", "tag": "HV-212" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd12", "at": [984, 300], "class": "GateValve", "tag": "HV-312" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd12", "at": [984, 380], "class": "SwingCheckValve", "tag": "CV-312" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-213",
+        "at": [1032, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-213", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-213-250",
+        "via": [[1006, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J13" }
+      },
+      "as": "ps13"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [1062, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-313-200",
+        "via": [[1062, 200]],
+        "from": { "tag": "P-213", "nozzle": "DIS" }
+      },
+      "as": "pd13"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd13[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps13", "at": [1006, 400], "class": "GateValve", "tag": "HV-213" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd13", "at": [1062, 300], "class": "GateValve", "tag": "HV-313" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd13", "at": [1062, 380], "class": "SwingCheckValve", "tag": "CV-313" } },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s0",
+        "class": "CentrifugalPump",
+        "tag": "P-214",
+        "at": [1110, 200],
+        "nozzles": [
+          { "subTag": "SUC", "side": "left", "dn": 250 },
+          { "subTag": "DIS", "side": "right", "dn": 200 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "tag": "P-214", "nozzle": "SUC" },
+        "dn": 250,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-214-250",
+        "via": [[1084, 200]],
+        "from": { "tag": "DF-101", "nozzle": "J14" }
+      },
+      "as": "ps14"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s0",
+        "to": { "free": [1140, 700] },
+        "dn": 200,
+        "pipingClass": "SUG150",
+        "fluidCode": "JR",
+        "lineNumber": "JR-314-200",
+        "via": [[1140, 200]],
+        "from": { "tag": "P-214", "nozzle": "DIS" }
+      },
+      "as": "pd14"
+    },
+    {
+      "command": "update_pid_item",
+      "params": { "item": "$pd14[1]", "set": { "attributes": { "endOfLine": "distribution over the cane bed" } } }
+    },
+    { "command": "add_pid_inline", "params": { "line": "$ps14", "at": [1084, 400], "class": "GateValve", "tag": "HV-214" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd14", "at": [1140, 300], "class": "GateValve", "tag": "HV-314" } },
+    { "command": "add_pid_inline", "params": { "line": "$pd14", "at": [1140, 380], "class": "SwingCheckValve", "tag": "CV-314" } },
+    {
+      "command": "create_pid_sheet",
+      "params": {
+        "number": "PID-801",
+        "title": "Steam cycle - bagasse boiler, turbo-alternator, LP steam to process",
+        "paper": "A2",
+        "convention": "ISA-5.1"
+      },
+      "as": "s8"
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s8",
+        "class": "Chamber",
+        "tag": "B-801",
+        "at": [430, 230],
+        "symbolSize": [90, 150],
+        "nozzles": [{ "subTag": "HS", "side": [-45, 50], "dn": 250 }]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$s8",
+        "class": "Chamber",
+        "tag": "TG-801",
+        "at": [230, 150],
+        "symbolSize": [120, 44],
+        "nozzles": [
+          { "subTag": "HS", "side": [30, 22], "dn": 250 },
+          { "subTag": "EX", "side": [-40, 22], "dn": 300 }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s8",
+        "to": { "tag": "TG-801", "nozzle": "HS" },
+        "dn": 250,
+        "pipingClass": "SUGHP",
+        "fluidCode": "HS",
+        "lineNumber": "HS-8001-250",
+        "via": [[260, 280]],
+        "from": { "tag": "B-801", "nozzle": "HS" }
+      },
+      "as": "hs"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$s8",
+        "to": { "opc": "OPC-4", "targetSheet": "PID-301", "at": [60, 330] },
+        "dn": 300,
+        "pipingClass": "SUG150",
+        "fluidCode": "LS",
+        "via": [[190, 330]],
+        "from": { "tag": "TG-801", "nozzle": "EX" }
+      },
+      "as": "lsx"
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s8", "tag": "PT-801", "at": [320, 310], "location": "field", "measures": { "line": "$hs", "at": [320, 280] } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s8", "tag": "TT-801", "at": [350, 310], "location": "field", "measures": { "line": "$hs", "at": [350, 280] } }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": { "sheet": "$s8", "tag": "PT-802", "at": [130, 360], "location": "field", "measures": { "line": "$lsx", "at": [130, 330] } }
+    },
+    { "command": "check_pid", "params": {} },
+    { "command": "check_pid_3d", "params": {} }
+  ]
+}

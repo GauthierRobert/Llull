@@ -63,6 +63,6 @@ export function partGeometry(doc: CadDocument, entityId: string, kernel: Geometr
     return { kind: 'stl', stlBase64: binaryStl(stored).toString('base64'), curved: isCurvedPart(entity, stored) };
   return {
     code: 'FEA_KERNEL_REQUIRED',
-    message: `no geometry kernel could build '${entityId}' (kind '${entity.kind}'); start the server with LLULL_KERNEL=manifold or occt`,
+    message: `no geometry kernel could build '${entityId}' (kind '${entity.kind}'); the server has no geometry kernel installed (llull kernel_info; build the native llull-kernel in solver/ or set LLULL_NATIVE_DIR)`,
   };
 }

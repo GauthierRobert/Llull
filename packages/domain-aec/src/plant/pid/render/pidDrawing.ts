@@ -7,6 +7,7 @@ import type { DrawingPrimitive } from '@core/model/drawing';
 import type { Vec2 } from '@core/model/vectors';
 import type { PidConvention, PidItem, PidModel, PidSegment, PidSheet } from '../model';
 import { equipmentSymbol } from '../symbols/equipment';
+import { equipmentHalfExtents } from '../authoring/classes';
 import { BUBBLE_R, INLINE_HALF, actuatorSymbol, connectorSymbol, flowArrowSymbol, instrumentSymbol, pipingSymbol } from '../symbols/piping';
 import { withProjectSymbol } from '../symbols/projectSymbol';
 import { label, placeSymbol } from './placeSymbol';
@@ -73,7 +74,10 @@ function itemGlyph(pid: PidModel, item: PidItem, convention: PidConvention): Pid
   const base = { id: item.id, kind: item.kind, ...(item.tag === undefined ? {} : { tag: item.tag }) };
   switch (item.kind) {
     case 'equipment': {
-      const symbol = withProjectSymbol(pid, equipmentSymbol(item.dexpiClass, convention), convention);
+      const symbol =
+        item.symbolSize === undefined
+          ? withProjectSymbol(pid, equipmentSymbol(item.dexpiClass, convention), convention)
+          : equipmentSymbol(item.dexpiClass, convention, equipmentHalfExtents(item));
       const below: Vec2 = [item.at[0], item.at[1] - symbol.halfHeight - 4];
       return {
         ...base,

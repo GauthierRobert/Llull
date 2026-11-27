@@ -1,4 +1,5 @@
 import { defineConfig, configDefaults } from 'vitest/config';
+import type { Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { workspaceAliases } from './workspaceAliases.ts';
@@ -19,8 +20,21 @@ const DOM_SUITES = [
   'tests/unit/**/*.test.tsx',
 ];
 
+/**
+ * The setup files register per-file hooks (unmount renders, reset stores, reset the injected kernel). In the projects that share a
+ * module graph (`isolate: false`) a setup file served from vitest's on-disk module cache was not run again for the next file of
+ * the worker, so those files ran without the hooks (ScanPanel after Sidebar: renders of earlier tests stayed mounted). Setup
+ * files are therefore never cached on disk.
+ */
+const setupFilesUncached: Plugin = {
+  name: 'llull:setup-files-uncached',
+  configureVitest({ defineCacheKeyGenerator }) {
+    defineCacheKeyGenerator(({ id }) => (/\/tests\/setup(Dom)?\.ts$/.test(id.split('?')[0] ?? id) ? false : undefined));
+  },
+};
+
 export default defineConfig(({ command }) => ({
-  plugins: [react()],
+  plugins: [react(), setupFilesUncached],
   // Serve .wasm files with the correct MIME type so WebAssembly.instantiateStreaming
   // succeeds in the browser (manifold-3d). Vite dev-server otherwise
   // serves them as application/octet-stream which browsers reject for streaming compile.

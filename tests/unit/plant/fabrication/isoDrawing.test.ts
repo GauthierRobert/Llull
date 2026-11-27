@@ -10,6 +10,7 @@ import { lineAnnotations, mmText, roundMm, runDimensions } from '@aec/plant/fabr
 import { buildIsoGraph, classifyDirection, type IsoGraph } from '@aec/plant/fabrication/iso/isoGraph';
 import { MIN_DRAWN_MM, layoutIso } from '@aec/plant/fabrication/iso/isoLayout';
 import { TRUE_ISO_SCALE, axisAngles, depthOf, projectIso } from '@aec/plant/fabrication/iso/isoProjection';
+import { titleBlock } from '@aec/plant/fabrication/iso/isoSheet';
 import { fixturePcf } from './fabricationFixtures';
 
 const pipe = (id: string, a: Vec3, b: Vec3): NetworkComponent => ({
@@ -113,6 +114,35 @@ describe('graph: runs and direction classes', () => {
     ]);
     expect(graph.groups).toBe(2);
     expect(graph.unreachable).toEqual(['far']);
+  });
+
+  it('the two faces of a gasket are one node: a flanged valve stays connected to the pipe on both sides', () => {
+    const part = (id: string, type: NetworkComponent['type'], a: Vec3, b: Vec3): NetworkComponent => ({
+      id,
+      type,
+      ends: [
+        { xyz: a, boreMm: 100, endType: 'FL' },
+        { xyz: b, boreMm: 100, endType: 'FL' },
+      ],
+    });
+    const graph = buildIsoGraph(
+      network([
+        pipe('p1', [0, 0, 0], [1000, 0, 0]),
+        part('f1', 'FLANGE', [1000, 0, 0], [1076, 0, 0]),
+        part('g1', 'GASKET', [1076, 0, 0], [1079, 0, 0]),
+        part('v', 'VALVE', [1079, 0, 0], [1308, 0, 0]),
+        part('g2', 'GASKET', [1308, 0, 0], [1311, 0, 0]),
+        part('f2', 'FLANGE', [1311, 0, 0], [1387, 0, 0]),
+        pipe('p2', [1387, 0, 0], [2000, 0, 0]),
+      ]),
+    );
+    expect(graph.groups).toBe(1);
+    expect(graph.unreachable).toEqual([]);
+    expect(graph.steps.map((step) => step.segment.componentId)).toEqual(['p1', 'f1', 'v', 'f2', 'p2']);
+    expect(graph.runs).toHaveLength(1);
+    const valve = graph.steps[2];
+    expect(valve?.entryKey).toBe(graph.steps[1]?.exitKey);
+    expect(valve?.start).toEqual([1079, 0, 0]);
   });
 });
 
@@ -384,5 +414,30 @@ describe('not-to-scale layout', () => {
       expect([crossing.a, crossing.b]).toContain(crossing.farther);
     }
     expect(JSON.stringify(layoutIso(buildIsoGraph(chain(ring)), 'up_right', AREA))).toBe(JSON.stringify(layout));
+  });
+});
+
+describe('title block', () => {
+  const values = (primitives: ReturnType<typeof titleBlock>): string[] =>
+    primitives.flatMap((primitive) => (primitive.t === 'text' ? [primitive.text] : []));
+
+  it('cuts a value longer than its cell and ends it in an ellipsis, short values stay', () => {
+    const long = 'Cane sugar factory 13 000 TCD - diffuser extraction and evaporation';
+    const texts = values(
+      titleBlock(594, [
+        [
+          ['PROJECT', long],
+          ['LINE', 'HS-8001-250'],
+          ['SPEC', 'SUGHP'],
+        ],
+      ]),
+    );
+    const cut = texts.find((value) => value.startsWith('Cane sugar'));
+    expect(cut).toBeDefined();
+    expect(cut).not.toBe(long);
+    expect(cut?.endsWith('…')).toBe(true);
+    expect((cut?.length ?? 0) * 3.2 * 0.55).toBeLessThanOrEqual(60 - 4);
+    expect(texts).toContain('HS-8001-250');
+    expect(texts).toContain('SUGHP');
   });
 });

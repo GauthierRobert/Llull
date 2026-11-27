@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { byTag, feedPump, ofKind, runSteps } from './authoringFixtures';
 
@@ -271,5 +272,48 @@ describe('replay of the authored document', () => {
   it('re-mints the same ids', () => {
     const { doc } = runSteps([{ command: 'create_pid_sheet', params: { number: 'PID-001' } }]);
     expect(execute(doc, 'replay_history', {}).document.plant?.pid).toEqual(doc.plant?.pid);
+  });
+});
+
+describe('add_pid_equipment symbolSize', () => {
+  const sized = (symbolSize: number[]): Record<string, unknown> => ({
+    sheet: 'PID-001',
+    class: 'Chamber',
+    tag: 'DF-101',
+    at: [600, 400],
+    symbolSize,
+    nozzles: [
+      { subTag: 'L', side: 'left' },
+      { subTag: 'T', side: 'top' },
+      { subTag: 'B1', side: 'bottom' },
+      { subTag: 'B2', side: 'bottom' },
+    ],
+  });
+
+  it('puts side nozzles on the given box, stores the size and draws the symbol at that size', () => {
+    const result = ok(sheetDoc(), 'add_pid_equipment', sized([1000, 40]));
+    expect(byTag(result.document, 'DF-101')).toMatchObject({ kind: 'equipment', symbolSize: [1000, 40] });
+    const ports = Object.fromEntries(ofKind(result.document, 'nozzle').map((nozzle) => [nozzle.subTag, nozzle.port]));
+    expect(ports['L']).toEqual([100, 400]);
+    expect(ports['T']).toEqual([600, 420]);
+    expect(ports['B1']?.[1]).toBe(380);
+    expect(ports['B2']?.[1]).toBe(380);
+    const svg = data<{ svg: string }>(result.document, 'export_pid_svg', { sheet: 'PID-001' }).svg;
+    const classBox = apply(sheetDoc(), 'add_pid_equipment', { ...sized([1000, 40]), symbolSize: undefined });
+    const plain = data<{ svg: string }>(classBox, 'export_pid_svg', { sheet: 'PID-001' }).svg;
+    expect(svg).not.toBe(plain);
+    expect(svg).toContain('DF-101');
+  });
+
+  it('keeps the class box without symbolSize and survives a reload', () => {
+    const doc = apply(sheetDoc(), 'add_pid_equipment', sized([1000, 40]));
+    const reloaded = deserializeDocument(serializeDocument(doc));
+    expect(byTag(reloaded, 'DF-101')).toMatchObject({ symbolSize: [1000, 40] });
+    const classBox = apply(sheetDoc(), 'add_pid_equipment', { ...sized([1000, 40]), symbolSize: undefined });
+    expect(byTag(classBox, 'DF-101')).not.toHaveProperty('symbolSize');
+  });
+
+  it.each([[[0, 40]], [[1000, 2001]], [[4, 4]]])('refuses a size outside 5 to 2000 mm: %j', (symbolSize) => {
+    expectRefusal(sheetDoc(), 'add_pid_equipment', sized(symbolSize), 'PID_PARAM_INVALID', 'symbolSize');
   });
 });

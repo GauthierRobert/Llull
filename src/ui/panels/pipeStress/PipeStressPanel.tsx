@@ -163,7 +163,7 @@ function ApprovalSection({ model, outcome }: { model: StressModel; outcome: Stre
         </button>
       </div>
       {recorded !== undefined && recorded.status !== 'pass' && status !== 'stale' && (
-        <p className="panel__row-meta">A {recorded.status} record cannot be approved.</p>
+        <p className="panel__section-hint">A {recorded.status} record cannot be approved.</p>
       )}
       {signing !== null && <SignActDialog request={signing} onClose={() => setSigning(null)} />}
     </PanelSection>
@@ -198,7 +198,7 @@ function ResultSections({ document, view }: { document: CadDocument; view: Stres
             <StationRow key={`${row.case}|${row.pipeId}|${row.node ?? row.element}`} document={document} view={view} row={row} />
           ))}
         </ul>
-        {stations.length === 0 && <p className="panel__row-meta">No code stress rows (no sustained, expansion or occasional case).</p>}
+        {stations.length === 0 && <p className="panel__section-hint">No code stress rows (no sustained, expansion or occasional case).</p>}
       </PanelSection>
       <PanelSection title="Findings" count={flagged.length} collapsible defaultOpen={flagged.some((f) => f.severity === 'fail')}>
         <ul className="panel__list" data-testid="stress-findings">
@@ -247,68 +247,70 @@ export function PipeStressPanel({ className }: { className?: string }): React.Re
       ) : (
         <>
           <PanelSection title="Model">
-            <LabeledSelect
-              label="Model"
-              value={model.id}
-              options={order.map((id) => [id, models[id]?.name ?? id] as const)}
-              testId="stress-model-select"
-              onChange={setModelId}
-            />
-            <p className="panel__row-meta">{model.rule}</p>
-            {outcome.ok && (
-              <KpiStrip
-                label="Pipe stress summary"
-                items={[
-                  {
-                    key: 'worst',
-                    label: 'Worst ratio',
-                    value: fmtRatio(
-                      outcome.view.cases.reduce<number | null>(
-                        (a, c) => (c.governingRatio === null || (a !== null && a >= c.governingRatio) ? a : c.governingRatio),
-                        null,
+            <div className="panel__form">
+              <LabeledSelect
+                label="Model"
+                value={model.id}
+                options={order.map((id) => [id, models[id]?.name ?? id] as const)}
+                testId="stress-model-select"
+                onChange={setModelId}
+              />
+              <p className="panel__row-meta">{model.rule}</p>
+              {outcome.ok && (
+                <KpiStrip
+                  label="Pipe stress summary"
+                  items={[
+                    {
+                      key: 'worst',
+                      label: 'Worst ratio',
+                      value: fmtRatio(
+                        outcome.view.cases.reduce<number | null>(
+                          (a, c) => (c.governingRatio === null || (a !== null && a >= c.governingRatio) ? a : c.governingRatio),
+                          null,
+                        ),
                       ),
-                    ),
-                    tone: STATUS_TONE[outcome.view.status],
-                  },
-                  { key: 'cases', label: 'Cases', value: String(outcome.view.cases.length) },
-                ]}
-              />
-            )}
-            <label className="field field--inline">
-              <input type="checkbox" checked={shown} data-testid="stress-overlay-toggle" onChange={(e) => setShown(e.target.checked)} />
-              <span className="field__label">Colour pipes and runs by stress ratio</span>
-            </label>
-            <ToneLegend />
-            {outcome.ok && (
-              <LabeledSelect
-                label="Overlay case"
-                value={caseName ?? ALL_CASES}
-                options={outcome.view.cases.filter((c) => c.governingRatio !== null).map((c) => [c.name, c.name] as const)}
-                blankLabel="Worst of all cases"
-                testId="stress-case-select"
-                onChange={(value) => setCaseName(value === ALL_CASES ? null : value)}
-              />
-            )}
-            <label className="field field--inline">
-              <input
-                type="checkbox"
-                checked={showReactions}
-                data-testid="stress-reactions-toggle"
-                onChange={(e) => setShowReactions(e.target.checked)}
-              />
-              <span className="field__label">Show support reactions</span>
-            </label>
-            {outcome.ok && caseName !== null && (
-              <LabeledSelect
-                label="Deformed shape"
-                value={deformScale === 0 ? '' : String(deformScale)}
-                options={DEFORM_SCALES.map((factor) => [String(factor), `x ${factor}`] as const)}
-                blankLabel="Off"
-                testId="stress-deform-select"
-                onChange={(value) => setDeformScale(value === '' ? 0 : Number(value))}
-              />
-            )}
-            {caseName === null && <p className="panel__row-meta">Pick an overlay case to show its deformed shape.</p>}
+                      tone: STATUS_TONE[outcome.view.status],
+                    },
+                    { key: 'cases', label: 'Cases', value: String(outcome.view.cases.length) },
+                  ]}
+                />
+              )}
+              <label className="field field--inline">
+                <input type="checkbox" checked={shown} data-testid="stress-overlay-toggle" onChange={(e) => setShown(e.target.checked)} />
+                <span className="field__label">Colour pipes and runs by stress ratio</span>
+              </label>
+              <ToneLegend />
+              {outcome.ok && (
+                <LabeledSelect
+                  label="Overlay case"
+                  value={caseName ?? ALL_CASES}
+                  options={outcome.view.cases.filter((c) => c.governingRatio !== null).map((c) => [c.name, c.name] as const)}
+                  blankLabel="Worst of all cases"
+                  testId="stress-case-select"
+                  onChange={(value) => setCaseName(value === ALL_CASES ? null : value)}
+                />
+              )}
+              <label className="field field--inline">
+                <input
+                  type="checkbox"
+                  checked={showReactions}
+                  data-testid="stress-reactions-toggle"
+                  onChange={(e) => setShowReactions(e.target.checked)}
+                />
+                <span className="field__label">Show support reactions</span>
+              </label>
+              {outcome.ok && caseName !== null && (
+                <LabeledSelect
+                  label="Deformed shape"
+                  value={deformScale === 0 ? '' : String(deformScale)}
+                  options={DEFORM_SCALES.map((factor) => [String(factor), `x ${factor}`] as const)}
+                  blankLabel="Off"
+                  testId="stress-deform-select"
+                  onChange={(value) => setDeformScale(value === '' ? 0 : Number(value))}
+                />
+              )}
+              {caseName === null && <p className="panel__row-meta">Pick an overlay case to show its deformed shape.</p>}
+            </div>
           </PanelSection>
           {outcome.ok ? (
             <ResultSections document={document} view={outcome.view} />
@@ -316,7 +318,7 @@ export function PipeStressPanel({ className }: { className?: string }): React.Re
             <StatusLine text={outcome.summary} testId="stress-refused" />
           )}
           <ApprovalSection model={model} outcome={outcome} />
-          <p className="panel__row-meta" data-testid="stress-review-required">
+          <p className="panel__section-hint" data-testid="stress-review-required">
             Review required: a qualified engineer reviews every pipe stress result.
           </p>
         </>

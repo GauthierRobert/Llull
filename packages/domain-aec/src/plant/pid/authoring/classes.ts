@@ -17,6 +17,12 @@ const HALF_EXTENTS: Readonly<Record<string, readonly [number, number]>> = {
 };
 export const DEFAULT_HALF_EXTENTS: readonly [number, number] = [20, 20];
 export const halfExtents = (dexpiClass: string): readonly [number, number] => HALF_EXTENTS[dexpiClass] ?? DEFAULT_HALF_EXTENTS;
+/** Half extents of the symbol of one equipment item: its own `symbolSize` when it has one, else the class box. */
+export const equipmentHalfExtents = (equipment: {
+  readonly dexpiClass: string;
+  readonly symbolSize?: readonly [number, number];
+}): readonly [number, number] =>
+  equipment.symbolSize === undefined ? halfExtents(equipment.dexpiClass) : [equipment.symbolSize[0] / 2, equipment.symbolSize[1] / 2];
 
 /** Edit distance, capped: enough to rank a handful of class names. */
 function editDistance(a: string, b: string): number {

@@ -36,7 +36,8 @@ describe.skipIf(!hasEsbuild)('desktop main bundle', () => {
     expect(existsSync(path.join(out, 'main.js'))).toBe(true);
     expect(existsSync(path.join(out, 'preload.js'))).toBe(true);
     const main = readFileSync(path.join(out, 'main.js'), 'utf8');
-    expect(main).not.toMatch(/resvg/i);
+    // the rasterizer package itself (@resvg/resvg-js), not an identifier that merely contains the letters (pictureSvg)
+    expect(main).not.toMatch(/@resvg\/|resvg-js/i);
     // a quoted path ending in .node (an addon), not a property access such as stage.node)
     expect(main).not.toMatch(/["'`][^"'`\n]*\.node["'`]/);
   });

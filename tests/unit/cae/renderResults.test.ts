@@ -8,7 +8,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { meshSkin } from '@cae/results/fieldSurface';
 import { bandLevels, resultColor, triangleBands } from '@lib/isoBands';
-import { surfacePayload } from '@cae/results/surfacePayload';
+import { SURFACE_CORNER_BUDGET, surfacePayload } from '@cae/results/surfacePayload';
 import { solvedBar, type SolvedBar } from './deckFixtures';
 import { solvedWall } from './thermal/solved';
 
@@ -325,5 +325,9 @@ describe('render_fea_results surface', () => {
     expect(cut.triangles).toBe(2);
     expect(cut.values).toHaveLength(6);
     expect(cut.truncated).toBe(true);
+  });
+
+  it('paints 200,000 triangles before it truncates (a 44,000-element C3D10 part has about 110,000 skin triangles)', () => {
+    expect(SURFACE_CORNER_BUDGET).toBe(600_000);
   });
 });

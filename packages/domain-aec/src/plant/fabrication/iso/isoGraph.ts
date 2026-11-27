@@ -113,16 +113,39 @@ function segmentsOf(component: NetworkComponent, componentIndex: number): IsoSeg
   return first === undefined || second === undefined ? [] : make('body', first, second);
 }
 
+/**
+ * Node key of a point with the two faces of every gasket taken as ONE node: a gasket is not drawn (SKIPPED), so without this the
+ * flange and the valve (or the mating flange) it sits between would be 3 mm apart and the line would read as disconnected.
+ */
+function jointKeys(network: PipingNetwork, include?: ReadonlySet<string>): (point: Vec3) => string {
+  const alias = new Map<string, string>();
+  const root = (key: string): string => {
+    let at = key;
+    for (let next = alias.get(at); next !== undefined; next = alias.get(at)) at = next;
+    return at;
+  };
+  for (const component of network.components) {
+    if (component.type !== 'GASKET' || (include !== undefined && !include.has(component.id))) continue;
+    const [first, second] = component.ends.map((end) => end.xyz);
+    if (first === undefined || second === undefined) continue;
+    const from = root(nodeKey(second));
+    const to = root(nodeKey(first));
+    if (from !== to) alias.set(from, to);
+  }
+  return (point) => root(nodeKey(point));
+}
+
 /** The graph of a line, or of the components named in `include` (one sheet of a split isometric). */
 export function buildIsoGraph(network: PipingNetwork, include?: ReadonlySet<string>): IsoGraph {
   const segments = network.components.flatMap((component, index) =>
     include === undefined || include.has(component.id) ? segmentsOf(component, index) : [],
   );
+  const keyOf = jointKeys(network, include);
   const adjacency = new Map<string, number[]>();
   const points = new Map<string, Vec3>();
   segments.forEach((segment, index) => {
     for (const end of [segment.a, segment.b]) {
-      const key = nodeKey(end);
+      const key = keyOf(end);
       adjacency.set(key, [...(adjacency.get(key) ?? []), index]);
       if (!points.has(key)) points.set(key, end);
     }
@@ -139,20 +162,20 @@ export function buildIsoGraph(network: PipingNetwork, include?: ReadonlySet<stri
     groups += 1;
     const first = segments[root] as IsoSegment;
     const reachedBefore = steps.length;
-    const stack: Task[] = [{ segment: root, entry: nodeKey(first.a), parent: -1 }];
+    const stack: Task[] = [{ segment: root, entry: keyOf(first.a), parent: -1 }];
     while (stack.length > 0) {
       const task = stack.pop() as Task;
       if (done.has(task.segment)) continue;
       done.add(task.segment);
       const segment = segments[task.segment] as IsoSegment;
-      const forward = nodeKey(segment.a) === task.entry;
+      const forward = keyOf(segment.a) === task.entry;
       const start = forward ? segment.a : segment.b;
       const end = forward ? segment.b : segment.a;
       const dir = normalize3(sub3(end, start));
       const parent = steps[task.parent];
       const run = parent !== undefined && dot3(parent.dir, dir) > 1 - 1e-9 ? parent.run : runDirection.length + 1;
       if (run > runDirection.length) runDirection.push(dir);
-      const exitKey = nodeKey(end);
+      const exitKey = keyOf(end);
       steps.push({ segment, start, end, entryKey: task.entry, exitKey, dir, axis: classifyDirection(dir), parent: task.parent, run });
       const here = steps.length - 1;
       const next = (adjacency.get(exitKey) ?? []).filter((candidate) => !done.has(candidate));

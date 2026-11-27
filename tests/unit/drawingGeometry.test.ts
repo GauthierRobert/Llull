@@ -72,4 +72,23 @@ describe('buildDrawingBuffers — ISO 128 line weights', () => {
     ]);
     expect(segmentCount(buffers.thin.positions)).toBeGreaterThan(5 + 32);
   });
+  it('dashes a plant-scale centre line (a remainder below the float resolution of the position must not stall the loop)', () => {
+    const scale = { patternUnit: 75, hatchSpacing: 150 };
+    const buffers = buildDrawingBuffers(
+      [styled({ type: 'polyline', layer: 'L', style: 'center', points: xy(0, 0, 0.1, 0, 0.1, 100000) })],
+      scale,
+      [0, 0],
+    );
+    const dashes = segmentCount(buffers.thin.positions);
+    expect(dashes).toBeGreaterThan(280);
+    expect(dashes).toBeLessThan(320);
+  });
+  it('draws a centre line solid when the pattern unit is not positive', () => {
+    const buffers = buildDrawingBuffers(
+      [styled({ type: 'line', layer: 'L', style: 'center', a: [0, 0], b: [20, 0] })],
+      { patternUnit: 0, hatchSpacing: 1 },
+      [0, 0],
+    );
+    expect(segmentCount(buffers.thin.positions)).toBe(1);
+  });
 });

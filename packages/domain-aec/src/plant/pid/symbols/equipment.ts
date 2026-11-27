@@ -187,8 +187,8 @@ function drawingOf(cls: string, hx: number, hy: number): Drawing {
 }
 
 /** The equipment symbol for a class; an unknown class gets the generic box (the importer maps those to `Custom`). */
-export function equipmentSymbol(cls: string, convention: PidConvention): PidSymbol {
-  const [hx, hy] = halfExtents(cls);
+export function equipmentSymbol(cls: string, convention: PidConvention, half: readonly [number, number] = halfExtents(cls)): PidSymbol {
+  const [hx, hy] = half;
   const drawing = drawingOf(cls, hx, hy);
   const initial = text([0, 0], Math.max(2.5, Math.min(hx, hy) * 0.45), cls.charAt(0));
   return {

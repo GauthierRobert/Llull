@@ -4,8 +4,11 @@ import type { UnitSystem } from '@core/model/analysis';
 import { analysisLengthMetres } from '../shared/defaults';
 import type { FieldFace } from './fieldFaces';
 
-/** Corners (3 per triangle) returned at most. */
-export const SURFACE_CORNER_BUDGET = 150_000;
+/**
+ * Corners (3 per triangle) returned at most: 200,000 triangles. 50,000 left the skin of a 44,000-element C3D10 part two thirds unpainted
+ * (the faces beyond the budget are dropped in mesh order, which reads as speckle).
+ */
+export const SURFACE_CORNER_BUDGET = 600_000;
 
 export interface SurfacePayload {
   /** Flat xyz per triangle corner, deformed as plotted, document units. */

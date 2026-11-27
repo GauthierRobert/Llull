@@ -3,7 +3,6 @@
 import { z, vec2 } from '@core/commands/schema';
 import type { Vec2 } from '@core/model/vectors';
 import type { PidEquipment, PidNozzle } from '../model';
-import { halfExtents } from './classes';
 
 export const SIDES = ['left', 'right', 'top', 'bottom'] as const;
 const DIRECTIONS: Readonly<Record<(typeof SIDES)[number], Vec2>> = { left: [-1, 0], right: [1, 0], top: [0, 1], bottom: [0, -1] };
@@ -31,9 +30,9 @@ const rotate = (v: Vec2, degrees: number): Vec2 => {
 };
 
 /** Offset of a nozzle from the centre; `index` / `count` spread nozzles that share a side, symmetric about the side centre. */
-export function nozzleOffset(dexpiClass: string, side: NozzleParam['side'], index: number, count: number): Vec2 {
+export function nozzleOffset(half: readonly [number, number], side: NozzleParam['side'], index: number, count: number): Vec2 {
   if (typeof side !== 'string') return side;
-  const [hx, hy] = halfExtents(dexpiClass);
+  const [hx, hy] = half;
   const [dx, dy] = DIRECTIONS[side];
   const shift = (index - (count - 1) / 2) * SPACING;
   return [dx * hx + (dx === 0 ? shift : 0), dy * hy + (dy === 0 ? shift : 0)];

@@ -28,12 +28,15 @@ interface RestRequest {
 }
 
 /** One request; network errors and timeouts propagate (callers word them for their surface). */
+// Every request closes its connection: a caller that pauses longer than the server's keep-alive (5 s) would otherwise send the
+// next command on a socket the server already closed (ECONNRESET), and a mutating POST cannot be retried blindly.
 export async function requestJson(url: string, request: RestRequest = {}): Promise<RestReply> {
   const hasBody = request.body !== undefined;
   const response = await (request.fetchImpl ?? globalFetch)(url, {
     method: request.method ?? (hasBody ? 'POST' : 'GET'),
     headers: {
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      Connection: 'close',
       ...(request.token !== undefined ? { Authorization: `Bearer ${request.token}` } : {}),
     },
     ...(hasBody ? { body: JSON.stringify(request.body) } : {}),
@@ -93,6 +96,7 @@ export async function requestCommandStream(url: string, request: CommandStreamRe
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Connection: 'close',
         Accept: `${NDJSON}, application/json`,
         ...(request.token !== undefined ? { Authorization: `Bearer ${request.token}` } : {}),
       },

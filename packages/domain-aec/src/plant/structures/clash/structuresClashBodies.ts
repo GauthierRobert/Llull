@@ -211,14 +211,17 @@ export function structuresClashBodies(doc: CadDocument): ExternalBody[] {
   const collect =
     (element: BuildingElement, connectedTo: readonly string[]): Emit =>
     (box) => {
-      if (box !== null && box !== undefined)
-        bodies.push({
-          id: element.id,
-          kind: 'solid',
-          box,
-          group: 'assemblyId' in element && element.assemblyId !== undefined ? element.assemblyId : element.id,
-          connectedTo,
-        });
+      if (box === null || box === undefined) return;
+      const assemblyId = 'assemblyId' in element ? element.assemblyId : undefined;
+      const assembly = assemblyId === undefined ? undefined : building.elements[assemblyId];
+      const hostId = assembly?.category === 'assembly' ? assembly.hostId : undefined;
+      bodies.push({
+        id: element.id,
+        kind: 'solid',
+        box,
+        group: assemblyId ?? element.id,
+        connectedTo: hostId === undefined ? connectedTo : [...connectedTo, hostId],
+      });
     };
 
   for (const ladder of elementsOf(building, 'ladder')) {

@@ -70,9 +70,16 @@ function arcPoints(center: Vec2, radius: number, start: number, end: number): Ve
   return [first, ...sampleArc(center, radius, start, positiveSweep(end - start), ARC_SEGMENTS)];
 }
 
-/** ISO 128 type 04 (long dash, gap, dot, gap), one pattern over the whole run. */
+/**
+ * ISO 128 type 04 (long dash, gap, dot, gap), one pattern over the whole run. A dash remainder below the float resolution of the
+ * position ends the dash (a 100 m grid line in mm must not stall); a pattern unit that is not positive draws the run solid.
+ */
 function chainRing(buffer: SegmentBuffer, points: ReadonlyArray<Vec2>, closed: boolean, unit: number, color: THREE.Color): void {
   const count = closed ? points.length : points.length - 1;
+  if (!(unit > 0) || !Number.isFinite(unit)) {
+    for (let index = 0; index < count; index++) buffer.add(points[index] as Vec2, points[(index + 1) % points.length] as Vec2, color);
+    return;
+  }
   const pattern = LINE_PATTERNS.center.map((length) => length * unit);
   let phase = 0;
   let drawn = 0;
@@ -88,9 +95,10 @@ function chainRing(buffer: SegmentBuffer, points: ReadonlyArray<Vec2>, closed: b
         const lerp = (t: number): Vec2 => [a[0] + ((b[0] - a[0]) * t) / length, a[1] + ((b[1] - a[1]) * t) / length];
         buffer.add(lerp(s), lerp(end), color);
       }
+      const stalled = end <= s;
       drawn += end - s;
       s = end;
-      if (drawn >= (pattern[phase] as number) - 1e-12) {
+      if (stalled || drawn >= (pattern[phase] as number) * (1 - 1e-9)) {
         phase = (phase + 1) % pattern.length;
         drawn = 0;
       }

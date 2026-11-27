@@ -3,6 +3,7 @@ import type { CommandResult } from '@core/commands/types';
 import type { Vec2 } from '@core/model/vectors';
 import { distance } from '../authoring/geometry';
 import { makeNozzle, nozzleOffset, portOf, sideParam } from '../authoring/nozzles';
+import { equipmentHalfExtents } from '../authoring/classes';
 import { Draft, fail, findItem, isFail, mintFree, refuse } from '../authoring/refs';
 import { getPid, withPid } from '../state';
 
@@ -45,7 +46,7 @@ export const addPidNozzle = defineCommand({
         name,
         fail('PID_TAG_DUPLICATE', `${equipment.tag ?? equipment.id} already has a nozzle ${params.subTag}`, ['subTag']),
       );
-    let port: Vec2 = params.at ?? portOf(equipment, nozzleOffset(equipment.dexpiClass, params.side ?? 'left', 0, 1));
+    let port: Vec2 = params.at ?? portOf(equipment, nozzleOffset(equipmentHalfExtents(equipment), params.side ?? 'left', 0, 1));
     if (params.at === undefined && typeof params.side === 'string') {
       const vertical = params.side === 'left' || params.side === 'right';
       for (let step = 1; owned.some((n) => distance(n.port, port) < 1) && step <= owned.length; step++)
