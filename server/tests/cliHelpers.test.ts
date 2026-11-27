@@ -197,6 +197,16 @@ describe('saveFiles', () => {
     expect(filesOfData('text')).toEqual([]);
   });
 
+  it('saves the csv table of a report, and prefers another payload when the result carries both', () => {
+    const root = dir();
+    const saved = saveDataFiles(
+      { kind: 'line_list', columns: ['lineNumber'], rows: [], csv: 'lineNumber\nJC-1002-250\n' },
+      path.join(root, 'lines.csv'),
+    );
+    expect(readFileSync(saved[0]?.path ?? '', 'utf8')).toBe('lineNumber\nJC-1002-250\n');
+    expect(filesOfData({ text: 'sheet', csv: 'a,b' })[0]?.bytes.toString()).toBe('sheet');
+  });
+
   it('writes one file to a path, several files into a directory', () => {
     const root = dir();
     const single = saveDataFiles({ step: 'ISO-10303' }, path.join(root, 'nested', 'p.step'));
