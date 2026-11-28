@@ -1,8 +1,7 @@
 # RV1 — Realistic visualisation and large scenes: the gap to Blender (2026-11-27)
 
-**Status:** planned (owner decision of §6, 2026-11-27); nothing built. Written at the owner's request ("why does Blender succeed with big, very realistic 3D models and digital
+**Status:** RV-M1 and RV-M2 built (2026-11-28, §5a as built); RV-M3 to RV-M8 planned (owner decision of §6, 2026-11-27). Written at the owner's request ("why does Blender succeed with big, very realistic 3D models and digital
 twins, what are we missing; evaluate the gap, verify it against what we have, write the specs and the validation layers").
-Nothing here is built.
 
 ## 1. The short answer
 
@@ -109,6 +108,27 @@ network (AF-41).
   `add-entity-kind` checklist.
 - Commands: `add_light`, `add_camera`, `set_environment` (HDR file from the asset store, or the existing sky model with turbidity).
 - The site context sun stays the default; a document without lights renders as today.
+
+### 5a. As built: RV-M1 and RV-M2 (2026-11-28)
+
+- Model: `model/appearance.ts` (`TextureRecord`, `Appearance` channels value / texture, `SceneEnvironment`, `CadDocument.appearance`),
+  `model/sceneKinds.ts` (`light`, `camera` kinds; no geometry, `is3D` false), `MeshData.uvs` / `normals`, `Material.appearance`,
+  `BaseEntity.appearance` (visual-only override; mass keeps `materialId`).
+- Commands (`commands/appearance/`, toolset materials): `import_texture` (PNG / JPEG / Radiance .hdr; `file=` → image asset store key,
+  or inline base64 up to 1 MiB), `set_material_appearance`, `apply_appearance` (offline library: steel, stainless, galvanised, painted,
+  concrete, insulation_cladding, glass, rubber, copper, brass), `clear_entity_appearance`, `remove_texture`, `list_appearances`,
+  `set_environment` (sky / hdr / color / default). Limits: side 8192 px, 1 GiB decoded per document; refusals `TEXTURE_TOO_LARGE`,
+  `TEXTURE_BUDGET_EXCEEDED`, `TEXTURE_FORMAT_UNSUPPORTED`, `TEXTURE_ASSET_UNAVAILABLE`, `TEXTURE_COLOR_SPACE` (srgb for colour
+  channels, linear for data maps, hdr only for the environment), `TEXTURE_IN_USE`.
+- Commands (`commands/scene/`): `add_light` (sun / point / spot / area; without an intensity a light gives the default sun's
+  3 W/m2 at its target), `add_camera`, `edit_light`, `edit_camera` (`set_camera` stays the viewport orbit), `render_view camera=<id>`
+  (perspective through a camera entity). Lights do not change `render_view` shading: they feed the viewport and RV-M3.
+- Host: `server/src/imageAssets/store.ts` (`LLULL_IMAGE_CACHE`), `GET /assets/image/<key>` for the renderer; the renderer runs without
+  the store, so a `fileKey` import resyncs from the snapshot (sync rule).
+- Viewport: physical materials with textures (stored or box-projected UVs), light glyphs + three.js lights (no light entity = the scene
+  as before), camera frusta with "Look through camera", colour / sky / HDR environment.
+- Left for later milestones: HDR backdrop through the post-processing chain and the real-GPU gate (RV-M4); glTF `KHR_lights_punctual`
+  and camera export (RV-M6); OBJ `vt` / `vn` import (the importer welds vertices).
 
 ### RV-M3 — Path-traced render (closes G1 to G5, G12 to G14)
 
