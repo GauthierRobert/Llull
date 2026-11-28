@@ -19,6 +19,8 @@ import { formatReport, resetReports, writeReport } from '../../../tests/producti
 import { SCENARIOS, chainOf } from '../../../tests/production/scenarios';
 import { estimateUsd, runAgent, type SendTurn } from './agentLoop';
 import { feaToolsMissing } from '../feaTestSupport';
+import { nativeBinaryPath } from '../../src/native/nativeBinary';
+import { requireTool } from '../../../tests/requireTool';
 import { callTool, liveDocument, resetDocument, startServer, stopServer } from './cliHarness';
 
 beforeAll(async () => {
@@ -55,10 +57,18 @@ describe('each job fits the default REST rate limit', () => {
   }
 });
 
+/** A scenario's host tools are missing here: the FE transports need Netgen + CalculiX, render_realistic needs llull-compute. */
+function hostToolsMissing(scenario: Scenario): boolean {
+  const tools = scenario.hostTools ?? [];
+  const fea = tools.some((tool) => tool !== 'render_realistic') && feaToolsMissing();
+  const render = tools.includes('render_realistic') && requireTool('native:llull-compute', nativeBinaryPath('llull-compute') !== null);
+  return fea || render;
+}
+
 describe('production scenarios — scripted driver through the CLI backend', () => {
   for (const scenario of SCENARIOS) {
-    // a scenario that calls the FE transports needs the real Netgen mesher and CalculiX: skipped (and recorded) where they are absent
-    it.skipIf(scenario.hostTools !== undefined && feaToolsMissing())(scenario.id, async () => {
+    // a scenario that calls host tools (FE transports, the native path tracer) is skipped (and recorded) where they are absent
+    it.skipIf(hostToolsMissing(scenario))(scenario.id, async () => {
       resetDocument(createEmptyDocument());
       let baseline: CadDocument = createEmptyDocument();
       let run = { calls: 0, ms: 0 };

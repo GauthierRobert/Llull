@@ -5,7 +5,7 @@ import React from 'react';
 import type { Appearance } from '@core/model/appearance';
 import { useStore } from '@ui/store';
 import { PropRow } from '../propertyFields';
-import { resolveAppearance } from '@ui/viewport/3d/appearance/surfacePlan';
+import { resolveAppearance } from '@core/model/appearance';
 import type { Entity } from '@core/model/types';
 
 /** One line per set channel: value, texture name, or both. */

@@ -59,6 +59,7 @@ stay green.
 | `desmet-extraction-revision-b` | Change order on the issued model: extractor uprated (18 m, 72 t), pump E-502 and line L-105 added, revision B. The office edits the model; every untouched element must keep its id, mark and IFC GlobalId.                                                                                                                                                                                                                                                     |
 | `desmet-pipe-rack`             | Inter-unit pipe rack: 54 m, 10 moment-frame bents (HEB240 / IPE300, rigid joints) with tiers at +5.0 and +6.5 m, IPE240 stringers and mid-bay tier beams (a shoe every 3 m), nine lines DN50–DN300 battery limit to battery limit, a 600 mm cable tray, a road crossing needing 4.5 m clear. Rack checks: every line supported at every bent, clear height, line spacing, line metres per DN across design / takeoff / schedule.                                |
 | `civil-site-development`       | Civil office job on the pilot sample survey (911 points, local grid, metres): existing-ground TIN, 50 × 40 m building pad balanced with swell 1.1, 130 m access road (R 60 m, 40 m clothoids, profile, 3 m lanes, 6 % superelevation, 40 km/h), four-manhole storm network sized against an IDF curve with an HGL check from the stream tailwater. Issue: plan-profile sheet (A2), LandXML, project file.                                                       |
+| `plant-rendered-views`         | Visualisation job on the issued pipe rack (RV1 §7 V6): the office appearance library as materials (S355 painted #c9a227, galvanised pipes and tray, steel supports) on every element, Ghent site sun + clear sky, six path-traced views (front, back, left, right, top, iso; PNG + scene-linear EXR, 480 × 270, 16 spp, seed 7, denoised) and a 12-frame turntable (`render_realistic direction`, 30° steps; render_realistic has no animation, so a turntable is a frame set). Graded on the files with independent PNG / EXR readers: sizes, not blank, six distinct views, frames in rotation order, provenance (illustration, deterministic, seed, samples, device, version). Needs llull-compute: skipped in-process (`hostTools`), run by `npm run production:scripted`. |
 
 ## Acceptance criteria
 
@@ -85,6 +86,13 @@ stay green.
 | pipe rack           | 28 / 28  | 28 / 28 | not run                         |
 | civil site          | 11 / 11  | 11 / 11 | not run                         |
 | physics benchmarks  | not run  | n/a     | not run                         |
+| plant rendered views | 5 / 6 (2026-11-28) | no flow | not run                         |
+
+`plant-rendered-views` (RV1 V6, added 2026-11-28; `npm run production:scripted`, 28 calls on top of the pipe rack, 39 s): six views and
+twelve turntable frames issue as real pictures with full provenance (closest pair of views 2.8 / 255 apart, every frame in rotation
+order). One known gap, `appearance-coverage` (0 / 283 element solids): llull refuses `apply_appearance` (and `assign_material`) on
+building-plugin solids (derivation guard: "edit the element instead"), no building command takes an appearance, and the elements' own
+material (S355 …) never reaches `render_realistic`, so the plant renders in its default element colours whatever the library says. It has no UI flow.
 
 Every acceptance criterion passes through the CLI backend calls and through the UI; `knownIssues` is empty
 for both drivers. The structure, equipment, lines, openings and stairs are modelled exactly; the

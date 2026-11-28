@@ -3,6 +3,7 @@ import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { CommandResult } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { CheckReport, DeliverableId, DriverId, GradeContext, Scenario, ScenarioReport } from './contract';
+import { renderIntent, renderParams } from './render/intent';
 
 /**
  * Grades a driver's final document against a scenario's acceptance criteria, then applies the
@@ -40,6 +41,10 @@ function produce(doc: CadDocument, id: DeliverableId): string {
     }
     case 'save':
       return serializeDocument(doc);
+    case 'render': {
+      const result = execute(doc, 'render_realistic', renderParams(renderIntent, id));
+      return JSON.stringify(result.error !== undefined ? { error: `${result.error.code}: ${result.summary}` } : (result.data ?? {}));
+    }
     default:
       throw new Error(`unknown deliverable ${id}`);
   }

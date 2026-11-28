@@ -1,0 +1,5 @@
+# Render reference gate (npm run render:reference): compare.py
+numpy>=1.26
+OpenEXR>=3.2
+flip-evaluator>=1.6
+Pillow>=10

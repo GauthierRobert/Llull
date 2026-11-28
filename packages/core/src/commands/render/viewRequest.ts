@@ -31,7 +31,7 @@ export const viewParams = {
     .string()
     .optional()
     .describe(
-      'Render from a camera entity (add_camera): perspective, from its position along its aim with its up vector, with the vertical field of view of its focal length and sensor (the image aspect comes from width / height). Replaces view / direction / zoom / projection / fovDeg; not with viewpointId, turntable, isolate or section. Unknown id: SCENE_CAMERA_NOT_FOUND; another kind: SCENE_NOT_A_CAMERA. Depth of field and exposure are not drawn here (render_realistic, planned); lights do not change this render.',
+      'Render from a camera entity (add_camera): perspective, from its position along its aim with its up vector, with the vertical field of view of its focal length and sensor (the image aspect comes from width / height). Replaces view / direction / zoom / projection / fovDeg; not with viewpointId, turntable, isolate or section. Unknown id: SCENE_CAMERA_NOT_FOUND; another kind: SCENE_NOT_A_CAMERA. Depth of field and exposure are not drawn here (render_realistic draws them); lights do not change this render.',
     ),
   renderer: z
     .enum(['reference', 'native'])

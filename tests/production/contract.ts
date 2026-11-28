@@ -25,7 +25,7 @@ export interface ToolCall {
  * A deliverable the office issues, produced from the final document:
  * `ifc` · `dxf:<levelId>` · `plan:<levelId>` · `elevation:<direction>` · `schedule:<kind>` ·
  * `takeoff` · `save` (serialized document) · civil: `landxml` ·
- * `plan-profile:<alignmentId>:<paper>`.
+ * `plan-profile:<alignmentId>:<paper>` · visualisation: `render:view:<name>`, `render:turntable:<k>` (render_realistic data as JSON).
  */
 export type DeliverableId = string;
 
@@ -59,7 +59,8 @@ type CriterionArea =
   | 'earthworks'
   | 'roads'
   | 'drainage'
-  | 'verification';
+  | 'verification'
+  | 'visualization';
 
 export interface Criterion {
   /** kebab-case, unique per scenario; the id used in `knownIssues`. */
@@ -80,7 +81,10 @@ export interface Scenario {
   brief: string;
   /** Deterministic tool-call sequence (scripted driver). */
   script: ToolCall[];
-  /** Host tools the script calls that are not registry commands (FE transports): the in-process run skips the scenario, the scripted gate needs the tools. */
+  /**
+   * Host tools the script needs that the in-process run lacks: host-only tools (FE transports) or registry commands that need a native host
+   * port (render_realistic: llull-compute pathtrace). The in-process run skips the scenario; the scripted gate needs the tools.
+   */
   hostTools?: readonly string[];
   criteria: Criterion[];
   /** Criteria that fail today, per driver. Ratchet: a known issue that passes fails the gate. */

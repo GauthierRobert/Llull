@@ -9,5 +9,12 @@ import base from './vitest.config.mts';
 
 export default defineConfig({
   ...base,
-  test: { ...base.test, include: ['tests/quality/**/*.gate.ts'], testTimeout: 600_000, hookTimeout: 600_000 },
+  test: {
+    ...base.test,
+    include: ['tests/quality/**/*.gate.ts'],
+    // the render reference gate has its own config and npm script (vitest.render.config.mts, npm run render:reference)
+    exclude: ['tests/quality/renderReference.gate.ts'],
+    testTimeout: 600_000,
+    hookTimeout: 600_000,
+  },
 });

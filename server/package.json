@@ -19,6 +19,8 @@
     "perf": "node ../scripts/heavyLock.mjs perf -- vitest run --config vitest.perf.config.mts",
     "quality:step": "vitest run --config vitest.quality.config.mts",
     "quality:drawings": "vitest run --config vitest.quality.config.mts tests/quality/drawingCorpus.gate.ts",
+    "render:reference": "vitest run --config vitest.render.config.mts",
+    "render:reference:bake": "RENDER_REFERENCE_BAKE=1 vitest run --config vitest.render.config.mts",
     "production:scripted": "vitest run --config vitest.production.config.mts tests/production/scripted.gate.ts",
     "production:agent": "vitest run --config vitest.production.config.mts tests/production/agent.gate.ts",
     "cli": "node bin/llull.cjs"

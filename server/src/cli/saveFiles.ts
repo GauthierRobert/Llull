@@ -11,6 +11,7 @@ import { rasterizeSvg } from '../renderImage';
 import { isHostedExport } from '../exportFiles';
 import { moveHostedFile } from '../hostedFile';
 import { saveAnimationFiles } from './saveAnimation';
+import { saveRenderFiles } from './saveRender';
 
 export interface OutputFile {
   readonly name: string | null; // suggested: `fileName`, or a `name` with an extension
@@ -117,6 +118,8 @@ function saveHostedFile(hosted: { path: string; bytes: number; name: string | nu
  * @failure no payload in data / several files but target is an existing file -> Error
  */
 export function saveDataFiles(data: unknown, target: string, exportDir?: string): SavedFile[] {
+  const render = saveRenderFiles(data, target, exportDir);
+  if (render !== null) return render;
   const hosted = hostedFileOf(data, exportDir);
   if (hosted !== null) return saveHostedFile(hosted, target);
   const animation = saveAnimationFiles(filesOfData(data), target);

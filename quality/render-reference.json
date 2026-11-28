@@ -1,0 +1,377 @@
+{
+  "$comment": "Render reference corpus (RV1 \u00a77 V3, docs/QUALITY_GATES.md \"Render reference gate\"). Scenes are built by server/tests/quality/renderScenes.ts; each Cycles reference EXR is rendered once by `npm run render:reference:bake` (Blender + quality/render/cycles_from_job.py) and kept in .cache/render-reference/<sha256>.exr, never committed. sceneSha256 pins the llull job the reference was made from (a changed scene is stale). thresholds are set at the first measurement (measured x (1 + margin) + floors) and only ever lowered. Re-baselined 2026-11-28 after the BSDF fixes this corpus found (diffuse / coat weighted by the GGX directional albedo with its 1/(1 \u2212 \u0112) normalisation; refraction tinted by the base colour): every threshold was tightened or kept except textured-lights (relError 0.0813 -> 0.1014, FLIP 0.142 -> 0.1316 kept lower, |bias| 1.71 % -> 9.72 %), whose first measurement had the two errors cancelling; llull's reciprocal diffuse weight (1 \u2212 E(\u03bci))(1 \u2212 E(\u03bco))/(1 \u2212 \u0112) is ~5 % brighter than Cycles' (1 \u2212 E(\u03bco)) under near-normal direct light. The pre-fix values are kept per scene as beforeBsdfFix.",
+  "llullSamples": 256,
+  "referenceSamples": 4096,
+  "seed": 1,
+  "margin": 0.25,
+  "floors": { "relError": 0.005, "flip": 0.005, "absBias": 0.005 },
+  "scenes": [
+    {
+      "id": "cal-sun",
+      "description": "one-light calibration: 4 x 4 m Lambert plate under a 3 W/m2 sun, black world, orthographic top view",
+      "sceneSha256": "876315ae48282d60d9720d8ef23770b8363bf8e71734c87e04e2e646394d5785",
+      "reference": {
+        "sha256": "7c2fbb366c65dfaea5fff053ec6f8494296f3f9a4f902e23610959bc5c58c42a",
+        "bytes": 2500,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 18.3
+      },
+      "firstMeasured": {
+        "relError": 5.385620201285121e-5,
+        "bias": 5.385620201292518e-5,
+        "biasRgb": [5.385620201292518e-5, 5.385620201292518e-5, 5.385620201292518e-5],
+        "flip": 0.00024936781846918166,
+        "meanReference": 0.4753161981498124,
+        "meanTest": 0.47534179687499994,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0051, "flip": 0.0054, "absBias": 0.0051 },
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 5.385620201285121e-5,
+          "bias": 5.385620201292518e-5,
+          "biasRgb": [5.385620201292518e-5, 5.385620201292518e-5, 5.385620201292518e-5],
+          "flip": 0.00024936781846918166,
+          "meanReference": 0.4753161981498124,
+          "meanTest": 0.47534179687499994,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.0051, "flip": 0.0054, "absBias": 0.0051 }
+      }
+    },
+    {
+      "id": "cal-point",
+      "description": "one-light calibration: the plate under a 50 W point light (r 5 cm) 1.5 m above",
+      "sceneSha256": "48f9a36d7324f2c0f2edf88d8e790bda261d496e3192d67e55d5ffa110b0edf2",
+      "reference": {
+        "sha256": "162d528754b435b10ec10aa71a584be83bd803285c7120541230125ec5f83e9a",
+        "bytes": 69116,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 21.9
+      },
+      "firstMeasured": {
+        "relError": 0.0006890531106514348,
+        "bias": 5.757701404318638e-6,
+        "biasRgb": [5.757701404318638e-6, 5.757701404318638e-6, 5.757701404318638e-6],
+        "flip": 0.0011681902687996626,
+        "meanReference": 0.12564662212207622,
+        "meanTest": 0.12564734555780888,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0059, "flip": 0.0065, "absBias": 0.0051 },
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.0006890531106514348,
+          "bias": 5.757701404318638e-6,
+          "biasRgb": [5.757701404318638e-6, 5.757701404318638e-6, 5.757701404318638e-6],
+          "flip": 0.0011681902687996626,
+          "meanReference": 0.12564662212207622,
+          "meanTest": 0.12564734555780888,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.0059, "flip": 0.0065, "absBias": 0.0051 }
+      }
+    },
+    {
+      "id": "cal-spot",
+      "description": "one-light calibration: the plate under a 50 W spot (cone 0.9 rad, blend 0.3) 2 m above",
+      "sceneSha256": "1db827a8d2bdf578f609134ce680e889faa398392f7f33ae1183784824b78827",
+      "reference": {
+        "sha256": "e189fa9011292d722ff12e222aa26cfbff790ddaf00ef8584923df0b0f9e4153",
+        "bytes": 22711,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 13.5
+      },
+      "firstMeasured": {
+        "relError": 0.012444529681681303,
+        "bias": 7.899246962539408e-6,
+        "biasRgb": [7.899246962539408e-6, 7.899246962539408e-6, 7.899246962539408e-6],
+        "flip": 0.08003012090921402,
+        "meanReference": 0.0267604465417408,
+        "meanTest": 0.02676065792911686,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0206, "flip": 0.1051, "absBias": 0.0051 },
+      "notes": "Edge-only difference: the 5 cm emitter penumbra at the cone edge (radial profiles agree to 0.002 inside the cone); bias 0.00 %.",
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.012444529681681303,
+          "bias": 7.899246962539408e-6,
+          "biasRgb": [7.899246962539408e-6, 7.899246962539408e-6, 7.899246962539408e-6],
+          "flip": 0.08003012090921402,
+          "meanReference": 0.0267604465417408,
+          "meanTest": 0.02676065792911686,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.0206, "flip": 0.1051, "absBias": 0.0051 }
+      }
+    },
+    {
+      "id": "cal-area",
+      "description": "one-light calibration: the plate under a 20 W 0.6 x 0.4 m area light 1 m above",
+      "sceneSha256": "c4f55be6287e1e9e6d875958c22cb1c82313b11501209ab9c6198e4d4cfb60f0",
+      "reference": {
+        "sha256": "a52b3c7e6939ea248539e41501b36516a63ac04c12aa976a7dd584e532fa7b6f",
+        "bytes": 69290,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 20.3
+      },
+      "firstMeasured": {
+        "relError": 0.012061265756691229,
+        "bias": 0.00010116823690986543,
+        "biasRgb": [0.00010116823690986543, 0.00010116823690986543, 0.00010116823690986543],
+        "flip": 0.010987912304699421,
+        "meanReference": 0.20055805674348903,
+        "meanTest": 0.20057834684848785,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0201, "flip": 0.0188, "absBias": 0.0052 },
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.012061265756691229,
+          "bias": 0.00010116823690986543,
+          "biasRgb": [0.00010116823690986543, 0.00010116823690986543, 0.00010116823690986543],
+          "flip": 0.010987912304699421,
+          "meanReference": 0.20055805674348903,
+          "meanTest": 0.20057834684848785,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.0201, "flip": 0.0188, "absBias": 0.0052 }
+      }
+    },
+    {
+      "id": "furnace-dielectric",
+      "description": "white furnace: a white (base colour 1) rough (0.5) dielectric (ior 1.5) sphere under a uniform white world, no ground, 32 bounces; energy-preserving = radiance ~1",
+      "sceneSha256": "440a6ce3e37e1ae38cc655da8b155fe2f8e1d328fe94098c30b5884a97d42df3",
+      "reference": {
+        "sha256": "97633eff0f2f418cadcb9fc5c5268dcbf16e1a1973ab9fdb8a7cf51ec9dd41ee",
+        "bytes": 68601,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 13.2
+      },
+      "firstMeasured": {
+        "relError": 0.0072786629630677245,
+        "bias": 0.00610168376051301,
+        "biasRgb": [0.00610168376051301, 0.00610168376051301, 0.00610168376051301],
+        "flip": 0.006914711557328701,
+        "meanReference": 0.9900639581028372,
+        "meanTest": 0.9961050152778625,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0141, "flip": 0.0137, "absBias": 0.0127 },
+      "notes": "llull BUG candidate: a non-absorbing dielectric (base 1, ior 1.5) returns 0.90 instead of ~1 (Cycles 0.98): the diffuse weight (1 - F(i))(1 - F(o)) has no internal-reflection compensation, so a dielectric loses ~8 % per bounce.",
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.0794534202955611,
+          "bias": -0.07945342029556113,
+          "biasRgb": [-0.07945342029556113, -0.07945342029556113, -0.07945342029556113],
+          "flip": 0.045334797352552414,
+          "meanReference": 0.9900639581028372,
+          "meanTest": 0.9113999903202057,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.1044, "flip": 0.0617, "absBias": 0.1044 }
+      }
+    },
+    {
+      "id": "cornell-box",
+      "description": "Cornell-style box (classic white / red / green albedos), 0.25 m area light under the ceiling, 8 bounces",
+      "sceneSha256": "4e82b44e204cb8ae13075bd12e6537872966097441feb06299fc95db1403f28d",
+      "reference": {
+        "sha256": "11b7ceee0b80c68d66a787a9b54a8dd5e883114692c1a73fdbd9e299417a8e74",
+        "bytes": 773603,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 228.1
+      },
+      "firstMeasured": {
+        "relError": 0.0599047185406383,
+        "bias": 0.04260574649432436,
+        "biasRgb": [0.04515767100508761, 0.04221504274241683, 0.03622626311492261],
+        "flip": 0.08728009462356567,
+        "meanReference": 0.5668825744687073,
+        "meanTest": 0.5910350297285709,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0799, "flip": 0.1142, "absBias": 0.0583 },
+      "notes": "-24 % is the dielectric energy loss compounded over the inter-reflections (default ior 1.5); with ior 1 on the walls the same box gives bias -1.0 % and relError 0.055 (256 spp reference).",
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.24160641651925036,
+          "bias": -0.2414688317161513,
+          "biasRgb": [-0.2536421272715854, -0.23984110877455933, -0.20788510843056296],
+          "flip": 0.3308687210083008,
+          "meanReference": 0.5668825744687073,
+          "meanTest": 0.42999810149150436,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.3071, "flip": 0.4186, "absBias": 0.3069 }
+      }
+    },
+    {
+      "id": "balls-uniform",
+      "description": "material balls (Lambert, rough gold metal, glass, red with clear coat) on the ground under a uniform white world",
+      "sceneSha256": "c1789dc19a19323605f36dd05963f57b1c7693c34caca3f8e3872da82f85ad6f",
+      "reference": {
+        "sha256": "301cd55e1e33354e9d8e75b457886085cc58e49f7415afc8797bbb3bb6b9f699",
+        "bytes": 559726,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 74.5
+      },
+      "firstMeasured": {
+        "relError": 0.020428607414905976,
+        "bias": 0.0012589349636891178,
+        "biasRgb": [0.0022133934439527714, 0.0009844249558284002, 0.0010268260406636198],
+        "flip": 0.031116798520088196,
+        "meanReference": 0.2949376337239879,
+        "meanTest": 0.2953089410231908,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0306, "flip": 0.0439, "absBias": 0.0066 },
+      "notes": "Lambert / coat / ground dark by 10-15 % (dielectric and coat energy loss); glass: llull ignores the base colour on transmission (library glass is tinted 0.74 / 0.87 / 0.91, Cycles and glTF tint it); metal within 3 %.",
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.1549927404422184,
+          "bias": -0.1410778865990998,
+          "biasRgb": [-0.1337470554606509, -0.1426979533821835, -0.14780556603042838],
+          "flip": 0.23578202724456787,
+          "meanReference": 0.2949376337239879,
+          "meanTest": 0.2533284556796683,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.1988, "flip": 0.2998, "absBias": 0.1814 }
+      }
+    },
+    {
+      "id": "balls-hdr",
+      "description": "the same balls under a synthetic equirect HDR (sun blob, sky gradient, orange patch), rotation 0.6 rad",
+      "sceneSha256": "b95dcd28f7707b027e2a3509c9d26c41b21d4124e0a8e4ec23260660d9dbd09d",
+      "reference": {
+        "sha256": "7d2de925a093591d0fabc0df466e675408168402a0aae3293d16aa97c0a472dc",
+        "bytes": 653622,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 160.4
+      },
+      "firstMeasured": {
+        "relError": 0.10580167473549251,
+        "bias": -0.021694010139677977,
+        "biasRgb": [-0.02321089903603346, -0.02177533311645463, -0.01717583417124935],
+        "flip": 0.09703677147626877,
+        "meanReference": 0.37705755203476266,
+        "meanTest": 0.3688776616776784,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.1373, "flip": 0.1263, "absBias": 0.0322 },
+      "notes": "as balls-uniform; HDR orientation and rotation agree (backdrop pixels identical, shadows aligned).",
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.23599487714546494,
+          "bias": -0.1770501083045748,
+          "biasRgb": [-0.16041597642723282, -0.18024291490050037, -0.19075683813248634],
+          "flip": 0.26373469829559326,
+          "meanReference": 0.37705755203476266,
+          "meanTest": 0.3102994716099501,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.3, "flip": 0.3347, "absBias": 0.2264 }
+      }
+    },
+    {
+      "id": "plant-instanced",
+      "description": "pipe-rack bay in mm: instance arrays of galvanised pipes, steel beams, painted columns under a sun + sky colour",
+      "sceneSha256": "a3aef3a2e2e395d1133f7d224c22a42dd459db25faae95fd5c64a9975a93a848",
+      "reference": {
+        "sha256": "20b01940c17c5b1613d7b63e5386053e2bb9572a30798b064b5ee455da66c04f",
+        "bytes": 658819,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 117.3
+      },
+      "firstMeasured": {
+        "relError": 0.028624799579438313,
+        "bias": 0.017792760298537047,
+        "biasRgb": [0.021881113139270436, 0.017693346007689348, 0.00994574746888266],
+        "flip": 0.05137467011809349,
+        "meanReference": 0.1627045404768867,
+        "meanTest": 0.1655995033650756,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.0408, "flip": 0.0693, "absBias": 0.0273 },
+      "notes": "painted (coat 0.3) columns 20-25 % dark, ground 5 % dark: dielectric / coat energy loss; instancing, sun and sky colour agree (backdrop identical).",
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.15567521961138264,
+          "bias": -0.15278868037417115,
+          "biasRgb": [-0.1525958018360003, -0.15234779598617254, -0.1567165286772202],
+          "flip": 0.18059377372264862,
+          "meanReference": 0.1627045404768867,
+          "meanTest": 0.13784512844653726,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.1996, "flip": 0.2308, "absBias": 0.196 }
+      }
+    },
+    {
+      "id": "textured-lights",
+      "description": "checker base-colour + striped roughness textures on a floor and ball, point + spot light, dim world",
+      "sceneSha256": "aa98581d3abb363258aa056bbf38e33f8fe93304c9d1019dc4ad6da624cf8ca6",
+      "reference": {
+        "sha256": "5a7353f27e7d835b893c358ca7a2434785c2df4a013e5fcec54bcb5ba7cf4a77",
+        "bytes": 622154,
+        "samples": 4096,
+        "blender": "4.0.2",
+        "seconds": 96.3
+      },
+      "firstMeasured": {
+        "relError": 0.07707739284201119,
+        "bias": 0.07370365986765881,
+        "biasRgb": [0.09071060050043633, 0.07151032027996362, 0.029980860738249904],
+        "flip": 0.10124967247247696,
+        "meanReference": 0.07085411652159561,
+        "meanTest": 0.07607632422592676,
+        "date": "2026-11-28",
+        "llullSamples": 256
+      },
+      "thresholds": { "relError": 0.1014, "flip": 0.1316, "absBias": 0.0972 },
+      "notes": "texture placement, colour space and wrap agree; bias -1 %; the residual is noise (llull 256 spp).",
+      "beforeBsdfFix": {
+        "firstMeasured": {
+          "relError": 0.061018306402298356,
+          "bias": -0.009635251473615991,
+          "biasRgb": [0.003999217995368953, -0.01083672130247626, -0.050454774482960985],
+          "flip": 0.10952237248420715,
+          "meanReference": 0.07085411652159561,
+          "meanTest": 0.07017141929096914,
+          "date": "2026-11-28",
+          "llullSamples": 256
+        },
+        "thresholds": { "relError": 0.0813, "flip": 0.142, "absBias": 0.0171 }
+      }
+    }
+  ]
+}

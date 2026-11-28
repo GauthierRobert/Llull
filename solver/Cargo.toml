@@ -11,6 +11,7 @@ default-members = [
   "crates/llull-media",
   "crates/llull-post",
   "crates/llull-raster",
+  "crates/llull-pathtrace",
   "crates/llull-gpu",
   "crates/llull-voxfe",
   "crates/llull-topopt",
@@ -84,6 +85,10 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.llull-bvh]
+opt-level = 3
+
+# RV-M3 path tracer: the V1 / V2 tests (furnace, closed forms, convergence against a 16 384-sample reference) trace millions of paths.
+[profile.dev.package.llull-pathtrace]
 opt-level = 3
 
 # 12 CFD: the lattice-Boltzmann tests run thousands of steps on 10^4..10^5 cells (Poiseuille order, Taylor-Green, sphere).

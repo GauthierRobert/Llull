@@ -7,6 +7,8 @@ pub struct Gpu {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub adapter: String,
+    /// The adapter's own name (e.g. `llvmpipe (LLVM 20.1.2, 256 bits)`), for result provenance.
+    pub name: String,
     /// True for a CPU-emulated adapter (lavapipe, WARP): fine for tests, not for speed.
     pub software: bool,
 }
@@ -56,6 +58,7 @@ pub fn acquire_with(label: &str, features: wgpu::Features) -> Result<Gpu, String
         device,
         queue,
         adapter: format!("{} ({:?}, {:?})", info.name, info.backend, info.device_type),
+        name: info.name.clone(),
         software: info.device_type == wgpu::DeviceType::Cpu,
     })
 }

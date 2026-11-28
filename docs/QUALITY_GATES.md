@@ -184,6 +184,83 @@ two gates above.
 Gates 1–4 can reuse this corpus and the Playwright harness as they are. A nightly CI job running
 `npm run quality` (the repo has no CI workflow yet) is what turns these from tools into gates.
 
+## Render reference gate — `quality/render-reference.json` (RV1 §7 V3)
+
+`render_realistic` (the native path tracer) against an independent renderer, Blender 4.0 Cycles (CPU).
+
+```bash
+pip install -r quality/render/requirements.txt   # numpy, OpenEXR, flip-evaluator, Pillow (compare.py)
+npm run render:reference        # render each scene with llull (256 spp, seed 1) and compare with its pinned Cycles reference
+npm run render:reference:bake   # first: render missing / stale references with Blender (LLULL_BLENDER, default `blender`)
+RENDER_REFERENCE_SCENES=cal-sun,cornell-box npm run render:reference   # a subset
+```
+
+- **Scenes** are llull documents built with registry commands (`server/tests/quality/renderScenes.ts`); their textures (a checker
+  PNG, a striped roughness PNG, a synthetic equirect `.hdr` with a sun blob, a sky gradient and an orange patch) are generated there,
+  deterministically. The gate keeps each scene's job folder in `.cache/render-reference/jobs/<id>/`.
+- **Converter** `quality/render/cycles_from_job.py` (run inside Blender: `blender -b -P cycles_from_job.py -- <job> <out.exr> <spp>`)
+  reads a §5b job folder and builds the same Cycles scene: one mesh per job mesh with its normals and UVs, one linked duplicate per
+  instance row, Principled BSDF ("GGX", not multiscatter) with every job channel and texture, the camera (vertical fov / ortho height,
+  thin lens), the lights hidden from the camera like llull's, the world (uniform colour, the default 0.3, or the HDR with llull's
+  orientation: a Mapping node rotates by −rotation about Z; Cycles' equirect lookup is the same u, v), bounces = maxBounces − 1, no
+  clamping / denoising / adaptive sampling / blur glossy / light threshold, a 32-bit linear EXR. The Preetham sky has no Cycles
+  counterpart (Nishita is a different model) and is refused: the corpus has no sky.
+- **References** are rendered once at 4 096 spp and stored as `.cache/render-reference/<sha256>.exr` (never committed); the manifest
+  pins the sha256, the Blender version and the render time, plus `sceneSha256`, a hash of the llull job without its sampling knobs. A
+  changed scene is stale and must be re-baked (its thresholds are then measured again); a lost cache file of an unchanged scene is
+  re-baked keeping its thresholds. Cycles stamps its render time into the EXR header, so a re-bake gives the same pixels (checked:
+  relError 0, FLIP 0) but a new sha256.
+- **Metrics** (`quality/render/compare.py`, on the linear RGB):
+  - `relError` = Σ min(|Yt − Yr|, Yr + ε) / Σ Yr, Y the Rec.709 luminance, ε = 0.1 × mean(Yr): a luminance-weighted mean relative
+    error where one firefly counts at most as a 100 % error at its pixel;
+  - `bias` = ΣYt / ΣYr − 1 (signed; radiometry and energy errors show here first; per channel in `biasRgb`);
+  - `flip` = mean HDR-FLIP (NVIDIA FLIP 1.x through `flip-evaluator`, 67 pixels per degree, automatic exposures).
+  Reports, a side-by-side picture (reference | llull | FLIP map) and the FLIP map per scene land in `.cache/render-reference/reports/`.
+- **Thresholds** are set at the first measurement: measured × 1.25 + 0.005, rounded up, stored in the manifest with the measurement,
+  and only ever lowered by hand.
+
+### Radiometry (llull §5b → Blender 4.0)
+
+The four `cal-*` scenes light a pure Lambert plate (base #bcbcbc, `ior 1`: no specular layer) with one light each, black world,
+orthographic top view. Every factor is **1**, mean luminance within 0.02 %: sun irradiance E W/m² = Blender sun strength (angle =
+2 × angularRadius); point / spot power P W = Blender power (intensity P / 4π W/sr, sphere radiance P / (4π² r²)), spot size = the full
+cone, spot blend = blend; area power P W = Blender area power (radiance P / (π A), one-sided, spread 180°). `cal-sun` also matches
+the closed form: ρ E cos θ / π = 0.5029 × 3 × 0.98974 / π = 0.47532, llull 0.47534, Cycles 0.47532.
+
+Pixel filter: llull's tent of radius 1 px matches Cycles' Blackman-Harris at **1.5 px** (Blender's default), not at 2.95 px, the width
+whose variance equals the tent's on paper. Measured on a plate edge half a pixel off the grid: llull 0.140 / 0.889, Cycles 1.5 px 0.133 /
+0.895, 2.0 px 0.20 / 0.82, 2.95 px 0.29 / 0.74.
+
+### First measurement (2026-11-28, llull 256 spp vs Cycles 4 096 spp, 4-core container)
+
+| scene | what | relError | FLIP | bias | threshold relError / FLIP / abs bias |
+| ----- | ---- | -------- | ---- | ---- | ------------------------------------ |
+| cal-sun | Lambert plate, 3 W/m² sun | 0.0001 | 0.0002 | +0.01 % | 0.0051 / 0.0054 / 0.51 % |
+| cal-point | 50 W point, r 5 cm | 0.0007 | 0.0012 | 0.00 % | 0.0059 / 0.0065 / 0.51 % |
+| cal-spot | 50 W spot, cone 0.9 rad, blend 0.3 | 0.0124 | 0.0800 | 0.00 % | 0.0206 / 0.1051 / 0.51 % |
+| cal-area | 20 W 0.6 × 0.4 m area | 0.0121 | 0.0110 | +0.01 % | 0.0201 / 0.0188 / 0.52 % |
+| furnace-dielectric | white rough dielectric sphere (ior 1.5) in a white world | 0.0795 | 0.0453 | −7.95 % | 0.1044 / 0.0617 / 10.44 % |
+| cornell-box | classic albedos, area light, 8 bounces | 0.2416 | 0.3309 | −24.15 % | 0.3071 / 0.4186 / 30.69 % |
+| balls-uniform | Lambert, rough metal, glass, coat; white world | 0.1550 | 0.2358 | −14.11 % | 0.1988 / 0.2998 / 18.14 % |
+| balls-hdr | the same under the synthetic HDR, rotation 0.6 | 0.2360 | 0.2637 | −17.71 % | 0.3000 / 0.3347 / 22.64 % |
+| plant-instanced | instance arrays: galvanised pipes, steel beams, painted columns; sun + sky colour (mm) | 0.1557 | 0.1806 | −15.28 % | 0.1996 / 0.2308 / 19.60 % |
+| textured-lights | checker + roughness textures, point + spot | 0.0610 | 0.1095 | −0.96 % | 0.0813 / 0.1420 / 1.71 % |
+
+What agrees: every light's radiometry, the camera (perspective, orthographic), instancing, the unit scale (the plant is in mm), the
+HDR orientation and rotation (backdrop pixels identical, shadows aligned), texture placement, colour space and wrap, metals (within
+3 %), clear glass (white glass in a white world 1.001). What differs, and is llull's (see each scene's `notes` in the manifest):
+
+1. **Dielectric layering loses energy.** A non-absorbing dielectric (base colour 1, ior 1.5) in a white furnace returns 0.90 (roughness
+   0.5) where an energy-preserving layered BSDF returns ~1 (Cycles 4.0: 0.98); base 0.8 gives 0.91 of Cycles at roughness 1 and 0.3. The diffuse weight
+   (1 − F(cos i))(1 − F(cos o)) has no internal-reflection compensation, so every dielectric bounce loses ~8–9 %: −24 % in the Cornell
+   box (−1.0 % when the walls are set to ior 1), −10 to −15 % on Lambert-like and coated objects. The coat layer loses the same way
+   (ior-1 base under coat 1: 0.92 of Cycles).
+2. **Transmission ignores the base colour.** Tinted glass (the library `glass`, base 0.74 / 0.87 / 0.91) renders untinted in llull
+   (0.998) where Cycles, like glTF `KHR_materials_transmission`, tints it (0.754 / 0.875 / 0.913).
+
+Legitimate differences kept out of the corpus or out of the numbers: the Preetham sky (no Cycles counterpart); Cycles' Multiscatter
+GGX (the converter picks "GGX"); lights seen by camera rays (hidden in both); the spot cone edge of a finite emitter (a 1–2 px ring).
+
 ## Code-export oracle — `tests/unit/chamferCodegenOracle.test.ts`
 
 The exported CadQuery / build123d program of a variable or two-leg chamfer is RUN with real OCP and compared with the analytic removed volume (the value the native kernel is held to) and with absolute vertex positions. It needs a python that imports OCP, cadquery and build123d: `uv venv` + `uv pip install cadquery build123d`, then `LLULL_PYTHON=<venv>/Scripts/python.exe npx vitest run tests/unit/chamferCodegenOracle.test.ts` (about 3 minutes). Without such a python the suite is skipped (counted as `python:ocp`); a run with `LLULL_REQUIRE_TOOLS=python:ocp` fails instead (the check job of CI sets it).

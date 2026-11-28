@@ -20,6 +20,8 @@ import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { ComponentInstancedRenderer } from './ComponentInstancedRenderer';
 import { NO_COMPONENT_BATCHES, planComponentBatches } from './componentInstancePlan';
+import { InstanceArrayRenderer } from './instanceArray/InstanceArrayRenderer';
+import { visibleInstanceArrays } from './instanceArray/arrayVisibility';
 import { PlantBatchRenderer } from './plant/PlantBatchRenderer';
 import { usePlantCoverage } from './plant/usePlantCoverage';
 import { usePlantPlan } from './plant/usePlantPlan';
@@ -171,6 +173,18 @@ export function Entities(): React.ReactElement {
     [select, toggleSelection, toggleClickAnimation],
   );
 
+  // Instance arrays (members are not entities: no selection id, a click only reports the member and clears the selection).
+  const visibleArrays = useMemo(
+    () => visibleInstanceArrays(document.instanceArrays, layers, hiddenLayerIds),
+    [document.instanceArrays, layers, hiddenLayerIds],
+  );
+  const handleMemberPick = useCallback(
+    (_memberId: string, additive: boolean): void => {
+      if (!additive) select([]);
+    },
+    [select],
+  );
+
   // Active exploded view: drawn positions are shifted here (render transform only; the document placements are untouched).
   const { explodedViews, activeExplodedView } = document;
   const explodeOffsets = useMemo(() => activeExplodeOffsets(explodedViews, activeExplodedView), [explodedViews, activeExplodedView]);
@@ -290,6 +304,8 @@ export function Entities(): React.ReactElement {
         selectionSet={selectionSet}
         onSelect={handleSelect}
       />
+
+      <InstanceArrayRenderer arrays={visibleArrays} document={document} onPickMember={handleMemberPick} />
 
       {plantPlan !== null && (
         <PlantBatchRenderer

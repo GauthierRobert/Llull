@@ -94,8 +94,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   const palette = useViewportPalette();
   // `doc.appearance.environment` (RV-M2): background colour / HDR; absent = today's palette background.
   const environment = useEnvironmentLook(palette.background);
-  // The effect chain composites a plain-colour backdrop only: with it on, an HDR lights the scene but does not draw the backdrop.
-  const hdrBackground = environment.hdr && !effects;
+  // An HDR backdrop is drawn with the effect chain on too (BackgroundOutputPass keeps an image background, tone-mapped with the scene).
+  const hdrBackground = environment.hdr;
 
   // Initial camera only: CameraReactor applies later changes imperatively.
   const [initialCamera] = useState(() => {

@@ -14,7 +14,7 @@ import { fromMm } from '@core/model/units';
 import { useStore, useViewportStore } from '@ui/store';
 import { currentViewportPalette } from '../../viewportPalette';
 import { mergedEntityBounds } from '../fitBounds';
-import { BackgroundOutputPass } from './BackgroundOutputPass';
+import { BackgroundOutputPass, keepsImageBackground } from './BackgroundOutputPass';
 import { DepthRangeCamera } from './depthRangeCamera';
 import { EdgeOverlayPass } from './EdgeOverlayPass';
 import { type DepthRange, GTAO_MAX_RADIUS_MM, gtaoParameters, gtaoRadius, viewDepthRange } from './gtaoSettings';
@@ -126,8 +126,9 @@ export function HighQualityEffects({ edges, ambientOcclusion }: EffectFlags): nu
       sized.current = { ratio, width: size.width, height: size.height };
     }
     // The chain renders with a transparent background; BackgroundOutputPass puts it back behind the tone-mapped image.
+    // An image backdrop (HDR environment) is drawn by the chain itself: linear in the half-float target, then tone-mapped with the scene.
     background.current = scene.background;
-    scene.background = null;
+    if (!keepsImageBackground(scene.background)) scene.background = null;
     try {
       composer.render();
     } finally {

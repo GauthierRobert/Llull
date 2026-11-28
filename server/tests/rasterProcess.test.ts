@@ -298,8 +298,10 @@ describe('persistent raster process (fake server)', () => {
 
 describe('persistent raster port (llull-compute raster-serve)', () => {
   native('two frames, one process; the same pixels, PNG bytes and SVG as the per-frame job and the reference', () => {
-    const port = createPersistentRasterPort(BINARY ?? '');
-    const job = createNativeRasterPort(BINARY ?? '');
+    // the CPU twin is the bit-exact one: a gpu-featured binary on a machine with an adapter would otherwise draw the frame on the GPU
+    const cpuOnly = { ...process.env, LLULL_GPU: 'off' };
+    const port = createPersistentRasterPort(BINARY ?? '', cpuOnly);
+    const job = createNativeRasterPort(BINARY ?? '', cpuOnly);
     const doc = plant();
     try {
       for (const params of [

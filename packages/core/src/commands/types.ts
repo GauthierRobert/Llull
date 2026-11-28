@@ -16,6 +16,7 @@ import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { CfdResultPort } from '../model/cfdResult';
 import type { MaterialLibrary } from '../model/materialLibrary';
 import type { RasterPort } from '../model/raster';
+import type { PathTracePort } from '../model/pathTrace';
 import type { ViewportCapturePort } from '../model/viewportCapture';
 import type { MediaPort } from '../model/media';
 import type { EntityPropertyReader } from '../model/entityProperties';
@@ -304,6 +305,8 @@ export interface ExecutionContext {
   readonly libraries?: MaterialLibraryProvider | null;
   /** Native offscreen raster (`renderer: 'native'`, plant 09 VIS-M9 / RS-5); null/absent = NATIVE_TOOL_MISSING. */
   readonly raster?: RasterPort | null;
+  /** Native path tracer (`render_realistic`, RV1 RV-M3); null/absent = NATIVE_TOOL_MISSING. */
+  readonly pathTrace?: PathTracePort | null;
   /** The open desktop viewport (`capture_viewport`, ASC M6a); null/absent = VIEWPORT_UNAVAILABLE. */
   readonly viewportCapture?: ViewportCapturePort | null;
   /** Native video encoder (`render_animation` format gif / mp4, PHY-22 MOV-M2); null/absent = NATIVE_TOOL_MISSING (use apng). */

@@ -34,8 +34,8 @@ export function useHdrEnvironment(): HdrEnvironmentState | null {
 }
 
 /**
- * In-Canvas: applies the loaded HDR to the scene (light + reflections; also the backdrop when `background`: the post-processing chain
- * composites a plain colour only, so with it on the backdrop stays the palette colour, RV-M4) and restores the previous environment / background on change or unmount. */
+ * In-Canvas: applies the loaded HDR to the scene (light + reflections; also the backdrop when `background`, with the post-processing chain on too:
+ * BackgroundOutputPass keeps an image background, RV-M4) and restores the previous environment / background on change or unmount. */
 export function HdrEnvironment({ background }: { background: boolean }): null {
   const hdr = useHdrEnvironment();
   const scene = useThree((s) => s.scene);

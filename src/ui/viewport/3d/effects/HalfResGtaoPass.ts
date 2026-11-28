@@ -34,9 +34,13 @@ export class HalfResGtaoPass extends GTAOPass {
   ): void {
     this.camera = this.depthCamera.current();
     const restore = hideEdgeExcluded(this.scene);
+    // An image backdrop (HDR environment) stays on the scene for the colour pass; the normal / depth pass must not draw it.
+    const background = this.scene.background;
+    this.scene.background = null;
     try {
       super.render(renderer, writeBuffer, readBuffer, deltaTime, maskActive);
     } finally {
+      this.scene.background = background;
       restore();
     }
   }

@@ -1,4 +1,4 @@
-/** render_view: the document as an SVG image; render_walkthrough: a walkthrough as PNG frames; render_motion: simulated poses as a frame grid; render_animation: a motion source as time-exact frames / APNG. */
+/** render_view: the document as an SVG image; render_walkthrough: a walkthrough as PNG frames; render_motion: simulated poses as a frame grid; render_animation: a motion source as time-exact frames / APNG; render_realistic: the native path-traced illustration. */
 
 import { commandCatalog } from '../schema';
 import { renderView } from './renderView';
@@ -7,6 +7,7 @@ import { renderMotion } from './renderMotion';
 import { renderAnimation } from './renderAnimation';
 import { captureViewport } from './captureViewport';
 import { visibleEntityIds } from './visibleEntityIds';
+import { renderRealistic } from './realistic/renderRealistic';
 
 export const renderCommands = commandCatalog(
   renderView,
@@ -15,4 +16,5 @@ export const renderCommands = commandCatalog(
   renderAnimation,
   visibleEntityIds,
   captureViewport,
+  renderRealistic,
 );

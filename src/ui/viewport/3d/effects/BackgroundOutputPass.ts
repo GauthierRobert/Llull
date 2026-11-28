@@ -29,6 +29,11 @@ export function pickBackground(background: unknown, clearColour: THREE.Color): T
   return background instanceof THREE.Color ? background : clearColour;
 }
 
+/** True for a texture backdrop (HDR environment): the composer renders it opaque itself, so it must stay on the scene during the chain. */
+export function keepsImageBackground(background: unknown): boolean {
+  return background instanceof THREE.Texture;
+}
+
 export class BackgroundOutputPass extends OutputPass {
   /** `background` is the scene's background as it was before the composer cleared it (any type). */
   constructor(private readonly background: () => unknown) {

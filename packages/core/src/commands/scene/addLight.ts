@@ -43,7 +43,7 @@ export const addLight = defineCommand({
     'Aim: give `target` (a world point the light shines toward) OR `rotation` (Euler radians; local -Z is the aim axis); with neither the light shines straight down (-Z). ' +
     'Units: sun intensity is irradiance in W/m2 (default 3), the others radiant power in W; without an intensity a point / spot / area light gets the power that gives the default sun irradiance (3 W/m2) at its target (1 m away when no target), so the default suits the scale of the document; ' +
     'color is the light color #rrggbb (default white); radius softens shadows (point/spot: emitter radius in document units; sun: angular radius in radians, default 0.00465 = the real sun disc; 0 = hard). ' +
-    'Lights are drawn as glyphs by the viewport and are used by render_realistic (planned); render_view shading does not change. ' +
+    'Lights are drawn as glyphs by the viewport and are used by render_realistic; render_view shading does not change. ' +
     'Errors: SCENE_LIGHT_INVALID (non-finite position / target, target equal to position, intensity < 0, spot coneAngle outside (0, pi/2] or blend outside [0, 1], area without width and height > 0, coneAngle / blend on a non-spot, width / height on a non-area).',
   params: z.object({
     lightType: z.enum(LIGHT_TYPES).describe('"sun", "point", "spot" or "area" (see the command description).'),

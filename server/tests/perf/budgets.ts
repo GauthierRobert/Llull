@@ -93,6 +93,47 @@ export const BUDGETS = {
     "render_view renderer='native' 1280 x 720, 36 parts, on the running raster process",
   ),
   'mesh.import.obj1m': budget('job', 3000, 4400, 'import_mesh_file of a 1M-triangle OBJ through the mesh asset store (fileKey)'),
+  'render.realistic.first256': budget(
+    'job',
+    1000,
+    null,
+    'render_realistic of the balls-uniform reference scene at 256 x 256, 16 samples: scene build, job files, native process start',
+  ),
+  'render.realistic.instances1m': budget(
+    'job',
+    7000,
+    null,
+    'add_instance_array of 1,000,000 box members + render_realistic 256 x 256, 4 samples (two-level BVH, no expansion)',
+  ),
+  // the guard counts the array members first (sceneGeometry arraysSurelyOverBudget) and refuses before placing any: 7 ms measured
+  'render.realistic.refuse_too_large': budget(
+    'instant',
+    100,
+    null,
+    'render_realistic refusing 8,000,001 placed parts (RENDER_SCENE_TOO_LARGE)',
+  ),
+  'render.realistic.texture_budget': budget(
+    'instant',
+    100,
+    null,
+    'import_texture of 16 x 8192^2 PNGs (4 GiB decoded): 4 accepted, 12 refused TEXTURE_BUDGET_EXCEEDED',
+  ),
 } as const satisfies Record<string, Budget>;
 
 export type BudgetId = keyof typeof BUDGETS;
+
+interface MemoryBudget {
+  readonly title: string;
+  /** Ceiling in MiB (not scaled by the machine factor); lowered only, like the time budgets. */
+  readonly budgetMiB: number;
+}
+
+/** Peak memory ceilings (PERF1 §3, RV1 §7 V4): native = peak RSS of the llull-compute job, host = growth of the Node process's max RSS. */
+export const MEMORY_BUDGETS = {
+  'render.realistic.instances1m.native': { title: 'llull-compute pathtrace peak RSS, 1,000,000 instances at 256 x 256', budgetMiB: 400 },
+  'render.realistic.instances1m.host': { title: 'host max-RSS growth building and sending that scene', budgetMiB: 450 },
+  // refused before any member is placed: 0 MiB measured
+  'render.realistic.refuse_too_large.host': { title: 'host max-RSS growth while refusing 8,000,001 placed parts', budgetMiB: 64 },
+} as const satisfies Record<string, MemoryBudget>;
+
+export type MemoryBudgetId = keyof typeof MEMORY_BUDGETS;

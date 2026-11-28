@@ -9,6 +9,7 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { app } from '../../src/index';
 import { installGeometryKernel } from '../../src/geometryKernel';
+import { installPathTracePort } from '../../src/native/pathTracePort';
 import { _resetLiveDoc, getLiveDoc } from '../../src/liveDocument';
 import { _resetHistory } from '../../src/commandBus';
 import { createRemoteBackend } from '../../src/cli/backend';
@@ -33,6 +34,8 @@ export async function startServer(): Promise<void> {
   process.env['LLULL_AUTH_TOKEN'] = token;
   // As the real start-up does (lifecycle.ts): without a kernel the FE scenario cannot build its part (FEA_KERNEL_REQUIRED).
   await installGeometryKernel();
+  // ... and without the path tracer the visualisation scenario cannot render (NATIVE_TOOL_MISSING).
+  installPathTracePort();
   const listening = await new Promise<Server>((resolve) => {
     const started: Server = app.listen(0, '127.0.0.1', () => resolve(started));
   });
