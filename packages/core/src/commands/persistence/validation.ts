@@ -17,6 +17,7 @@ import { exchangeProblems } from './exchangeValidation';
 import { dynamicsProblems } from './dynamicsValidation';
 import { prototypeProblems } from './prototypeValidation';
 import { reviewProblems } from './reviewValidation';
+import { appearanceProblems } from './appearanceValidation';
 import { displayProblems } from './displayValidation';
 import { instanceArrayProblems } from './instanceArrayValidation';
 import { siteContextProblem } from '../../model/siteContext';
@@ -299,6 +300,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   appendAll(errors, prototypeProblems(v['prototype']));
   appendAll(errors, reviewProblems(v['review'], v['display']));
   appendAll(errors, displayProblems(v['display']));
+  appendAll(errors, appearanceProblems(v));
   appendAll(errors, instanceArrayProblems(v['instanceArrays'], v));
   appendAll(errors, kernelSliceProblems(v));
   if (v['siteContext'] !== undefined) {

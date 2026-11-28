@@ -13,6 +13,8 @@ import { TextMesh } from './entities/TextMesh';
 import { NurbsCurveLine } from './entities/NurbsCurveLine';
 import { NurbsSurfaceMesh } from './entities/NurbsSurfaceMesh';
 import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
+import { LightObject } from './lights/LightObject';
+import { CameraObject } from './lights/CameraObject';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
@@ -102,6 +104,10 @@ const EntityRenderer = memo(function EntityRenderer({
       return <NurbsCurveLine entity={entity} selected={selected} />;
     case 'nurbs_surface':
       return <NurbsSurfaceMesh entity={entity} selected={selected} onSelect={onSelect} pbrMaterial={pbrMaterial} />;
+    case 'light':
+      return <LightObject entity={entity} selected={selected} onSelect={onSelect} />;
+    case 'camera':
+      return <CameraObject entity={entity} selected={selected} onSelect={onSelect} />;
     case 'instance':
       if (!components) return null;
       return <InstanceEntityRenderer instance={entity} components={components} selected={selected} onSelect={onSelect} />;
@@ -186,7 +192,10 @@ export function Entities(): React.ReactElement {
 
   const hasFinish = useCallback(
     (entity: Entity): boolean =>
-      entity.decals !== undefined || (entity.materialId !== undefined && materials[entity.materialId]?.finish !== undefined),
+      entity.decals !== undefined ||
+      entity.appearance !== undefined ||
+      (entity.materialId !== undefined &&
+        (materials[entity.materialId]?.finish !== undefined || materials[entity.materialId]?.appearance !== undefined)),
     [materials],
   );
   const animatedIds = useMemo(

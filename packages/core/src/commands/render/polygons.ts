@@ -213,6 +213,9 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return []; // drawn by renderScene (annotations.ts): dimension strokes + SVG text on top
     case 'image':
       return []; // drawn by renderScene as an <image> underlay behind every polygon
+    case 'light':
+    case 'camera':
+      return []; // scene objects: no geometry
     case 'instance':
       return []; // drawn by renderScene, which bakes the instance into its component's entities first
     default: {

@@ -32,10 +32,12 @@ import { displayCommands } from './display/catalog';
 import { instanceArrayCommands } from './instanceArray/catalog';
 import { materialLabCommands } from './materiallab/catalog';
 import { materialCommands } from './materials/catalog';
+import { appearanceCommands } from './appearance/catalog';
 import { surfaceCommands } from './surface/catalog';
 import { meshCommands } from './mesh/catalog';
 import { deformCommands } from './deform/catalog';
 import { wrapCommands } from './wrap/catalog';
+import { sceneCommands } from './scene/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -62,10 +64,12 @@ registerCommands('core', [
   ...instanceArrayCommands,
   ...materialLabCommands,
   ...materialCommands,
+  ...appearanceCommands,
   ...surfaceCommands,
   ...meshCommands,
   ...deformCommands,
   ...wrapCommands,
+  ...sceneCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

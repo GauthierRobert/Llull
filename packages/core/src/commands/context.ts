@@ -10,6 +10,7 @@ import { getGeometryKernel } from '../geometry/kernel';
 import { getGeometryQueryEngine } from '../geometry/geometryQueries';
 import { getSpatialIndex } from '../geometry/spatialIndex';
 import { type PairCache, createPairCache } from '../geometry/assemblyCheck/pairCache';
+import { getImageAssetPort } from '../geometry/imageAssets';
 import { getMeshProcessingEngine } from '../geometry/mesh/engine';
 import { getFieldEngine } from '../geometry/field/engine';
 import { getPhysicsEngine } from '../dynamics/physicsEngine';
@@ -55,6 +56,7 @@ export function defaultContext(): ExecutionContext {
     meshProcessing: getMeshProcessingEngine(),
     fieldEngine: getFieldEngine(),
     libraries: getMaterialLibraryProvider(),
+    imageAssets: getImageAssetPort(),
     ...(getSignaturePort() !== null ? { humanSignature: getSignaturePort() } : {}),
     raster: getRasterPort(),
     media: getMediaPort(),

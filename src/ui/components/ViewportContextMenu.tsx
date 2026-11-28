@@ -9,6 +9,7 @@ import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { useDismiss } from '@ui/hooks/useDismiss';
 import { useLayoutStore, usePaletteStore, useStore, useToolStore, useViewportStore } from '@ui/store';
 import type { GizmoMode } from '@ui/store';
+import { lookThroughCamera } from '@ui/viewport/3d/lights/lookThrough';
 
 /** Max pointer travel (px) between right-button down and up that still counts as a click. */
 const CLICK_SLOP = 5;
@@ -27,6 +28,12 @@ function useMenuEntries(): MenuEntry[] {
   const hasSelection = useStore((s) => s.document.selection.length > 0);
   const viewMode = useToolStore((s) => s.viewMode);
   const anyHidden = useViewportStore((s) => s.hiddenEntityIds.size > 0);
+  // A sole selected camera entity offers "Look through camera" (set_camera with its pose; presentation only).
+  const selectedCamera = useStore((s) => {
+    const [only, ...rest] = s.document.selection;
+    const entity = only === undefined || rest.length > 0 ? undefined : s.document.entities[only];
+    return entity?.kind === 'camera' ? entity : undefined;
+  });
   return useMemo(() => {
     const showAll: MenuItem = {
       label: 'Show all',
@@ -61,7 +68,20 @@ function useMenuEntries(): MenuEntry[] {
       viewMode === '3d'
         ? [gizmo('Move', 'G', 'translate'), gizmo('Rotate', 'R', 'rotate'), gizmo('Scale', 'S', 'scale')]
         : [{ label: 'Move', shortcut: 'M', enabled: true, run: () => useToolStore.getState().setDrawTool('move') }];
+    const lookThrough: MenuEntry[] =
+      selectedCamera === undefined || viewMode !== '3d'
+        ? []
+        : [
+            {
+              label: 'Look through camera',
+              shortcut: '',
+              enabled: true,
+              run: () => void useStore.getState().dispatch('set_camera', { ...lookThroughCamera(selectedCamera) }),
+            },
+            'separator',
+          ];
     return [
+      ...lookThrough,
       ...transforms,
       { label: 'Duplicate', shortcut: 'Ctrl D', enabled: true, run: duplicateSelection },
       { label: 'Delete', shortcut: 'Del', enabled: true, run: deleteSelection },
@@ -72,7 +92,7 @@ function useMenuEntries(): MenuEntry[] {
       'separator',
       { label: 'Properties', shortcut: 'N', enabled: true, run: () => useLayoutStore.getState().toggleInspector() },
     ];
-  }, [hasSelection, viewMode, anyHidden]);
+  }, [hasSelection, viewMode, anyHidden, selectedCamera]);
 }
 
 interface MenuPosition {

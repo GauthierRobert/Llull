@@ -13,13 +13,27 @@ import { positionsGeometry } from '../../lineGeometry';
 /** Edges sharper than this stay hard (radians). */
 const MESH_CREASE_ANGLE = toRadians(30);
 
-/** `colors` (r, g, b per vertex) become the geometry's `color` attribute (analysis colour maps); they survive the crease splitting. */
+/**
+ * `colors` (r, g, b per vertex) become the geometry's `color` attribute (analysis colour maps); they survive the crease splitting.
+ * Stored `uvs` (2 per vertex) become the `uv` attribute and flag `userData.storedUvs` (the shell then keeps them instead of box-projecting);
+ * stored unit `normals` (3 per vertex) replace the crease-split normals (smooth shading as authored). Wrong-length arrays are ignored.
+ */
 export function buildMeshSolidGeometry(mesh: MeshData, colors?: ReadonlyArray<number>): THREE.BufferGeometry {
   const indexed = positionsGeometry(mesh.positions);
   indexed.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.indices), 1));
   if (colors !== undefined) indexed.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const storedUvs = mesh.uvs !== undefined && mesh.uvs.length === (mesh.positions.length / 3) * 2;
+  if (storedUvs) {
+    indexed.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs ?? [], 2));
+    indexed.userData['storedUvs'] = true;
+  }
+  if (mesh.normals !== undefined && mesh.normals.length === mesh.positions.length) {
+    indexed.setAttribute('normal', new THREE.Float32BufferAttribute(mesh.normals, 3));
+    return indexed;
+  }
   const creased = toCreasedNormals(indexed, MESH_CREASE_ANGLE);
   indexed.dispose();
+  if (storedUvs) creased.userData['storedUvs'] = true;
   return creased;
 }
 

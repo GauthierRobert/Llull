@@ -92,6 +92,8 @@ function unrotatedTriangles(e: Entity): Triangle[] {
     case 'subdivision':
       return subdivisionTriangles(e, e.position);
     case 'instance':
+    case 'light':
+    case 'camera':
       return [];
   }
 }

@@ -193,6 +193,8 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
       }
     }
     case 'instance':
+    case 'light':
+    case 'camera':
       return null;
   }
 }

@@ -118,6 +118,18 @@ const ANNOTATE_TOOLS: readonly CommandTool[] = [
   { id: 'text', label: 'Text', icon: 'text', hint: 'place a text note', command: 'add_text' },
 ];
 
+const SCENE_TOOLS: readonly CommandTool[] = [
+  { id: 'light', label: 'Light', icon: 'sun', hint: 'add a sun, point, spot or area light', command: 'add_light' },
+  { id: 'camera', label: 'Camera', icon: 'eye', hint: 'add a physical camera (focal length, sensor)', command: 'add_camera' },
+  {
+    id: 'environment',
+    label: 'Environment',
+    icon: 'image',
+    hint: 'sky, HDR image or flat colour around the model',
+    command: 'set_environment',
+  },
+];
+
 /** Only the tools whose command is registered (a host without a plugin never shows a dead button). */
 function registered(id: string, label: string, tools: readonly CommandTool[]): CommandToolSection[] {
   const available = tools.filter((tool) => getCommand(tool.command) !== undefined);
@@ -139,6 +151,10 @@ export function inspectSections(): CommandToolSection[] {
 
 export function annotateSections(): CommandToolSection[] {
   return registered('annotate', 'Annotate', ANNOTATE_TOOLS);
+}
+
+export function sceneSections(): CommandToolSection[] {
+  return registered('scene', 'Light & camera', SCENE_TOOLS);
 }
 
 /** The three boolean shortcuts (selection bar, when several solids are selected). */

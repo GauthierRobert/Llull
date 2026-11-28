@@ -16,6 +16,7 @@ import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
 import { toDegrees } from '../../lib/angle';
 import { arrayAsInstances } from './arrayInstances';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
+import { isSceneObject } from '../../model/sceneKinds';
 
 /** Smallest |angle| (radians) that still spreads array_polar copies apart. */
 const MIN_POLAR_ANGLE = 1e-9;
@@ -115,6 +116,8 @@ export const scaleEntity = defineCommand({
     const target = doc.entities[id];
     if (!target) return noop(doc, `No entity ${id} to scale.`);
     if (factor <= 0) return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
+    if (isSceneObject(target))
+      return noop(doc, `scale_entity: ${target.kind} ${id} has no geometry to scale (edit it with edit_${target.kind}); entity unchanged.`);
     const { scaled, dims } = scaleGeometry(target, factor);
     if (target.kind === 'mesh' && target.asset !== undefined && scaled.kind === 'mesh') {
       const stored = storeMesh(scaled.mesh, (ctx ?? currentContext()).meshAssets);

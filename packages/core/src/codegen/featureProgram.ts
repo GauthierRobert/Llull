@@ -8,6 +8,7 @@ import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D 
 import { subdivide } from '../geometry/subdivision';
 import { settleBudgetProblem, settleLevels } from '../geometry/subd/settle';
 import { isCurve3D, isSheet } from '../model/curveKinds';
+import { isSceneObject } from '../model/sceneKinds';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history/replay';
 import { buildParamEnv } from '../commands/history/regenerate';
@@ -142,6 +143,8 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
       return skinShape(entity, doc, trace);
     case 'mesh':
     case 'instance':
+    case 'light':
+    case 'camera':
       return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
   }
 }
@@ -487,6 +490,17 @@ function settleClampNotes(doc: CadDocument): string[] {
   });
 }
 
+/** Lights and cameras are scene objects with no solid form: listed, never lowered. */
+function skippedSceneNote(doc: CadDocument): string[] {
+  const skipped = doc.order.filter((id) => {
+    const entity = doc.entities[id];
+    return entity !== undefined && isSceneObject(entity);
+  });
+  return skipped.length === 0
+    ? []
+    : [`not exported to code (lights and cameras are scene objects with no geometry): ${skipped.join(', ')}.`];
+}
+
 function skippedSurfaceNote(doc: CadDocument): string[] {
   const skipped = doc.order.filter((id) => {
     const entity = doc.entities[id];
@@ -521,7 +535,7 @@ function buildProgram(
   const namer = new Namer();
   const { parameters, identifiers } = lowerParameters(doc, namer);
   const ctx: LowerContext = { identifiers, env: buildParamEnv(doc.parameters), kernel, chamferLegs };
-  const notes: string[] = [...skippedSurfaceNote(doc), ...settleClampNotes(doc)];
+  const notes: string[] = [...skippedSurfaceNote(doc), ...skippedSceneNote(doc), ...settleClampNotes(doc)];
   const activeSteps: FeatureStep[] = doc.featureHistory.filter((s) => s.suppressed !== true);
   if (activeSteps.length === 0) return lowerSnapshot(doc, parameters, ctx, namer, notes);
   const features: Feature[] = [];

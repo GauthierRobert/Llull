@@ -12,6 +12,9 @@ import { computeContactShadowPlane } from './contactShadowPlane';
 import { computeKeyLightRig } from './keyLightRig';
 import type { RenderQualitySettings } from './useRenderQuality';
 import { CascadedShadows } from './effects/CascadedShadows';
+import { useHdrEnvironment } from './appearance/HdrEnvironment';
+import { keyLightRule } from './lights/lightModel';
+import { useAuthoredLights } from './lights/useAuthoredLights';
 import { getContactBakeTick, markShadowsDirty, subscribeContactBake } from './renderRigState';
 
 /** drei ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
@@ -20,7 +23,7 @@ export const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 
 /** World AABB of the whole scene (null when empty); recomputed only when the content changes. */
 type SceneBounds = ReturnType<typeof mergedEntityBounds>;
 
-function useSceneBounds(): SceneBounds {
+export function useSceneBounds(): SceneBounds {
   const entities = useStore((s) => s.document.entities);
   const components = useStore((s) => s.document.components);
   const order = useStore((s) => s.document.order);
@@ -166,7 +169,7 @@ function SceneShadowRig({
   cascaded,
   shadowMapSize,
   shadowRadius,
-  keyShadows,
+  keyShadowsEnabled,
   contactShadows,
   contactShadowOpacity,
   groundShadowOpacity,
@@ -174,7 +177,7 @@ function SceneShadowRig({
   cascaded: boolean;
   shadowMapSize: number;
   shadowRadius: number;
-  keyShadows: boolean;
+  keyShadowsEnabled: boolean;
   contactShadows: boolean;
   contactShadowOpacity: number;
   groundShadowOpacity: number;
@@ -185,6 +188,10 @@ function SceneShadowRig({
   const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin, sun?.direction), [bounds, renderOrigin, sun]);
   // Sun below the horizon (site context): no key light, no sun shadow; sky light only.
   const sunUp = sun === null || sun.up;
+  // Authored lights (RV-M2): none = the rig as before; a sun light replaces the key light; others dim it to a fill (lightModel.keyLightRule).
+  const lights = useAuthoredLights();
+  const rule = useMemo(() => keyLightRule(lights), [lights]);
+  const keyShadows = keyShadowsEnabled && rule.keyShadows;
   // Cascades (High) replace the single key light; with them off the single light is the whole path.
   const useCascades = cascaded && keyShadows && sunUp;
   return (
@@ -198,7 +205,7 @@ function SceneShadowRig({
           castShadow={keyShadows && sunUp}
           bounds={bounds}
           sunDirection={sun?.direction}
-          intensity={sunUp ? 1.8 : 0}
+          intensity={sunUp ? 1.8 * rule.keyScale : 0}
         />
       )}
       {keyShadows && sunUp && <GroundShadowCatcher opacity={groundShadowOpacity} bounds={bounds} />}
@@ -216,9 +223,11 @@ export function SceneLighting({
   contactShadowOpacity: number;
   groundShadowOpacity: number;
 }): React.ReactElement {
+  // A loaded HDR environment (RV-M2) replaces the procedural one; until it loads (or if it cannot) the procedural one stays.
+  const hdrActive = useHdrEnvironment() !== null;
   return (
     <>
-      {quality.environmentEnabled && (
+      {quality.environmentEnabled && !hdrActive && (
         // Procedural IBL: preset="studio" fetches an HDR from a CDN and crashes offline.
         <Environment background={false} resolution={256}>
           <Lightformer form="rect" intensity={2} position={[0, 5, 5]} scale={[10, 6, 1]} />
@@ -241,7 +250,7 @@ export function SceneLighting({
         cascaded={quality.cascadedShadows}
         shadowMapSize={quality.shadowMapSize}
         shadowRadius={quality.shadowRadius}
-        keyShadows={quality.keyShadows}
+        keyShadowsEnabled={quality.keyShadows}
         contactShadows={quality.contactShadowsEnabled}
         contactShadowOpacity={contactShadowOpacity}
         groundShadowOpacity={groundShadowOpacity}

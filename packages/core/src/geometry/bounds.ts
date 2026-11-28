@@ -188,6 +188,8 @@ export function localBounds(e: Entity): Bounds {
       return bounds(min, max);
     }
     case 'point':
+    case 'light':
+    case 'camera':
     case 'instance':
       // Instances need the document for real bounds: use `instanceBoundsFromDoc`.
       return bounds(ORIGIN, ORIGIN);

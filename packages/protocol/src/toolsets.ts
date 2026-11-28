@@ -85,13 +85,14 @@ const PIPING_TOOLS = words('add_pipe_run add_pipe_support add_cable_tray check_p
 /** Core material records, properties and libraries (08 MAT, PHY-01); the material-selection plugin adds its commands to the same toolset. */
 const MATERIALS_CORE_TOOLS = words(
   'create_material assign_material define_material_record set_material_property get_material get_material_allowable convert_quantity import_material_library delete_material_library resolve_material_libraries diff_material_libraries set_export_marking check_materials register_material_library ' +
+    'import_texture set_material_appearance apply_appearance list_appearances set_environment clear_entity_appearance remove_texture ' +
     'define_property_model delete_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model delete_material_model define_constitutive_set check_material_models',
 );
 
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   core: words(
-    'describe_scene find_entities build_project check_model render_view capture_viewport set_units load_document document_content_hash clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name set_entity_color set_face_color align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view kernel_info set_modeling_tolerance set_mesh_storage set_selection set_site_context clear_site_context sun_position',
+    'describe_scene find_entities build_project check_model render_view add_light add_camera edit_light edit_camera capture_viewport set_units load_document document_content_hash clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name set_entity_color set_face_color align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view kernel_info set_modeling_tolerance set_mesh_storage set_selection set_site_context clear_site_context sun_position',
   ),
   '2d': words(
     'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline hatch_region draw_involute draw_belt_around create_sketch_plane place_on_sketch_plane project_edges_to_sketch break_sketch_link explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension create_dimension_style update_dimension_style delete_dimension_style apply_dimension_style set_active_dimension_style list_dimension_styles add_image_underlay calibrate_underlay set_underlay image_to_world create_sheet create_drawing_view add_section_view add_detail_view update_drawing_view delete_drawing_view update_sheet delete_sheet export_sheet_svg',

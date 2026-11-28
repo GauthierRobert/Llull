@@ -12,6 +12,7 @@ import { objectsOf } from '../plm/vault/location';
 import { defaultFeArtifactStore } from './artifactStore';
 import { defaultPointCloudPort } from '../scan/pointCloudPort';
 import { defaultMeshAssetStore } from '../meshAssets/store';
+import { defaultImageAssetStore } from '../imageAssets/store';
 import { cfdResultPort } from '../cfd/resultPort';
 import { currentScope } from '../native/deferredRun';
 import { exportFilePort } from '../exportFiles';
@@ -32,6 +33,7 @@ export function serverContext(
     ...(onStep !== undefined ? { onStep } : {}),
     pointClouds: defaultPointCloudPort(),
     meshAssets: defaultMeshAssetStore(),
+    imageAssets: defaultImageAssetStore(),
     exportFiles: exportFilePort(),
     hostVersion: hostVersion(),
     viewportCapture: createViewportCapturePort(),

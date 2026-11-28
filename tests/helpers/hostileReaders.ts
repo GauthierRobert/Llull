@@ -11,6 +11,7 @@ import { FLIGHT_READERS } from './hostile/flightReaders';
 import { GLTF_READERS } from './hostile/gltfReaders';
 import { EXCHANGE_READERS } from './hostile/exchangeReaders';
 import { MESH_READERS } from './hostile/meshReaders';
+import { IMAGE_READERS } from './hostile/imageReaders';
 import { PLANT_DATA_READERS } from './hostile/plantDataReaders';
 import { CFD_FILE_READERS } from './hostile/cfdFileReaders';
 import { XML_READERS } from './hostile/xmlReaders';
@@ -20,6 +21,7 @@ export type { HostileReader } from './hostile/types';
 export const HOSTILE_READERS: readonly HostileReader[] = [
   ...XML_READERS,
   ...MESH_READERS,
+  ...IMAGE_READERS,
   ...EXCHANGE_READERS,
   ...BCF_READERS,
   ...GLTF_READERS,

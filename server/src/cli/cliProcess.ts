@@ -31,6 +31,8 @@ async function prepareKernel(): Promise<void> {
     { installFieldEngine },
     { setMeshAssetPort },
     { defaultMeshAssetStore },
+    { defaultImageAssetStore },
+    { setImageAssetPort },
     { installFontProvider },
     { installArtifactPort },
     { defaultFeArtifactStore },
@@ -45,6 +47,8 @@ async function prepareKernel(): Promise<void> {
     import('../native/fieldEngine'),
     import('@core/geometry/mesh/assets'),
     import('../meshAssets/store'),
+    import('../imageAssets/store'),
+    import('@core/geometry/imageAssets'),
     import('../fontProvider'),
     import('@implicit/index'),
     import('../fea/artifactStore'),
@@ -56,6 +60,7 @@ async function prepareKernel(): Promise<void> {
   installSpatialIndex();
   installFieldEngine();
   setMeshAssetPort(defaultMeshAssetStore());
+  setImageAssetPort(defaultImageAssetStore());
   installArtifactPort(defaultFeArtifactStore());
   installFontProvider();
   installPipingLibraryProvider();

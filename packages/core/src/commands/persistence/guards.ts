@@ -1,3 +1,4 @@
+import { appearanceShapeProblem, meshAttributeProblem } from './appearanceValidation';
 import { storedMaterialModelsProblem } from '../document/materialModelStored';
 import { getMeshAssetPort } from '../../geometry/mesh/assets';
 import type { MeshAssetRef } from '../../model/meshProvenance';
@@ -34,6 +35,8 @@ import {
 } from '../limits';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
 import { hypotOf } from '../../lib/hypotOf';
+import { SCENE_KINDS } from '../../model/sceneKinds';
+import { cameraFieldsProblem, lightFieldsProblem } from '../scene/validate';
 
 /** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
 function imageProblem(v: Record<string, unknown>): string | null {
@@ -148,7 +151,14 @@ function stationsProblem(stations: unknown): string | null {
   return problem === null ? null : `stations ${problem}`;
 }
 
-const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, ...SHEET_KINDS, 'instance']);
+const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([
+  ...SOLID_KINDS,
+  ...SHAPE2D_KINDS,
+  ...CURVE_KINDS,
+  ...SHEET_KINDS,
+  ...SCENE_KINDS,
+  'instance',
+]);
 
 export function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;
@@ -257,6 +267,10 @@ function baseOptionalProblem(v: Record<string, unknown>): string | null {
   if (v['name'] !== undefined && typeof v['name'] !== 'string') return 'name must be a string';
   if (v['materialId'] !== undefined && typeof v['materialId'] !== 'string') return 'materialId must be a string';
   if (v['patternSourceId'] !== undefined && typeof v['patternSourceId'] !== 'string') return 'patternSourceId must be a string';
+  if (v['appearance'] !== undefined) {
+    const problem = appearanceShapeProblem('appearance', v['appearance']);
+    if (problem !== null) return problem;
+  }
   if (v['fastener'] !== undefined && v['fastener'] !== true) return 'fastener must be true when present';
   if (v['fastener'] === true && v['kind'] !== 'instance' && !(SOLID_KINDS as readonly string[]).includes(String(v['kind'])))
     return 'fastener applies to 3D solids and instances only';
@@ -396,6 +410,8 @@ function meshProblem(v: Record<string, unknown>): string | null {
       !vertexColors.every((c) => isFiniteNumber(c) && c >= 0 && c <= 255))
   )
     return 'vertexColors must be 3 numbers in [0, 255] per mesh vertex';
+  const attributes = meshAttributeProblem(mesh, vertexCount);
+  if (attributes !== null) return attributes;
   const provenance = meshProvenanceProblem(v, indices.length / 3);
   if (provenance !== null) return provenance;
   const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
@@ -459,6 +475,8 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   ellipse: (v) => vec2Problem(v, 'center'),
   rectangle: noProblem,
   point: noProblem,
+  light: lightFieldsProblem,
+  camera: cameraFieldsProblem,
   text: textProblem,
   dimension: dimensionProblem,
   instance: (v) => {
@@ -505,6 +523,10 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
       v['propertyModels'],
     );
     if (laws !== null) return laws;
+  }
+  if (v['appearance'] !== undefined) {
+    const problem = appearanceShapeProblem(`material '${name}'.appearance`, v['appearance']);
+    if (problem !== null) return problem;
   }
   const finish = v['finish'];
   if (finish === undefined) return null;

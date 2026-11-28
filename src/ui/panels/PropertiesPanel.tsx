@@ -17,6 +17,7 @@ import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { AxisFields, CommitInput, PropRow } from './propertyFields';
 import { GeometrySection } from './StepDimensionRows';
 import { ColorField } from './ColorField';
+import { AppearanceRows } from './appearance/AppearanceRows';
 import { ElementInspector } from './building/ElementInspector';
 import { ExchangeProvenanceSection } from './exchange/ExchangeReport';
 import { buildingElementOf } from '@aec/index';
@@ -152,6 +153,7 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
             onCommit={(color) => dispatch('set_entity_color', { entityIds: [entity.id], color })}
           />
         </PropRow>
+        <AppearanceRows entity={entity} />
       </PanelSection>
 
       {provenance !== undefined && (

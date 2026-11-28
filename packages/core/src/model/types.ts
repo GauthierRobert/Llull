@@ -5,8 +5,6 @@ import type { FaceColored, FaceGroup, MeshAssetRef, MeshSource, VertexTint } fro
 export type { FaceColor, FaceSignature } from './meshProvenance';
 import type { EdgeBlendNode, FaceBlendParams, FullRoundParams, JointRadius } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
-import type { PropertyModel } from './propertyModel';
-import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { CageBoundary, CageElementIds, CageEdgeSharpness, CageSymmetry, CageVertexSharpness } from './subdivisionCage';
 import type { ExactLeafRecipe } from './sheetSolid';
@@ -28,8 +26,7 @@ import type { CurveSegment } from './curve';
 import type { RegionHatch } from './regionHatch';
 import type { DocumentExtensions } from './documentExtensions';
 import type { DocumentKernelSettings } from './documentKernelSettings';
-import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
-import type { MaterialFinish } from './materialFinish';
+import type { MaterialLibraryEntry } from './materialLibrary';
 export { FINISH_PATTERNS, type FinishPattern, type MaterialFinish } from './materialFinish';
 import type { FeatureParams, PartRef } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
@@ -41,6 +38,11 @@ import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
 import type { DocumentSettingsFields } from './documentSettings';
+import type { Material } from './material';
+import type { MeshData } from './meshData';
+export type { Material, MeshData };
+import { type CameraFields, type LightFields, type SceneKind, isSceneObject } from './sceneKinds';
+import type { AppearanceModel } from './appearance';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -88,7 +90,7 @@ export const SHAPE2D_KINDS = [
 
 export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
 
-export type EntityKind = SolidKind | Shape2DKind | CurveKind | SheetKind | 'instance';
+export type EntityKind = SolidKind | Shape2DKind | CurveKind | SheetKind | SceneKind | 'instance';
 
 export interface BaseEntity extends EntityTags {
   readonly id: EntityId;
@@ -110,6 +112,8 @@ export interface BaseEntity extends EntityTags {
   patternSourceId?: string;
   /** Decals painted on this solid (entity-local frame); set by `add_decal`. */
   decals?: ReadonlyArray<Decal>;
+  /** Visual-only appearance override (RV-M1 `apply_appearance`), drawn over the material's; mass and analysis keep `materialId`. */
+  appearance?: import('./appearance').Appearance;
 }
 
 export interface BoxEntity extends BaseEntity, FaceColored {
@@ -423,6 +427,16 @@ export interface ImageEntity extends BaseEntity {
   locked: boolean;
 }
 
+/** Light source (RV-M2 `add_light`); no geometry. @see sceneKinds.ts */
+export interface LightEntity extends BaseEntity, LightFields {
+  readonly kind: 'light';
+}
+
+/** Physical camera (RV-M2 `add_camera`); no geometry. @see sceneKinds.ts */
+export interface CameraEntity extends BaseEntity, CameraFields {
+  readonly kind: 'camera';
+}
+
 /**
  * Placed reference to a Component definition; geometry is never copied.
  * @invariant componentId exists in CadDocument.components
@@ -463,6 +477,8 @@ export type Entity =
   | TextEntity
   | DimensionEntity
   | ImageEntity
+  | LightEntity
+  | CameraEntity
   | InstanceEntity;
 
 const SHAPE2D_KIND_SET: ReadonlySet<string> = new Set(SHAPE2D_KINDS);
@@ -471,9 +487,9 @@ export function is2D(e: Entity): e is Extract<Entity, { kind: Shape2DKind }> {
   return SHAPE2D_KIND_SET.has(e.kind);
 }
 
-/** True for solids, meshes, instances and images; false for planar shapes and 3D curves (no volume, no kernel leaf). */
+/** True for solids, meshes, instances and images; false for planar shapes, 3D curves, sheets and scene objects (no volume, no kernel leaf). */
 export function is3D(e: Entity): boolean {
-  return !SHAPE2D_KIND_SET.has(e.kind) && !isCurve3D(e) && !isSheet(e);
+  return !SHAPE2D_KIND_SET.has(e.kind) && !isCurve3D(e) && !isSheet(e) && !isSceneObject(e);
 }
 
 export interface Layer {
@@ -680,6 +696,8 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   review?: ReviewModel;
   /** Absent until the first display command (`define_colour_profile`, `apply_service_colour_scheme`; plant 09 VIS). */
   display?: DisplayModel;
+  /** Textures and scene environment (RV1 RV-M1 / RV-M2); absent until the first `import_texture` / `set_environment`. */
+  appearance?: AppearanceModel;
   /** Absent until the first `add_instance_array`: packed placements of a Component, no Entity per instance (plant 09 VIS-M8j, VIS1). */
   instanceArrays?: Record<string, InstanceArray>;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
@@ -715,38 +733,6 @@ export interface DocumentBlob {
   readonly size: number;
 }
 
-/**
- * Physical + PBR material. `density` is mass per (document unit)³ so mass = volume × density (mm document: g/mm³, steel ≈ 0.00785).
- * Replaced via `create_material`.
- * @invariant density > 0 and finite (0 only on a `record` material with no density value yet, or an unresolved private stub); color matches
- *   /^#[0-9a-fA-F]{6}$/; metalness, roughness in [0, 1]
- */
-export interface Material {
-  readonly name: string;
-  density: number;
-  /** Unit `density` was given in at creation (create_material `densityUnit`); absent = given directly in g/(document unit)³. Still no source. */
-  readonly densityUnit?: string;
-  /** Where the density comes from (FR-FPR-73): a material with a source is not reported as unsourced by the dynamics mass. */
-  readonly source?: string;
-  /** Quality of `source`: A measured / verified, B published datasheet, C reconstructed or unchecked. */
-  readonly grade?: 'A' | 'B' | 'C';
-  /** Aerospace material record (08 MAT M2): designation, specs, licence, export marking, library origin. Absent on a legacy material. */
-  readonly record?: MaterialRecordInfo;
-  color: string;
-  metalness: number;
-  roughness: number;
-  /** Procedural surface texture (albedo + normal + roughness maps); absent = plain PBR colour. */
-  finish?: MaterialFinish;
-  /** Property models (PHY-01: k(T), cp(T), E(T), …) defined with define_property_model; read through `propertyModelEval`. */
-  readonly propertyModels?: readonly PropertyModel[];
-  /** Constitutive / durability laws (PHY-02: add_material_model); read through `materialLaws/*`. */
-  readonly materialModels?: readonly MaterialModel[];
-  /** Named combinations of material models an analysis picks (PHY-02: define_constitutive_set). */
-  readonly constitutiveSets?: readonly ConstitutiveSet[];
-  /** Id of the set used when a query names none. */
-  readonly defaultConstitutiveSet?: string;
-}
-
 export const DEFAULT_LAYER_ID = 'layer-default';
 
 export function createEmptyDocument(): CadDocument {
@@ -775,12 +761,6 @@ export function createEmptyDocument(): CadDocument {
     driveRelations: {},
     driveRelationOrder: [],
   };
-}
-
-/** World-space triangle mesh. `positions`: flat xyz triples (length 3 × vertexCount); `indices`: flat triangle vertex indices. */
-export interface MeshData {
-  readonly positions: ReadonlyArray<number>;
-  readonly indices: ReadonlyArray<number>;
 }
 
 export type BooleanOp = 'union' | 'subtract' | 'intersect';

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { expectPure } from '../../helpers/expectNoOp';
 import { empty, expectRefused, ok, run } from './helpers';
+import { HEAVY_TEST_TIMEOUT_MS } from '../../helpers/heavyTest';
 
 const KINDS = ['gyroid', 'schwarz_p', 'diamond', 'neovius', 'iwp', 'lidinoid', 'fischer_koch_s', 'split_p'] as const;
 
@@ -35,20 +36,24 @@ describe('TPMS families', () => {
     }
   });
 
-  it('Neovius, Fischer-Koch S and the other level-0 networks fill their symmetric fraction; the rest match the measured fractions (VC-IMP-27)', () => {
-    const expected: Record<string, [number, number]> = {
-      neovius: [0.5, 2e-3],
-      fischer_koch_s: [0.5, 2e-3],
-      iwp: [0.4693, 5e-3],
-      lidinoid: [0.3842, 5e-3],
-      split_p: [0.51, 5e-3],
-    };
-    for (const [kind, [fraction, tolerance]] of Object.entries(expected)) {
-      const lattice = ok(empty(), 'add_tpms_lattice', { kind, form: 'network', level: 0, cellSize: 10 });
-      const density = ok(lattice.doc, 'lattice_properties', { id: lattice.id, resolution: 64 }).data['rhoMeasured'] as number;
-      expect(Math.abs(density - fraction), kind).toBeLessThan(tolerance);
-    }
-  });
+  it(
+    'Neovius, Fischer-Koch S and the other level-0 networks fill their symmetric fraction; the rest match the measured fractions (VC-IMP-27)',
+    { timeout: HEAVY_TEST_TIMEOUT_MS },
+    () => {
+      const expected: Record<string, [number, number]> = {
+        neovius: [0.5, 2e-3],
+        fischer_koch_s: [0.5, 2e-3],
+        iwp: [0.4693, 5e-3],
+        lidinoid: [0.3842, 5e-3],
+        split_p: [0.51, 5e-3],
+      };
+      for (const [kind, [fraction, tolerance]] of Object.entries(expected)) {
+        const lattice = ok(empty(), 'add_tpms_lattice', { kind, form: 'network', level: 0, cellSize: 10 });
+        const density = ok(lattice.doc, 'lattice_properties', { id: lattice.id, resolution: 64 }).data['rhoMeasured'] as number;
+        expect(Math.abs(density - fraction), kind).toBeLessThan(tolerance);
+      }
+    },
+  );
 
   it('measures the specific surface of families without a reference value, and walls / pores by the distance transform', () => {
     const lattice = ok(empty(), 'add_tpms_lattice', { kind: 'neovius', form: 'sheet', thickness: 1, cellSize: 12 });
