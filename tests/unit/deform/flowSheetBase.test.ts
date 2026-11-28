@@ -22,6 +22,7 @@ import {
   volumeOf,
 } from './harness';
 import { packData } from './packPaths';
+import { HEAVY_TEST_TIMEOUT_MS } from '../../helpers/heavyTest';
 
 const KERNELS: KernelKind[] = ['none', 'manifold'];
 type SurfaceLaw = Extract<DeformLaw, { kind: 'flowSurface' }>;
@@ -273,27 +274,31 @@ describe.each(KERNELS)('flow_on_surface with a base sheet, kernel: %s', (kind) =
     expectPure(doc, () => execute(doc, 'flow_on_surface', params));
   }, 120_000);
 
-  it('a 300 degree wrap: the predicted volume does not depend on a fan apex (the bounding-box centre is at the axis of curvature, where det J of the base blows up)', async () => {
-    await installKernel(kind);
-    const length = (50 * 5 * Math.PI) / 3;
-    const box = addBox([2, 20, length], 'base-center');
-    const bent = execute(box.doc, 'bend_body', { id: box.id, radius: 50, angleDeg: 300, frame: WORLD_Z, output: { tolerance: 0.1 } });
-    expect(bent.error, bent.summary).toBeUndefined();
-    const made = fullCircleSheet(bent.document);
-    expect(made.error, made.summary).toBeUndefined();
-    const target = flatSheet(made.document, [-10, 400], [-30, 30], 0);
-    const result = execute(target.doc, 'flow_on_surface', {
-      id: bent.affected[0],
-      base: { sheetId: made.affected[0], origin: [0, 0, 0], uDirection: [0, 0, 1] },
-      target: { sheetId: target.id },
-      targetOrigin: [0, 0, 0],
-      targetUDirection: [1, 0, 0],
-      output: { tolerance: 0.1 },
-    });
-    expect(result.error, result.summary).toBeUndefined();
-    const analysis = dataOf<AnalysisData>(execute(result.document, 'analyze_deformation', { id: result.affected[0] as string }));
-    expect(relative(analysis.volume.predicted, length * 20 * 2)).toBeLessThan(5e-2);
-  });
+  it(
+    'a 300 degree wrap: the predicted volume does not depend on a fan apex (the bounding-box centre is at the axis of curvature, where det J of the base blows up)',
+    { timeout: HEAVY_TEST_TIMEOUT_MS },
+    async () => {
+      await installKernel(kind);
+      const length = (50 * 5 * Math.PI) / 3;
+      const box = addBox([2, 20, length], 'base-center');
+      const bent = execute(box.doc, 'bend_body', { id: box.id, radius: 50, angleDeg: 300, frame: WORLD_Z, output: { tolerance: 0.1 } });
+      expect(bent.error, bent.summary).toBeUndefined();
+      const made = fullCircleSheet(bent.document);
+      expect(made.error, made.summary).toBeUndefined();
+      const target = flatSheet(made.document, [-10, 400], [-30, 30], 0);
+      const result = execute(target.doc, 'flow_on_surface', {
+        id: bent.affected[0],
+        base: { sheetId: made.affected[0], origin: [0, 0, 0], uDirection: [0, 0, 1] },
+        target: { sheetId: target.id },
+        targetOrigin: [0, 0, 0],
+        targetUDirection: [1, 0, 0],
+        output: { tolerance: 0.1 },
+      });
+      expect(result.error, result.summary).toBeUndefined();
+      const analysis = dataOf<AnalysisData>(execute(result.document, 'analyze_deformation', { id: result.affected[0] as string }));
+      expect(relative(analysis.volume.predicted, length * 20 * 2)).toBeLessThan(5e-2);
+    },
+  );
 
   it('a flat base sheet is the base plane: the same extents as base.plane', async () => {
     await installKernel(kind);

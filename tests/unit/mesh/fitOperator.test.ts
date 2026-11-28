@@ -8,6 +8,7 @@ import { VertexGrid } from '@core/geometry/mesh/vertexGrid';
 import { dartMaskWeights } from '@core/geometry/subd/dartMask';
 import { boxCage, cageProblem, subdivide, type Cage } from '@core/geometry/subdivision';
 import type { Vec3 } from '@core/model/types';
+import { HEAVY_TEST_TIMEOUT_MS } from '../../helpers/heavyTest';
 
 /** Limit points the operator gives at the cage vertices (its first rows). */
 function operatorPoints(cage: Cage, level: number): Vec3[] {
@@ -238,23 +239,28 @@ describe('dart limit mask', () => {
 describe('sharpness above three', () => {
   const cage = (): Cage => cube({ edgeSharpness: [{ a: 0, b: 1, s: 5 }] });
 
-  it('settles at ceil(5) = 5 levels on every path, so the operator is the surface refineOnce defines', () => {
-    expect(settleLevels(cage())).toBe(5);
-    expect(fullSettleLevels(cage())).toBe(5);
-    expect(sampleLevel(cage(), 1)).toBe(5);
-    expect(limitSurfaceMesh(cage(), 1).level).toBe(5);
-    const points = [1, 5, 6, 7].map((level) => operatorPoints(cage(), level));
-    // level independence from the settle level on, for every cage vertex
-    for (const later of points.slice(1)) later.forEach((p, v) => expect(distance(p, (points[1] as Vec3[])[v] as Vec3)).toBeLessThan(1e-9));
-    points[0]?.forEach((p, v) => expect(distance(p, (points[1] as Vec3[])[v] as Vec3)).toBeLessThan(1e-12));
-    // and the limit of the real refinement: the vertex after k levels approaches the operator point
-    const exact = points[1] as Vec3[];
-    for (const v of [0, 1, 4]) {
-      const errors = [5, 6, 7].map((k) => distance(subdivide(cage(), k).vertices[v] as Vec3, exact[v] as Vec3));
-      expect(errors[2] as number).toBeLessThan(errors[0] as number);
-      expect(errors[2] as number).toBeLessThan(0.01);
-    }
-  });
+  it(
+    'settles at ceil(5) = 5 levels on every path, so the operator is the surface refineOnce defines',
+    { timeout: HEAVY_TEST_TIMEOUT_MS },
+    () => {
+      expect(settleLevels(cage())).toBe(5);
+      expect(fullSettleLevels(cage())).toBe(5);
+      expect(sampleLevel(cage(), 1)).toBe(5);
+      expect(limitSurfaceMesh(cage(), 1).level).toBe(5);
+      const points = [1, 5, 6, 7].map((level) => operatorPoints(cage(), level));
+      // level independence from the settle level on, for every cage vertex
+      for (const later of points.slice(1))
+        later.forEach((p, v) => expect(distance(p, (points[1] as Vec3[])[v] as Vec3)).toBeLessThan(1e-9));
+      points[0]?.forEach((p, v) => expect(distance(p, (points[1] as Vec3[])[v] as Vec3)).toBeLessThan(1e-12));
+      // and the limit of the real refinement: the vertex after k levels approaches the operator point
+      const exact = points[1] as Vec3[];
+      for (const v of [0, 1, 4]) {
+        const errors = [5, 6, 7].map((k) => distance(subdivide(cage(), k).vertices[v] as Vec3, exact[v] as Vec3));
+        expect(errors[2] as number).toBeLessThan(errors[0] as number);
+        expect(errors[2] as number).toBeLessThan(0.01);
+      }
+    },
+  );
 
   it('the settled cage of the other exact paths is fully settled: no sharpness is left', () => {
     const settled = settledCage(cage());

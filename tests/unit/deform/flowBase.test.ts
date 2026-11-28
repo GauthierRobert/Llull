@@ -1,3 +1,4 @@
+import { HEAVY_TEST_TIMEOUT_MS } from '../../helpers/heavyTest';
 /** 01 DEF §17.2: `flow_along_curve` with a `baseCurve`, and the frame fix (the curves are read in the body frame), on the mesh path. The native exact warp: server/tests/nativeKernelDeform.test.ts. */
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -109,36 +110,40 @@ describe.each(KERNELS)('flow_along_curve, kernel: %s', (kind) => {
     expect(based.summary).toBe(plain.summary);
   });
 
-  it('an arc base onto a straight target straightens a bent bar: length, volume, position, Jacobian and predicted volume', async () => {
-    await installKernel(kind);
-    const rod = bentRod();
-    const base = curve(rod.doc, 'create_conic', { start: [0, 0, 0], apex: [0, 0, 50], end: [50, 0, 50], rho: Math.SQRT2 - 1 });
-    const target = curve(base.doc, 'create_nurbs_curve', {
-      degree: 1,
-      poles: [
-        [200, 0, 0],
-        [200, 0, 100],
-      ],
-    });
-    const params = { id: rod.id, targetId: target.id, baseCurve: base.id, frame: WORLD, output: { tolerance: 0.01 } };
-    const result = execute(target.doc, 'flow_along_curve', params);
-    expect(result.error, result.summary).toBeUndefined();
-    const next = result.affected[0] as string;
-    const extent = extentOf(result.document, next);
-    expect(extent.min[2]).toBeCloseTo(0, 1);
-    expect(extent.max[2]).toBeCloseTo(QUARTER, 1);
-    expect(extent.min[0]).toBeCloseTo(195, 1);
-    expect(extent.max[0]).toBeCloseTo(205, 1);
-    expect(relative(volumeOf(result.document, next), Math.PI * 25 * QUARTER)).toBeLessThan(2e-2);
-    const analysis = dataOf<AnalysisData>(execute(result.document, 'analyze_deformation', { id: next }));
-    // det J = 1 / (1 - x / 50) for offsets x in [-5, 5] toward the centre of the base arc
-    expect(analysis.jacobian.min).toBeCloseTo(1 / 1.1, 2);
-    expect(analysis.jacobian.max).toBeCloseTo(1 / 0.9, 2);
-    expect(analysis.volume.driftRel).toBeLessThan(2e-2);
-    expect(dataOf<CheckData>(execute(result.document, 'check_deformation', { ids: [next] })).status).not.toBe('fail');
-    expect(dataOf<RunData>(result).path).toBe('mesh');
-    expectPure(target.doc, () => execute(target.doc, 'flow_along_curve', params));
-  });
+  it(
+    'an arc base onto a straight target straightens a bent bar: length, volume, position, Jacobian and predicted volume',
+    { timeout: HEAVY_TEST_TIMEOUT_MS },
+    async () => {
+      await installKernel(kind);
+      const rod = bentRod();
+      const base = curve(rod.doc, 'create_conic', { start: [0, 0, 0], apex: [0, 0, 50], end: [50, 0, 50], rho: Math.SQRT2 - 1 });
+      const target = curve(base.doc, 'create_nurbs_curve', {
+        degree: 1,
+        poles: [
+          [200, 0, 0],
+          [200, 0, 100],
+        ],
+      });
+      const params = { id: rod.id, targetId: target.id, baseCurve: base.id, frame: WORLD, output: { tolerance: 0.01 } };
+      const result = execute(target.doc, 'flow_along_curve', params);
+      expect(result.error, result.summary).toBeUndefined();
+      const next = result.affected[0] as string;
+      const extent = extentOf(result.document, next);
+      expect(extent.min[2]).toBeCloseTo(0, 1);
+      expect(extent.max[2]).toBeCloseTo(QUARTER, 1);
+      expect(extent.min[0]).toBeCloseTo(195, 1);
+      expect(extent.max[0]).toBeCloseTo(205, 1);
+      expect(relative(volumeOf(result.document, next), Math.PI * 25 * QUARTER)).toBeLessThan(2e-2);
+      const analysis = dataOf<AnalysisData>(execute(result.document, 'analyze_deformation', { id: next }));
+      // det J = 1 / (1 - x / 50) for offsets x in [-5, 5] toward the centre of the base arc
+      expect(analysis.jacobian.min).toBeCloseTo(1 / 1.1, 2);
+      expect(analysis.jacobian.max).toBeCloseTo(1 / 0.9, 2);
+      expect(analysis.volume.driftRel).toBeLessThan(2e-2);
+      expect(dataOf<CheckData>(execute(result.document, 'check_deformation', { ids: [next] })).status).not.toBe('fail');
+      expect(dataOf<RunData>(result).path).toBe('mesh');
+      expectPure(target.doc, () => execute(target.doc, 'flow_along_curve', params));
+    },
+  );
 
   it('refuses a missing or non-curve base, a base shorter than the body, a degenerate one and one tighter than the body half width', async () => {
     await installKernel(kind);

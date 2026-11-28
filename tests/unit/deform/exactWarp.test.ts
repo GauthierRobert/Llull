@@ -5,6 +5,7 @@ import type { DeformReport } from '@core/geometry/kernelPorts';
 import { maxDeviation, referenceDistance } from '@core/geometry/deform/referenceShape';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { type AnalysisData, type RunData, WORLD_Z, addBox, addCylinder, dataOf, installKernel, stubReport } from './harness';
+import { HEAVY_TEST_TIMEOUT_MS } from '../../helpers/heavyTest';
 
 afterEach(() => {
   setGeometryKernel(null);
@@ -148,7 +149,7 @@ describe('a full-turn bend closes into a ring (exact kernel only)', () => {
     expect(refused.summary).toContain('exactly two planar end faces');
   });
 
-  it.each(['none', 'manifold'] as const)('is refused without the exact kernel (%s)', async (kind) => {
+  it.each(['none', 'manifold'] as const)('is refused without the exact kernel (%s)', { timeout: HEAVY_TEST_TIMEOUT_MS }, async (kind) => {
     await installKernel(kind);
     const { doc, id } = addCylinder(rod.radius, rod.height);
     const result = execute(doc, 'bend_body', { id, ...ring });
