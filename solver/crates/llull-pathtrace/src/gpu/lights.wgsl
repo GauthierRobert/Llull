@@ -1,4 +1,5 @@
-// GPU path tracer, part 5 of 6: the lights (lights.rs), sampled for next-event estimation and intersected by BSDF rays for MIS.
+// GPU path tracer, part 5 of 6: the lights (lights.rs), sampled for next-event estimation and intersected by BSDF rays for MIS, and
+// the emissive triangles (emitters.rs).
 // Rows (6 vec4) per light, by kind in r0.w (0 sun, 1 sphere = point / spot, 2 rect = area); r5.x = castShadows:
 //   sun    r0 direction · r1 (irradiance, cosMax) · r2 (cone radiance, solidAngle)
 //   sphere r0 centre · r1 (intensity, radius) · r2 (radiance, unitMetres) · r3 (spot axis, cosHalf) · r4 (blend, hasSpot)
@@ -172,4 +173,46 @@ fn light_intersect(i: u32, o: vec3f, d: vec3f, t_max: f32) -> LightHit {
     return out;
   }
   return LightHit(t, r2.xyz, t * t / (r1.w * -denom));
+}
+
+// --- emissive triangles (emitters.rs): one row each (alias threshold, bitcast alias, area pdf, bitcast instance); an instance's
+// row 7 x holds its first emitter (0xffffffff = none), so emitter = first + (triangle - the instance's tri_base).
+
+fn emitter_first(instance: u32) -> u32 {
+  return bitcast<u32>(objects[P.instance_base + 8u * instance + 7u].x);
+}
+
+// Area pdf the emitter sampler gives a point of global triangle `tri` of `instance`, -1 when it is not light-sampled.
+fn emitter_pdf_area(instance: u32, tri: u32) -> f32 {
+  if (P.emitter_count == 0u) {
+    return -1.0;
+  }
+  let first = emitter_first(instance);
+  if (first == 0xffffffffu) {
+    return -1.0;
+  }
+  let inst = load_instance(instance);
+  return objects[P.emitter_base + first + (tri - inst.tri_base)].z;
+}
+
+// A point on an emitter chosen by power: its surface, emitted radiance and area pdf (pdf 0 = none).
+struct EmitterSample { s: Surface, radiance: vec3f, pdf_area: f32 };
+
+fn emitter_sample(bin: u32, u: f32, u1: f32, u2: f32) -> EmitterSample {
+  let row = objects[P.emitter_base + bin];
+  var e = bin;
+  if (!(u < row.x)) {
+    e = bitcast<u32>(row.y);
+  }
+  let chosen = objects[P.emitter_base + e];
+  let instance = bitcast<u32>(chosen.w);
+  let inst = load_instance(instance);
+  let tri = inst.tri_base + (e - emitter_first(instance));
+  let root = sqrt(u1);
+  let s = surface_of(Hit(0.0, instance, tri, root * (1.0 - u2), root * u2, true));
+  var radiance = vec3f(0.0);
+  if (s.material < P.material_count) {
+    radiance = emission_at(s.material, s.uv);
+  }
+  return EmitterSample(s, radiance, chosen.z);
 }

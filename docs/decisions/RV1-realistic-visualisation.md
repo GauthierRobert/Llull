@@ -221,9 +221,17 @@ departs from §5 / §5b in these places:
   skipped with `PATHTRACE_DENOISE_SKIPPED`. The learned model of §5 is an optional later item, needing the owner's explicit go-ahead.
   The only offline source is Intel Open Image Denoise 1.4.3 (Apache-2.0): a prebuilt Linux library in PyPI's `oidn` wheel, which
   would be loaded through unsafe FFI.
+- **Emissive triangles:** every (instance, triangle) whose material has non-zero `emission` is a light.
+  - **Choice:** by power (luminance of factor x emission-texture mean x world area), from an alias table.
+  - **Sampling:** uniform on the triangle's area, converted to solid angle with |cos| (emission is two-sided); shadow-tested like the
+    other lights.
+  - **MIS:** combined with BSDF hits by the power heuristic, through an O(1) instance -> first-emitter lookup.
+  - **Cap:** 1,000,000 emissive triangles (`MAX_EMITTERS`); above it, emission is hit-only with warning `PATHTRACE_EMITTER_LIMIT`.
+  - **Determinism:** unchanged on the CPU; scenes without emitters keep their random streams.
+  - **Measured:** a 0.1 x 0.1 emitter at 16 spp gives RMSE 0.0018 with NEE against 0.6832 hit-only (GPU 0.0020 on lavapipe).
 - **GPU** (crate feature `gpu`, in `llull-compute --features gpu`; `src/gpu/`): `engine: "gpu"` renders on wgpu compute. It uses the
   CPU's own BLAS / TLAS flattened into storage buffers, textures in a storage-buffer atlas (no binding limits), and a line-by-line WGSL
-  port of the BSDF, lights, environments, NEE + MIS and camera; denoise / AgX / EXR stay on the CPU path. Rendering is progressive in
+  port of the BSDF, lights, emissive triangles (rows appended to `objects`), environments, NEE + MIS and camera; denoise / AgX / EXR stay on the CPU path. Rendering is progressive in
   256² tiles, with submissions sized to ~100 ms so no dispatch trips a driver timeout. `maxSeconds` and `targetNoise` behave as on the
   CPU. `device` is the adapter name and `deterministic` is false (32-bit sampler hash, GPU rounding). It falls back to the CPU with
   `fallbackReason` "<cause>; rendered on the CPU" and `PATHTRACE_GPU_FALLBACK` when: there is no adapter or `LLULL_GPU=off`; there are

@@ -270,7 +270,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 ## Realistic visualisation (spec: `docs/decisions/RV1-realistic-visualisation.md`; gap to Blender measured 2026-11-27)
 
-- `[TODO]` **RV-M3-FU** (RV1 §5c) real-GPU timing of the wgpu path (verified on lavapipe only), optional learned denoiser (OIDN 1.4.3 from PyPI's `oidn` wheel, Linux only; needs the owner's explicit go-ahead to bundle a prebuilt binary), light-sampled emissive triangles, denoiser memory under 1 GB at 4096², appearances on building-plugin solids (V6 known issue `appearance-coverage`), the ~5 % reciprocal-vs-Cycles diffuse difference (V3 textured-lights); owner decision on the backend blocking during a long render (worker execute). _Lane 1 + native_
+- `[TODO]` **RV-M3-FU** (RV1 §5c) real-GPU timing of the wgpu path (verified on lavapipe only), optional learned denoiser (OIDN 1.4.3 from PyPI's `oidn` wheel, Linux only; needs the owner's explicit go-ahead to bundle a prebuilt binary), denoiser memory under 1 GB at 4096², appearances on building-plugin solids (V6 known issue `appearance-coverage`), the ~5 % reciprocal-vs-Cycles diffuse difference (V3 textured-lights); owner decision on the backend blocking during a long render (worker execute). _Lane 1 + native_
 - `[TODO]` **RV-M4-FU** (RV1 §5c) select instance-array members (`set_selection` entity ids only; core), nested instances in array components, per-member hover / selection tint; real-GPU checklist of §5c under VIS-HUMAN. _Lane 2 + Lane 1_
 - `[TODO]` **RV-M5** `link_document` external references with overrides, tiled mesh streaming (Lane 1 + Lane 4).
 - `[TODO]` **RV-M6** `export_usd` / `import_usd`; glTF import with textures, hierarchy, Draco / meshopt (Lane 4). Deps: RV-M1.

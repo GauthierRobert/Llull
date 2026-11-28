@@ -130,7 +130,7 @@ impl Pipeline {
     }
 }
 
-const PARAM_WORDS: usize = 28 + 24;
+const PARAM_WORDS: usize = 32 + 24;
 
 #[derive(Clone, Copy)]
 struct TileRect {
@@ -174,6 +174,10 @@ fn params_bytes(job: &Job, layout: &pack::Layout, tile: TileRect, samples: u32) 
         TILE / BLOCK,
         MASK_BASE as u32,
         layout.albedo_table,
+        layout.emitter_base,
+        world.emitters.rows.len() as u32,
+        0,
+        0,
     ];
     let v = |a: crate::math::Vec3, w: f32| [a.x, a.y, a.z, w];
     let floats = [

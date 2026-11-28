@@ -5,7 +5,10 @@
 
 mod common;
 
-use common::{icosphere, lambert, material, mean, perspective, quad, rgb, SceneBuilder, IDENTITY};
+use common::{
+    emissive_square_over_plane, icosphere, lambert, material, mean, perspective, quad, rgb, small_emitter_over_plane, square_irradiance,
+    SceneBuilder, IDENTITY,
+};
 use image::{ImageFormat, Rgb, Rgba, RgbaImage};
 use llull_pathtrace::engine::GpuAccess;
 use llull_pathtrace::render::Image;
@@ -48,6 +51,41 @@ fn gpu_white_furnace_lambert_sphere_returns_the_environment_everywhere() {
         let p = rgb(&image, i);
         assert!(p.iter().all(|c| (c - 1.0).abs() <= 0.01), "pixel {i}: {p:?}");
     }
+}
+
+#[test]
+fn gpu_emissive_square_matches_the_rectangle_form_factor() {
+    let Some(adapter) = adapter("gpu emissive square") else { return };
+    for (texture, scale) in [(None, 1.0), (Some(128u8), 128.0 / 255.0)] {
+        let mut b = emissive_square_over_plane(0.5, 2.0, texture);
+        let image = on_gpu(&mut b, "gpu-emissive-square", &adapter).image;
+        let expected = 0.5 * square_irradiance(2.0 * scale, 2.0, 1.0) / std::f64::consts::PI;
+        let m = mean(&image);
+        assert!((m[0] - expected).abs() <= 0.01 * expected, "texture {texture:?}: mean {m:?} expected {expected}");
+    }
+}
+
+#[test]
+fn gpu_light_samples_a_small_emitter_like_the_cpu() {
+    // A 0.1 x 0.1 emitter over a floor, the camera below it: at 16 spp the GPU's NEE noise is the CPU's, far below hit-only.
+    let Some(adapter) = adapter("gpu small emitter") else { return };
+    let half_a = channels(&render_job(&small_emitter_over_plane(1024, 11).load("gpu-small-a")).image);
+    let half_b = channels(&render_job(&small_emitter_over_plane(1024, 22).load("gpu-small-b")).image);
+    let reference: Vec<[f64; 3]> = half_a.iter().zip(&half_b).map(|(a, b)| [0, 1, 2].map(|k| 0.5 * (a[k] + b[k]))).collect();
+    let reference_variance = mean_square(&half_a, &half_b) / 4.0;
+    let rmse = |image: &Image| (mean_square(&channels(image), &reference) - reference_variance).max(0.0).sqrt();
+    let cpu = render_job(&small_emitter_over_plane(16, 3).load("gpu-small-cpu")).image;
+    let gpu = on_gpu(&mut small_emitter_over_plane(16, 3), "gpu-small-gpu", &adapter).image;
+    let mut hit_only = small_emitter_over_plane(16, 3).load("gpu-small-hit");
+    hit_only.world.emitters = llull_pathtrace::emitters::Emitters::default();
+    let hit_only = render_job(&hit_only).image;
+    let (cpu_rmse, gpu_rmse, hit_rmse) = (rmse(&cpu), rmse(&gpu), rmse(&hit_only));
+    eprintln!(
+        "{adapter}: 16 spp rmse cpu {cpu_rmse:.4} gpu {gpu_rmse:.4} hit-only {hit_rmse:.4}; means cpu {:?} gpu {:?}",
+        mean(&cpu),
+        mean(&gpu)
+    );
+    assert!(gpu_rmse <= 1.3 * cpu_rmse && gpu_rmse < 0.1 * hit_rmse, "rmse gpu {gpu_rmse} cpu {cpu_rmse} hit-only {hit_rmse}");
 }
 
 fn png_bytes(image: &RgbaImage) -> Vec<u8> {

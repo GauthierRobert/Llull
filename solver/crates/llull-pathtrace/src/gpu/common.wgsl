@@ -18,6 +18,8 @@ struct Params {
   texture_base: u32, material_count: u32, env_kind: u32, env_texture: u32,
   env_marginal: u32, env_conditional: u32, env_rows: u32, srgb_table: u32,
   projection: u32, tile_blocks_x: u32, mask_base: u32, albedo_table: u32,
+  // Emissive triangles (lights.wgsl): first row in `objects` and count (0 = none light-sampled); then two pad words.
+  emitter_base: u32, emitter_count: u32, pad0: u32, pad1: u32,
   // xyz uniform radiance (env_kind 0); w map intensity (env_kind 1).
   env_color: vec4f,
   // cos, sin of the map rotation.
@@ -36,7 +38,7 @@ struct Params {
 @group(0) @binding(2) var<storage, read> words: array<u32>;
 // Vertices, two vec4 each: (position, u), (normal, v).
 @group(0) @binding(3) var<storage, read> verts: array<vec4f>;
-// Instances (8 vec4), materials (5 vec4), lights (6 vec4), texture descriptors (1 vec4) at the Params bases.
+// Instances (8 vec4), materials (5 vec4), lights (6 vec4), texture descriptors (1 vec4), emitters (1 vec4) at the Params bases.
 @group(0) @binding(4) var<storage, read> objects: array<vec4f>;
 // LDR texels, RGBA8 packed little-endian.
 @group(0) @binding(5) var<storage, read> ldr: array<u32>;
@@ -130,4 +132,22 @@ fn rand() -> f32 {
   let value = hash(rng_a ^ hash(rng_b + rng_dim * 0x9e3779b9u));
   rng_dim = rng_dim + 1u;
   return f32(value >> 8u) * (1.0 / 16777216.0);
+}
+
+// (a * b) >> 32 without 64-bit integers.
+fn mul_hi(a: u32, b: u32) -> u32 {
+  let a_lo = a & 0xffffu;
+  let a_hi = a >> 16u;
+  let b_lo = b & 0xffffu;
+  let b_hi = b >> 16u;
+  let hi_lo = a_hi * b_lo;
+  let cross = ((a_lo * b_lo) >> 16u) + (hi_lo & 0xffffu) + a_lo * b_hi;
+  return a_hi * b_hi + (hi_lo >> 16u) + (cross >> 16u);
+}
+
+// Next index in 0..n from 32 random bits (rng.rs `Sampler::index`).
+fn rand_index(n: u32) -> u32 {
+  let value = hash(rng_a ^ hash(rng_b + rng_dim * 0x9e3779b9u));
+  rng_dim = rng_dim + 1u;
+  return mul_hi(value, n);
 }

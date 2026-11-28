@@ -28,6 +28,13 @@ impl Sampler {
         (value >> 40) as f32 * (1.0 / 16_777_216.0)
     }
 
+    /// Next index in 0..n from 32 random bits (multiply-high, bias below n / 2³²; the WGSL `rand_index`).
+    pub fn index(&mut self, n: u32) -> u32 {
+        let value = mix64(self.key ^ self.dimension.wrapping_mul(0x9e37_79b9_7f4a_7c15)) >> 32;
+        self.dimension += 1;
+        ((value * u64::from(n)) >> 32) as u32
+    }
+
     pub fn uniform2(&mut self) -> (f32, f32) {
         let a = self.uniform();
         (a, self.uniform())

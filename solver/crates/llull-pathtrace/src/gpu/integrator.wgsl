@@ -1,5 +1,5 @@
 // GPU path tracer, part 6 of 6: the camera (camera.rs), the path integrator (integrator.rs: NEE to every light and the map, MIS with
-// the power heuristic, Russian roulette after three bounces) and the kernel: one invocation per pixel of the tile, `P.samples`
+// the power heuristic, emissive triangles light-sampled, Russian roulette after three bounces) and the kernel: one invocation per pixel of the tile, `P.samples`
 // samples added to the pixel's accumulator (blocks whose activity word is 0 have met targetNoise and are skipped).
 
 fn power_heuristic(a: f32, b: f32) -> f32 {
@@ -53,6 +53,51 @@ fn shadowed(p: vec3f, ng: vec3f, wi: vec3f, distance: f32) -> bool {
   return trace(origin, wi, t_max, true).found;
 }
 
+// One emissive-triangle sample, MIS-weighted against the BSDF (integrator.rs `emitter_direct`; draws nothing without emitters).
+fn emitter_direct(b: Placed, p: vec3f, wo: vec3f) -> vec3f {
+  if (P.emitter_count == 0u) {
+    return vec3f(0.0);
+  }
+  let bin = rand_index(P.emitter_count);
+  let u = rand();
+  let u1 = rand();
+  let u2 = rand();
+  let es = emitter_sample(bin, u, u1, u2);
+  let to = es.s.p - p;
+  let d2 = dot(to, to);
+  let distance = sqrt(d2);
+  if (!(distance > 0.0) || !finite(distance)) {
+    return vec3f(0.0);
+  }
+  let wi = to / distance;
+  let cos_light = abs(dot(wi, es.s.ng));
+  if (cos_light <= 0.0 || is_black(es.radiance)) {
+    return vec3f(0.0);
+  }
+  let pdf = es.pdf_area * d2 / cos_light;
+  if (!(pdf > 0.0) || !finite(pdf)) {
+    return vec3f(0.0);
+  }
+  let e = placed_eval(b, wo, wi);
+  if (is_black(e.xyz) || shadowed(p, b.ng, wi, distance)) {
+    return vec3f(0.0);
+  }
+  return e.xyz * es.radiance * (placed_cos(b, wi) * power_heuristic(pdf, e.w) / pdf);
+}
+
+// Emission met by a ray, MIS-weighted against the emitter sampler after a BSDF sample (integrator.rs `hit_emission`).
+fn hit_emission(hit: Hit, ng: vec3f, d: vec3f, emission: vec3f, has_pdf: bool, bsdf_pdf: f32) -> vec3f {
+  if (!has_pdf || is_black(emission)) {
+    return emission;
+  }
+  let pdf_area = emitter_pdf_area(hit.instance, hit.tri);
+  if (pdf_area < 0.0) {
+    return emission;
+  }
+  let light_pdf = pdf_area * hit.t * hit.t / abs(dot(d, ng));
+  return emission * power_heuristic(bsdf_pdf, light_pdf);
+}
+
 fn direct(b: Placed, p: vec3f, wo: vec3f) -> vec3f {
   var l = vec3f(0.0);
   for (var i = 0u; i < P.light_count; i = i + 1u) {
@@ -85,7 +130,7 @@ fn direct(b: Placed, p: vec3f, wo: vec3f) -> vec3f {
       l = l + e.xyz * s.radiance * (placed_cos(b, s.wi) * power_heuristic(s.pdf, e.w) / s.pdf);
     }
   }
-  return l;
+  return l + emitter_direct(b, p, wo);
 }
 
 struct Path { l: vec3f, albedo: vec3f, normal: vec3f, depth: f32 };
@@ -126,7 +171,7 @@ fn radiance(o_in: vec3f, d_in: vec3f) -> Path {
       out.normal = ns;
       out.depth = hit.t;
     }
-    out.l = out.l + beta * r.emission;
+    out.l = out.l + beta * hit_emission(hit, s.ng, d, r.emission, has_pdf, bsdf_pdf);
     if (depth >= P.max_bounces) {
       break;
     }

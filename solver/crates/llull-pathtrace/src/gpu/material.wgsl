@@ -92,6 +92,13 @@ fn perturb(s: Surface, texel: vec3f, scale: f32) -> vec3f {
   return n;
 }
 
+// Emitted radiance of material m at uv (material.rs `emission_at`).
+fn emission_at(m: u32, uv: vec2f) -> vec3f {
+  let r1 = objects[P.material_base + 5u * m + 1u];
+  let et = lookup(r1.w, uv);
+  return select(r1.xyz, et.xyz * r1.xyz, et.w > 0.0);
+}
+
 // Material rows (5 vec4): (baseColor, tex) (emission, tex) (metalness, tex, roughness, tex) (transmission, tex, coat, tex)
 // (normal tex, normalScale, ior, coatRoughness).
 fn resolve(m: u32, s: Surface) -> Resolved {

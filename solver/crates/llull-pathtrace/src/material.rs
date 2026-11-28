@@ -41,11 +41,16 @@ fn lookup(textures: &[Arc<Texture>], index: Option<u32>, uv: [f32; 2]) -> Option
 }
 
 impl Material {
+    /// Emitted radiance at `uv` (the emission factor times its texture), as `resolve` gives it.
+    pub fn emission_at(&self, textures: &[Arc<Texture>], uv: [f32; 2]) -> Vec3 {
+        lookup(textures, self.emission_texture, uv).map_or(self.emission, |v| v.times(self.emission))
+    }
+
     pub fn resolve(&self, textures: &[Arc<Texture>], s: &SurfacePoint) -> Resolved {
         let uv = s.uv;
         let scalar = |factor: f32, index: Option<u32>| (factor * lookup(textures, index, uv).map_or(1.0, |v| v.x)).clamp(0.0, 1.0);
         let base_color = lookup(textures, self.base_color_texture, uv).map_or(self.base_color, |v| v.times(self.base_color));
-        let emission = lookup(textures, self.emission_texture, uv).map_or(self.emission, |v| v.times(self.emission));
+        let emission = self.emission_at(textures, uv);
         let mut ns = s.ns;
         if let Some(n) = lookup(textures, self.normal_texture, uv) {
             ns = perturb(s, n, self.normal_scale);

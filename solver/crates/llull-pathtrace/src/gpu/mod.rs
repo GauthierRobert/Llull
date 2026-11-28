@@ -5,7 +5,8 @@
 //!   and inverse, never expanded), the materials, lights, textures and environment CDFs into seven storage buffers (layout in `pack`).
 //! - **Shading:** `common.wgsl` (bindings, random numbers), `scene.wgsl` (traversal, surface point), `bsdf.wgsl` (GGX metal-roughness,
 //!   coat, rough transmission), `material.wgsl` (textures, normal maps, environment map + importance sampling), `lights.wgsl` (sun cone,
-//!   point / spot spheres, area rects), `integrator.wgsl` (camera with thin lens and tent filter, NEE + MIS, Russian roulette, kernel).
+//!   point / spot spheres, area rects, emissive triangles from the CPU's alias table), `integrator.wgsl` (camera with thin lens and tent
+//!   filter, NEE + MIS, Russian roulette, kernel).
 //! - **Textures:** a storage-buffer atlas, not GPU textures: RGBA8 texels (sRGB decoded per texel through the CPU's table) and f32
 //!   RGB texels, sampled bilinear in the shader exactly as `texture.rs`, so there is no texture-count or texture-size binding limit.
 //! - **Progressive:** `run` renders 256² px tiles in submissions of about 100 ms; `maxSeconds` and `targetNoise` as on the CPU.

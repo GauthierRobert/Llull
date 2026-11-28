@@ -2,7 +2,10 @@
 
 mod common;
 
-use common::{cube, icosphere, lambert, material, mean, ortho_down, perspective, quad, rgb, SceneBuilder, IDENTITY};
+use common::{
+    cube, emissive_square_over_plane, icosphere, lambert, material, mean, ortho_down, perspective, quad, rgb, square_irradiance,
+    SceneBuilder, IDENTITY,
+};
 use llull_pathtrace::render_job;
 use serde_json::json;
 use std::f64::consts::PI;
@@ -157,6 +160,18 @@ fn area_light_matches_the_rectangle_form_factor() {
         x / (1.0 + x * x).sqrt() * (y / (1.0 + x * x).sqrt()).atan() + y / (1.0 + y * y).sqrt() * (x / (1.0 + y * y).sqrt()).atan();
     let irradiance = 4.0 * radiance / 2.0 * corner;
     assert_all_near(&image, 0.5 * irradiance / PI, 0.01, "area light");
+}
+
+#[test]
+fn emissive_square_matches_the_rectangle_form_factor() {
+    // The emitter is light-sampled (NEE) and MIS-combined with BSDF hits; two-sided (its normal faces away from the plane), placed by
+    // a scaled instance (world area 4), and with a texture its factor is modulated by the texel (128 / 255 linear).
+    for (texture, scale) in [(None, 1.0), (Some(128u8), 128.0 / 255.0)] {
+        let job = emissive_square_over_plane(0.5, 2.0, texture).load("emissive-square");
+        assert_eq!(job.world.emitters.rows.len(), 2);
+        let image = render_job(&job).image;
+        assert_all_near(&image, 0.5 * square_irradiance(2.0 * scale, 2.0, 1.0) / PI, 0.01, &format!("emissive square {texture:?}"));
+    }
 }
 
 #[test]

@@ -1,16 +1,18 @@
 //! Unidirectional path tracer: next-event estimation to every light and to the environment map at each vertex, BSDF sampling for the
 //! continuation, multiple importance sampling (power heuristic) between the two for every non-delta light and the map. Russian roulette
 //! after three bounces; `maxBounces` counts scattering events (0 = emitters and the environment only, 1 = direct light).
-//! Surface emission is added where a path hits it (emitting triangles are not light-sampled).
+//! Emissive triangles are lights too (`emitters`): one is light-sampled per vertex, and a BSDF ray that hits one is weighted by MIS
+//! against that sample. Over the emitter cap (or with none) surface emission is only added where a path hits it.
 
 use crate::bsdf::{Bsdf, SurfaceBsdf};
 use crate::camera::Camera;
+use crate::emitters::Emitters;
 use crate::env::Environment;
 use crate::lights::{Light, Shape};
 use crate::material::Material;
 use crate::math::{offset_ray, Frame, Vec3};
 use crate::rng::Sampler;
-use crate::scene::Geometry;
+use crate::scene::{Geometry, Hit};
 use crate::texture::Texture;
 use std::sync::Arc;
 
@@ -21,6 +23,7 @@ pub struct World {
     pub materials: Vec<Material>,
     pub textures: Vec<Arc<Texture>>,
     pub lights: Vec<Light>,
+    pub emitters: Emitters,
     pub environment: Environment,
     pub camera: Camera,
 }
@@ -70,7 +73,54 @@ fn light_hit(world: &World, origin: Vec3, direction: Vec3, t_max: f32) -> Option
     best
 }
 
-/// Direct light at a vertex: every light plus one environment-map sample.
+/// One emissive-triangle sample (chosen by power, a point uniform on it), MIS-weighted against the BSDF. Draws its four numbers only
+/// when the scene has emitters, so a scene without any keeps its random streams.
+fn emitter_direct(world: &World, bsdf: &SurfaceBsdf, p: Vec3, wo: Vec3, sampler: &mut Sampler) -> Vec3 {
+    let emitters = &world.emitters;
+    if emitters.rows.is_empty() {
+        return Vec3::ZERO;
+    }
+    let bin = sampler.index(emitters.rows.len() as u32);
+    let u = sampler.uniform();
+    let (u1, u2) = sampler.uniform2();
+    let (e, instance, triangle) = emitters.pick(bin, u);
+    let root = u1.sqrt();
+    let light = world.geometry.surface(&Hit { t: 0.0, instance, triangle, u: root * (1.0 - u2), v: root * u2 });
+    let to = light.p - p;
+    let d2 = to.dot(to);
+    let distance = d2.sqrt();
+    if distance <= 0.0 || !distance.is_finite() {
+        return Vec3::ZERO;
+    }
+    let wi = to / distance;
+    let cos_light = wi.dot(light.ng).abs();
+    let Some(material) = world.materials.get(light.material as usize) else { return Vec3::ZERO };
+    let emission = material.emission_at(&world.textures, light.uv);
+    if cos_light <= 0.0 || emission.is_black() {
+        return Vec3::ZERO;
+    }
+    let pdf = emitters.rows[e].pdf_area * d2 / cos_light;
+    if !(pdf > 0.0 && pdf.is_finite()) {
+        return Vec3::ZERO;
+    }
+    let (f, bsdf_pdf) = bsdf.eval(wo, wi);
+    if f.is_black() || shadowed(world, p, bsdf.ng, wi, distance) {
+        return Vec3::ZERO;
+    }
+    f.times(emission) * (bsdf.cos(wi) * power_heuristic(pdf, bsdf_pdf) / pdf)
+}
+
+/// Emission met by a ray: MIS-weighted against the emitter sampler when a BSDF sample led here and the triangle is light-sampled.
+fn hit_emission(world: &World, hit: &Hit, ng: Vec3, direction: Vec3, emission: Vec3, bsdf_pdf: Option<f32>) -> Vec3 {
+    let (Some(bsdf_pdf), Some(pdf_area)) = (bsdf_pdf, world.emitters.pdf_area(hit.instance, hit.triangle)) else { return emission };
+    if emission.is_black() {
+        return emission;
+    }
+    let light_pdf = pdf_area * hit.t * hit.t / direction.dot(ng).abs();
+    emission * power_heuristic(bsdf_pdf, light_pdf)
+}
+
+/// Direct light at a vertex: every light, one environment-map sample and one emissive-triangle sample.
 fn direct(world: &World, bsdf: &SurfaceBsdf, p: Vec3, wo: Vec3, sampler: &mut Sampler) -> Vec3 {
     let mut l = Vec3::ZERO;
     for light in &world.lights {
@@ -100,7 +150,7 @@ fn direct(world: &World, bsdf: &SurfaceBsdf, p: Vec3, wo: Vec3, sampler: &mut Sa
             l += f.times(radiance) * (bsdf.cos(wi) * power_heuristic(pdf, bsdf_pdf) / pdf);
         }
     }
-    l
+    l + emitter_direct(world, bsdf, p, wo, sampler)
 }
 
 fn shadowed(world: &World, p: Vec3, ng: Vec3, wi: Vec3, distance: f32) -> bool {
@@ -139,7 +189,7 @@ pub fn radiance(world: &World, mut origin: Vec3, mut direction: Vec3, sampler: &
         if depth == 0 {
             first = FirstHit { albedo: resolved.params.base_color, normal: ns, depth: hit.t };
         }
-        l += beta.times(resolved.emission);
+        l += beta.times(hit_emission(world, &hit, surface.ng, direction, resolved.emission, bsdf_pdf));
         if depth >= max_bounces {
             break;
         }

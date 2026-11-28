@@ -5,10 +5,12 @@
 //! - `nodes` (32 B per node): every BLAS, mesh after mesh, then the TLAS; child / leaf indices stay local to their tree.
 //! - `words` (4 B): 3 global vertex indices per triangle (BLAS leaf order, mesh after mesh), then the TLAS instance order.
 //! - `verts` (32 B per vertex): position + u, normal + v.
-//! - `objects` (16 B rows): instances (8 rows: to-world, to-local, BLAS bases), materials (5), lights (6), texture descriptors (1).
+//! - `objects` (16 B rows): instances (8 rows: to-world, to-local, BLAS bases, first emitter), materials (5), lights (6), texture
+//!   descriptors (1), emissive triangles (1: alias threshold, alias, area pdf, instance; `emitters`).
 //! - `ldr` (4 B per texel, RGBA8) and `hdr` (12 B per texel, then the environment CDFs and the sRGB decode table).
 
 use crate::bvh::Bvh;
+use crate::emitters::NONE;
 use crate::env::Environment;
 use crate::integrator::World;
 use crate::lights::Shape;
@@ -38,6 +40,8 @@ pub struct Layout {
     pub srgb_table: u32,
     /// GGX albedo tables (`albedo::flattened`).
     pub albedo_table: u32,
+    /// First emitter row in `objects`.
+    pub emitter_base: u32,
     pub env_color: [f32; 4],
     pub env_rot: [f32; 4],
 }
@@ -106,7 +110,8 @@ fn sizes(world: &World, env_extra: Option<&Arc<Texture>>) -> [(&'static str, u64
         + MATERIAL_ROWS * world.materials.len()
         + LIGHT_ROWS * world.lights.len()
         + world.textures.len()
-        + 1;
+        + 1
+        + world.emitters.rows.len();
     [
         ("BVH nodes", nodes * 32),
         ("triangle indices", (3 * triangles + g.instances.len() as u64) * 4),
@@ -179,13 +184,20 @@ fn push_geometry(world: &World, out: &mut Packed) {
     out.layout.tlas_order = out.words.len() as u32;
     out.words.extend(&g.tlas.order);
     out.layout.instance_base = out.objects.len() as u32;
-    for instance in &g.instances {
+    for (index, instance) in g.instances.iter().enumerate() {
         out.objects.extend(instance.to_world.m);
         out.objects.extend(instance.to_local.m);
         let (node_base, tri_base, empty) = bases[instance.mesh as usize];
         out.objects.push([bits(node_base), bits(tri_base), bits(instance.material), bits(u32::from(empty))]);
-        out.objects.push([0.0; 4]);
+        out.objects.push([bits(world.emitters.first.get(index).copied().unwrap_or(NONE)), 0.0, 0.0, 0.0]);
     }
+}
+
+/// The emitter rows (each instance's first emitter is its row 7, `emitters::NONE` when it does not emit).
+fn push_emitters(world: &World, out: &mut Packed) {
+    let emitters = &world.emitters;
+    out.layout.emitter_base = out.objects.len() as u32;
+    out.objects.extend(emitters.rows.iter().map(|row| [row.threshold, bits(row.alias), row.pdf_area, bits(row.instance)]));
 }
 
 fn push_materials(world: &World, out: &mut Packed) {
@@ -286,6 +298,7 @@ pub fn pack(world: &World) -> Packed {
     push_materials(world, &mut out);
     push_lights(world, &mut out);
     push_textures(world, &mut out);
+    push_emitters(world, &mut out);
     out
 }
 
@@ -323,6 +336,7 @@ mod tests {
             materials: Vec::new(),
             textures: Vec::new(),
             lights: Vec::new(),
+            emitters: crate::emitters::Emitters::default(),
             environment: Environment::Uniform(Vec3::ONE),
             camera,
         }

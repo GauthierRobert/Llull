@@ -4,6 +4,7 @@
 //! `PATHTRACE_TEXTURE_MISSING`, `PATHTRACE_TEXTURE_INVALID`.
 
 use crate::camera::Camera;
+use crate::emitters::{Emitters, MAX_EMITTERS};
 use crate::env::{EnvMap, Environment};
 use crate::integrator::World;
 use crate::job::{self, invalid, CameraJson, Engine, EnvironmentJson, JobFile, Projection};
@@ -358,5 +359,6 @@ pub fn load(folder: &Path) -> Result<Job, PathTraceError> {
     let lights = lights(&job.lights, unit_metres)?;
     let environment = environment(&job.environment, &textures)?;
     let geometry = geometry(folder, &job)?;
-    Ok(Job { settings, world: World { geometry, materials, textures, lights, environment, camera } })
+    let emitters = Emitters::build(&geometry, &materials, &textures, MAX_EMITTERS);
+    Ok(Job { settings, world: World { geometry, materials, textures, lights, emitters, environment, camera } })
 }

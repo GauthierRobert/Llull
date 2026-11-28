@@ -1,7 +1,7 @@
 //! `llull-compute pathtrace <job-folder>`: the realistic renderer of `render_realistic` (RV1 RV-M3; wire contract RV1 §5b).
 //!
 //! A unidirectional path tracer on the CPU: two-level BVH (one binned-SAH BLAS per mesh, a TLAS over the instances, never expanded),
-//! next-event estimation to every light and the environment map with MIS (`integrator`), a GGX metal-roughness BSDF with clear coat and
+//! next-event estimation to every light, the emissive triangles (`emitters`) and the environment map with MIS (`integrator`), a GGX metal-roughness BSDF with clear coat and
 //! rough transmission (`bsdf`), Preetham sky / HDR / uniform environments (`env`, `sky`), thin-lens camera (`camera`), counter-based
 //! random numbers (`rng`: the image is a pure function of the job and the seed, whatever the thread count), tiled adaptive sampling with
 //! a time budget (`render`), an à-trous denoiser (`denoise`: OpenImageDenoise is not bundled; this edge-avoiding wavelet filter guided
@@ -16,6 +16,7 @@ pub mod bsdf;
 pub mod bvh;
 pub mod camera;
 pub mod denoise;
+pub mod emitters;
 pub mod engine;
 pub mod env;
 pub mod files;
@@ -104,6 +105,15 @@ pub fn render_job_with(job: &load::Job, access: &engine::GpuAccess) -> Rendered 
             message: format!(
                 "{} x {} px is over the denoiser's {DENOISE_MAX_PIXELS} px memory limit; the beauty is not denoised",
                 settings.width, settings.height
+            ),
+        });
+    }
+    if let Some(count) = job.world.emitters.over_cap {
+        warnings.push(Warning {
+            code: "PATHTRACE_EMITTER_LIMIT",
+            message: format!(
+                "{count} emissive triangles are over the {} light-sampled limit: their emission is only seen where paths hit it (noisier)",
+                emitters::MAX_EMITTERS
             ),
         });
     }

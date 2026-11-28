@@ -270,3 +270,52 @@ pub fn mean(image: &Image) -> [f64; 3] {
     }
     sum.map(|s| s / image.beauty.len() as f64)
 }
+
+/// Irradiance below the centre of a square emitter of radiance `radiance`, side `side`, at `height` (rectangle form factor).
+pub fn square_irradiance(radiance: f64, side: f64, height: f64) -> f64 {
+    let (x, y) = (side / 2.0 / height, side / 2.0 / height);
+    let corner =
+        x / (1.0 + x * x).sqrt() * (y / (1.0 + x * x).sqrt()).atan() + y / (1.0 + y * y).sqrt() * (x / (1.0 + y * y).sqrt()).atan();
+    4.0 * radiance / 2.0 * corner
+}
+
+/// A black emissive square (radiance `radiance`, world side 2 at height 1, from a unit quad scaled by its instance) over a Lambert
+/// plane of albedo `rho`, black environment; the orthographic camera sits between them, so it sees the plane's centre only.
+/// `texture`: the emission factor is modulated by a 1 x 1 linear texture of this 8-bit value.
+pub fn emissive_square_over_plane(rho: f64, radiance: f64, texture: Option<u8>) -> SceneBuilder {
+    let mut b = SceneBuilder::new(8, 8, 256);
+    b.camera = ortho_down(0.002, 0.5);
+    b.environment = json!({ "type": "color", "color": [0.0, 0.0, 0.0], "intensity": 0.0 });
+    let emission_texture = texture.map(|value| {
+        let mut bytes = Vec::new();
+        image::RgbaImage::from_pixel(1, 1, image::Rgba([value, value, value, 255]))
+            .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+            .unwrap();
+        b.add_texture("png", "png", "linear", bytes)
+    });
+    let floor = b.add_material(lambert(rho));
+    let emitter = b.add_material(material(
+        json!({ "baseColor": [0.0, 0.0, 0.0], "ior": 1.0, "emission": [radiance, radiance, radiance], "emissionTexture": emission_texture }),
+    ));
+    let plane = b.add_mesh(&quad(100.0, 0.0));
+    let square = b.add_mesh(&quad(1.0, 0.0));
+    b.add_instance(plane, floor, IDENTITY);
+    b.add_instance(square, emitter, [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 1.0]);
+    b
+}
+
+/// A Lambert floor lit only by a 0.1 x 0.1 emitter (radiance 200) 1 unit above it, seen from below the emitter (an orthographic
+/// camera at z = 0.5 framing 4 x 4 units of floor), so every pixel measures the lighting and none the emitter's own coverage.
+pub fn small_emitter_over_plane(samples: u32, seed: u32) -> SceneBuilder {
+    let mut b = SceneBuilder::new(32, 32, samples);
+    b.camera = ortho_down(4.0, 0.5);
+    b.environment = json!({ "type": "color", "color": [0.0, 0.0, 0.0], "intensity": 0.0 });
+    b.set("seed", json!(seed)).set("maxBounces", json!(4));
+    let floor = b.add_material(lambert(0.6));
+    let lamp = b.add_material(material(json!({ "baseColor": [0.0, 0.0, 0.0], "ior": 1.0, "emission": [200.0, 180.0, 150.0] })));
+    let plane = b.add_mesh(&quad(10.0, 0.0));
+    let square = b.add_mesh(&quad(0.1, 1.0));
+    b.add_instance(plane, floor, IDENTITY);
+    b.add_instance(square, lamp, IDENTITY);
+    b
+}
