@@ -141,7 +141,8 @@ network (AF-41).
   transmission; environment importance sampling.
 - Output in scene-linear: OpenEXR and tone-mapped PNG (AgX-like view transform, documented curve).
 - The result records sample count, seed, device and `deterministic: true | false` (PERF1 rule 4: no silent trade).
-- Denoiser: a bundled open model run locally; off by default for reference renders.
+- Denoiser: a bundled open model run locally; off by default for reference renders. (As built: the à-trous filter; a learned model
+  is optional later work, §5c.)
 
 ### 5b. RV-M3 wire contract (2026-11-28, fixed before the build)
 
@@ -215,9 +216,11 @@ departs from §5 / §5b in these places:
   - **Surfaces:** emission and the opaque lobes are two-sided.
   - **Unknown job fields:** ignored.
   - **`deterministic`:** means bit-identical on the same binary and platform.
-- **Denoiser:** an edge-aware à-trous filter guided by albedo / normal / depth and the per-pixel variance. The bundled learned model
-  of §5 is not shipped: it cannot be bundled offline in this build, and it stays open. Above 4096² pixels the denoiser is skipped
-  with `PATHTRACE_DENOISE_SKIPPED`.
+- **Denoiser (decision 2026-11-28, amends §5):** the shipped denoiser is the edge-aware à-trous filter, guided by albedo / normal /
+  depth and the per-pixel variance. It is deterministic, has no third-party binary, and is off by default; above 4096² pixels it is
+  skipped with `PATHTRACE_DENOISE_SKIPPED`. The learned model of §5 is an optional later item, needing the owner's explicit go-ahead.
+  The only offline source is Intel Open Image Denoise 1.4.3 (Apache-2.0): a prebuilt Linux library in PyPI's `oidn` wheel, which
+  would be loaded through unsafe FFI.
 - **GPU** (crate feature `gpu`, in `llull-compute --features gpu`; `src/gpu/`): `engine: "gpu"` renders on wgpu compute. It uses the
   CPU's own BLAS / TLAS flattened into storage buffers, textures in a storage-buffer atlas (no binding limits), and a line-by-line WGSL
   port of the BSDF, lights, environments, NEE + MIS and camera; denoise / AgX / EXR stay on the CPU path. Rendering is progressive in
@@ -260,7 +263,8 @@ Validation as built:
 - **V6** (`tests/production`, scenario `plant-rendered-views`): six rendered views plus a 12-frame turntable (frames at 30° steps;
   `render_realistic` has no animation), graded on the files: 5 of 6 criteria. Known issue: `appearance-coverage` — building-plugin
   solids refuse `apply_appearance` / `assign_material` (derivation guard), so the appearance library does not reach the plant elements.
-- **V7** (human, real GPU) is not done: it needs a person on real hardware (checklist below).
+- **V7** (human, real GPU): deferred to the VIS-HUMAN queue (decision 2026-11-28), like the earlier viewport milestones. RV-M3 and
+  RV-M4 are done pending that sign-off; the checklist is below.
 
 Measured (4-core container, release):
 
