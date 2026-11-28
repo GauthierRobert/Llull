@@ -1383,6 +1383,15 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
     { command: 'assign_material', params: { materialName: 'steel_s355', entityIds: ['$beam'] } },
     { command: 'apply_appearance', params: { appearance: 'glass', entityIds: ['$window'] } },
     { command: 'set_environment', params: { source: 'color', color: '#d8e6f2', intensity: 0.8 } },
+    {
+      command: 'import_texture',
+      params: {
+        name: 'paint_albedo',
+        base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      },
+      as: 'tex',
+    },
+    { command: 'set_material_appearance', params: { material: 'paint', baseColor: { texture: '$tex' } } },
     { command: 'list_appearances', params: {} },
   ],
   kernel_boolean_union: [

@@ -2,7 +2,7 @@
 // native mesh engines exist only in the backend, so there the preview cannot run, which says nothing about the parameters; Run applies the command there.
 
 /** Codes of a refusal that is about where the preview runs, not about the parameters. */
-const HOST_ONLY = /MESH_ASSET_UNAVAILABLE|MESH_ENGINE_UNSUPPORTED|MESH_ENGINE_CAP_EXCEEDED/;
+const HOST_ONLY = /MESH_ASSET_UNAVAILABLE|MESH_ENGINE_UNSUPPORTED|MESH_ENGINE_CAP_EXCEEDED|TEXTURE_ASSET_UNAVAILABLE/;
 
 export interface PreviewNote {
   readonly label: 'Preview' | 'No preview here' | 'Preview unavailable';

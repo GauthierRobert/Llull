@@ -43,6 +43,15 @@ export const IMAGE_READERS: readonly HostileReader[] = [
     accepts: isHeader,
   },
   {
+    name: 'image: readImageHeader (hdr, newline run)',
+    covers: ['core/src/lib/imageHeader.ts:readImageHeader'],
+    input: 'bytes',
+    build: (records) => new TextEncoder().encode('#?RADIANCE' + '\n'.repeat(records)),
+    extra: [{ name: 'hdr: a header made of only newlines', input: () => new TextEncoder().encode('#?RADIANCE' + '\n'.repeat(65_526)) }],
+    read: (input) => readImageHeader(asBytes(input)),
+    accepts: (result) => result === null,
+  },
+  {
     name: 'image: import_texture (execute, png as base64)',
     covers: ['import_texture'],
     input: 'bytes',

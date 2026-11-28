@@ -252,6 +252,33 @@ describe('edit_light / edit_camera', () => {
   });
 });
 
+describe('light and camera commands are pure', () => {
+  const doc = execute(
+    execute(createEmptyDocument(), 'add_light', { lightType: 'spot', position: [0, 0, 5], target: [0, 0, 0] }).document,
+    'add_camera',
+    { position: [0, -10, 2], target: [0, 0, 0], fStop: 4 },
+  ).document;
+  const lightId = doc.order[0]!;
+  const cameraId = doc.order[1]!;
+
+  it('add_light and add_camera leave the input document untouched', () => {
+    expectPure(doc, () => execute(doc, 'add_light', { lightType: 'point', position: [1, 2, 3] }));
+    expectPure(doc, () => execute(doc, 'add_camera', { position: [1, 2, 3], target: [0, 0, 0] }));
+  });
+
+  it('edit_light and edit_camera leave the input untouched, also when re-aiming through target', () => {
+    expectPure(doc, () => execute(doc, 'edit_light', { id: lightId, target: [5, 0, 5], intensity: 2 }));
+    expectPure(doc, () => execute(doc, 'edit_camera', { id: cameraId, target: [3, 3, 0], position: [9, 0, 1] }));
+  });
+
+  it('edit_camera re-derives focusDistance from a new target, and keeps a given one', () => {
+    const aimed = execute(doc, 'edit_camera', { id: cameraId, position: [0, 0, 0], target: [0, 0, 7] });
+    expect((aimed.document.entities[cameraId] as { focusDistance: number }).focusDistance).toBeCloseTo(7);
+    const given = execute(doc, 'edit_camera', { id: cameraId, target: [0, 0, 7], focusDistance: 3 });
+    expect((given.document.entities[cameraId] as { focusDistance: number }).focusDistance).toBe(3);
+  });
+});
+
 describe('scene objects in the rest of the command layer', () => {
   const scene = (): { doc: CadDocument; lightId: string; cameraId: string } => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });

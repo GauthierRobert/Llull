@@ -2,7 +2,7 @@ import type { CameraEntity } from '../../model/types';
 import { cameraVerticalFov } from '../../model/sceneKinds';
 import type { CommandResult } from '../types';
 import { defineCommand, looseVec3, nameField, z } from '../schema';
-import { isVec3 } from '../../lib/vec3';
+import { distance3, isVec3 } from '../../lib/vec3';
 import { toDegrees } from '../../lib/angle';
 import { changed } from '../noop';
 import { replaceEntity } from '../entity/entityOps';
@@ -18,13 +18,15 @@ import { cameraFieldsProblem } from './validate';
 export const editCamera = defineCommand({
   name: 'edit_camera',
   description:
-    'Edit a camera entity (created by add_camera; NOT the viewport orbit camera, which is set_camera): only the given fields change. Re-aim with `target` (world point, level horizon) or `rotation`; `position` alone keeps the current rotation. ' +
+    'Edit a camera entity (created by add_camera; NOT the viewport orbit camera, which is set_camera): only the given fields change. Re-aim with `target` (world point, level horizon) or `rotation`; `position` alone keeps the current rotation. A new `target` also resets focusDistance to the distance to it (unless focusDistance is given). ' +
     'Optics as in add_camera (focalLength and sensor in mm, focusDistance in document units, fStop f-number; `pinhole: true` removes the aperture). ' +
     'Errors: SCENE_OBJECT_NOT_FOUND (unknown id), SCENE_CAMERA_INVALID (not a camera, nothing to change, or a non-finite / non-positive value).',
   params: z.object({
     id: z.string().describe('Id of the camera to edit.'),
     position: looseVec3('New world position [x, y, z] of the eye.').optional(),
-    target: looseVec3('World point to look at (must differ from the position the camera ends up at). Overrides rotation.').optional(),
+    target: looseVec3(
+      'World point to look at (must differ from the position the camera ends up at). Overrides rotation; focusDistance is re-derived as the distance to it unless given.',
+    ).optional(),
     rotation: looseVec3('New Euler XYZ angles in radians; the camera looks along its local -Z. Ignored when target is given.').optional(),
     focalLength: z.number().describe('New focal length in mm, > 0.').optional(),
     sensorWidth: z.number().describe('New sensor width in mm, > 0.').optional(),
@@ -56,6 +58,8 @@ export const editCamera = defineCommand({
     if (aim.error !== undefined) return refuse(aim.error);
     const { fStop: previousFStop, ...withoutFStop } = found;
     const fStop = params.pinhole === true ? undefined : (params.fStop ?? previousFStop);
+    const focusDistance =
+      params.focusDistance ?? (params.target === undefined || !isVec3(params.target) ? undefined : distance3(params.target, position));
     const merged: CameraEntity = {
       ...withoutFStop,
       position,
@@ -64,7 +68,7 @@ export const editCamera = defineCommand({
       ...(params.focalLength === undefined ? {} : { focalLength: params.focalLength }),
       ...(params.sensorWidth === undefined ? {} : { sensorWidth: params.sensorWidth }),
       ...(params.sensorHeight === undefined ? {} : { sensorHeight: params.sensorHeight }),
-      ...(params.focusDistance === undefined ? {} : { focusDistance: params.focusDistance }),
+      ...(focusDistance === undefined ? {} : { focusDistance }),
       ...(params.name === undefined ? {} : { name: params.name }),
     };
     const problem = cameraFieldsProblem({ ...merged });

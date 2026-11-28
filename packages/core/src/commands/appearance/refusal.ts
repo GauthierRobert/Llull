@@ -13,7 +13,11 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   TEXTURE_BUDGET_EXCEEDED: 'list_appearances shows the memory in use; downscale textures or use fewer of them',
   TEXTURE_NAME_EXISTS: 'pick another texture name (list_appearances shows the existing ones)',
   TEXTURE_NOT_FOUND: 'import_texture first, or read the ids with list_appearances',
-  TEXTURE_COLOR_SPACE: 'an hdr texture is linear radiance: use it for set_environment source hdr, not for a surface channel',
+  TEXTURE_COLOR_SPACE:
+    'hdr textures only light set_environment; baseColor / emission need an srgb texture, normal / roughness / metalness / transmission / coat a linear one (re-import with colorSpace)',
+  TEXTURE_IN_USE:
+    'clear the material channels, clear_entity_appearance on the entities, or set_environment default first; list_appearances shows the users',
+  APPEARANCE_NOT_SET: 'only entities with a visual override can be cleared; list_appearances shows them',
   APPEARANCE_PARAM_INVALID: 'follow the parameter description in `llull describe set_material_appearance`',
   APPEARANCE_MATERIAL_NOT_FOUND: 'create_material first, or read the names with describe_scene',
   APPEARANCE_NOT_FOUND: 'read the library ids with list_appearances',

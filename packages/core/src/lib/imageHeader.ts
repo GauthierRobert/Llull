@@ -49,7 +49,9 @@ function jpegHeader(bytes: Uint8Array): ImageHeader | null {
 function hdrHeader(bytes: Uint8Array): ImageHeader | null {
   const head = new TextDecoder('latin1').decode(bytes.subarray(0, Math.min(bytes.length, HDR_SCAN_BYTES)));
   if (!head.startsWith('#?RADIANCE') && !head.startsWith('#?RGBE')) return null;
-  const match = /\n\s*\n[^\n]*?-Y\s+(\d+)\s+\+X\s+(\d+)/.exec(head);
+  const blank = head.indexOf('\n\n');
+  if (blank < 0) return null;
+  const match = /^-Y +(\d{1,9}) +\+X +(\d{1,9})/.exec(head.slice(blank + 2, blank + 2 + 64));
   return match === null ? null : { format: 'hdr', width: Number(match[2]), height: Number(match[1]) };
 }
 

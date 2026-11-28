@@ -4,7 +4,7 @@ import type { Appearance, ColorChannel, ScalarChannel } from '../../model/appear
 import type { CadDocument, Material } from '../../model/types';
 import { isHexColor } from '../../lib/isHexColor';
 import { z } from '../schema';
-import { appearanceTextureIds, textureOf } from './textureUse';
+import { textureOf } from './textureUse';
 
 export const CLEARABLE_CHANNELS = [
   'baseColor',
@@ -56,6 +56,20 @@ export interface ChannelParams {
   readonly coatRoughness?: number | undefined;
   readonly uvScale?: number | undefined;
   readonly clear?: readonly (typeof CLEARABLE_CHANNELS)[number][] | undefined;
+}
+
+const SRGB_CHANNELS: ReadonlySet<string> = new Set(['baseColor', 'emission']);
+
+const TEXTURE_CHANNELS = ['baseColor', 'metalness', 'roughness', 'normal', 'emission', 'transmission', 'coat'] as const;
+
+/** [channel, texture id] of every channel of `appearance` that references a texture. */
+function textureChannels(appearance: Appearance): Array<[string, string]> {
+  const pairs: Array<[string, string]> = [];
+  for (const channel of TEXTURE_CHANNELS) {
+    const id = appearance[channel]?.texture;
+    if (id !== undefined) pairs.push([channel, id]);
+  }
+  return pairs;
 }
 
 const UNIT_CHANNELS = ['metalness', 'roughness', 'transmission', 'coat'] as const;
@@ -128,11 +142,18 @@ export function mergeChannels(doc: CadDocument, base: Appearance | undefined, in
     if (value !== undefined) next[name] = value;
   }
   const appearance = next as Appearance;
-  for (const id of appearanceTextureIds(appearance)) {
+  for (const [channel, id] of textureChannels(appearance)) {
     const texture = textureOf(doc, id);
-    if (texture === undefined) return bad('TEXTURE_NOT_FOUND', `texture '${id}' is not imported in this document`, 'texture');
+    if (texture === undefined) return bad('TEXTURE_NOT_FOUND', `texture '${id}' is not imported in this document`, `${channel}.texture`);
     if (texture.format === 'hdr')
-      return bad('TEXTURE_COLOR_SPACE', `texture '${id}' is hdr (linear radiance), not a surface map`, 'texture');
+      return bad('TEXTURE_COLOR_SPACE', `texture '${id}' is hdr (linear radiance), not a surface map`, `${channel}.texture`);
+    const needed = SRGB_CHANNELS.has(channel) ? 'srgb' : 'linear';
+    if (texture.colorSpace !== needed)
+      return bad(
+        'TEXTURE_COLOR_SPACE',
+        `${channel} needs a ${needed} texture but '${id}' is ${texture.colorSpace}; import it with colorSpace ${needed}`,
+        `${channel}.texture`,
+      );
   }
   return { appearance };
 }

@@ -29,6 +29,7 @@ export const setMaterialAppearance = defineCommand({
     'Visual only: mass, density and analysis keep using the material record. The material colour, metalness and roughness follow the value parts, so ' +
     'render_view and the viewport stay consistent. A channel you pass replaces that channel; channels you omit are kept; `clear` removes channels ("all" removes the whole appearance). ' +
     'Ranges: metalness, roughness, transmission, coat, coatRoughness 0..1; ior 1..3; emissionStrength >= 0; uvScale > 0 (document units one texture tile spans when the mesh has no UVs; default 100). ' +
+    'Texture colour space must fit the channel: baseColor and emission need an srgb texture; normal, roughness, metalness, transmission and coat a linear one (import_texture colorSpace); hdr textures are never surface maps. ' +
     'Refusals carry error.code APPEARANCE_MATERIAL_NOT_FOUND, APPEARANCE_PARAM_INVALID, TEXTURE_NOT_FOUND, TEXTURE_COLOR_SPACE.',
   params: z.object({
     material: z.string().describe('Material name as given to create_material.'),

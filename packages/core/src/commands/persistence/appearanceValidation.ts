@@ -149,5 +149,10 @@ export function appearanceProblems(doc: Record<string, unknown>): string[] {
     if (isRecord(material)) check(`material '${name}'.appearance`, material['appearance']);
   for (const [id, entity] of Object.entries(isRecord(doc['entities']) ? doc['entities'] : {}))
     if (isRecord(entity)) check(`entity '${id}'.appearance`, entity['appearance']);
+  for (const [componentId, component] of Object.entries(isRecord(doc['components']) ? doc['components'] : {})) {
+    if (!isRecord(component)) continue;
+    for (const [id, entity] of Object.entries(isRecord(component['entities']) ? component['entities'] : {}))
+      if (isRecord(entity)) check(`component '${componentId}' entity '${id}'.appearance`, entity['appearance']);
+  }
   return errors;
 }

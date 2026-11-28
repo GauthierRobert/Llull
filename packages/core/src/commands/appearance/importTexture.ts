@@ -20,13 +20,13 @@ import { refuseAppearance } from './refusal';
 
 const COMMAND = 'import_texture';
 /** Inline (base64) images are recorded in the document step; larger files go through the asset store (`fileKey`). */
-const MAX_INLINE_TEXTURE_BYTES = 8 * 1024 * 1024;
+const MAX_INLINE_TEXTURE_BYTES = 1024 * 1024;
 
 /**
  * @affects CadDocument.appearance.textures (+ textureOrder): adds one TextureRecord; affected = [texture id]
  * @invariant the bytes stay in the image asset store (key = sha256), the document holds the record; width / height come from the file header only
  * @invariant total decoded size of all textures (RGBA8, HDR float32 RGBA) never exceeds TEXTURE_MEMORY_BUDGET_BYTES; each side is at most TEXTURE_MAX_DIMENSION
- * @failure neither / both of fileKey and base64, bad base64, inline over 8 MiB -> TEXTURE_PARAM_INVALID; no asset store or key missing -> TEXTURE_ASSET_UNAVAILABLE;
+ * @failure neither / both of fileKey and base64, bad base64, inline over 1 MiB -> TEXTURE_PARAM_INVALID; no asset store or key missing -> TEXTURE_ASSET_UNAVAILABLE;
  *   not PNG / JPEG / HDR -> TEXTURE_FORMAT_UNSUPPORTED; side > 8192 -> TEXTURE_TOO_LARGE; over the memory budget -> TEXTURE_BUDGET_EXCEEDED; name taken -> TEXTURE_NAME_EXISTS
  */
 export const importTexture = defineCommand({
@@ -34,7 +34,7 @@ export const importTexture = defineCommand({
   description:
     'Register an image file as a named texture of the document: PNG, JPEG (sRGB colour or data maps) or Radiance .hdr (equirectangular environment, linear). ' +
     'Give the file as `fileKey` (sha256, 64 hex, of a file kept in the image asset store of this machine; the CLI stores `file=PATH` there and fills it, ' +
-    'so the document keeps 64 hex characters, not the image) or as `base64` (small files, up to 8 MiB, recorded in the document step). ' +
+    'so the document keeps 64 hex characters, not the image) or as `base64` (small files, up to 1 MiB decoded, recorded in the document step; larger files: `file=PATH` in the CLI or fileKey). ' +
     'The size is read from the file header. Limits: each side at most 8192 px; all textures of a document together at most 1 GiB decoded (RGBA8 = 4 bytes per pixel, ' +
     'HDR = 16). Returns the texture id; use it in set_material_appearance (baseColor / roughness / metalness / normal / emission ... texture) or, for an hdr texture, in ' +
     'set_environment. `colorSpace` defaults to srgb for PNG / JPEG (colour maps: base colour, emission) and linear for hdr; pass linear for roughness, metalness and normal maps. ' +
@@ -54,7 +54,7 @@ export const importTexture = defineCommand({
       .string()
       .optional()
       .describe(
-        'The image file bytes, base64 encoded (PNG, JPEG or .hdr), at most 8 MiB; recorded in the document step. Give exactly one of fileKey or base64.',
+        'The image file bytes, base64 encoded (PNG, JPEG or .hdr), at most 1 MiB decoded (use fileKey / the CLI `file=` beyond); recorded in the document step. Give exactly one of fileKey or base64.',
       ),
     colorSpace: z
       .enum(['srgb', 'linear'])
@@ -93,7 +93,7 @@ export const importTexture = defineCommand({
       if (decoded.length > MAX_INLINE_TEXTURE_BYTES)
         return reject(
           'TEXTURE_PARAM_INVALID',
-          `inline image is ${decoded.length} bytes, over ${MAX_INLINE_TEXTURE_BYTES}: use fileKey`,
+          `inline image is ${decoded.length} bytes, over the ${MAX_INLINE_TEXTURE_BYTES} inline limit (1 MiB): use file=PATH in the CLI or fileKey`,
           'base64',
         );
       bytes = decoded;

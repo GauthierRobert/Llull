@@ -98,3 +98,37 @@ describe('commands that need the host mesh asset store (renderer re-run without 
     expect(applyLiveCommand(createEmptyDocument(), 0, event)).toEqual({ ok: false, reason: 'mismatch' });
   });
 });
+
+describe('commands that need the host image asset store (renderer re-run without it)', () => {
+  it('import_texture fileKey on the host diverges in a client without the store, and so does the command that uses the texture', async () => {
+    const { defaultContext } = await import('@core/commands/context');
+    const { memoryImageAssets, pngBytes } = await import('../../helpers/imageHeaderFixtures');
+    const { sha256Hex } = await import('@lib/sha256');
+    const bytes = pngBytes(8, 8);
+    const key = sha256Hex(bytes);
+    const hostContext = { ...defaultContext(), imageAssets: memoryImageAssets({ [key]: bytes }, sha256Hex) };
+    const importParams = { name: 'albedo', fileKey: key };
+    const base = execute(createEmptyDocument(), 'create_material', { name: 'steel', density: 7850, densityUnit: 'kg/m^3' }).document;
+    const imported = execute(base, 'import_texture', importParams, hostContext);
+    expect(imported.affected).toHaveLength(1);
+    const importEvent: LiveCommandEvent = {
+      epoch: 'e',
+      seq: 1,
+      name: 'import_texture',
+      params: importParams,
+      stateHash: documentHash(imported.document),
+    };
+    expect(applyLiveCommand(base, 0, importEvent)).toEqual({ ok: false, reason: 'mismatch' });
+    const useParams = { material: 'steel', baseColor: { texture: imported.affected[0] } };
+    const used = execute(imported.document, 'set_material_appearance', useParams, hostContext);
+    expect(used.document.materials['steel']?.appearance).toBeDefined();
+    const useEvent: LiveCommandEvent = {
+      epoch: 'e',
+      seq: 2,
+      name: 'set_material_appearance',
+      params: useParams,
+      stateHash: documentHash(used.document),
+    };
+    expect(applyLiveCommand(base, 1, useEvent)).toEqual({ ok: false, reason: 'mismatch' });
+  });
+});

@@ -2,9 +2,19 @@
 
 import { commandCatalog } from '../schema';
 import { applyAppearance } from './applyAppearance';
+import { clearEntityAppearance } from './clearEntityAppearance';
 import { importTexture } from './importTexture';
 import { listAppearances } from './listAppearances';
+import { removeTexture } from './removeTexture';
 import { setEnvironment } from './setEnvironment';
 import { setMaterialAppearance } from './setMaterialAppearance';
 
-export const appearanceCommands = commandCatalog(importTexture, setMaterialAppearance, applyAppearance, listAppearances, setEnvironment);
+export const appearanceCommands = commandCatalog(
+  importTexture,
+  setMaterialAppearance,
+  applyAppearance,
+  listAppearances,
+  setEnvironment,
+  clearEntityAppearance,
+  removeTexture,
+);

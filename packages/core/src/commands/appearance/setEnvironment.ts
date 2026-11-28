@@ -34,7 +34,7 @@ export const setEnvironment = defineCommand({
   run: (doc, params): CommandResult => {
     const reject = (code: string, message: string, path: string): CommandResult => refuseAppearance(doc, COMMAND, code, message, { path });
     const intensity = params.intensity ?? 1;
-    if (!Number.isFinite(intensity) || intensity < 0)
+    if (params.source !== 'default' && (!Number.isFinite(intensity) || intensity < 0))
       return reject('ENVIRONMENT_PARAM_INVALID', `intensity must be finite and >= 0, got ${intensity}`, 'intensity');
     let environment: SceneEnvironment | undefined;
     if (params.source === 'sky') {

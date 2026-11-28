@@ -142,7 +142,7 @@ describe('import_texture', () => {
       doc,
       'TEXTURE_PARAM_INVALID',
     );
-    const inline = new Uint8Array(9 * 1024 * 1024);
+    const inline = new Uint8Array(1024 * 1024 + 1);
     inline.set(pngBytes(4, 4));
     expectNoOp(execute(doc, 'import_texture', { name: 'huge', base64: toBase64(inline) }, ctx), doc, 'TEXTURE_PARAM_INVALID');
   });
@@ -199,8 +199,15 @@ describe('set_material_appearance', () => {
   });
 
   it('merges: a later call replaces only the channels it names, clear removes channels and "all" the appearance', () => {
-    const { doc: withTextures, png } = textureDoc();
-    const doc = { ...withTextures, materials: materialDoc().materials };
+    const { doc: withTextures } = textureDoc();
+    const linear = execute(
+      withTextures,
+      'import_texture',
+      { name: 'nrm', base64: toBase64(pngBytes(8, 8)), colorSpace: 'linear' },
+      withAssets(store()),
+    );
+    const png = linear.affected[0] as string;
+    const doc = { ...linear.document, materials: materialDoc().materials };
     const first = execute(doc, 'set_material_appearance', { material: 'steel', roughness: 0.2, normal: { texture: png, normalScale: 2 } });
     const second = execute(first.document, 'set_material_appearance', { material: 'steel', metalness: 0.7 });
     expect(second.document.materials['steel']!.appearance).toEqual({
