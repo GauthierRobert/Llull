@@ -6,6 +6,7 @@ import { installGeometryKernel } from './geometryKernel';
 import { installPhysicsEngine } from './physicsEngine';
 import { closeRasterPort, installRasterPort } from './native/rasterPort';
 import { installMediaPort } from './native/mediaPort';
+import { installPathTracePort } from './native/pathTracePort';
 import { installFontProvider } from './fontProvider';
 import { installPipingLibraryProvider } from './libraries/pipingLibraryStore';
 import { setMeshAssetPort } from '@core/geometry/mesh/assets';
@@ -75,6 +76,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
   const refusal = checkBindSafety(host);
   if (refusal !== null) throw new Error(refusal);
   installRasterPort();
+  installPathTracePort();
   installMediaPort();
   installFontProvider();
   installPipingLibraryProvider();

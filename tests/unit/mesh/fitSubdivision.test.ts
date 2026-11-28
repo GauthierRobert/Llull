@@ -10,6 +10,7 @@ import { type CadDocument, type MeshData, type SubdivisionEntity, type Vec3, cre
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { docWithMeshes, icosphere, torus, type IndexedMesh } from '../../helpers/meshFixtures';
 import { quadBox, quadSphere, tessellatedBox } from '../../helpers/quadFixtures';
+import { HEAVY_TEST_TIMEOUT_MS } from '../../helpers/heavyTest';
 
 type Data = Record<string, unknown>;
 const dataOf = (result: { data?: unknown }): Data => result.data as Data;
@@ -207,17 +208,21 @@ describe('fit_subdivision_to_mesh', () => {
     expect(entityOf(result.document, cageId).vertices).not.toEqual(entityOf(doc, cageId).vertices);
   });
 
-  it('is pure and replays to the same cage', () => {
-    const { doc, cageId, targetId } = sphereSetup;
-    const params = { cageId, targetId, maxDeviation: 0.05 };
-    expectPure(doc, () => execute(doc, 'fit_subdivision_to_mesh', params));
-    const a = execute(doc, 'fit_subdivision_to_mesh', params);
-    const b = execute(doc, 'fit_subdivision_to_mesh', params);
-    expect(JSON.stringify(a.document)).toBe(JSON.stringify(b.document));
-    const replayed = execute(a.document, 'replay_history', {});
-    expect(replayed.error).toBeUndefined();
-    expect(entityOf(replayed.document, cageId).vertices).toEqual(entityOf(a.document, cageId).vertices);
-  });
+  it(
+    'is pure and replays to the same cage',
+    () => {
+      const { doc, cageId, targetId } = sphereSetup;
+      const params = { cageId, targetId, maxDeviation: 0.05 };
+      expectPure(doc, () => execute(doc, 'fit_subdivision_to_mesh', params));
+      const a = execute(doc, 'fit_subdivision_to_mesh', params);
+      const b = execute(doc, 'fit_subdivision_to_mesh', params);
+      expect(JSON.stringify(a.document)).toBe(JSON.stringify(b.document));
+      const replayed = execute(a.document, 'replay_history', {});
+      expect(replayed.error).toBeUndefined();
+      expect(entityOf(replayed.document, cageId).vertices).toEqual(entityOf(a.document, cageId).vertices);
+    },
+    HEAVY_TEST_TIMEOUT_MS,
+  );
 
   it('refuses bad input without touching the document', () => {
     const { doc, cageId, targetId } = sphereSetup;

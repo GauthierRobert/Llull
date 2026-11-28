@@ -58,6 +58,7 @@ const AUDIT: Readonly<Record<string, Answer>> = {
     display: 'inspect_face_triangles labels the display triangles of the viewport tessellation, by design',
   },
   'core/src/commands/edit/decals.ts': { commands: ['add_decal'] },
+  'core/src/commands/render/realistic/sceneGeometry.ts': { commands: ['render_realistic'] },
   'core/src/commands/deform/sourceMesh.ts': { commands: DEFORM },
   'core/src/commands/deform/target.ts': { commands: DEFORM },
   'core/src/commands/exchange/export3mf.ts': { assets: 'collectExportParts with ctx.meshAssets' },

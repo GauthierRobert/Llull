@@ -102,3 +102,14 @@ export const TEXTURE_MEMORY_BUDGET_BYTES = 1024 * 1024 * 1024;
 export function textureMemoryBytes(texture: Pick<TextureRecord, 'width' | 'height' | 'format'>): number {
   return texture.width * texture.height * (texture.format === 'hdr' ? 16 : 4);
 }
+
+/** Entity override over the material appearance, channel by channel (what every renderer draws); undefined when neither has one. */
+export function resolveAppearance(
+  entity: { readonly appearance?: Appearance | undefined },
+  material: { readonly appearance?: Appearance | undefined } | undefined,
+): Appearance | undefined {
+  const own = entity.appearance;
+  const inherited = material?.appearance;
+  if (own === undefined) return inherited;
+  return inherited === undefined ? own : { ...inherited, ...own };
+}

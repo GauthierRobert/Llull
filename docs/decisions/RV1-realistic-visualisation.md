@@ -132,8 +132,8 @@ network (AF-41).
 
 ### RV-M3 — Path-traced render (closes G1 to G5, G12 to G14)
 
-- New crate `solver/crates/llull-pathtrace` (Rust, wgpu compute with a CPU reference path), reached through the existing native
-  raster host port. BVH from `llull-bvh`; instances traced without expansion.
+- New crate `solver/crates/llull-pathtrace` (Rust, wgpu compute with a CPU reference path), reached through its own host port (as
+  built: CPU only, own SAH BVH; §5c). Instances traced without expansion.
 - Command `render_realistic` (a new command; `render_view` stays the deterministic technical raster, so spec 09 keeps its promise
   for that command).
 - Params: camera or viewpoint, size up to 8192 px (tiled), samples or target noise, bounces, denoise on / off, seed.
@@ -142,6 +142,157 @@ network (AF-41).
 - Output in scene-linear: OpenEXR and tone-mapped PNG (AgX-like view transform, documented curve).
 - The result records sample count, seed, device and `deterministic: true | false` (PERF1 rule 4: no silent trade).
 - Denoiser: a bundled open model run locally; off by default for reference renders.
+
+### 5b. RV-M3 wire contract (2026-11-28, fixed before the build)
+
+`render_realistic` (core, `commands/render/realistic/`) builds a `PathTraceScene` and hands it to `ctx.pathTrace` (a `PathTracePort`,
+synchronous like `ctx.raster`). The host port (`server/src/native/pathTracePort.ts`) writes one job folder and runs
+`llull-compute pathtrace <folder>` (crate `solver/crates/llull-pathtrace`). Without the port the command refuses `NATIVE_TOOL_MISSING`.
+
+Conventions: world = document frame, +Z up, lengths in document units; `unitMetres` converts them for light falloff. Colours are
+scene-linear Rec.709 (TS converts `#rrggbb` sRGB to linear). Radiance unit: W / (m² sr); the default site sun is 3 W/m², so a white
+Lambert plane facing it shows radiance 3/π ≈ 0.95 and exposure 0 EV maps radiance 1 near white.
+
+Job folder:
+
+- `job.json`: `{ kind: "pathtrace", version: 1, width, height (1..8192), samples (1..65536), targetNoise (null or relative error;
+sampling stops early per tile once reached), maxBounces (0..64), seed (u32), denoise, engine ("cpu" | "gpu"), exr, png,
+exposure (EV), maxSeconds, unitMetres, camera, meshes, materials, instanceCount, textures, lights, environment }`.
+- `camera`: `{ position, forward, up (unit vec3), projection: "perspective" | "orthographic", fovY (radians, vertical),
+orthoHeight (document units), apertureRadius (document units, 0 = pinhole), focusDistance (document units) }`.
+- `meshes[i]`: `{ vertexOffset, vertexCount, indexOffset, indexCount }` into `positions.f32` (xyz), `normals.f32` (xyz, unit),
+  `uvs.f32` (uv; always present, box-projected by TS where none are stored), `indices.u32` (mesh-local vertex indices).
+- `instances.f64`: `instanceCount` rows of 14 little-endian f64: meshIndex, materialIndex, then the 3x4 local-to-world affine row-major
+  (r00 r01 r02 tx r10 … tz; scale included). Instances are traced without expanding the mesh (two-level BVH).
+- `materials[i]`: `{ baseColor [r,g,b], baseColorTexture, metalness, metalnessTexture, roughness, roughnessTexture, normalTexture,
+normalScale, emission [r,g,b] (radiance, strength multiplied in), emissionTexture, transmission, transmissionTexture, ior, coat,
+coatTexture, coatRoughness }`; each `*Texture` is a `textures` index or null (texture value × factor, glTF style; metalness and
+  roughness read their own map's first channel).
+- `textures[i]`: `{ file: "tex-<i>.<png|jpg|hdr>", format: "png" | "jpeg" | "hdr", colorSpace: "srgb" | "linear" }`; sampled bilinear,
+  repeat wrap, image row 0 at v = 1.
+- `lights[]`: `{ type: "sun", direction (unit, toward the sun), irradiance [rgb] W/m², angularRadius }` ·
+  `{ type: "point", position, power [rgb] W, radius }` · `{ type: "spot", position, direction (aim), power, radius, coneAngle (full),
+blend }` · `{ type: "area", position (centre), uAxis, vAxis (full edge vectors), normal (emitting side), power }`; each with
+  `castShadows`. Point power P gives intensity P/(4π) W/sr; an area light radiance P/(π A), A in m².
+- `environment`: `{ type: "sky", turbidity, intensity, sunDirection }` (Preetham, scaled so its mean upper-hemisphere radiance is
+  0.3 × intensity) · `{ type: "hdr", texture, rotation, intensity }` · `{ type: "color", color, intensity }` (uniform radiance
+  color × intensity) · `{ type: "default" }` (uniform radiance 0.3, the reference raster's ambient). HDR lookup: world direction d
+  turned by -rotation about +Z to (x, y, z); u = 0.5 + atan2(-y, x) / 2π, v = 0.5 + asin(z) / π (the viewport's orientation).
+
+Outputs: `image.png` (8-bit sRGB after exposure and the AgX-like view transform, opaque), `beauty.exr` (scene-linear RGBA half, the
+denoised beauty when `denoise`), `stats.json` `{ samples (mean per pixel), seed, device, deterministic, elapsedMs, noise, denoised,
+triangles, instances, stoppedBy: "samples" | "noise" | "time" }`. `deterministic` is true only on the CPU path with no time stop.
+
+### 5c. As built: RV-M3 and RV-M4 (2026-11-28)
+
+RV-M3, command (`commands/render/realistic/`, toolset render): `render_realistic` builds the §5b scene. It includes every visible solid,
+NURBS sheet and instance-array member. Identical solids, component children and array members share one mesh placed by instance rows;
+nested instances pass their material / appearance on, and an array member without a material takes the array colour, as the viewport
+draws it. Appearance is the entity override over the material, with textures read from `ctx.imageAssets`. Lights are the light entities,
+else one 3 W/m² sun (site sun or the reference key light). The environment comes from `set_environment`; absent, a site context gives
+the Preetham site sky, else uniform 0.3. The camera is a camera entity (with depth of field from `fStop`), a viewpoint, or a named /
+custom view framed on the drawn geometry (perspective by default). An optional ground plane (albedo 0.18) is added.
+Guards: 8,000,000 placed parts, 50,000,000 unique triangles (`RENDER_SCENE_TOO_LARGE`, checked before a buffer grows). Refusals:
+`NATIVE_TOOL_MISSING`, `RENDER_SCENE_EMPTY`, `RENDER_NO_LIGHT`, `TEXTURE_ASSET_UNAVAILABLE`, the camera codes of render_view,
+`RENDER_CAMERA_INVALID`, and the native job's own codes. Output: `data.files` render.png and render.exr; an EXR over 160 MiB goes to
+the host export sink (`data.file`) or is left out with `RENDER_EXR_NOT_RETURNED`. Every result is marked `illustration: true`.
+CLI `--save out.png | out.exr | dir/`.
+
+RV-M3, native (`solver/crates/llull-pathtrace`, job `llull-compute pathtrace`, host port `server/src/native/pathTracePort.ts`). It
+departs from §5 / §5b in these places:
+
+- **BVH:** its own binned-SAH two-level BVH (a BLAS per mesh, a TLAS over instances). `llull-bvh` is a closest-point tree, unsuited to
+  rays.
+- **Diffuse weight:** (1 − F(cos i))(1 − F(cos o)), reciprocal and energy-conserving; the glTF (1 − F(wo·h)) gained ~1 % at
+  grazing angles. Schlick f90 = min(1, 50 f0); transmission uses exact dielectric Fresnel, including total internal reflection.
+- **Conventions fixed by the crate:**
+  - **Bounces:** `maxBounces` counts scattering events (1 = direct light only).
+  - **Pixel filter:** tent, radius 1 px.
+  - **Sky:** baked to a 512 x 256 map without a sun disk (the sun light gives it); below the horizon it is 0.3 x the mirrored sky.
+  - **Sun cone:** radiance E / (π sin² α).
+  - **Spot light:** point-light normalisation with a smoothstep blend.
+  - **Lights:** not seen by camera rays.
+  - **Surfaces:** emission and the opaque lobes are two-sided.
+  - **Unknown job fields:** ignored.
+  - **`deterministic`:** means bit-identical on the same binary and platform.
+- **Denoiser:** an edge-aware à-trous filter guided by albedo / normal / depth and the per-pixel variance. The bundled learned model
+  of §5 is not shipped: it cannot be bundled offline in this build, and it stays open. Above 4096² pixels the denoiser is skipped
+  with `PATHTRACE_DENOISE_SKIPPED`.
+- **GPU** (crate feature `gpu`, in `llull-compute --features gpu`; `src/gpu/`): `engine: "gpu"` renders on wgpu compute. It uses the
+  CPU's own BLAS / TLAS flattened into storage buffers, textures in a storage-buffer atlas (no binding limits), and a line-by-line WGSL
+  port of the BSDF, lights, environments, NEE + MIS and camera; denoise / AgX / EXR stay on the CPU path. Rendering is progressive in
+  256² tiles, with submissions sized to ~100 ms so no dispatch trips a driver timeout. `maxSeconds` and `targetNoise` behave as on the
+  CPU. `device` is the adapter name and `deterministic` is false (32-bit sampler hash, GPU rounding). It falls back to the CPU with
+  `fallbackReason` "<cause>; rendered on the CPU" and `PATHTRACE_GPU_FALLBACK` when: there is no adapter or `LLULL_GPU=off`; there are
+  fewer than 7 storage buffers per stage; a buffer is over the device limits; the BVH is deeper than 62; or there is a device / shader
+  error. Verified on lavapipe (software Vulkan): furnace within 1 %, per-channel means within 0.3 % of the CPU, RMSE ratio GPU/CPU
+  0.95-1.10 at equal spp. 256² at 64 spp: llvmpipe 7.5-9.5 s vs CPU 2.7-3.6 s. A real-GPU measurement is part of the human gate.
+
+Validation as built:
+
+- **V0:** crate `tests/gpu.rs` (feature gpu, run on lavapipe); unit + contract suites (`tests/unit/render/renderRealistic*.test.ts`, server `pathTraceNative.test.ts` with native runs).
+- **V1:** crate tests `physics.rs` and `bsdf.rs`:
+  - Lambert / metal / coat furnaces within 0.5 %;
+  - an emitting closed box;
+  - Lambert plane under sky, sun, point and area lights against closed forms within 1 %;
+  - an HDR furnace;
+  - reciprocity, pdf consistency, and albedo ≤ 1 + 1 % over 200 parameter sets.
+- **V2:** `convergence.rs` (slopes −0.48 to −0.51 against a 16,384-spp reference split into two independent halves, not 65,536) and
+  `determinism.rs` (same seed, 1 / 3 / 4 threads give identical EXR hashes).
+- **V3** (`npm run render:reference`, docs/QUALITY_GATES.md "Render reference gate"): 10 scenes rendered by Blender 4.0 Cycles from the
+  same job folder (`quality/render/cycles_from_job.py`), pinned by sha256 in `quality/render-reference.json`, compared by a
+  luminance-weighted relative error, bias and HDR-FLIP. Radiometry factors are all 1 (sun, point, spot, area within 0.02 %).
+  - **Bugs found and fixed:**
+    - the diffuse and coat weights lost ~9 % per bounce;
+    - rough dielectrics were 9–16 % dark;
+    - refraction ignored the base colour.
+  - **Fixes:** diffuse / coat weighted by the GGX directional albedo E (`albedo.rs`, tabulated) as (1 − E(μi))(1 − E(μo)) / (1 − Ē);
+    refraction tinted by √ρ per interface.
+  - **Bias against Cycles:** Cornell −24 % → +4.3 %; material balls −14 % → +0.1 %; plant −15 % → +1.8 %; HDR balls −17.7 % → −2.2 %.
+  - **Residual:** llull's reciprocal diffuse is ~5 % brighter than Cycles' (1 − E(μo)) under near-normal direct light
+    (textured-lights +7.4 %).
+  - **Thresholds:** re-baselined after the fix and only lowered from here.
+- **V4** (`npm run perf`, `server/tests/perf/renderRealistic.gate.ts`):
+  - first image at 256², 16 spp: 0.6 s (budget 1 s);
+  - 1,000,000 array members at 256², 4 spp: 4.8 s, native peak 268 MiB, host growth 280 MiB;
+  - 8,000,001 parts refused in 7 ms (array members counted before any is placed);
+  - 4 GiB of textures: `TEXTURE_BUDGET_EXCEEDED`.
+- **V6** (`tests/production`, scenario `plant-rendered-views`): six rendered views plus a 12-frame turntable (frames at 30° steps;
+  `render_realistic` has no animation), graded on the files: 5 of 6 criteria. Known issue: `appearance-coverage` — building-plugin
+  solids refuse `apply_appearance` / `assign_material` (derivation guard), so the appearance library does not reach the plant elements.
+- **V7** (human, real GPU) is not done: it needs a person on real hardware (checklist below).
+
+Measured (4-core container, release):
+
+- 256² at 64 spp, 10,242 triangles: 5.7 s.
+- 8192² at 1 spp: 414 MB peak, 38 s.
+- 4096² with the denoiser: 1.16 GB peak.
+
+Host caveat (owner decision): the port is synchronous (§5b). In the desktop backend a long render blocks the backend event loop, and
+with it live sync and `--app` commands, for up to `maxSeconds` plus five minutes. Prefer the CLI on a document file for long renders.
+A worker-based backend execute is the fix if this matters.
+
+RV-M4 (`src/ui/viewport/3d/instanceArray/`, effects chain):
+
+- **HDR backdrop:** the HDR environment is the backdrop with the post-processing chain on. `HighQualityEffects` keeps a texture
+  background, so it is tone-mapped with the scene; GTAO's normal / depth pass hides it.
+- **Instance arrays:** members are drawn as InstancedMeshes per (child solid x LOD tier), straight from the packed table, with
+  typed-array frustum / pixel culling and the `componentLod` thresholds.
+  - Cap: at most 1,500,000 members drawn per array; the surplus is warned on the console.
+  - Picking: reports `instanceMemberId(arrayId, index)`. A member cannot be selected yet (`set_selection` accepts entity ids
+    only).
+  - Not done: nested instances in an array component, and per-member hover or selection tint.
+- **Real-GPU human gate (VIS-HUMAN, G24):** not run; no GPU or Electron in the build container. Record GPU, driver, resolution and
+  quality tier. Checks:
+  1. Plant-scale document (≥ 1,500 solids, site sun), quality High.
+  2. Cascaded shadows: no seams, popping or acne while orbiting / dollying or moving the sun; ≥ 30 fps.
+  3. Impostor / LOD transitions: no flicker at the hysteresis points; billboards right from every azimuth; nothing blinks out at the
+     screen edge.
+  4. HDR environment with edges + GTAO on: the backdrop shows the HDR and matches the lighting; rotation and intensity move both
+     together. No grey look against a standard-tier render, and no halo at silhouettes. Switching back restores the palette.
+  5. A ~4,000,000-member instance array: interactive orbit; right positions and colours; far members turn into boxes and then drop
+     out; hiding the layer hides them; a click does not crash.
+  6. `render_realistic` of the same view next to the viewport: same light direction, backdrop, colours and shadow placement.
 
 ### RV-M4 — Viewport realism (closes G16, G24, part of G9)
 

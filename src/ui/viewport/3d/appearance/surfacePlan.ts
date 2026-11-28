@@ -3,7 +3,6 @@
 // value, so the surface falls back to the material colour silently.
 
 import type { Appearance, TextureColorSpace, TextureRecord } from '@core/model/appearance';
-import type { Material } from '@core/model/types';
 
 export type MapChannel = 'baseColor' | 'metalness' | 'roughness' | 'normal' | 'emission' | 'transmission' | 'coat';
 
@@ -49,17 +48,6 @@ export interface SurfacePlan {
 }
 
 type TextureTable = Readonly<Record<string, TextureRecord>>;
-
-/** Entity override over the material appearance, channel by channel; undefined when neither has one. */
-export function resolveAppearance(
-  entity: { readonly appearance?: Appearance | undefined },
-  material: Pick<Material, 'appearance'> | undefined,
-): Appearance | undefined {
-  const own = entity.appearance;
-  const inherited = material?.appearance;
-  if (own === undefined) return inherited;
-  return inherited === undefined ? own : { ...inherited, ...own };
-}
 
 function textureIdOf(appearance: Appearance, channel: MapChannel): string | undefined {
   switch (channel) {

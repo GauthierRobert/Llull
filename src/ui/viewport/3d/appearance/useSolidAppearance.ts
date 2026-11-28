@@ -5,7 +5,8 @@ import { useMemo } from 'react';
 import type { Appearance } from '@core/model/appearance';
 import { useStore } from '@ui/store';
 import type { PbrMaterial } from '../useMaterialProps';
-import { mapRequests, resolveAppearance, surfacePlan, type MapChannel, type SurfaceFallback, type SurfacePlan } from './surfacePlan';
+import { resolveAppearance } from '@core/model/appearance';
+import { mapRequests, surfacePlan, type MapChannel, type SurfaceFallback, type SurfacePlan } from './surfacePlan';
 import { useAppearanceMaps, type AppearanceMaps } from './useAppearanceMaps';
 
 export interface SolidAppearance {

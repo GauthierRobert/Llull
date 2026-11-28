@@ -1,0 +1,32 @@
+[package]
+name = "llull-pathtrace"
+description = "Path-traced realistic render of llull-compute (RV1 RV-M3): unidirectional path tracer with NEE + MIS, GGX metal-roughness BSDF, two-level BVH, EXR + AgX PNG"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# wgpu compute path tracer for `engine: "gpu"`; without an adapter (or room on it) the CPU renders with a named fallback reason.
+gpu = ["dep:wgpu", "dep:pollster", "dep:llull-gpu", "llull-gpu/wgpu"]
+
+[dependencies]
+llull-protocol = { path = "../llull-protocol" }
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error = "0.1"
+sha2.workspace = true
+half = "2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "hdr"] }
+png = "0.18"
+llull-gpu = { path = "../llull-gpu", optional = true }
+wgpu = { workspace = true, optional = true }
+pollster = { workspace = true, optional = true }
+
+[dev-dependencies]
+exr = "1"
+
+[lints]
+workspace = true

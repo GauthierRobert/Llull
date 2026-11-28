@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { OutputShader } from 'three/examples/jsm/shaders/OutputShader.js';
-import { backgroundOutputFragment, pickBackground, srgb } from '@ui/viewport/3d/effects/BackgroundOutputPass';
+import { backgroundOutputFragment, keepsImageBackground, pickBackground, srgb } from '@ui/viewport/3d/effects/BackgroundOutputPass';
 
 describe('background output pass', () => {
   const fragment = backgroundOutputFragment();
@@ -25,5 +25,10 @@ describe('background output pass', () => {
     expect(pickBackground(background, clear)).toBe(background);
     expect(pickBackground(null, clear)).toBe(clear);
     expect(pickBackground(new THREE.Texture(), clear)).toBe(clear);
+  });
+  it('keeps an image backdrop on the scene during the chain, but not a colour or nothing', () => {
+    expect(keepsImageBackground(new THREE.Texture())).toBe(true);
+    expect(keepsImageBackground(new THREE.Color('#fff'))).toBe(false);
+    expect(keepsImageBackground(null)).toBe(false);
   });
 });

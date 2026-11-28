@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Appearance, SceneEnvironment, TextureRecord } from '@core/model/appearance';
 import { cameraVerticalFov } from '@core/model/sceneKinds';
-import { mapRequests, resolveAppearance, surfacePlan, type MapChannel } from '@ui/viewport/3d/appearance/surfacePlan';
+import { resolveAppearance } from '@core/model/appearance';
+import { mapRequests, surfacePlan, type MapChannel } from '@ui/viewport/3d/appearance/surfacePlan';
 import { environmentLook, hdrOrientation, skyTurbidity } from '@ui/viewport/3d/appearance/environmentPlan';
 import { keyLightRule, perspectiveShadowRange, shadowCasterIds, sunShadowFrustum, threeLightOf } from '@ui/viewport/3d/lights/lightModel';
 import { aimInPlan, cameraGlyph, lightGlyph, planSymbol } from '@ui/viewport/3d/lights/sceneObjectGlyphs';

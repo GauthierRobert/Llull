@@ -17,6 +17,7 @@ import { getPhysicsEngine } from '../dynamics/physicsEngine';
 import { getMaterialLibraryProvider } from './libraryPort';
 import { getSignaturePort } from './signaturePort';
 import { getRasterPort } from './rasterPort';
+import { getPathTracePort } from './pathTracePort';
 import { getMediaPort } from './mediaPort';
 import { getFontProvider } from './fontPort';
 import { entityPropertyProviders } from '../plugins/host';
@@ -59,6 +60,7 @@ export function defaultContext(): ExecutionContext {
     imageAssets: getImageAssetPort(),
     ...(getSignaturePort() !== null ? { humanSignature: getSignaturePort() } : {}),
     raster: getRasterPort(),
+    pathTrace: getPathTracePort(),
     media: getMediaPort(),
     fonts: getFontProvider(),
     properties: (doc, entityId) => entityPropertyBag(doc, entityId, entityPropertyProviders()),

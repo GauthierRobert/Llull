@@ -25,6 +25,7 @@ async function prepareKernel(): Promise<void> {
     { installGeometryKernel },
     { installPhysicsEngine },
     { installRasterPort },
+    { installPathTracePort },
     { installMediaPort },
     { installGeometryQueryEngine },
     { installSpatialIndex },
@@ -41,6 +42,7 @@ async function prepareKernel(): Promise<void> {
     import('../geometryKernel'),
     import('../physicsEngine'),
     import('../native/rasterPort'),
+    import('../native/pathTracePort'),
     import('../native/mediaPort'),
     import('../native/geometryQueryEngine'),
     import('../native/spatialIndexPort'),
@@ -55,6 +57,7 @@ async function prepareKernel(): Promise<void> {
     import('../libraries/pipingLibraryStore'),
   ]);
   installRasterPort();
+  installPathTracePort();
   installMediaPort();
   installGeometryQueryEngine();
   installSpatialIndex();
